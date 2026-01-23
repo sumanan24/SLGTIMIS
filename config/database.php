@@ -13,7 +13,12 @@ if (!defined('DB_HOST')) {
 // Application Configuration
 if (!defined('APP_NAME')) {
     define('APP_NAME', 'SLGTI SIS');
-    define('APP_URL', 'http://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['SCRIPT_NAME']));
+    // Detect HTTPS automatically
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || 
+                (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
+                (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+                ? 'https://' : 'http://';
+    define('APP_URL', $protocol . $_SERVER['HTTP_HOST'] . dirname($_SERVER['SCRIPT_NAME']));
 }
 
 // BASE_PATH is defined in index.php

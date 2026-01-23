@@ -530,7 +530,12 @@ $config = [
                 $config_content .= "// Application Configuration\n";
                 $config_content .= "if (!defined('APP_NAME')) {\n";
                 $config_content .= "    define('APP_NAME', 'SLGTI SIS');\n";
-                $config_content .= "    define('APP_URL', 'http://' . \$_SERVER['HTTP_HOST'] . dirname(\$_SERVER['SCRIPT_NAME']));\n";
+                $config_content .= "    // Detect HTTPS automatically\n";
+                $config_content .= "    \$protocol = (!empty(\$_SERVER['HTTPS']) && \$_SERVER['HTTPS'] !== 'off') || \n";
+                $config_content .= "                (isset(\$_SERVER['SERVER_PORT']) && \$_SERVER['SERVER_PORT'] == 443) ||\n";
+                $config_content .= "                (isset(\$_SERVER['HTTP_X_FORWARDED_PROTO']) && \$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')\n";
+                $config_content .= "                ? 'https://' : 'http://';\n";
+                $config_content .= "    define('APP_URL', \$protocol . \$_SERVER['HTTP_HOST'] . dirname(\$_SERVER['SCRIPT_NAME']));\n";
                 $config_content .= "}\n\n";
                 $config_content .= "// BASE_PATH is defined in index.php\n";
                 $config_content .= "// If not defined, set it here (shouldn't happen)\n";
