@@ -535,7 +535,14 @@ $config = [
                 $config_content .= "                (isset(\$_SERVER['SERVER_PORT']) && \$_SERVER['SERVER_PORT'] == 443) ||\n";
                 $config_content .= "                (isset(\$_SERVER['HTTP_X_FORWARDED_PROTO']) && \$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')\n";
                 $config_content .= "                ? 'https://' : 'http://';\n";
-                $config_content .= "    define('APP_URL', \$protocol . \$_SERVER['HTTP_HOST'] . dirname(\$_SERVER['SCRIPT_NAME']));\n";
+                $config_content .= "    // Get base path and normalize it (remove trailing slash, handle root case)\n";
+                $config_content .= "    \$basePath = dirname(\$_SERVER['SCRIPT_NAME']);\n";
+                $config_content .= "    \$basePath = rtrim(\$basePath, '/\\\\'); // Remove trailing slashes\n";
+                $config_content .= "    // If basePath is empty or just a slash, set it to empty string\n";
+                $config_content .= "    if (\$basePath === '/' || \$basePath === '\\\\' || empty(\$basePath)) {\n";
+                $config_content .= "        \$basePath = '';\n";
+                $config_content .= "    }\n";
+                $config_content .= "    define('APP_URL', \$protocol . \$_SERVER['HTTP_HOST'] . \$basePath);\n";
                 $config_content .= "}\n\n";
                 $config_content .= "// BASE_PATH is defined in index.php\n";
                 $config_content .= "// If not defined, set it here (shouldn't happen)\n";

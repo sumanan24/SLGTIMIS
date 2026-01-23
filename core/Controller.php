@@ -35,6 +35,8 @@ class Controller {
      * Redirect to a URL
      */
     protected function redirect($url) {
+        // Remove leading slash from URL if present to avoid double slashes
+        $url = ltrim($url, '/');
         header("Location: " . APP_URL . "/" . $url);
         exit();
     }
