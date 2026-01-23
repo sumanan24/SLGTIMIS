@@ -12,8 +12,8 @@ class DashboardController extends Controller {
             return;
         }
         
-        // Redirect HOD users to their dedicated dashboard
-        if ($this->isHOD()) {
+        // Redirect HOD, IN1, IN2, IN3 users to their dedicated department dashboard
+        if ($this->isDepartmentRestricted()) {
             $this->redirect('hod/dashboard');
             return;
         }

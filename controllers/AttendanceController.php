@@ -43,19 +43,19 @@ class AttendanceController extends Controller {
         $studentModel = $this->model('StudentModel');
         $attendanceModel = $this->model('AttendanceModel');
         
-        // Get HOD's department if user is HOD
-        $hodDepartmentId = $this->getHODDepartment();
+        // Get user's department if user is HOD, IN1, IN2, or IN3
+        $userDepartmentId = $this->getUserDepartment();
         
-        // Get filter parameters - use HOD's department if HOD user
-        $departmentId = $hodDepartmentId ? $hodDepartmentId : $this->get('department_id', '');
+        // Get filter parameters - use user's department if department-restricted user
+        $departmentId = $userDepartmentId ? $userDepartmentId : $this->get('department_id', '');
         $courseId = $this->get('course_id', '');
         $academicYear = $this->get('academic_year', '');
         $month = $this->get('month', date('Y-m'));
         $group = $this->get('group', '');
         
-        // Get filter options - only show HOD's department if HOD
-        if ($hodDepartmentId) {
-            $dept = $departmentModel->getById($hodDepartmentId);
+        // Get filter options - only show user's department if department-restricted
+        if ($userDepartmentId) {
+            $dept = $departmentModel->getById($userDepartmentId);
             $departments = $dept ? [$dept] : [];
         } else {
             $departments = $departmentModel->getAll();
@@ -341,9 +341,9 @@ class AttendanceController extends Controller {
         $attendanceModel = $this->model('AttendanceModel');
         $lockModel = $this->model('AttendanceMonthLockModel');
         
-        // Get HOD's department if user is HOD
-        $hodDepartmentId = $this->getHODDepartment();
-        $isHOD = $this->isHOD();
+        // Get user's department if user is HOD, IN1, IN2, or IN3
+        $userDepartmentId = $this->getUserDepartment();
+        $isDepartmentRestricted = $this->isDepartmentRestricted();
         $isAdmin = false;
         
         // Check if user is admin
@@ -353,15 +353,15 @@ class AttendanceController extends Controller {
             $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
         }
         
-        // Get filter parameters - use HOD's department if HOD
-        $departmentId = $hodDepartmentId ? $hodDepartmentId : $this->get('department_id', '');
+        // Get filter parameters - use user's department if department-restricted user
+        $departmentId = $userDepartmentId ? $userDepartmentId : $this->get('department_id', '');
         $courseId = $this->get('course_id', '');
         $academicYear = $this->get('academic_year', '');
         $month = $this->get('month', date('Y-m'));
         
-        // Get filter options - only show HOD's department if HOD
-        if ($hodDepartmentId) {
-            $dept = $departmentModel->getById($hodDepartmentId);
+        // Get filter options - only show user's department if department-restricted
+        if ($userDepartmentId) {
+            $dept = $departmentModel->getById($userDepartmentId);
             $departments = $dept ? [$dept] : [];
         } else {
             $departments = $departmentModel->getAll();

@@ -132,6 +132,45 @@ class Controller {
     }
     
     /**
+     * Get user's department ID for HOD, IN1, IN2, or IN3 roles
+     * Returns null if user doesn't have department-restricted access or can access all departments
+     */
+    protected function getUserDepartment() {
+        if (!isset($_SESSION['user_id'])) {
+            return null;
+        }
+        
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $userRole = $userModel->getUserRole($_SESSION['user_id']);
+        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
+        
+        // ADM and Admin can access all departments
+        if ($userRole === 'ADM' || $isAdmin) {
+            return null;
+        }
+        
+        // HOD: use existing method
+        if ($userRole === 'HOD') {
+            return $userModel->getHODDepartment($_SESSION['user_id']);
+        }
+        
+        // IN1, IN2, IN3: get department from staff table
+        if (in_array($userRole, ['IN1', 'IN2', 'IN3'])) {
+            $user = $userModel->find($_SESSION['user_id']);
+            if (!$user || !isset($user['user_name'])) {
+                return null;
+            }
+            
+            $staffModel = $this->model('StaffModel');
+            $staff = $staffModel->find($user['user_name']);
+            return $staff ? ($staff['department_id'] ?? null) : null;
+        }
+        
+        return null;
+    }
+    
+    /**
      * Check if user is HOD
      */
     protected function isHOD() {
@@ -142,6 +181,21 @@ class Controller {
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         return $userModel->isHOD($_SESSION['user_id']);
+    }
+    
+    /**
+     * Check if user is HOD, IN1, IN2, or IN3 (department-restricted roles)
+     */
+    protected function isDepartmentRestricted() {
+        if (!isset($_SESSION['user_id'])) {
+            return false;
+        }
+        
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $userRole = $userModel->getUserRole($_SESSION['user_id']);
+        
+        return in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3']);
     }
     
     /**

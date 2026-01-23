@@ -19,14 +19,14 @@ class StaffController extends Controller {
         
         $staffModel = $this->model('StaffModel');
         
-        // Get HOD's department if user is HOD
-        $hodDepartmentId = $this->getHODDepartment();
+        // Get user's department if user is HOD, IN1, IN2, or IN3
+        $userDepartmentId = $this->getUserDepartment();
         
         $page = $this->get('page', 1);
         $search = $this->get('search', '');
         
-        $staff = $staffModel->getStaffWithDepartment($page, 20, $search, $hodDepartmentId ? $hodDepartmentId : '');
-        $total = $staffModel->getTotalStaff($search, $hodDepartmentId ? $hodDepartmentId : '');
+        $staff = $staffModel->getStaffWithDepartment($page, 20, $search, $userDepartmentId ? $userDepartmentId : '');
+        $total = $staffModel->getTotalStaff($search, $userDepartmentId ? $userDepartmentId : '');
         $totalPages = ceil($total / 20);
         
         // Check if user can manage staff (ADM, MHF, REG only)

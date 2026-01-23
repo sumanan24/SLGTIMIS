@@ -1,7 +1,8 @@
 <?php
 /**
  * HOD Dashboard Controller
- * Shows dashboard with only the HOD's department details
+ * Shows dashboard with only the user's department details
+ * Supports HOD, IN1, IN2, and IN3 roles (department-restricted access)
  */
 
 class HODDashboardController extends Controller {
@@ -13,17 +14,17 @@ class HODDashboardController extends Controller {
             return;
         }
         
-        // Check if user is HOD
-        if (!$this->isHOD()) {
-            $_SESSION['error'] = 'Access denied. This dashboard is only available for Head of Department.';
+        // Check if user is HOD, IN1, IN2, or IN3 (department-restricted roles)
+        if (!$this->isDepartmentRestricted()) {
+            $_SESSION['error'] = 'Access denied. This dashboard is only available for Head of Department or Instructors.';
             $this->redirect('dashboard');
             return;
         }
         
         try {
-            // Get HOD's department
-            $hodDepartmentId = $this->getHODDepartment();
-            if (!$hodDepartmentId) {
+            // Get user's department (for HOD, IN1, IN2, or IN3)
+            $userDepartmentId = $this->getUserDepartment();
+            if (!$userDepartmentId) {
                 $_SESSION['error'] = 'Department information not found. Please contact administrator.';
                 $this->redirect('dashboard');
                 return;
@@ -36,7 +37,7 @@ class HODDashboardController extends Controller {
             $departmentModel = $this->model('DepartmentModel');
             
             // Get department information
-            $department = $departmentModel->getById($hodDepartmentId);
+            $department = $departmentModel->getById($userDepartmentId);
             if (!$department) {
                 $_SESSION['error'] = 'Department not found.';
                 $this->redirect('dashboard');
@@ -52,9 +53,9 @@ class HODDashboardController extends Controller {
                 $selectedAcademicYear = $academicYears[0]; // First one is the latest (DESC order)
             }
             
-            // Fetch data filtered by HOD's department and academic year
+            // Fetch data filtered by user's department and academic year
             $filters = [
-                'department_id' => $hodDepartmentId,
+                'department_id' => $userDepartmentId,
                 'academic_year' => $selectedAcademicYear
             ];
             
@@ -63,40 +64,40 @@ class HODDashboardController extends Controller {
             $totalStudentsByYear = $totalStudents;
             
             // Get department courses
-            $departmentCourses = $courseModel->getCoursesWithDepartment(['department_id' => $hodDepartmentId]);
+            $departmentCourses = $courseModel->getCoursesWithDepartment(['department_id' => $userDepartmentId]);
             $totalCourses = count($departmentCourses);
             
             // Get department staff count
-            $totalStaff = $staffModel->getTotalStaff('', $hodDepartmentId);
+            $totalStaff = $staffModel->getTotalStaff('', $userDepartmentId);
             
             // Get recent students in department
-            $recentStudents = $this->getDepartmentRecentStudents($studentModel, $hodDepartmentId, $selectedAcademicYear, 5);
+            $recentStudents = $this->getDepartmentRecentStudents($studentModel, $userDepartmentId, $selectedAcademicYear, 5);
             
             // Get course enrollment for department only
             $courseEnrollment = $studentModel->getCourseEnrollmentByDepartment($selectedAcademicYear);
-            // Filter to show only HOD's department
+            // Filter to show only user's department
             $departmentEnrollment = [];
-            if (isset($courseEnrollment[$hodDepartmentId])) {
-                $departmentEnrollment[$hodDepartmentId] = $courseEnrollment[$hodDepartmentId];
+            if (isset($courseEnrollment[$userDepartmentId])) {
+                $departmentEnrollment[$userDepartmentId] = $courseEnrollment[$userDepartmentId];
             }
             
             // Get NVQ stats for department only
             $nvqStatsByDepartment = $studentModel->getStudentsByNVQLevelAndDepartment($selectedAcademicYear);
             $departmentNVQStats = [];
-            if (isset($nvqStatsByDepartment[$hodDepartmentId])) {
-                $departmentNVQStats[$hodDepartmentId] = $nvqStatsByDepartment[$hodDepartmentId];
+            if (isset($nvqStatsByDepartment[$userDepartmentId])) {
+                $departmentNVQStats[$userDepartmentId] = $nvqStatsByDepartment[$userDepartmentId];
             }
             
             // Get gender stats for department
             $genderStats = $studentModel->getStudentsByGender($selectedAcademicYear);
             // Note: Gender stats don't filter by department in the model, so we'll calculate separately
-            $departmentGenderStats = $this->getDepartmentGenderStats($studentModel, $hodDepartmentId, $selectedAcademicYear);
+            $departmentGenderStats = $this->getDepartmentGenderStats($studentModel, $userDepartmentId, $selectedAcademicYear);
             
             // Get religion stats for department
-            $departmentReligionStats = $this->getDepartmentReligionStats($studentModel, $hodDepartmentId, $selectedAcademicYear);
+            $departmentReligionStats = $this->getDepartmentReligionStats($studentModel, $userDepartmentId, $selectedAcademicYear);
             
             // Get district stats for department
-            $departmentDistrictStats = $this->getDepartmentDistrictStats($studentModel, $hodDepartmentId, $selectedAcademicYear);
+            $departmentDistrictStats = $this->getDepartmentDistrictStats($studentModel, $userDepartmentId, $selectedAcademicYear);
             
             // Final deduplication check - ensure each student appears only once
             $uniqueStudents = [];
@@ -114,7 +115,7 @@ class HODDashboardController extends Controller {
                 'page' => 'dashboard',
                 'user_name' => $_SESSION['user_name'] ?? 'User',
                 'department' => $department,
-                'department_id' => $hodDepartmentId,
+                'department_id' => $userDepartmentId,
                 'totalStudents' => $totalStudents,
                 'totalStudentsByYear' => $totalStudentsByYear,
                 'totalStaff' => $totalStaff,

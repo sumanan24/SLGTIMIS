@@ -25,16 +25,16 @@ class StudentController extends Controller {
         
         $page = $this->get('page', 1);
         
-        // Get HOD's department if user is HOD
-        $hodDepartmentId = $this->getHODDepartment();
-        $isHOD = $this->isHOD();
+        // Get user's department if user is HOD, IN1, IN2, or IN3
+        $userDepartmentId = $this->getUserDepartment();
+        $isDepartmentRestricted = $this->isDepartmentRestricted();
         
         $filters = [
             'search' => $this->get('search', ''),
-            'status' => $isHOD ? 'Active' : $this->get('status', ''), // Force Active status for HOD
+            'status' => $isDepartmentRestricted ? 'Active' : $this->get('status', ''), // Force Active status for department-restricted users
             'district' => $this->get('district', ''),
             'gender' => $this->get('gender', ''),
-            'department_id' => $hodDepartmentId ? $hodDepartmentId : $this->get('department_id', ''),
+            'department_id' => $userDepartmentId ? $userDepartmentId : $this->get('department_id', ''),
             'course_id' => $this->get('course_id', ''),
             'academic_year' => $this->get('academic_year', '')
         ];
@@ -44,17 +44,17 @@ class StudentController extends Controller {
         $totalPages = ceil($total / 20);
         $districts = $studentModel->getDistricts();
         
-        // For HOD users, only show their department
-        if ($hodDepartmentId) {
-            $departments = [$departmentModel->getById($hodDepartmentId)];
+        // For department-restricted users (HOD, IN1, IN2, IN3), only show their department
+        if ($userDepartmentId) {
+            $departments = [$departmentModel->getById($userDepartmentId)];
             $departments = array_filter($departments); // Remove null if department not found
         } else {
             $departments = $departmentModel->getAll();
         }
         
-        // Filter courses by department if HOD
-        if ($hodDepartmentId) {
-            $courses = $courseModel->getCoursesWithDepartment(['department_id' => $hodDepartmentId]);
+        // Filter courses by department if user is department-restricted
+        if ($userDepartmentId) {
+            $courses = $courseModel->getCoursesWithDepartment(['department_id' => $userDepartmentId]);
         } else {
             $courses = $courseModel->all('course_name ASC');
         }
@@ -83,7 +83,7 @@ class StudentController extends Controller {
             'academicYears' => $academicYears,
             'statuses' => ['Active', 'Inactive', 'Graduated'],
             'genders' => ['Male', 'Female'],
-            'isHOD' => $isHOD,
+            'isHOD' => $isDepartmentRestricted,
             'canExport' => $canExport,
             'isADM' => $isADM,
             'canEdit' => $canEdit,

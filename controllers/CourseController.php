@@ -58,12 +58,12 @@ class CourseController extends Controller {
         $courseModel = $this->model('CourseModel');
         $departmentModel = $this->model('DepartmentModel');
         
-        // Get HOD's department if user is HOD
-        $hodDepartmentId = $this->getHODDepartment();
+        // Get user's department if user is HOD, IN1, IN2, or IN3
+        $userDepartmentId = $this->getUserDepartment();
         
         // Get filter parameters
         $filters = [
-            'department_id' => $hodDepartmentId ? $hodDepartmentId : $this->get('department_id', ''),
+            'department_id' => $userDepartmentId ? $userDepartmentId : $this->get('department_id', ''),
             'nvq_level' => $this->get('nvq_level', ''),
             'search' => $this->get('search', '')
         ];
@@ -76,21 +76,21 @@ class CourseController extends Controller {
         // Get filtered courses
         $courses = $courseModel->getCoursesWithDepartment($filters);
         
-        // Get departments for filter dropdown - only show HOD's department if HOD
-        if ($hodDepartmentId) {
-            $dept = $departmentModel->getById($hodDepartmentId);
+        // Get departments for filter dropdown - only show user's department if department-restricted
+        if ($userDepartmentId) {
+            $dept = $departmentModel->getById($userDepartmentId);
             $departments = $dept ? [$dept] : [];
         } else {
             $departments = $departmentModel->getAll();
         }
         
-        // Check if user is HOD or ADM for edit permissions
+        // Check if user is department-restricted or ADM for edit permissions
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
-        $isHOD = $this->isHOD();
+        $isDepartmentRestricted = $this->isDepartmentRestricted();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
-        $canEdit = $isHOD || $isADM;
+        $canEdit = $isDepartmentRestricted || $isADM;
         
         $data = [
             'title' => 'Courses',

@@ -19,10 +19,10 @@ class DepartmentController extends Controller {
         
         $departmentModel = $this->model('DepartmentModel');
         
-        // Get HOD's department if user is HOD - show only their department
-        $hodDepartmentId = $this->getHODDepartment();
-        if ($hodDepartmentId) {
-            $dept = $departmentModel->getById($hodDepartmentId);
+        // Get user's department if user is HOD, IN1, IN2, or IN3 - show only their department
+        $userDepartmentId = $this->getUserDepartment();
+        if ($userDepartmentId) {
+            $dept = $departmentModel->getById($userDepartmentId);
             $departments = $dept ? [$dept] : [];
         } else {
             $departments = $departmentModel->getAll();
@@ -38,8 +38,8 @@ class DepartmentController extends Controller {
             'title' => 'Departments',
             'page' => 'departments',
             'departments' => $departments,
-            'isHOD' => $hodDepartmentId ? true : false,
-            'hodDepartmentId' => $hodDepartmentId,
+            'isHOD' => $userDepartmentId ? true : false,
+            'hodDepartmentId' => $userDepartmentId,
             'isADM' => $isADM,
             'message' => $_SESSION['message'] ?? null,
             'error' => $_SESSION['error'] ?? null
