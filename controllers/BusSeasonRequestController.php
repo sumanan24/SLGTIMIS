@@ -15,77 +15,86 @@ class BusSeasonRequestController extends Controller {
             return;
         }
         
-        // Check if user is a student
-        if (!isset($_SESSION['user_table']) || $_SESSION['user_table'] !== 'student') {
-            $_SESSION['error'] = 'Access denied. This section is only available for students.';
-            $this->redirect('dashboard');
-            return;
-        }
-        
-        $studentId = $_SESSION['user_name'];
-        $studentModel = $this->model('StudentModel');
         $requestModel = $this->model('BusSeasonRequestModel');
-        
-        // Ensure columns exist
+        $studentModel = $this->model('StudentModel');
         $requestModel->addRequiredColumnsIfNotExists();
-        
-        // Get student info
-        $student = $studentModel->find($studentId);
-        if (!$student) {
-            $_SESSION['error'] = 'Student record not found.';
-            $this->redirect('student/dashboard');
-            return;
-        }
-        
-        // Get current enrollment
-        $enrollmentModel = $this->model('StudentEnrollmentModel');
-        $currentEnrollment = $enrollmentModel->getCurrentEnrollment($studentId);
-        $seasonYear = $currentEnrollment['academic_year'] ?? date('Y');
-        
-        // Get department ID
-        $departmentId = null;
-        if ($currentEnrollment && isset($currentEnrollment['course_id'])) {
-            $courseModel = $this->model('CourseModel');
-            $course = $courseModel->find($currentEnrollment['course_id']);
-            if ($course && isset($course['department_id'])) {
-                $departmentId = $course['department_id'];
+
+        // Check if user is a student
+        if (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student') {
+            $studentId = $_SESSION['user_name'];
+            
+            // Get student info
+            $student = $studentModel->find($studentId);
+            if (!$student) {
+                $_SESSION['error'] = 'Student record not found.';
+                $this->redirect('student/dashboard');
+                return;
             }
-        }
-        
-        // Get academic years
-        $academicYears = $studentModel->getAcademicYears();
-        
-        // Get requests for student (with payment info)
-        $requests = $requestModel->getByStudentId($studentId);
-        
-        // Add payment collection info to each request
-        foreach ($requests as &$request) {
-            $payment = $requestModel->getPaymentCollectionByRequestId($request['id']);
-            if ($payment) {
-                $request['payment'] = $payment;
+            
+            // Get current enrollment
+            $enrollmentModel = $this->model('StudentEnrollmentModel');
+            $currentEnrollment = $enrollmentModel->getCurrentEnrollment($studentId);
+            $seasonYear = $currentEnrollment['academic_year'] ?? date('Y');
+            
+            // Get department ID
+            $departmentId = null;
+            if ($currentEnrollment && isset($currentEnrollment['course_id'])) {
+                $courseModel = $this->model('CourseModel');
+                $course = $courseModel->find($currentEnrollment['course_id']);
+                if ($course && isset($course['department_id'])) {
+                    $departmentId = $course['department_id'];
+                }
             }
+            
+            // Get academic years
+            $academicYears = $studentModel->getAcademicYears();
+            
+            // Get requests for student (with payment info)
+            $requests = $requestModel->getByStudentId($studentId);
+            
+            // Add payment collection info to each request
+            foreach ($requests as &$request) {
+                $payment = $requestModel->getPaymentCollectionByRequestId($request['id']);
+                if ($payment) {
+                    $request['payment'] = $payment;
+                }
+            }
+            unset($request);
+            
+            // Check if student already has request for current season year
+            $hasExistingRequest = $requestModel->hasExistingRequest($studentId, $seasonYear);
+            
+            $data = [
+                'title' => 'Bus Season Request',
+                'page' => 'bus-season-requests',
+                'student' => $student,
+                'currentEnrollment' => $currentEnrollment,
+                'seasonYear' => $seasonYear,
+                'departmentId' => $departmentId,
+                'requests' => $requests,
+                'hasExistingRequest' => $hasExistingRequest,
+                'academicYears' => $academicYears,
+                'message' => $_SESSION['message'] ?? null,
+                'error' => $_SESSION['error'] ?? null
+            ];
+            
+            unset($_SESSION['message'], $_SESSION['error']);
+            return $this->view('bus-season-requests/index', $data);
+        } else {
+            // Staff/Admin view - Show all requests
+            $requests = $requestModel->getRequestsForSAO();
+            
+            $data = [
+                'title' => 'All Bus Season Requests',
+                'page' => 'bus-season-requests-all',
+                'requests' => $requests,
+                'message' => $_SESSION['message'] ?? null,
+                'error' => $_SESSION['error'] ?? null
+            ];
+            
+            unset($_SESSION['message'], $_SESSION['error']);
+            return $this->view('bus-season-requests/index', $data);
         }
-        unset($request);
-        
-        // Check if student already has request for current season year
-        $hasExistingRequest = $requestModel->hasExistingRequest($studentId, $seasonYear);
-        
-        $data = [
-            'title' => 'Bus Season Request',
-            'page' => 'bus-season-requests',
-            'student' => $student,
-            'currentEnrollment' => $currentEnrollment,
-            'seasonYear' => $seasonYear,
-            'departmentId' => $departmentId,
-            'requests' => $requests,
-            'hasExistingRequest' => $hasExistingRequest,
-            'academicYears' => $academicYears,
-            'message' => $_SESSION['message'] ?? null,
-            'error' => $_SESSION['error'] ?? null
-        ];
-        
-        unset($_SESSION['message'], $_SESSION['error']);
-        return $this->view('bus-season-requests/index', $data);
     }
     
     /**
@@ -512,9 +521,9 @@ class BusSeasonRequestController extends Controller {
         
         $requestId = (int)$this->post('request_id', 0);
         $studentPayment = floatval($this->post('student_payment_amount', 0));
-        $paymentPeriod = trim($this->post('payment_period', 'month'));
         $paymentReference = trim($this->post('payment_reference', ''));
         $notes = trim($this->post('notes', ''));
+        $paymentMethod = trim($this->post('payment_method', 'cash'));
         
         if (empty($requestId)) {
             $_SESSION['error'] = 'Request ID is required.';
@@ -531,16 +540,10 @@ class BusSeasonRequestController extends Controller {
         $requestModel = $this->model('BusSeasonRequestModel');
         $requestModel->addRequiredColumnsIfNotExists();
         
-        // Check if request exists and is approved
+        // Check if request exists
         $request = $requestModel->getRequestWithDetails($requestId);
         if (!$request) {
             $_SESSION['error'] = 'Request not found.';
-            $this->redirect('bus-season-requests/sao-process');
-            return;
-        }
-        
-        if ($request['status'] !== 'approved') {
-            $_SESSION['error'] = 'Only approved requests can have payments collected.';
             $this->redirect('bus-season-requests/sao-process');
             return;
         }
@@ -552,60 +555,256 @@ class BusSeasonRequestController extends Controller {
             return;
         }
         
-        // Get season rate (from request or calculate)
-        $seasonRate = floatval($this->post('season_rate', 0));
-        if ($seasonRate <= 0) {
-            // Calculate season rate from student payment (30% of total)
-            $totalAmount = $requestModel->calculateSeasonTotal($studentPayment);
-            $seasonRate = $totalAmount;
-        }
-        
-        $paymentMethod = trim($this->post('payment_method', 'cash'));
-        
-        // Calculate payment details
-        $totalAmount = $requestModel->calculateSeasonTotal($studentPayment);
-        $slgtiPaid = $requestModel->calculateSLGTIPayment($totalAmount);
-        $ctbPaid = $requestModel->calculateCTBPayment($totalAmount);
-        
-        // Create payment collection record
+        // Create initial payment collection record (status: paid)
         $paymentId = $requestModel->createPaymentCollection(
             $requestId,
             $request['student_id'],
             $studentPayment,
-            $seasonRate,
+            0, // season_rate (filled later)
+            $_SESSION['user_id'],
             $paymentMethod,
             $paymentReference,
-            $notes,
-            $_SESSION['user_id']
+            $notes
         );
         
         if ($paymentId) {
+            // Update request status to 'paid'
+            $requestModel->updateStatus($requestId, 'paid');
+
             // Log activity
             $activityModel = $this->model('ActivityLogModel');
             $activityModel->logActivity([
                 'activity_type' => 'CREATE',
                 'module' => 'bus_season_payment',
                 'record_id' => $paymentId,
-                'description' => "SAO/ADM collected payment for bus season request #{$requestId} - Student: Rs. {$studentPayment}, Total: Rs. {$totalAmount}",
+                'description' => "SAO/ADM collected initial payment for bus season request #{$requestId} - Student: Rs. {$studentPayment}. Status: paid",
                 'new_values' => [
                     'request_id' => $requestId,
                     'student_id' => $request['student_id'],
                     'student_paid' => $studentPayment,
-                    'slgti_paid' => $slgtiPaid,
-                    'ctb_paid' => $ctbPaid,
-                    'total_amount' => $totalAmount,
-                    'season_rate' => $seasonRate,
                     'payment_method' => $paymentMethod,
-                    'payment_reference' => $paymentReference
+                    'payment_reference' => $paymentReference,
+                    'status' => 'paid'
                 ]
             ]);
             
-            $_SESSION['message'] = 'Payment collection recorded successfully. Season ticket processed.';
+            $_SESSION['message'] = 'Payment recorded successfully. Status set to paid.';
         } else {
             $_SESSION['error'] = 'Failed to record payment collection. Please try again.';
         }
         
         $this->redirect('bus-season-requests/sao-process');
+    }
+
+    /**
+     * Update payment status (paid -> processing -> issued)
+     */
+    public function updatePaymentStatus() {
+        // Check authentication
+        if (!isset($_SESSION['user_id'])) {
+            $this->json(['success' => false, 'message' => 'Unauthorized'], 401);
+            return;
+        }
+        
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $isSAO = $userModel->isSAO($_SESSION['user_id']);
+        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
+        
+        if (!$isSAO && !$isAdmin) {
+            $this->json(['success' => false, 'message' => 'Access denied.'], 403);
+            return;
+        }
+        
+        $paymentId = (int)$this->post('payment_id', 0);
+        $newStatus = trim($this->post('status', ''));
+        $actualPrice = floatval($this->post('actual_price', 0));
+        $studentPortion = floatval($this->post('student_portion', 0));
+        $paymentReference = trim($this->post('payment_reference', ''));
+        
+        if (empty($paymentId) || empty($newStatus)) {
+            $this->json(['success' => false, 'message' => 'Payment ID and status are required.'], 400);
+            return;
+        }
+        
+        $requestModel = $this->model('BusSeasonRequestModel');
+        $payment = $requestModel->getPaymentCollectionById($paymentId);
+        
+        if (!$payment) {
+            $this->json(['success' => false, 'message' => 'Payment record not found.'], 404);
+            return;
+        }
+        
+        $updateData = [];
+        if ($newStatus === 'issued') {
+            // Use provided values or calculate defaults
+            $totalAmount = $actualPrice > 0 ? $actualPrice : ($studentPortion > 0 ? $studentPortion / 0.30 : $requestModel->calculateSeasonTotal($payment['paid_amount']));
+            
+            // Student portion should be what was confirmed in the modal
+            $finalStudentPaid = $studentPortion > 0 ? $studentPortion : $totalAmount * 0.30;
+            
+            // SLGTI pays 35%, CTB pays 35%
+            $slgtiPaid = $totalAmount * 0.35;
+            $ctbPaid = $totalAmount * 0.35;
+            
+            // Calculate balance (Difference between what they should pay now and what they initially paid)
+            $remainingBalance = $finalStudentPaid - $payment['paid_amount'];
+            
+            $updateData = [
+                'total_amount' => $totalAmount,
+                'student_paid' => $finalStudentPaid,
+                'slgti_paid' => $slgtiPaid,
+                'ctb_paid' => $ctbPaid,
+                'season_rate' => $totalAmount,
+                'remaining_balance' => $remainingBalance,
+                'payment_reference' => $paymentReference ?: $payment['payment_reference']
+            ];
+        }
+        
+        if ($requestModel->updatePaymentStatus($paymentId, $newStatus, $updateData)) {
+            // Also update request status
+            $requestModel->updateStatus($payment['request_id'], $newStatus);
+            
+            $this->json(['success' => true, 'message' => 'Status updated successfully.']);
+        } else {
+            $this->json(['success' => false, 'message' => 'Failed to update status.']);
+        }
+    }
+
+    /**
+     * Export payments to Excel
+     */
+    public function exportPaymentsExcel() {
+        // Check authentication
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $isSAO = $userModel->isSAO($_SESSION['user_id']);
+        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
+        
+        if (!$isSAO && !$isAdmin) {
+            $_SESSION['error'] = 'Access denied.';
+            $this->redirect('dashboard');
+            return;
+        }
+        
+        $requestModel = $this->model('BusSeasonRequestModel');
+        $status = $this->get('status', 'paid');
+        $filters = [
+            'season_year' => $this->get('season_year', ''),
+            'student_id' => $this->get('student_id', ''),
+            'month' => $this->get('month', ''),
+            'status' => $status
+        ];
+        
+        $collections = $requestModel->getAllPaymentCollections($filters);
+        
+        $filename = 'bus_season_' . $status . '_' . ($filters['month'] ?: date('Y-m')) . '.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+        header('Pragma: public');
+        
+        echo "\xEF\xBB\xBF"; // BOM for UTF-8
+        $output = fopen('php://output', 'w');
+        
+        // CSV Headers based on status
+        if ($status === 'issued') {
+            fputcsv($output, [
+                'Name', 'NIC Number', 'Route', 'Total Price', 'Student Portion (30%)', 'SLGTI (35%)', 'CTB (35%)', 'Issued Date', 'Reference'
+            ]);
+        } else {
+            fputcsv($output, [
+                'Name', 'NIC Number', 'Route', 'Paid Amount', 'Date', 'Status', 'Reference'
+            ]);
+        }
+        
+        foreach ($collections as $c) {
+            $route = ($c['route_from'] ?? '') . ' to ' . ($c['route_to'] ?? '');
+            
+            if ($status === 'issued') {
+                fputcsv($output, [
+                    $c['student_fullname'] ?? 'N/A',
+                    $c['student_nic'] ?? 'N/A',
+                    $route,
+                    number_format($c['total_amount'] ?? 0, 2, '.', ''),
+                    number_format($c['student_paid'] ?? 0, 2, '.', ''),
+                    number_format($c['slgti_paid'] ?? 0, 2, '.', ''),
+                    number_format($c['ctb_paid'] ?? 0, 2, '.', ''),
+                    !empty($c['issued_at']) ? date('Y-m-d', strtotime($c['issued_at'])) : 'N/A',
+                    $c['payment_reference'] ?? 'N/A'
+                ]);
+            } else {
+                fputcsv($output, [
+                    $c['student_fullname'] ?? 'N/A',
+                    $c['student_nic'] ?? 'N/A',
+                    $route,
+                    number_format($c['paid_amount'] ?? 0, 2, '.', ''),
+                    !empty($c['payment_date']) ? date('Y-m-d', strtotime($c['payment_date'])) : 'N/A',
+                    ucfirst($c['payment_status'] ?? 'paid'),
+                    $c['payment_reference'] ?? 'N/A'
+                ]);
+            }
+        }
+        
+        fclose($output);
+        exit;
+    }
+
+    /**
+     * Bulk update payment status
+     */
+    public function bulkUpdateStatus() {
+        // Check authentication
+        if (!isset($_SESSION['user_id'])) {
+            $this->json(['success' => false, 'message' => 'Unauthorized'], 401);
+            return;
+        }
+        
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->json(['success' => false, 'message' => 'Invalid request method'], 405);
+            return;
+        }
+
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $isSAO = $userModel->isSAO($_SESSION['user_id']);
+        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
+        
+        if (!$isSAO && !$isAdmin) {
+            $this->json(['success' => false, 'message' => 'Access denied'], 403);
+            return;
+        }
+
+        $paymentIds = $this->post('payment_ids', []);
+        $newStatus = $this->post('status', '');
+
+        if (empty($paymentIds) || empty($newStatus)) {
+            $this->json(['success' => false, 'message' => 'No records or status provided'], 400);
+            return;
+        }
+
+        $requestModel = $this->model('BusSeasonRequestModel');
+        $successCount = 0;
+
+        foreach ($paymentIds as $id) {
+            $payment = $requestModel->getPaymentCollectionById($id);
+            if ($payment) {
+                if ($requestModel->updatePaymentStatus($id, $newStatus)) {
+                    $requestModel->updateStatus($payment['request_id'], $newStatus);
+                    $successCount++;
+                }
+            }
+        }
+
+        $this->json([
+            'success' => true, 
+            'message' => "Successfully updated {$successCount} records to {$newStatus}."
+        ]);
     }
     
     /**
@@ -638,7 +837,8 @@ class BusSeasonRequestController extends Controller {
         // Get filters
         $filters = [
             'season_year' => $this->get('season_year', ''),
-            'student_id' => $this->get('student_id', '')
+            'student_id' => $this->get('student_id', ''),
+            'month' => $this->get('month', '')
         ];
         
         // Get all payment collections

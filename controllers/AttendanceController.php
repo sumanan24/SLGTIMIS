@@ -344,6 +344,7 @@ class AttendanceController extends Controller {
         // Get user's department if user is HOD, IN1, IN2, or IN3
         $userDepartmentId = $this->getUserDepartment();
         $isDepartmentRestricted = $this->isDepartmentRestricted();
+        $isHOD = $this->isHOD();
         $isAdmin = false;
         
         // Check if user is admin

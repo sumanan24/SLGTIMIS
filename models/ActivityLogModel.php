@@ -48,12 +48,18 @@ class ActivityLogModel extends Model {
         } else {
             // Table exists, add missing columns
             $columns = [
-                'user_type' => "ALTER TABLE `{$this->table}` ADD COLUMN `user_type` VARCHAR(20) DEFAULT NULL COMMENT 'student, user, admin' AFTER `user_id`",
-                'module' => "ALTER TABLE `{$this->table}` ADD COLUMN `module` VARCHAR(100) DEFAULT NULL COMMENT 'bus_season_request, on_peak_request, etc.' AFTER `activity_type`",
-                'record_id' => "ALTER TABLE `{$this->table}` ADD COLUMN `record_id` VARCHAR(50) DEFAULT NULL COMMENT 'ID of the affected record' AFTER `module`",
-                'old_values' => "ALTER TABLE `{$this->table}` ADD COLUMN `old_values` TEXT DEFAULT NULL COMMENT 'JSON of old values before change' AFTER `description`",
-                'new_values' => "ALTER TABLE `{$this->table}` ADD COLUMN `new_values` TEXT DEFAULT NULL COMMENT 'JSON of new values after change' AFTER `old_values`",
-                'mac_address' => "ALTER TABLE `{$this->table}` ADD COLUMN `mac_address` VARCHAR(17) DEFAULT NULL COMMENT 'MAC address if available' AFTER `ip_address`"
+                'user_id' => "ALTER TABLE `{$this->table}` ADD COLUMN `user_id` INT(11) DEFAULT NULL",
+                'user_type' => "ALTER TABLE `{$this->table}` ADD COLUMN `user_type` VARCHAR(20) DEFAULT NULL COMMENT 'student, user, admin'",
+                'user_name' => "ALTER TABLE `{$this->table}` ADD COLUMN `user_name` VARCHAR(100) DEFAULT NULL",
+                'activity_type' => "ALTER TABLE `{$this->table}` ADD COLUMN `activity_type` VARCHAR(50) NOT NULL COMMENT 'CREATE, UPDATE, DELETE, etc.'",
+                'module' => "ALTER TABLE `{$this->table}` ADD COLUMN `module` VARCHAR(100) DEFAULT NULL COMMENT 'bus_season_request, etc.'",
+                'record_id' => "ALTER TABLE `{$this->table}` ADD COLUMN `record_id` VARCHAR(50) DEFAULT NULL COMMENT 'ID of the affected record'",
+                'description' => "ALTER TABLE `{$this->table}` ADD COLUMN `description` TEXT DEFAULT NULL COMMENT 'Human-readable description'",
+                'old_values' => "ALTER TABLE `{$this->table}` ADD COLUMN `old_values` TEXT DEFAULT NULL COMMENT 'JSON of old values before change'",
+                'new_values' => "ALTER TABLE `{$this->table}` ADD COLUMN `new_values` TEXT DEFAULT NULL COMMENT 'JSON of new values after change'",
+                'ip_address' => "ALTER TABLE `{$this->table}` ADD COLUMN `ip_address` VARCHAR(45) DEFAULT NULL COMMENT 'IPv4 or IPv6'",
+                'mac_address' => "ALTER TABLE `{$this->table}` ADD COLUMN `mac_address` VARCHAR(17) DEFAULT NULL COMMENT 'MAC address if available'",
+                'user_agent' => "ALTER TABLE `{$this->table}` ADD COLUMN `user_agent` TEXT DEFAULT NULL"
             ];
             
             foreach ($columns as $columnName => $sql) {
@@ -176,6 +182,12 @@ class ActivityLogModel extends Model {
             $newValues = is_string($data['new_values']) ? $data['new_values'] : json_encode($data['new_values']);
         }
         
+        // Extract required values to variables (bind_param requires references)
+        $activityType = $data['activity_type'] ?? null;
+        $module = $data['module'] ?? null;
+        $recordId = $data['record_id'] ?? null;
+        $description = $data['description'] ?? null;
+        
         $sql = "INSERT INTO `{$this->table}` 
                 (`user_id`, `user_type`, `user_name`, `activity_type`, `module`, `record_id`, 
                  `description`, `old_values`, `new_values`, `ip_address`, `mac_address`, `user_agent`) 
@@ -186,10 +198,10 @@ class ActivityLogModel extends Model {
             $userId,
             $userType,
             $userName,
-            $data['activity_type'],
-            $data['module'],
-            $data['record_id'] ?? null,
-            $data['description'] ?? null,
+            $activityType,
+            $module,
+            $recordId,
+            $description,
             $oldValues,
             $newValues,
             $ipAddress,

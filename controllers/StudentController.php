@@ -442,18 +442,14 @@ class StudentController extends Controller {
                     // Remove existing image
                     $currentImagePath = $student['file_path'] ?? '';
                     if (!empty($currentImagePath)) {
-                        // Delete the physical file
-                        $imagePaths = [
-                            BASE_PATH . '/assets/img/student_profile/' . basename($currentImagePath),
-                            BASE_PATH . '/assets/img/Student_profile/' . basename($currentImagePath),
-                            BASE_PATH . '/assets/img/Studnet_profile/' . basename($currentImagePath),
-                            BASE_PATH . '/assets/' . $currentImagePath
-                        ];
-                        foreach ($imagePaths as $imagePath) {
-                            if (file_exists($imagePath)) {
-                                @unlink($imagePath);
-                                break;
-                            }
+                        // Normalize path - remove leading slash, ensure it's relative to assets
+                        $normalizedPath = ltrim($currentImagePath, '/');
+                        if (strpos($normalizedPath, 'img/student_profile/') !== 0) {
+                            $normalizedPath = 'img/student_profile/' . basename($normalizedPath);
+                        }
+                        $oldImagePath = BASE_PATH . '/assets/' . $normalizedPath;
+                        if (file_exists($oldImagePath)) {
+                            @unlink($oldImagePath);
                         }
                     }
                     // Update database to remove image path
@@ -467,60 +463,40 @@ class StudentController extends Controller {
                     $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
                     
                     if (in_array($fileExtension, $allowedExtensions) && in_array($file['type'], $allowedMimeTypes)) {
-                        // Get or create target directory
+                        // Standardized directory: assets/img/student_profile
                         $imageDirectory = BASE_PATH . '/assets/img/student_profile';
-                        $imageDirectoryAlt = BASE_PATH . '/assets/img/Student_profile';
-                        $imageDirectoryTypo = BASE_PATH . '/assets/img/Studnet_profile';
                         
-                        $targetDir = null;
-                        $imagePathPrefix = 'img/student_profile';
-                        
-                        if (is_dir($imageDirectory)) {
-                            $targetDir = $imageDirectory;
-                            $imagePathPrefix = 'img/student_profile';
-                        } elseif (is_dir($imageDirectoryAlt)) {
-                            $targetDir = $imageDirectoryAlt;
-                            $imagePathPrefix = 'img/Student_profile';
-                        } elseif (is_dir($imageDirectoryTypo)) {
-                            $targetDir = $imageDirectoryTypo;
-                            $imagePathPrefix = 'img/Studnet_profile';
-                        }
-                        
-                        if (!$targetDir) {
+                        // Create directory if it doesn't exist
+                        if (!is_dir($imageDirectory)) {
                             if (!mkdir($imageDirectory, 0755, true)) {
                                 $_SESSION['error'] = 'Could not create image directory. Please check folder permissions.';
-                            } else {
-                                $targetDir = $imageDirectory;
-                                $imagePathPrefix = 'img/student_profile';
                             }
                         }
                         
-                        if ($targetDir) {
+                        if (is_dir($imageDirectory)) {
                             // Delete old image if exists
                             $currentImagePath = $student['file_path'] ?? '';
                             if (!empty($currentImagePath)) {
-                                $oldImagePaths = [
-                                    BASE_PATH . '/assets/img/student_profile/' . basename($currentImagePath),
-                                    BASE_PATH . '/assets/img/Student_profile/' . basename($currentImagePath),
-                                    BASE_PATH . '/assets/img/Studnet_profile/' . basename($currentImagePath),
-                                    BASE_PATH . '/assets/' . $currentImagePath
-                                ];
-                                foreach ($oldImagePaths as $oldImagePath) {
-                                    if (file_exists($oldImagePath)) {
-                                        @unlink($oldImagePath);
-                                        break;
-                                    }
+                                // Normalize path - remove leading slash, ensure it's relative to assets
+                                $normalizedPath = ltrim($currentImagePath, '/');
+                                if (strpos($normalizedPath, 'img/student_profile/') !== 0) {
+                                    $normalizedPath = 'img/student_profile/' . basename($normalizedPath);
+                                }
+                                $oldImagePath = BASE_PATH . '/assets/' . $normalizedPath;
+                                if (file_exists($oldImagePath)) {
+                                    @unlink($oldImagePath);
                                 }
                             }
                             
                             // Generate unique filename
                             $safeStudentId = preg_replace('/[^a-zA-Z0-9._-]/', '_', $id);
                             $newFilename = $safeStudentId . '_' . time() . '.' . $fileExtension;
-                            $targetPath = $targetDir . '/' . $newFilename;
+                            $targetPath = $imageDirectory . '/' . $newFilename;
                             
                             // Move uploaded file
                             if (move_uploaded_file($file['tmp_name'], $targetPath)) {
-                                $newImagePath = $imagePathPrefix . '/' . $newFilename;
+                                // Store path relative to assets: img/student_profile/filename.jpg
+                                $newImagePath = 'img/student_profile/' . $newFilename;
                                 $studentModel->updateStudentImage($id, $newImagePath);
                                 $successMessage .= ' Profile image updated.';
                             } else {
@@ -1569,24 +1545,17 @@ class StudentController extends Controller {
         
         // GET request - show image selection interface
         $studentModel = $this->model('StudentModel');
+        
+        // Standardized directory: assets/img/student_profile
         $imageDirectory = BASE_PATH . '/assets/img/student_profile';
-        $imageDirectoryAlt = BASE_PATH . '/assets/img/Student_profile';
-        $imageDirectoryTypo = BASE_PATH . '/assets/img/Studnet_profile';
         
-        // Find existing directory
-        $targetDir = null;
-        $imagePathPrefix = 'img/student_profile';
-        
-        if (is_dir($imageDirectory)) {
-            $targetDir = $imageDirectory;
-            $imagePathPrefix = 'img/student_profile';
-        } elseif (is_dir($imageDirectoryAlt)) {
-            $targetDir = $imageDirectoryAlt;
-            $imagePathPrefix = 'img/Student_profile';
-        } elseif (is_dir($imageDirectoryTypo)) {
-            $targetDir = $imageDirectoryTypo;
-            $imagePathPrefix = 'img/Studnet_profile';
+        // Create directory if it doesn't exist
+        if (!is_dir($imageDirectory)) {
+            @mkdir($imageDirectory, 0755, true);
         }
+        
+        $targetDir = $imageDirectory;
+        $imagePathPrefix = 'img/student_profile';
         
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
         $existingImages = [];
@@ -1700,30 +1669,21 @@ class StudentController extends Controller {
         }
         
         $studentModel = $this->model('StudentModel');
+        
+        // Standardized directory: assets/img/student_profile
         $imageDirectory = BASE_PATH . '/assets/img/student_profile';
-        $imageDirectoryAlt = BASE_PATH . '/assets/img/Student_profile';
-        $imageDirectoryTypo = BASE_PATH . '/assets/img/Studnet_profile';
         
-        // Find existing directory
-        $targetDir = null;
+        // Create directory if it doesn't exist
+        if (!is_dir($imageDirectory)) {
+            if (!mkdir($imageDirectory, 0755, true)) {
+                $_SESSION['error'] = 'Image directory does not exist and could not be created.';
+                $this->redirect('students/import-images');
+                return;
+            }
+        }
+        
+        $targetDir = $imageDirectory;
         $imagePathPrefix = 'img/student_profile';
-        
-        if (is_dir($imageDirectory)) {
-            $targetDir = $imageDirectory;
-            $imagePathPrefix = 'img/student_profile';
-        } elseif (is_dir($imageDirectoryAlt)) {
-            $targetDir = $imageDirectoryAlt;
-            $imagePathPrefix = 'img/Student_profile';
-        } elseif (is_dir($imageDirectoryTypo)) {
-            $targetDir = $imageDirectoryTypo;
-            $imagePathPrefix = 'img/Studnet_profile';
-        }
-        
-        if (!$targetDir) {
-            $_SESSION['error'] = 'Image directory does not exist.';
-            $this->redirect('students/import-images');
-            return;
-        }
         
         $processed = 0;
         $skipped = 0;
@@ -1960,35 +1920,20 @@ class StudentController extends Controller {
         
         $studentModel = $this->model('StudentModel');
         
-        // Get or create target directory
+        // Standardized directory: assets/img/student_profile
         $imageDirectory = BASE_PATH . '/assets/img/student_profile';
-        $imageDirectoryAlt = BASE_PATH . '/assets/img/Student_profile';
-        $imageDirectoryTypo = BASE_PATH . '/assets/img/Studnet_profile';
         
-        $targetDir = null;
-        $imagePathPrefix = 'img/student_profile';
-        
-        if (is_dir($imageDirectory)) {
-            $targetDir = $imageDirectory;
-            $imagePathPrefix = 'img/student_profile';
-        } elseif (is_dir($imageDirectoryAlt)) {
-            $targetDir = $imageDirectoryAlt;
-            $imagePathPrefix = 'img/Student_profile';
-        } elseif (is_dir($imageDirectoryTypo)) {
-            $targetDir = $imageDirectoryTypo;
-            $imagePathPrefix = 'img/Studnet_profile';
-        }
-        
-        if (!$targetDir) {
-            // Create directory
+        // Create directory if it doesn't exist
+        if (!is_dir($imageDirectory)) {
             if (!mkdir($imageDirectory, 0755, true)) {
                 $_SESSION['error'] = 'Could not create image directory. Please check folder permissions.';
                 $this->redirect('students/upload-images');
                 return;
             }
-            $targetDir = $imageDirectory;
-            $imagePathPrefix = 'img/student_profile';
         }
+        
+        $targetDir = $imageDirectory;
+        $imagePathPrefix = 'img/student_profile';
         
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
         $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];

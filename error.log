@@ -4162,3 +4162,70 @@
 [18-Jan-2026 15:05:10 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@secondApproval', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
 [18-Jan-2026 15:05:10 UTC] PHP   4. BusSeasonRequestController->secondApproval() C:\wamp64\www\SLGTIMIS\core\Router.php:67
 [18-Jan-2026 15:05:10 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:323
+[24-Jan-2026 15:42:46 UTC] PHP Deprecated:  Optional parameter $paymentMethod declared before required parameter $collectedBy is implicitly treated as a required parameter in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 307
+[24-Jan-2026 15:42:46 UTC] PHP Stack trace:
+[24-Jan-2026 15:42:46 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[24-Jan-2026 15:42:46 UTC] PHP   2. Router->route($uri = 'bus-season-requests') C:\wamp64\www\SLGTIMIS\index.php:144
+[24-Jan-2026 15:42:46 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@index', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[24-Jan-2026 15:42:46 UTC] PHP   4. BusSeasonRequestController->index() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[24-Jan-2026 15:42:46 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:27
+[24-Jan-2026 15:42:46 UTC] PHP Deprecated:  Optional parameter $paymentReference declared before required parameter $collectedBy is implicitly treated as a required parameter in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 307
+[24-Jan-2026 15:42:46 UTC] PHP Stack trace:
+[24-Jan-2026 15:42:46 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[24-Jan-2026 15:42:46 UTC] PHP   2. Router->route($uri = 'bus-season-requests') C:\wamp64\www\SLGTIMIS\index.php:144
+[24-Jan-2026 15:42:46 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@index', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[24-Jan-2026 15:42:46 UTC] PHP   4. BusSeasonRequestController->index() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[24-Jan-2026 15:42:46 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:27
+[24-Jan-2026 15:42:46 UTC] PHP Deprecated:  Optional parameter $notes declared before required parameter $collectedBy is implicitly treated as a required parameter in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 307
+[24-Jan-2026 15:42:46 UTC] PHP Stack trace:
+[24-Jan-2026 15:42:46 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[24-Jan-2026 15:42:46 UTC] PHP   2. Router->route($uri = 'bus-season-requests') C:\wamp64\www\SLGTIMIS\index.php:144
+[24-Jan-2026 15:42:46 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@index', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[24-Jan-2026 15:42:46 UTC] PHP   4. BusSeasonRequestController->index() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[24-Jan-2026 15:42:46 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:27
+[24-Jan-2026 15:43:40 UTC] Error adding column old_values: Unknown column 'description' in 'activity_log'
+[24-Jan-2026 15:43:40 UTC] Error adding column new_values: Unknown column 'old_values' in 'activity_log'
+[24-Jan-2026 15:54:29 UTC] PHP Deprecated:  Optional parameter $paymentMethod declared before required parameter $collectedBy is implicitly treated as a required parameter in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 299
+[24-Jan-2026 15:54:29 UTC] PHP Stack trace:
+[24-Jan-2026 15:54:29 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[24-Jan-2026 15:54:29 UTC] PHP   2. Router->route($uri = 'bus-season-requests/payment-collections') C:\wamp64\www\SLGTIMIS\index.php:144
+[24-Jan-2026 15:54:29 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@paymentCollections', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[24-Jan-2026 15:54:29 UTC] PHP   4. BusSeasonRequestController->paymentCollections() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[24-Jan-2026 15:54:29 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:649
+[24-Jan-2026 15:54:29 UTC] PHP Deprecated:  Optional parameter $paymentReference declared before required parameter $collectedBy is implicitly treated as a required parameter in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 299
+[24-Jan-2026 15:54:29 UTC] PHP Stack trace:
+[24-Jan-2026 15:54:29 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[24-Jan-2026 15:54:29 UTC] PHP   2. Router->route($uri = 'bus-season-requests/payment-collections') C:\wamp64\www\SLGTIMIS\index.php:144
+[24-Jan-2026 15:54:29 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@paymentCollections', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[24-Jan-2026 15:54:29 UTC] PHP   4. BusSeasonRequestController->paymentCollections() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[24-Jan-2026 15:54:29 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:649
+[24-Jan-2026 15:54:29 UTC] PHP Deprecated:  Optional parameter $notes declared before required parameter $collectedBy is implicitly treated as a required parameter in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 299
+[24-Jan-2026 15:54:29 UTC] PHP Stack trace:
+[24-Jan-2026 15:54:29 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[24-Jan-2026 15:54:29 UTC] PHP   2. Router->route($uri = 'bus-season-requests/payment-collections') C:\wamp64\www\SLGTIMIS\index.php:144
+[24-Jan-2026 15:54:29 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@paymentCollections', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[24-Jan-2026 15:54:29 UTC] PHP   4. BusSeasonRequestController->paymentCollections() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[24-Jan-2026 15:54:29 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:649
+[24-Jan-2026 16:01:05 UTC] PHP Deprecated:  Optional parameter $paymentMethod declared before required parameter $collectedBy is implicitly treated as a required parameter in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 316
+[24-Jan-2026 16:01:05 UTC] PHP Stack trace:
+[24-Jan-2026 16:01:05 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[24-Jan-2026 16:01:05 UTC] PHP   2. Router->route($uri = 'bus-season-requests/sao-process') C:\wamp64\www\SLGTIMIS\index.php:144
+[24-Jan-2026 16:01:05 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@saoProcess', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[24-Jan-2026 16:01:05 UTC] PHP   4. BusSeasonRequestController->saoProcess() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[24-Jan-2026 16:01:05 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:469
+[24-Jan-2026 16:01:05 UTC] PHP Deprecated:  Optional parameter $paymentReference declared before required parameter $collectedBy is implicitly treated as a required parameter in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 316
+[24-Jan-2026 16:01:05 UTC] PHP Stack trace:
+[24-Jan-2026 16:01:05 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[24-Jan-2026 16:01:05 UTC] PHP   2. Router->route($uri = 'bus-season-requests/sao-process') C:\wamp64\www\SLGTIMIS\index.php:144
+[24-Jan-2026 16:01:05 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@saoProcess', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[24-Jan-2026 16:01:05 UTC] PHP   4. BusSeasonRequestController->saoProcess() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[24-Jan-2026 16:01:05 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:469
+[24-Jan-2026 16:01:05 UTC] PHP Deprecated:  Optional parameter $notes declared before required parameter $collectedBy is implicitly treated as a required parameter in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 316
+[24-Jan-2026 16:01:05 UTC] PHP Stack trace:
+[24-Jan-2026 16:01:05 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[24-Jan-2026 16:01:05 UTC] PHP   2. Router->route($uri = 'bus-season-requests/sao-process') C:\wamp64\www\SLGTIMIS\index.php:144
+[24-Jan-2026 16:01:05 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@saoProcess', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[24-Jan-2026 16:01:05 UTC] PHP   4. BusSeasonRequestController->saoProcess() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[24-Jan-2026 16:01:05 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:469
+[24-Jan-2026 16:02:28 UTC] Error adding column old_values: Unknown column 'description' in 'activity_log'
+[24-Jan-2026 16:02:28 UTC] Error adding column new_values: Unknown column 'old_values' in 'activity_log'

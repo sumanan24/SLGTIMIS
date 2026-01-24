@@ -877,7 +877,8 @@ class StudentModel extends Model {
     
     /**
      * Get profile image path for a student
-     * Handles both path formats (student_profile, Student_profile, and Studnet_profile typo)
+     * Database stores path relative to assets (e.g., "img/student_profile/filename.jpg")
+     * Images are stored directly in assets/img/student_profile/ directory
      */
     public function getProfileImagePath($student) {
         if (empty($student['file_path'])) {
@@ -885,23 +886,21 @@ class StudentModel extends Model {
         }
         
         $imagePath = $student['file_path'];
-        $filename = basename($imagePath);
         
-        // Define possible directory paths
-        $possiblePaths = [
-            BASE_PATH . '/assets/img/student_profile/' . $filename,
-            BASE_PATH . '/assets/img/Student_profile/' . $filename,
-            BASE_PATH . '/assets/img/Studnet_profile/' . $filename,
-            BASE_PATH . '/assets/' . $imagePath, // Try exact path from database
-        ];
+        // Remove leading slash if present
+        $imagePath = ltrim($imagePath, '/');
         
-        // Check each possible path
-        foreach ($possiblePaths as $fullPath) {
-            if (file_exists($fullPath)) {
-                // Return the corresponding URL
-                $relativePath = str_replace(BASE_PATH . '/assets/', '', $fullPath);
-                return APP_URL . '/assets/' . $relativePath;
-            }
+        // If path doesn't start with 'img/student_profile/', assume it's just a filename
+        if (strpos($imagePath, 'img/student_profile/') !== 0) {
+            // If it's just a filename, prepend the standard path
+            $imagePath = 'img/student_profile/' . basename($imagePath);
+        }
+        
+        // Check if file exists in assets directory
+        $fullPath = BASE_PATH . '/assets/' . $imagePath;
+        if (file_exists($fullPath)) {
+            // Return the URL (path is already relative to assets)
+            return APP_URL . '/assets/' . $imagePath;
         }
         
         return null;

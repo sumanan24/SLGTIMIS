@@ -15,7 +15,7 @@ class BusSeasonRequestModel extends Model {
      * Add required columns to existing season_requests table if they don't exist
      */
     public function addRequiredColumnsIfNotExists() {
-        // Add HOD approval columns
+        // Add HOD approval columns for requests table
         $columns = [
             'hod_approver_id' => "ALTER TABLE `{$this->table}` ADD COLUMN `hod_approver_id` INT(11) DEFAULT NULL COMMENT 'User ID of HOD who approved' AFTER `approved_by`",
             'hod_approval_date' => "ALTER TABLE `{$this->table}` ADD COLUMN `hod_approval_date` DATETIME DEFAULT NULL AFTER `hod_approver_id`",
@@ -36,6 +36,23 @@ class BusSeasonRequestModel extends Model {
                 }
             } catch (Exception $e) {
                 error_log("Error adding column {$columnName}: " . $e->getMessage());
+            }
+        }
+        
+        // Add columns for payments table
+        $paymentColumns = [
+            'issued_at' => "ALTER TABLE `{$this->paymentTable}` ADD COLUMN `issued_at` DATETIME DEFAULT NULL AFTER `payment_date`"
+        ];
+        
+        foreach ($paymentColumns as $columnName => $sql) {
+            try {
+                $checkSql = "SHOW COLUMNS FROM `{$this->paymentTable}` LIKE '{$columnName}'";
+                $result = $this->db->query($checkSql);
+                if (!$result || $result->num_rows == 0) {
+                    $this->db->query($sql);
+                }
+            } catch (Exception $e) {
+                error_log("Error adding payment column {$columnName}: " . $e->getMessage());
             }
         }
         
@@ -81,7 +98,7 @@ class BusSeasonRequestModel extends Model {
         );
         
         if ($stmt->execute()) {
-            return $this->db->insert_id;
+            return $this->db->lastInsertId();
         }
         return false;
     }
@@ -209,15 +226,7 @@ class BusSeasonRequestModel extends Model {
                 LEFT JOIN `department` d ON r.department_id = d.department_id
                 LEFT JOIN `user` hod ON r.hod_approver_id = hod.user_id
                 LEFT JOIN `user` second ON r.second_approver_id = second.user_id
-                WHERE r.status IN ('hod_approved', 'approved')
                 ORDER BY 
-                    CASE 
-                        WHEN r.status = 'approved' THEN 1
-                        WHEN r.status = 'hod_approved' THEN 2
-                        ELSE 3
-                    END,
-                    r.second_approval_date DESC, 
-                    r.hod_approval_date DESC, 
                     r.created_at DESC";
         
         $result = $this->db->query($sql);
@@ -302,35 +311,25 @@ class BusSeasonRequestModel extends Model {
     }
     
     /**
-     * Create payment collection record (separate table)
+     * Create initial payment collection record
      */
-    public function createPaymentCollection($requestId, $studentId, $studentPayment, $seasonRate, $paymentMethod = 'cash', $paymentReference = null, $notes = null, $collectedBy) {
+    public function createPaymentCollection($requestId, $studentId, $studentPayment, $seasonRate, $collectedBy, $paymentMethod = 'cash', $paymentReference = null, $notes = null) {
         $this->addRequiredColumnsIfNotExists();
         
-        // Calculate totals
-        $totalAmount = $this->calculateSeasonTotal($studentPayment); // Total = student_payment / 0.30
-        $slgtiPaid = $this->calculateSLGTIPayment($totalAmount);
-        $ctbPaid = $this->calculateCTBPayment($totalAmount);
-        $remainingBalance = 0; // All payments calculated, no remaining balance
+        // Initial status is 'paid'
+        $status = 'paid';
         
         $sql = "INSERT INTO `{$this->paymentTable}` 
-                (`request_id`, `student_id`, `paid_amount`, `season_rate`, `total_amount`, 
-                 `student_paid`, `slgti_paid`, `ctb_paid`, `remaining_balance`, 
-                 `status`, `payment_date`, `payment_method`, `payment_reference`, 
-                 `collected_by`, `notes`) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', NOW(), ?, ?, ?, ?)";
+                (`request_id`, `student_id`, `paid_amount`, `status`, `payment_date`, `payment_method`, 
+                 `payment_reference`, `collected_by`, `notes`) 
+                VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?)";
         
         $stmt = $this->db->prepare($sql);
-        $stmt->bind_param("isddddddssis", 
+        $stmt->bind_param("isdsssss", 
             $requestId,
             $studentId,
-            $studentPayment, // paid_amount (what student actually paid)
-            $seasonRate, // season_rate
-            $totalAmount, // total_amount (100%)
-            $studentPayment, // student_paid (30%)
-            $slgtiPaid, // slgti_paid (35%)
-            $ctbPaid, // ctb_paid (35%)
-            $remainingBalance, // remaining_balance
+            $studentPayment,
+            $status,
             $paymentMethod,
             $paymentReference,
             $collectedBy,
@@ -338,11 +337,50 @@ class BusSeasonRequestModel extends Model {
         );
         
         if ($stmt->execute()) {
-            return $this->db->insert_id;
+            return $this->db->lastInsertId();
         }
         return false;
     }
+
+    /**
+     * Update payment status and details
+     */
+    public function updatePaymentStatus($paymentId, $status, $data = []) {
+        $fields = ["`status` = ?", "`updated_at` = NOW()"];
+        $params = [$status];
+        $types = "s";
+        
+        if ($status === 'issued') {
+            $fields[] = "`issued_at` = NOW()";
+        }
+        
+        foreach ($data as $key => $value) {
+            $fields[] = "`$key` = ?";
+            $params[] = $value;
+            $types .= is_numeric($value) ? "d" : "s";
+        }
+        
+        $fieldsStr = implode(", ", $fields);
+        $sql = "UPDATE `{$this->paymentTable}` SET $fieldsStr WHERE `id` = ?";
+        $params[] = $paymentId;
+        $types .= "i";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param($types, ...$params);
+        return $stmt->execute();
+    }
     
+    /**
+     * Get payment collection by ID
+     */
+    public function getPaymentCollectionById($paymentId) {
+        $sql = "SELECT * FROM `{$this->paymentTable}` WHERE `id` = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param("i", $paymentId);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_assoc();
+    }
+
     /**
      * Get payment collection by request ID
      */
@@ -368,24 +406,26 @@ class BusSeasonRequestModel extends Model {
         $this->addRequiredColumnsIfNotExists();
         
         $sql = "SELECT r.id as request_id,
-                r.student_id, r.season_year, r.season_name, r.depot_name, r.route_from, r.route_to, r.change_point, r.distance_km,
+                p.student_id as payment_student_id,
+                r.student_id as request_student_id, 
+                r.season_year, r.season_name, r.depot_name, r.route_from, r.route_to, r.change_point, r.distance_km,
                 r.status as request_status,
                 r.hod_approver_id, r.hod_approval_date, r.hod_comments,
                 r.second_approver_id, r.second_approver_role, r.second_approval_date, r.second_comments,
-                s.student_fullname, s.student_email,
+                s.student_fullname, s.student_email, s.student_nic, s.student_id as profile_student_id,
                 d.department_name, d.department_id,
                 hod.user_name as hod_approver_name,
                 second.user_name as second_approver_name,
                 p.id as payment_id, p.paid_amount, p.season_rate, p.total_amount, p.student_paid, p.slgti_paid, p.ctb_paid, 
                 p.remaining_balance, p.status as payment_status, p.payment_date, p.payment_method, 
-                p.payment_reference, p.collected_by, p.notes as payment_notes,
+                p.payment_reference, p.collected_by, p.notes as payment_notes, p.issued_at,
                 u.user_name as collected_by_name
-                FROM `{$this->table}` r
-                INNER JOIN `student` s ON r.student_id = s.student_id
+                FROM `{$this->paymentTable}` p
+                INNER JOIN `{$this->table}` r ON p.request_id = r.id
+                LEFT JOIN `student` s ON p.student_id = s.student_id
                 LEFT JOIN `department` d ON r.department_id = d.department_id
                 LEFT JOIN `user` hod ON r.hod_approver_id = hod.user_id
                 LEFT JOIN `user` second ON r.second_approver_id = second.user_id
-                LEFT JOIN `{$this->paymentTable}` p ON r.id = p.request_id
                 LEFT JOIN `user` u ON p.collected_by = u.user_id
                 WHERE 1=1";
         
@@ -399,12 +439,25 @@ class BusSeasonRequestModel extends Model {
         }
         
         if (!empty($filters['student_id'])) {
-            $sql .= " AND p.student_id = ?";
+            $sql .= " AND (p.student_id = ? OR r.student_id = ?)";
             $params[] = $filters['student_id'];
+            $params[] = $filters['student_id'];
+            $types .= 'ss';
+        }
+
+        if (!empty($filters['status'])) {
+            $sql .= " AND LOWER(p.status) = LOWER(?)";
+            $params[] = $filters['status'];
+            $types .= 's';
+        }
+
+        if (!empty($filters['month'])) {
+            $sql .= " AND DATE_FORMAT(p.payment_date, '%Y-%m') = ?";
+            $params[] = $filters['month'];
             $types .= 's';
         }
         
-        $sql .= " ORDER BY p.payment_date DESC";
+        $sql .= " ORDER BY p.payment_date DESC, r.created_at DESC";
         
         if (!empty($params)) {
             $stmt = $this->db->prepare($sql);
@@ -475,6 +528,16 @@ class BusSeasonRequestModel extends Model {
         return $request;
     }
     
+    /**
+     * Update request status
+     */
+    public function updateStatus($requestId, $status) {
+        $sql = "UPDATE `{$this->table}` SET `status` = ?, `updated_at` = NOW() WHERE `id` = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param("si", $status, $requestId);
+        return $stmt->execute();
+    }
+
     /**
      * Check if student has existing request for season year
      */

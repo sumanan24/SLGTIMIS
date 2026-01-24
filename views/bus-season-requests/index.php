@@ -106,150 +106,258 @@
         </div>
     <?php endif; ?>
     
-    <?php if ($hasExistingRequest): ?>
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle me-2"></i>
-            You already have a bus season request for the season year <strong><?php echo htmlspecialchars($seasonYear ?? ''); ?></strong>. Only one request per year is allowed.
-        </div>
-    <?php else: ?>
-        <!-- Request Form -->
-        <div class="form-card">
-            <div class="form-header">
-                <h4 class="fw-bold mb-0">
-                    <i class="fas fa-bus me-2 text-success"></i>New Bus Season Request
-                </h4>
-            </div>
-            
+    <?php if (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student'): ?>
+        <?php if ($hasExistingRequest): ?>
             <div class="alert alert-info">
-                <h6 class="fw-bold mb-2"><i class="fas fa-info-circle me-2"></i>Request Information</h6>
-                <p class="mb-2">Submit a bus season request for approval. Payment collection will be handled separately by the Student Affairs Office (SAO) after your request is approved.</p>
-                <p class="mb-0"><small><strong>Payment Structure:</strong> Student pays 30%, SLGTI pays 35%, CTB pays 35%</small></p>
+                <i class="fas fa-info-circle me-2"></i>
+                You already have a bus season request for the season year <strong><?php echo htmlspecialchars($seasonYear ?? ''); ?></strong>. Only one request per year is allowed.
             </div>
-            
-            <form method="POST" action="<?php echo APP_URL; ?>/bus-season-requests/create" id="busSeasonForm">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label for="route_from" class="form-label fw-semibold">Route From <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="route_from" name="route_from" 
-                               placeholder="Starting point" required>
-                    </div>
-                    
-                    <div class="col-md-6">
-                        <label for="route_to" class="form-label fw-semibold">Route To <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="route_to" name="route_to" 
-                               placeholder="Destination" required>
-                    </div>
-                    
-                    <div class="col-md-6">
-                        <label for="change_point" class="form-label fw-semibold">Change Point</label>
-                        <input type="text" class="form-control" id="change_point" name="change_point" 
-                               placeholder="Transfer point if any">
-                    </div>
-                    
-                    <div class="col-md-6">
-                        <label for="distance_km" class="form-label fw-semibold">Distance (KM) <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="distance_km" name="distance_km" 
-                               step="0.1" min="0" placeholder="0.0" required>
-                    </div>
-                    
-                    <div class="col-12">
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            <strong>Note:</strong> Only one bus season request per season year is allowed. Season year (<?php echo htmlspecialchars($seasonYear ?? ''); ?>) is automatically set from your current enrollment. Once approved, payment collection will be handled by SAO.
+        <?php else: ?>
+            <!-- Request Form -->
+            <div class="form-card">
+                <div class="form-header">
+                    <h4 class="fw-bold mb-0">
+                        <i class="fas fa-bus me-2 text-success"></i>New Bus Season Request
+                    </h4>
+                </div>
+                
+                <div class="alert alert-info">
+                    <h6 class="fw-bold mb-2"><i class="fas fa-info-circle me-2"></i>Request Information</h6>
+                    <p class="mb-2">Submit a bus season request for approval. Payment collection will be handled separately by the Student Affairs Office (SAO) after your request is approved.</p>
+                    <p class="mb-0"><small><strong>Payment Structure:</strong> Student pays 30%, SLGTI pays 35%, CTB pays 35%</small></p>
+                </div>
+                
+                <form method="POST" action="<?php echo APP_URL; ?>/bus-season-requests/create" id="busSeasonForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="route_from" class="form-label fw-semibold">Route From <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="route_from" name="route_from" 
+                                   placeholder="Starting point" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="route_to" class="form-label fw-semibold">Route To <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="route_to" name="route_to" 
+                                   placeholder="Destination" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="change_point" class="form-label fw-semibold">Change Point</label>
+                            <input type="text" class="form-control" id="change_point" name="change_point" 
+                                   placeholder="Transfer point if any">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="distance_km" class="form-label fw-semibold">Distance (KM) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="distance_km" name="distance_km" 
+                                   step="0.1" min="0" placeholder="0.0" required>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Note:</strong> Only one bus season request per season year is allowed. Season year (<?php echo htmlspecialchars($seasonYear ?? ''); ?>) is automatically set from your current enrollment. Once approved, payment collection will be handled by SAO.
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-paper-plane me-2"></i>Submit Request
+                            </button>
+                            <a href="<?php echo APP_URL; ?>/student/dashboard" class="btn btn-outline-secondary ms-2">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
                         </div>
                     </div>
-                    
-                    <div class="col-12">
-                        <button type="submit" class="btn btn-success">
-                            <i class="fas fa-paper-plane me-2"></i>Submit Request
-                        </button>
-                        <a href="<?php echo APP_URL; ?>/student/dashboard" class="btn btn-outline-secondary ms-2">
-                            <i class="fas fa-times me-2"></i>Cancel
-                        </a>
-                    </div>
+                </form>
+            </div>
+        <?php endif; ?>
+        
+        <!-- Existing Requests (Student View) -->
+        <?php if (!empty($requests)): ?>
+            <div class="form-card">
+                <h4 class="fw-bold mb-3">
+                    <i class="fas fa-list me-2"></i>My Bus Season Requests
+                </h4>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Academic Year</th>
+                                <th>Payment Status</th>
+                                <th>Payment Period</th>
+                                <th>Student Payment</th>
+                                <th>Total Value</th>
+                                <th>Request Status</th>
+                                <th>Request Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($requests as $request): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($request['season_year'] ?? ''); ?></td>
+                                    <td>
+                                        <?php if (isset($request['payment'])): ?>
+                                            <span class="badge bg-success">Payment Collected</span>
+                                            <br><small class="text-muted"><?php echo $request['payment']['payment_date'] ? date('M d, Y', strtotime($request['payment']['payment_date'])) : ''; ?></small>
+                                        <?php else: ?>
+                                            <span class="badge bg-warning">Pending Collection</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if (isset($request['payment'])): ?>
+                                            <?php echo htmlspecialchars($request['payment']['payment_method'] ?? 'N/A'); ?>
+                                        <?php else: ?>
+                                            <span class="text-muted">N/A</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if (isset($request['payment'])): ?>
+                                            Rs. <?php echo number_format($request['payment']['student_paid'] ?? 0, 2); ?>
+                                        <?php else: ?>
+                                            <span class="text-muted">Not Collected</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if (isset($request['payment'])): ?>
+                                            Rs. <?php echo number_format($request['payment']['total_amount'] ?? 0, 2); ?>
+                                        <?php else: ?>
+                                            <span class="text-muted">Pending Collection</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php
+                                        $status = $request['status'] ?? 'pending';
+                                        $statusClass = 'status-' . strtolower($status);
+                                        $statusLabels = [
+                                            'pending' => 'Pending HOD Approval',
+                                            'hod_approved' => 'HOD Approved - Pending Second Approval',
+                                            'approved' => 'Approved',
+                                            'paid' => 'Paid',
+                                            'rejected' => 'Rejected'
+                                        ];
+                                        $statusLabel = $statusLabels[$status] ?? ucfirst($status);
+                                        ?>
+                                        <span class="status-badge <?php echo $statusClass; ?>">
+                                            <?php echo $statusLabel; ?>
+                                        </span>
+                                    </td>
+                                    <td><?php echo $request['created_at'] ? date('M d, Y', strtotime($request['created_at'])) : 'N/A'; ?></td>
+                                    <td>
+                                        <a href="<?php echo APP_URL; ?>/bus-season-requests/view?id=<?php echo $request['id']; ?>" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
-            </form>
-        </div>
-    <?php endif; ?>
-    
-    <!-- Existing Requests -->
-    <?php if (!empty($requests)): ?>
+            </div>
+        <?php endif; ?>
+    <?php else: ?>
+        <!-- Admin/Staff View (All Requests) -->
         <div class="form-card">
-            <h4 class="fw-bold mb-3">
-                <i class="fas fa-list me-2"></i>My Bus Season Requests
-            </h4>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="fw-bold mb-0">
+                    <i class="fas fa-list me-2"></i>All Bus Season Requests
+                </h4>
+                <div class="btn-group">
+                    <a href="<?php echo APP_URL; ?>/bus-season-requests/sao-process" class="btn btn-success btn-sm">
+                        <i class="fas fa-cash-register me-1"></i> Payment Collection
+                    </a>
+                </div>
+            </div>
             
             <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
                         <tr>
-                            <th>Academic Year</th>
-                            <th>Payment Status</th>
-                            <th>Payment Period</th>
-                            <th>Student Payment</th>
-                            <th>Total Value</th>
-                            <th>Request Status</th>
-                            <th>Request Date</th>
+                            <th>Student Details</th>
+                            <th>Route Information</th>
+                            <th>Season</th>
+                            <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($requests as $request): ?>
+                        <?php if (empty($requests)): ?>
                             <tr>
-                                <td><?php echo htmlspecialchars($request['season_year'] ?? ''); ?></td>
-                                <td>
-                                    <?php if (isset($request['payment'])): ?>
-                                        <span class="badge bg-success">Payment Collected</span>
-                                        <br><small class="text-muted"><?php echo $request['payment']['payment_date'] ? date('M d, Y', strtotime($request['payment']['payment_date'])) : ''; ?></small>
-                                    <?php else: ?>
-                                        <span class="badge bg-warning">Pending Collection</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <?php if (isset($request['payment'])): ?>
-                                        <?php echo htmlspecialchars($request['payment']['payment_method'] ?? 'N/A'); ?>
-                                    <?php else: ?>
-                                        <span class="text-muted">N/A</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <?php if (isset($request['payment'])): ?>
-                                        Rs. <?php echo number_format($request['payment']['student_paid'] ?? 0, 2); ?>
-                                    <?php else: ?>
-                                        <span class="text-muted">Not Collected</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <?php if (isset($request['payment'])): ?>
-                                        Rs. <?php echo number_format($request['payment']['total_amount'] ?? 0, 2); ?>
-                                    <?php else: ?>
-                                        <span class="text-muted">Pending Collection</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <?php
-                                    $status = $request['status'] ?? 'pending';
-                                    $statusClass = 'status-' . strtolower($status);
-                                    $statusLabels = [
-                                        'pending' => 'Pending HOD Approval',
-                                        'hod_approved' => 'HOD Approved - Pending Second Approval',
-                                        'approved' => 'Approved',
-                                        'rejected' => 'Rejected'
-                                    ];
-                                    $statusLabel = $statusLabels[$status] ?? ucfirst($status);
-                                    ?>
-                                    <span class="status-badge <?php echo $statusClass; ?>">
-                                        <?php echo $statusLabel; ?>
-                                    </span>
-                                </td>
-                                <td><?php echo $request['created_at'] ? date('M d, Y', strtotime($request['created_at'])) : 'N/A'; ?></td>
-                                <td>
-                                    <a href="<?php echo APP_URL; ?>/bus-season-requests/view?id=<?php echo $request['id']; ?>" class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-eye"></i> View
-                                    </a>
+                                <td colspan="5" class="text-center py-4 text-muted">
+                                    <i class="fas fa-info-circle me-2"></i>No requests found.
                                 </td>
                             </tr>
-                        <?php endforeach; ?>
+                        <?php else: ?>
+                            <?php foreach ($requests as $request): ?>
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold"><?php echo htmlspecialchars($request['student_fullname'] ?? 'N/A'); ?></div>
+                                        <small class="text-muted"><?php echo htmlspecialchars($request['student_id']); ?></small>
+                                        <div class="small text-muted"><?php echo htmlspecialchars($request['department_name'] ?? 'N/A'); ?></div>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <i class="fas fa-map-marker-alt text-danger me-1 small"></i>
+                                            <?php echo htmlspecialchars($request['route_from']); ?> 
+                                            <i class="fas fa-arrow-right mx-1 small text-muted"></i> 
+                                            <?php echo htmlspecialchars($request['route_to']); ?>
+                                        </div>
+                                        <small class="text-muted">
+                                            <?php echo number_format($request['distance_km'], 2); ?> km
+                                            <?php if (!empty($request['change_point'])): ?>
+                                                | Via: <?php echo htmlspecialchars($request['change_point']); ?>
+                                            <?php endif; ?>
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold text-primary"><?php echo htmlspecialchars($request['season_year']); ?></div>
+                                        <small class="text-muted"><?php echo htmlspecialchars($request['season_name'] ?? 'Bus Season'); ?></small>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $status = $request['status'] ?? 'pending';
+                                        $statusColors = [
+                                            'pending' => 'warning',
+                                            'hod_approved' => 'info',
+                                            'approved' => 'primary',
+                                            'paid' => 'success',
+                                            'rejected' => 'danger'
+                                        ];
+                                        $statusLabels = [
+                                            'pending' => 'Pending HOD',
+                                            'hod_approved' => 'HOD Approved',
+                                            'approved' => 'Final Approved',
+                                            'paid' => 'Paid',
+                                            'rejected' => 'Rejected'
+                                        ];
+                                        $color = $statusColors[$status] ?? 'secondary';
+                                        $label = $statusLabels[$status] ?? ucfirst($status);
+                                        ?>
+                                        <span class="badge bg-<?php echo $color; ?>"><?php echo $label; ?></span>
+                                        
+                                        <?php if (isset($request['has_payment']) && $request['has_payment'] > 0): ?>
+                                            <div class="mt-1 small text-success fw-bold">
+                                                <i class="fas fa-check-circle me-1"></i>Paid
+                                            </div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="<?php echo APP_URL; ?>/bus-season-requests/view?id=<?php echo $request['id']; ?>" class="btn btn-outline-primary btn-sm">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <?php if ($status === 'approved' && !(isset($request['has_payment']) && $request['has_payment'] > 0)): ?>
+                                                <a href="<?php echo APP_URL; ?>/bus-season-requests/sao-process" class="btn btn-outline-success btn-sm">
+                                                    <i class="fas fa-cash-register"></i>
+                                                </a>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
