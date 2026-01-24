@@ -460,7 +460,7 @@
                                         $adminPages[] = 'admin-import-images';
                                     }
                                     if ($isAdminUser) {
-                                        $adminPages = array_merge($adminPages, ['admin-users', 'admin-locked-accounts', 'admin-activity-logs']);
+                                        $adminPages = array_merge($adminPages, ['admin-users', 'admin-locked-accounts', 'admin-activity-logs', 'admin-backup-db']);
                                     }
                             ?>
                             <!-- Administration Branch -->
@@ -501,6 +501,13 @@
                                         <a href="<?php echo APP_URL; ?>/admin/activity-logs" class="<?php echo (isset($page) && $page === 'admin-activity-logs') ? 'active' : ''; ?>">
                                             <i class="fas fa-history"></i>
                                             <span>User Activities</span>
+                                        </a>
+                                    </li>
+                                    <li class="menu-divider-submenu"></li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/admin/backup-db" class="<?php echo (isset($page) && $page === 'admin-backup-db') ? 'active' : ''; ?>">
+                                            <i class="fas fa-database"></i>
+                                            <span>SQL Backup</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>

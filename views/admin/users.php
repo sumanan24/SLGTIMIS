@@ -1,7 +1,10 @@
 <div class="container-fluid px-3 px-md-4 py-3 py-md-4">
     <div class="card shadow-sm border-0 mb-4">
-        <div class="card-header bg-primary text-white">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
             <h4 class="mb-0"><i class="fas fa-users-cog me-2"></i>User Management</h4>
+            <a href="<?php echo APP_URL; ?>/admin/backup-db" class="btn btn-light btn-sm fw-bold">
+                <i class="fas fa-database me-1 text-primary"></i> Download SQL Backup
+            </a>
         </div>
         <div class="card-body">
             <?php if (isset($message)): ?>

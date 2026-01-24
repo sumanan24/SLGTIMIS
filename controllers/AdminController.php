@@ -338,5 +338,108 @@ class AdminController extends Controller {
             return $this->view('admin/activity-logs', $data);
         }
     }
+
+    /**
+     * Database Backup - Download full SQL file including data, triggers, and functions
+     */
+    public function backupDb() {
+        if (!$this->checkAdmin()) {
+            return;
+        }
+
+        try {
+            $db = Database::getInstance();
+            $conn = $db->getConnection();
+            
+            $tables = [];
+            $result = $conn->query("SHOW TABLES");
+            while ($row = $result->fetch_row()) {
+                $tables[] = $row[0];
+            }
+
+            $return = "-- SLGTI MIS Database Backup\n";
+            $return .= "-- Generated: " . date('Y-m-d H:i:s') . "\n";
+            $return .= "-- MySQL Version: " . $conn->server_info . "\n\n";
+            $return .= "SET FOREIGN_KEY_CHECKS=0;\n";
+            $return .= "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n";
+            $return .= "SET time_zone = \"+00:00\";\n\n";
+
+            // 1. Export Tables and Data
+            foreach ($tables as $table) {
+                // Table structure
+                $result = $conn->query("SHOW CREATE TABLE `$table`");
+                $row = $result->fetch_row();
+                $return .= "\n\n" . $row[1] . ";\n\n";
+
+                // Table data
+                $result = $conn->query("SELECT * FROM `$table`");
+                $num_fields = $result->field_count;
+
+                while ($row = $result->fetch_row()) {
+                    $return .= "INSERT INTO `$table` VALUES(";
+                    for ($j = 0; $j < $num_fields; $j++) {
+                        if (isset($row[$j])) {
+                            // Escape special characters
+                            $escapedValue = $conn->real_escape_string($row[$j]);
+                            $return .= '"' . $escapedValue . '"';
+                        } else {
+                            $return .= 'NULL';
+                        }
+                        if ($j < ($num_fields - 1)) {
+                            $return .= ',';
+                        }
+                    }
+                    $return .= ");\n";
+                }
+            }
+
+            // 2. Export Triggers
+            $result = $conn->query("SHOW TRIGGERS");
+            if ($result && $result->num_rows > 0) {
+                $return .= "\n\n-- TRIGGERS --\n";
+                while ($row = $result->fetch_assoc()) {
+                    $return .= "DELIMITER //\n";
+                    $return .= "CREATE TRIGGER `{$row['Trigger']}` {$row['Timing']} {$row['Event']} ON `{$row['Table']}` FOR EACH ROW {$row['Statement']}//\n";
+                    $return .= "DELIMITER ;\n";
+                }
+            }
+
+            // 3. Export Functions and Procedures
+            $routines = $conn->query("SHOW PROCEDURE STATUS WHERE Db = '" . DB_NAME . "'");
+            while ($row = $routines->fetch_assoc()) {
+                $res = $conn->query("SHOW CREATE PROCEDURE `{$row['Name']}`");
+                $create = $res->fetch_row();
+                $return .= "\n\n-- PROCEDURE: {$row['Name']} --\n";
+                $return .= "DELIMITER //\n" . $create[2] . "//\nDELIMITER ;\n";
+            }
+
+            $functions = $conn->query("SHOW FUNCTION STATUS WHERE Db = '" . DB_NAME . "'");
+            while ($row = $functions->fetch_assoc()) {
+                $res = $conn->query("SHOW CREATE FUNCTION `{$row['Name']}`");
+                $create = $res->fetch_row();
+                $return .= "\n\n-- FUNCTION: {$row['Name']} --\n";
+                $return .= "DELIMITER //\n" . $create[2] . "//\nDELIMITER ;\n";
+            }
+
+            $return .= "\nSET FOREIGN_KEY_CHECKS=1;\n";
+
+            // Log activity
+            require_once BASE_PATH . '/core/ActivityLogger.php';
+            $activityLogger = new ActivityLogger();
+            $activityLogger->log('database_backup', "Full database backup downloaded by admin", 'success');
+
+            // Set headers for download
+            $filename = 'backup_' . DB_NAME . '_' . date('Y-m-d_H-i-s') . '.sql';
+            header('Content-Type: application/octet-stream');
+            header("Content-Transfer-Encoding: Binary");
+            header("Content-disposition: attachment; filename=\"" . $filename . "\"");
+            echo $return;
+            exit;
+
+        } catch (Exception $e) {
+            $_SESSION['error'] = 'Backup failed: ' . $e->getMessage();
+            $this->redirect('admin/users');
+        }
+    }
 }
 

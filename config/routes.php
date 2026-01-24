@@ -15,6 +15,7 @@ return [
     'admin/unlock-account' => 'AdminController@unlockAccount',
     'admin/reset-password' => 'AdminController@resetPassword',
     'admin/activity-logs' => 'AdminController@activityLogs',
+    'admin/backup-db' => 'AdminController@backupDb',
     'profile' => 'ProfileController@index',
     'profile/update' => 'ProfileController@update',
     'dashboard' => 'DashboardController@index',

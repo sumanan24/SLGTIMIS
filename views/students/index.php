@@ -215,7 +215,7 @@
                                     <td class="text-muted"><?php echo $rowNumber++; ?></td>
                                     <td>
                                         <?php if ($profileImageUrl): ?>
-                                            <img src="<?php echo htmlspecialchars($profileImageUrl); ?>" 
+                                            <img src="assets/<?php echo $student['student_fullname']; ?>" 
                                                  alt="<?php echo htmlspecialchars($student['student_fullname']); ?>" 
                                                  class="rounded-circle" 
                                                  style="width: 40px; height: 40px; object-fit: cover; border: 2px solid #dee2e6;">
