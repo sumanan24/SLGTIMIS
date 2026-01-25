@@ -312,15 +312,6 @@
                     </div>
                 </div>
                 <?php endif; ?>
-                
-                <?php if (!empty($request['depot_name'])): ?>
-                <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                    <div class="info-section">
-                        <div class="info-label">Depot Name</div>
-                        <div class="info-value"><?php echo htmlspecialchars($request['depot_name']); ?></div>
-                    </div>
-                </div>
-                <?php endif; ?>
             </div>
             
             <?php if (!empty($request['notes'])): ?>

@@ -123,12 +123,6 @@
                             <div class="fw-semibold"><?php echo htmlspecialchars($request['season_name']); ?></div>
                         </div>
                         <?php endif; ?>
-                        <?php if (!empty($request['depot_name'])): ?>
-                        <div class="col-md-3">
-                            <small class="text-muted d-block mb-1">Depot Name:</small>
-                            <div class="fw-semibold"><?php echo htmlspecialchars($request['depot_name']); ?></div>
-                        </div>
-                        <?php endif; ?>
                     </div>
                 </div>
                 

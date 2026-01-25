@@ -88,9 +88,9 @@ class BusSeasonRequestModel extends Model {
             $this->ensureTableStructure();
             
             $sql = "INSERT INTO `{$this->table}` 
-                    (`student_id`, `department_id`, `season_year`, `season_name`, `depot_name`, 
+                    (`student_id`, `department_id`, `season_year`, `season_name`, 
                      `route_from`, `route_to`, `change_point`, `distance_km`, `status`, `notes`) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)";
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)";
             
             error_log("{$logPrefix} - SQL: " . $sql);
             error_log("{$logPrefix} - Data: " . json_encode($data));
@@ -109,7 +109,6 @@ class BusSeasonRequestModel extends Model {
             $departmentId = $data['department_id'] ?? null;
             $seasonYear = $data['season_year'] ?? '';
             $seasonName = $data['season_name'] ?? '';
-            $depotName = $data['depot_name'] ?? '';
             $routeFrom = $data['route_from'] ?? '';
             $routeTo = $data['route_to'] ?? '';
             $changePoint = $data['change_point'] ?? '';
@@ -132,8 +131,8 @@ class BusSeasonRequestModel extends Model {
                 $distanceKm = 0;
             }
             
-            $bindResult = $stmt->bind_param("ssssssssds",
-                $studentId, $departmentId, $seasonYear, $seasonName, $depotName,
+            $bindResult = $stmt->bind_param("sssssssds",
+                $studentId, $departmentId, $seasonYear, $seasonName,
                 $routeFrom, $routeTo, $changePoint, $distanceKm, $notes
             );
             
@@ -544,7 +543,7 @@ class BusSeasonRequestModel extends Model {
                 p.remaining_balance, p.status as payment_status, p.payment_date, p.payment_method, 
                 p.payment_reference, p.collected_by, p.notes as payment_notes, p.issued_at,
                 p.student_id as payment_student_id,
-                r.id as request_id, r.student_id as request_student_id, r.season_year, r.season_name, r.depot_name, r.route_from, r.route_to, r.change_point, r.distance_km,
+                r.id as request_id, r.student_id as request_student_id, r.season_year, r.season_name, r.route_from, r.route_to, r.change_point, r.distance_km,
                 r.status as request_status,
                 s.student_fullname, s.student_email, s.student_nic,
                 d.department_name, d.department_id,

@@ -76,7 +76,6 @@ class SeasonRequestHelper {
         $sanitized['department_id'] = isset($data['department_id']) ? trim($data['department_id']) : null;
         $sanitized['season_year'] = isset($data['season_year']) ? trim($data['season_year']) : '';
         $sanitized['season_name'] = isset($data['season_name']) ? trim($data['season_name']) : '';
-        $sanitized['depot_name'] = isset($data['depot_name']) ? trim($data['depot_name']) : '';
         $sanitized['route_from'] = isset($data['route_from']) ? trim($data['route_from']) : '';
         $sanitized['route_to'] = isset($data['route_to']) ? trim($data['route_to']) : '';
         $sanitized['change_point'] = isset($data['change_point']) ? trim($data['change_point']) : '';
@@ -340,7 +339,6 @@ class SeasonRequestHelper {
             'department_id' => $departmentId,
             'season_year' => $seasonYear,
             'season_name' => $sanitized['season_name'] ?? '',
-            'depot_name' => $sanitized['depot_name'] ?? '',
             'route_from' => $sanitized['route_from'],
             'route_to' => $sanitized['route_to'],
             'change_point' => $sanitized['change_point'] ?? '',
