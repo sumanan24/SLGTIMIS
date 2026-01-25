@@ -417,7 +417,8 @@ class BusSeasonRequestModel extends Model {
             return false;
         }
         
-        $stmt->bind_param("iiddsisi",
+        // Fix: student_id is VARCHAR (string), not integer
+        $stmt->bind_param("isddssis",
             $requestId, $studentId, $paidAmount, $seasonRate,
             $paymentMethod, $paymentReference, $collectedBy, $notes
         );
