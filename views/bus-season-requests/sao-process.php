@@ -57,6 +57,9 @@
             </p>
         </div>
         <div class="d-flex gap-2">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRequestModal">
+                <i class="fas fa-plus me-2"></i>Create Request
+            </button>
             <a href="<?php echo APP_URL; ?>/bus-season-requests/payment-collections" class="btn btn-outline-primary">
                 <i class="fas fa-list me-2"></i>View All Payments
             </a>
@@ -236,10 +239,189 @@
             </table>
         </div>
     </div>
+    
+    <!-- Create Request Modal -->
+    <div class="modal fade" id="createRequestModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus me-2"></i>Create Bus Season Request
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Create a bus season request for a student. Season Year: <strong>2026</strong>
+                    </div>
+                    
+                    <form id="createRequestForm" method="POST" action="<?php echo APP_URL; ?>/bus-season-requests/sao-create-request">
+                        <?php 
+                        require_once BASE_PATH . '/core/SeasonRequestHelper.php';
+                        $csrfToken = SeasonRequestHelper::generateCSRFToken();
+                        ?>
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                        
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <label for="student_id" class="form-label fw-bold">
+                                    Student ID <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="student_id" 
+                                       name="student_id" 
+                                       placeholder="Enter student ID"
+                                       required
+                                       autocomplete="off">
+                                <small class="text-muted">Enter the student ID to create a request for</small>
+                                <div id="studentInfo" class="mt-2"></div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="sao_route_from" class="form-label fw-bold">
+                                    <i class="fas fa-map-marker-alt text-danger me-2"></i>Route From <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="sao_route_from" 
+                                       name="route_from" 
+                                       placeholder="Enter starting point"
+                                       required>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="sao_route_to" class="form-label fw-bold">
+                                    <i class="fas fa-map-marker-alt text-success me-2"></i>Route To <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="sao_route_to" 
+                                       name="route_to" 
+                                       placeholder="Enter destination"
+                                       required>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div id="createRequestError" class="alert alert-danger d-none" role="alert">
+                                    <i class="fas fa-exclamation-circle me-2"></i>
+                                    <span id="createRequestErrorText"></span>
+                                </div>
+                                <div id="createRequestSuccess" class="alert alert-success d-none" role="alert">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    <span id="createRequestSuccessText"></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 text-end">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary px-4" id="createRequestBtn">
+                                <i class="fas fa-save me-2"></i>Create Request
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Basic initialization if needed
+    const createRequestForm = document.getElementById('createRequestForm');
+    const studentIdInput = document.getElementById('student_id');
+    const studentInfo = document.getElementById('studentInfo');
+    const createRequestError = document.getElementById('createRequestError');
+    const createRequestErrorText = document.getElementById('createRequestErrorText');
+    const createRequestSuccess = document.getElementById('createRequestSuccess');
+    const createRequestSuccessText = document.getElementById('createRequestSuccessText');
+    const createRequestBtn = document.getElementById('createRequestBtn');
+    
+    // Student ID lookup (optional - can be enhanced with AJAX)
+    let studentLookupTimeout;
+    studentIdInput.addEventListener('input', function() {
+        clearTimeout(studentLookupTimeout);
+        const studentId = this.value.trim();
+        
+        if (studentId.length >= 3) {
+            studentLookupTimeout = setTimeout(function() {
+                // Could add AJAX lookup here to show student name
+                studentInfo.innerHTML = '<small class="text-muted">Checking student...</small>';
+            }, 500);
+        } else {
+            studentInfo.innerHTML = '';
+        }
+    });
+    
+    // Form submission
+    createRequestForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Hide previous messages
+        createRequestError.classList.add('d-none');
+        createRequestSuccess.classList.add('d-none');
+        
+        // Disable button
+        createRequestBtn.disabled = true;
+        createRequestBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating...';
+        
+        const formData = new FormData(createRequestForm);
+        
+        fetch(createRequestForm.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (response.redirected) {
+                window.location.href = response.url;
+                return;
+            }
+            return response.text().then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    if (data.success) {
+                        createRequestSuccessText.textContent = data.message || 'Request created successfully!';
+                        createRequestSuccess.classList.remove('d-none');
+                        
+                        // Reset form
+                        createRequestForm.reset();
+                        studentInfo.innerHTML = '';
+                        
+                        // Reload page after 1.5 seconds
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        createRequestErrorText.textContent = data.error || 'Failed to create request.';
+                        createRequestError.classList.remove('d-none');
+                        createRequestBtn.disabled = false;
+                        createRequestBtn.innerHTML = '<i class="fas fa-save me-2"></i>Create Request';
+                    }
+                } catch (e) {
+                    // Not JSON, might be HTML redirect
+                    if (text.includes('successfully') || text.includes('created')) {
+                        window.location.reload();
+                    } else {
+                        createRequestErrorText.textContent = 'An error occurred. Please try again.';
+                        createRequestError.classList.remove('d-none');
+                        createRequestBtn.disabled = false;
+                        createRequestBtn.innerHTML = '<i class="fas fa-save me-2"></i>Create Request';
+                    }
+                }
+            });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            createRequestErrorText.textContent = 'An error occurred. Please try again.';
+            createRequestError.classList.remove('d-none');
+            createRequestBtn.disabled = false;
+            createRequestBtn.innerHTML = '<i class="fas fa-save me-2"></i>Create Request';
+        });
+    });
 });
 </script>

@@ -104,6 +104,7 @@ return [
     'bus-season-requests/second-approve' => 'BusSeasonRequestController@secondApprove',
     'bus-season-requests/sao-process' => 'BusSeasonRequestController@saoProcess',
     'bus-season-requests/sao-process-save' => 'BusSeasonRequestController@saoProcessSave',
+    'bus-season-requests/sao-create-request' => 'BusSeasonRequestController@saoCreateRequest',
     'bus-season-requests/update-payment-status' => 'BusSeasonRequestController@updatePaymentStatus',
     'bus-season-requests/bulk-update-status' => 'BusSeasonRequestController@bulkUpdateStatus',
     'bus-season-requests/export-payments' => 'BusSeasonRequestController@exportPaymentsExcel',

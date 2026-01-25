@@ -411,6 +411,115 @@ class BusSeasonRequestController extends Controller {
     }
     
     /**
+     * SAO Create Request for Student
+     */
+    public function saoCreateRequest() {
+        $this->requireAuth();
+        $this->requireSAOAccess();
+        $this->requirePost();
+        
+        $isAjax = SeasonRequestHelper::isAjaxRequest();
+        
+        // Get form data
+        $studentId = trim($this->post('student_id', ''));
+        $routeFrom = trim($this->post('route_from', ''));
+        $routeTo = trim($this->post('route_to', ''));
+        
+        // Validate
+        if (empty($studentId)) {
+            $errorMsg = 'Please enter a student ID.';
+            $this->handleResponse($isAjax, false, $errorMsg);
+            return;
+        }
+        
+        if (empty($routeFrom)) {
+            $errorMsg = 'Please enter the route from location.';
+            $this->handleResponse($isAjax, false, $errorMsg);
+            return;
+        }
+        
+        if (empty($routeTo)) {
+            $errorMsg = 'Please enter the route to location.';
+            $this->handleResponse($isAjax, false, $errorMsg);
+            return;
+        }
+        
+        // Verify student exists
+        $studentModel = $this->model('StudentModel');
+        $student = $studentModel->find($studentId);
+        if (!$student) {
+            $errorMsg = 'Student not found. Please check the student ID.';
+            $this->handleResponse($isAjax, false, $errorMsg);
+            return;
+        }
+        
+        try {
+            $requestModel = $this->model('BusSeasonRequestModel');
+            $requestModel->ensureTableStructure();
+            
+            // Check if student already has request for 2026
+            if ($requestModel->hasExistingRequest($studentId, '2026')) {
+                $errorMsg = 'This student already has a bus season request for 2026.';
+                $this->handleResponse($isAjax, false, $errorMsg);
+                return;
+            }
+            
+            // Get department ID
+            $departmentId = null;
+            $enrollmentModel = $this->model('StudentEnrollmentModel');
+            $currentEnrollment = $enrollmentModel->getCurrentEnrollment($studentId);
+            if ($currentEnrollment && isset($currentEnrollment['course_id'])) {
+                $courseModel = $this->model('CourseModel');
+                $course = $courseModel->find($currentEnrollment['course_id']);
+                if ($course && isset($course['department_id'])) {
+                    $departmentId = $course['department_id'];
+                }
+            }
+            
+            // Prepare request data
+            $requestData = [
+                'student_id' => $studentId,
+                'department_id' => $departmentId,
+                'season_year' => '2026',
+                'season_name' => '',
+                'depot_name' => '',
+                'route_from' => $routeFrom,
+                'route_to' => $routeTo,
+                'change_point' => '',
+                'distance_km' => 0,
+                'notes' => 'Created by SAO'
+            ];
+            
+            // Create request
+            $newRequestId = $requestModel->create($requestData);
+            
+            if ($newRequestId) {
+                // Log activity
+                try {
+                    SeasonRequestHelper::logActivity(
+                        'CREATE',
+                        $newRequestId,
+                        "SAO created bus season request for student {$studentId} (Season Year 2026)",
+                        $requestData
+                    );
+                } catch (Exception $e) {
+                    error_log("SAO create request - Activity log error: " . $e->getMessage());
+                }
+                
+                $successMsg = "Bus season request created successfully for student {$studentId}.";
+                $this->handleResponse($isAjax, true, $successMsg);
+            } else {
+                $errorMsg = 'Failed to create request. Please try again.';
+                $this->handleResponse($isAjax, false, $errorMsg);
+            }
+        } catch (Exception $e) {
+            error_log("SAO create request - Exception: " . $e->getMessage());
+            $errorMsg = 'An error occurred. Please try again.';
+            $this->handleResponse($isAjax, false, $errorMsg);
+        }
+    }
+    
+    /**
      * SAO Save Payment Collection
      */
     public function saoProcessSave() {

@@ -98,27 +98,20 @@
     <?php endif; ?>
     
     <?php if (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student'): ?>
+        <!-- Students can only view their requests, not create -->
         <?php if ($hasExistingRequest): ?>
             <div class="alert alert-info">
                 <i class="fas fa-info-circle me-2"></i>
-                You already have a bus season request for the season year <strong>2026</strong>. Only one request per year is allowed.
+                You have a bus season request for the season year <strong>2026</strong>.
             </div>
         <?php else: ?>
-            <!-- Request Form -->
-            <div class="form-card">
-                <div class="form-header">
-                    <h4 class="fw-bold mb-0">
-                        <i class="fas fa-bus me-2 text-success"></i>New Bus Season Request - 2026
-                    </h4>
-                </div>
-                
-                <div class="alert alert-info">
-                    <h6 class="fw-bold mb-2"><i class="fas fa-info-circle me-2"></i>Request Information</h6>
-                    <p class="mb-2">Submit a bus season request for approval. Payment collection will be handled separately by the Student Affairs Office (SAO) after your request is approved.</p>
-                    <p class="mb-0"><small><strong>Season Year:</strong> 2026</small></p>
-                </div>
-                
-                <form method="POST" action="<?php echo APP_URL; ?>/bus-season-requests/create" id="busSeasonForm" novalidate>
+            <div class="alert alert-warning">
+                <i class="fas fa-info-circle me-2"></i>
+                You don't have a bus season request yet. Please contact the Student Affairs Office (SAO) to create a request.
+            </div>
+        <?php endif; ?>
+        
+        <!-- Students can only view their requests, not create new ones -->
                     <?php 
                     require_once BASE_PATH . '/core/SeasonRequestHelper.php';
                     $csrfToken = SeasonRequestHelper::generateCSRFToken();
