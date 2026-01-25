@@ -23,6 +23,14 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     
+    # Increase client body size for form submissions
+    client_max_body_size 10M;
+    client_body_buffer_size 128k;
+    
+    # Timeouts for long-running requests
+    fastcgi_read_timeout 300;
+    fastcgi_send_timeout 300;
+    
     # Main location block
     location / {
         try_files $uri $uri/ /index.php?$query_string;
@@ -34,6 +42,11 @@ server {
         fastcgi_pass unix:/var/run/php/php-fpm.sock;  # Update PHP version as needed
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         include fastcgi_params;
+        
+        # FastCGI buffer settings for POST data
+        fastcgi_buffer_size 128k;
+        fastcgi_buffers 4 256k;
+        fastcgi_busy_buffers_size 256k;
         
         # Security: Prevent execution of PHP files in uploads directory
         fastcgi_param PHP_ADMIN_VALUE "open_basedir=$document_root/:/tmp/";
