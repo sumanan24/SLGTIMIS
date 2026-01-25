@@ -178,9 +178,25 @@ class BusSeasonRequestController extends Controller {
         
         // Create request
         try {
+            // Log request attempt
+            error_log("BusSeasonRequestController::create - Attempting to create request for student: {$studentId}, Season: {$seasonYear}");
+            error_log("BusSeasonRequestController::create - Request data: " . json_encode($data));
+            
+            // Check database connection
+            $db = Database::getInstance();
+            $conn = $db->getConnection();
+            if (!$conn || $conn->connect_error) {
+                error_log("BusSeasonRequestController::create - Database connection failed: " . ($conn ? $conn->connect_error : 'Connection object is null'));
+                $_SESSION['error'] = 'Database connection error. Please contact the administrator.';
+                $this->redirect('bus-season-requests');
+                return;
+            }
+            
             $newRequestId = $requestModel->createRequest($data);
             
             if ($newRequestId) {
+                error_log("BusSeasonRequestController::create - Request created successfully. ID: {$newRequestId}");
+                
                 // Log activity
                 try {
                     $activityModel = $this->model('ActivityLogModel');
@@ -193,16 +209,24 @@ class BusSeasonRequestController extends Controller {
                     ]);
                 } catch (Exception $e) {
                     // Log activity error but don't fail the request
-                    error_log("Activity log error: " . $e->getMessage());
+                    error_log("BusSeasonRequestController::create - Activity log error: " . $e->getMessage());
                 }
                 
                 $_SESSION['message'] = 'Bus season request submitted successfully. Waiting for HOD approval.';
             } else {
+                error_log("BusSeasonRequestController::create - Request creation failed. Student: {$studentId}");
                 $_SESSION['error'] = 'Failed to submit request. Please check your input and try again. If the problem persists, contact the administrator.';
             }
         } catch (Exception $e) {
-            error_log("BusSeasonRequestController::create - Error: " . $e->getMessage());
+            error_log("BusSeasonRequestController::create - Exception: " . $e->getMessage());
+            error_log("BusSeasonRequestController::create - Stack trace: " . $e->getTraceAsString());
+            error_log("BusSeasonRequestController::create - File: " . $e->getFile() . ", Line: " . $e->getLine());
             $_SESSION['error'] = 'An error occurred while submitting your request. Please try again or contact support.';
+        } catch (Error $e) {
+            error_log("BusSeasonRequestController::create - Fatal Error: " . $e->getMessage());
+            error_log("BusSeasonRequestController::create - Stack trace: " . $e->getTraceAsString());
+            error_log("BusSeasonRequestController::create - File: " . $e->getFile() . ", Line: " . $e->getLine());
+            $_SESSION['error'] = 'A system error occurred. Please contact the administrator.';
         }
         
         $this->redirect('bus-season-requests');

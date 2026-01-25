@@ -14,7 +14,10 @@ class Database {
     private function connect() {
         if ($this->connection === null) {
             try {
-                $this->connection = new mysqli(
+                // Set connection timeout for nginx servers
+                ini_set('default_socket_timeout', 10);
+                
+                $this->connection = @new mysqli(
                     DB_HOST,
                     DB_USER,
                     DB_PASS,
@@ -22,12 +25,28 @@ class Database {
                 );
                 
                 if ($this->connection->connect_error) {
-                    throw new Exception("Database connection failed: " . $this->connection->connect_error);
+                    $errorMsg = "Database connection failed: " . $this->connection->connect_error;
+                    $errorCode = $this->connection->connect_errno;
+                    error_log("Database::connect - {$errorMsg} [Code: {$errorCode}]");
+                    error_log("Database::connect - Host: " . DB_HOST . ", User: " . DB_USER . ", DB: " . DB_NAME);
+                    throw new Exception($errorMsg);
                 }
                 
-                $this->connection->set_charset(DB_CHARSET);
+                // Set connection options for better compatibility
+                $this->connection->options(MYSQLI_OPT_CONNECT_TIMEOUT, 10);
+                $this->connection->options(MYSQLI_OPT_READ_TIMEOUT, 10);
+                
+                if (!$this->connection->set_charset(DB_CHARSET)) {
+                    error_log("Database::connect - Failed to set charset: " . $this->connection->error);
+                }
+                
+                error_log("Database::connect - Connection successful to " . DB_NAME);
             } catch (Exception $e) {
+                error_log("Database::connect - Exception: " . $e->getMessage());
                 throw new Exception("Database Error: " . $e->getMessage());
+            } catch (Error $e) {
+                error_log("Database::connect - Fatal Error: " . $e->getMessage());
+                throw new Exception("Database Fatal Error: " . $e->getMessage());
             }
         }
         return $this->connection;

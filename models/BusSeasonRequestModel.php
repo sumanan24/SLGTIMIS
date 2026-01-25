@@ -76,54 +76,87 @@ class BusSeasonRequestModel extends Model {
      * Create new request (approval only, no payment details)
      */
     public function createRequest($data) {
-        $this->addRequiredColumnsIfNotExists();
-        
-        $sql = "INSERT INTO `{$this->table}` 
-                (`student_id`, `department_id`, `season_year`, `season_name`, `depot_name`, 
-                 `route_from`, `route_to`, `change_point`, `distance_km`, `status`, `notes`) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)";
-        
-        $stmt = $this->db->prepare($sql);
-        
-        if (!$stmt) {
-            $conn = $this->db->getConnection();
-            error_log("BusSeasonRequestModel::createRequest - Prepare failed: " . ($conn ? $conn->error : 'Unknown error'));
-            return false;
-        }
-        
-        // Extract values to variables (bind_param requires variables, not direct array access)
-        $studentId = $data['student_id'];
-        $departmentId = $data['department_id'] ?? null;
-        $seasonYear = $data['season_year'];
-        $seasonName = $data['season_name'] ?? '';
-        $depotName = $data['depot_name'] ?? '';
-        $routeFrom = $data['route_from'] ?? '';
-        $routeTo = $data['route_to'] ?? '';
-        $changePoint = $data['change_point'] ?? '';
-        $distanceKm = floatval($data['distance_km'] ?? 0);
-        $notes = $data['notes'] ?? null;
-        
-        $stmt->bind_param("ssssssssds",
-            $studentId,
-            $departmentId,
-            $seasonYear,
-            $seasonName,
-            $depotName,
-            $routeFrom,
-            $routeTo,
-            $changePoint,
-            $distanceKm,
-            $notes
-        );
-        
-        if ($stmt->execute()) {
-            $insertId = $this->db->lastInsertId();
-            $stmt->close();
-            return $insertId;
-        } else {
-            $error = $stmt->error;
-            error_log("BusSeasonRequestModel::createRequest - Execute failed: " . $error);
-            $stmt->close();
+        try {
+            $this->addRequiredColumnsIfNotExists();
+            
+            $sql = "INSERT INTO `{$this->table}` 
+                    (`student_id`, `department_id`, `season_year`, `season_name`, `depot_name`, 
+                     `route_from`, `route_to`, `change_point`, `distance_km`, `status`, `notes`) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)";
+            
+            $stmt = $this->db->prepare($sql);
+            
+            if (!$stmt) {
+                $conn = $this->db->getConnection();
+                $errorMsg = $conn ? $conn->error : 'Unknown error';
+                $errorCode = $conn ? $conn->errno : 0;
+                error_log("BusSeasonRequestModel::createRequest - Prepare failed [Error: {$errorMsg}, Code: {$errorCode}]");
+                error_log("BusSeasonRequestModel::createRequest - SQL: " . $sql);
+                error_log("BusSeasonRequestModel::createRequest - Data: " . json_encode($data));
+                return false;
+            }
+            
+            // Extract values to variables (bind_param requires variables, not direct array access)
+            $studentId = $data['student_id'] ?? '';
+            $departmentId = $data['department_id'] ?? null;
+            $seasonYear = $data['season_year'] ?? '';
+            $seasonName = $data['season_name'] ?? '';
+            $depotName = $data['depot_name'] ?? '';
+            $routeFrom = $data['route_from'] ?? '';
+            $routeTo = $data['route_to'] ?? '';
+            $changePoint = $data['change_point'] ?? '';
+            $distanceKm = floatval($data['distance_km'] ?? 0);
+            $notes = $data['notes'] ?? null;
+            
+            // Validate critical fields before binding
+            if (empty($studentId) || empty($seasonYear) || empty($routeFrom) || empty($routeTo)) {
+                error_log("BusSeasonRequestModel::createRequest - Validation failed. Missing required fields.");
+                error_log("BusSeasonRequestModel::createRequest - Data: " . json_encode($data));
+                $stmt->close();
+                return false;
+            }
+            
+            $bindResult = $stmt->bind_param("ssssssssds",
+                $studentId,
+                $departmentId,
+                $seasonYear,
+                $seasonName,
+                $depotName,
+                $routeFrom,
+                $routeTo,
+                $changePoint,
+                $distanceKm,
+                $notes
+            );
+            
+            if (!$bindResult) {
+                error_log("BusSeasonRequestModel::createRequest - Bind param failed: " . $stmt->error);
+                $stmt->close();
+                return false;
+            }
+            
+            if ($stmt->execute()) {
+                $insertId = $this->db->lastInsertId();
+                $stmt->close();
+                if ($insertId) {
+                    error_log("BusSeasonRequestModel::createRequest - Success. Insert ID: {$insertId}, Student: {$studentId}");
+                    return $insertId;
+                } else {
+                    error_log("BusSeasonRequestModel::createRequest - Execute succeeded but no insert ID returned");
+                    return false;
+                }
+            } else {
+                $error = $stmt->error;
+                $errorCode = $stmt->errno;
+                error_log("BusSeasonRequestModel::createRequest - Execute failed [Error: {$error}, Code: {$errorCode}]");
+                error_log("BusSeasonRequestModel::createRequest - SQL: " . $sql);
+                error_log("BusSeasonRequestModel::createRequest - Data: " . json_encode($data));
+                $stmt->close();
+                return false;
+            }
+        } catch (Exception $e) {
+            error_log("BusSeasonRequestModel::createRequest - Exception: " . $e->getMessage());
+            error_log("BusSeasonRequestModel::createRequest - Stack trace: " . $e->getTraceAsString());
             return false;
         }
     }
