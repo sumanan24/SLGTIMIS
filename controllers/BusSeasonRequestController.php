@@ -177,22 +177,32 @@ class BusSeasonRequestController extends Controller {
         ];
         
         // Create request
-        $newRequestId = $requestModel->createRequest($data);
-        
-        if ($newRequestId) {
-            // Log activity
-            $activityModel = $this->model('ActivityLogModel');
-            $activityModel->logActivity([
-                'activity_type' => 'CREATE',
-                'module' => 'bus_season_request',
-                'record_id' => $newRequestId,
-                'description' => "Student {$studentId} created bus season request for season year {$seasonYear}",
-                'new_values' => $data
-            ]);
+        try {
+            $newRequestId = $requestModel->createRequest($data);
             
-            $_SESSION['message'] = 'Bus season request submitted successfully. Waiting for HOD approval.';
-        } else {
-            $_SESSION['error'] = 'Failed to submit request. Please try again.';
+            if ($newRequestId) {
+                // Log activity
+                try {
+                    $activityModel = $this->model('ActivityLogModel');
+                    $activityModel->logActivity([
+                        'activity_type' => 'CREATE',
+                        'module' => 'bus_season_request',
+                        'record_id' => $newRequestId,
+                        'description' => "Student {$studentId} created bus season request for season year {$seasonYear}",
+                        'new_values' => $data
+                    ]);
+                } catch (Exception $e) {
+                    // Log activity error but don't fail the request
+                    error_log("Activity log error: " . $e->getMessage());
+                }
+                
+                $_SESSION['message'] = 'Bus season request submitted successfully. Waiting for HOD approval.';
+            } else {
+                $_SESSION['error'] = 'Failed to submit request. Please check your input and try again. If the problem persists, contact the administrator.';
+            }
+        } catch (Exception $e) {
+            error_log("BusSeasonRequestController::create - Error: " . $e->getMessage());
+            $_SESSION['error'] = 'An error occurred while submitting your request. Please try again or contact support.';
         }
         
         $this->redirect('bus-season-requests');

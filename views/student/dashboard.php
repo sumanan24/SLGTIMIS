@@ -81,6 +81,26 @@
         border-color: var(--student-primary) !important;
     }
     
+    /* Utility classes */
+    .min-w-0 {
+        min-width: 0;
+    }
+    
+    /* Quick link card base styles */
+    .quick-link-card {
+        transition: all 0.3s ease;
+    }
+    
+    .quick-link-icon {
+        flex-shrink: 0;
+    }
+    
+    .quick-link-text,
+    .quick-link-subtext {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    
     /* Mobile Responsive Styles */
     @media (max-width: 768px) {
         .stat-value {
@@ -106,11 +126,55 @@
         .student-welcome-card .col-md-4.text-md-end {
             text-align: center !important;
         }
+        
+        /* Quick Links Mobile */
+        .quick-link-card {
+            padding: 0.75rem !important;
+            gap: 0.75rem !important;
+        }
+        
+        .quick-link-icon {
+            padding: 0.5rem !important;
+            min-width: 45px;
+            width: 45px;
+            height: 45px;
+        }
+        
+        .quick-link-icon i {
+            font-size: 1.25rem !important;
+        }
+        
+        .quick-link-text {
+            font-size: 0.875rem;
+        }
+        
+        .quick-link-subtext {
+            font-size: 0.75rem;
+        }
+        
+        /* Statistics Cards Mobile */
+        .stat-value {
+            font-size: 1.75rem;
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+        }
+        
+        /* Dashboard Cards Mobile */
+        .student-dashboard-card {
+            padding: 1rem !important;
+        }
+        
+        /* Quick Info Mobile */
+        .quick-info-row .col-6 {
+            margin-bottom: 0.75rem;
+        }
     }
     
     @media (max-width: 576px) {
         .stat-value {
-            font-size: 1.75rem;
+            font-size: 1.5rem;
         }
         
         .stat-label {
@@ -125,11 +189,64 @@
         
         .student-dashboard-card {
             margin-bottom: 1rem;
+            padding: 0.875rem !important;
+        }
+        
+        /* Quick Links Small Mobile */
+        .quick-link-card {
+            padding: 0.625rem !important;
+            gap: 0.5rem !important;
+            flex-direction: column;
+            text-align: center;
+            align-items: center !important;
+        }
+        
+        .quick-link-icon {
+            padding: 0.5rem !important;
+            min-width: 40px;
+            width: 40px;
+            height: 40px;
+        }
+        
+        .quick-link-icon i {
+            font-size: 1.1rem !important;
+        }
+        
+        .quick-link-text {
+            font-size: 0.8rem;
+            text-align: center;
+        }
+        
+        .quick-link-subtext {
+            font-size: 0.7rem;
+            text-align: center;
+        }
+        
+        /* Container padding */
+        .container-fluid {
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }
+        
+        /* Welcome card mobile */
+        .student-welcome-card {
+            padding: 1rem !important;
+        }
+        
+        .student-welcome-card h2 {
+            font-size: 1.25rem;
+        }
+        
+        /* Calendar header mobile */
+        .calendar-header {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 0.75rem;
         }
     }
 </style>
 
-<div class="container-fluid px-3 px-md-4">
+<div class="container-fluid px-2 px-md-3 px-lg-4">
     <!-- Welcome Card -->
     <div class="student-welcome-card mb-3 mb-md-4">
         <div class="row align-items-center g-3">
@@ -178,78 +295,78 @@
                 <h5 class="fw-bold mb-3">
                     <i class="fas fa-link me-2" style="color: var(--student-primary);"></i>Quick Links
                 </h5>
-                <div class="row g-3">
+                <div class="row g-2 g-md-3">
                     <div class="col-6 col-md-4 col-lg-3">
                         <a href="<?php echo APP_URL; ?>/on-peak-requests" class="text-decoration-none">
-                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-primary border-opacity-25 hover-lift">
+                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-primary border-opacity-25 hover-lift quick-link-card">
                                 <div class="flex-shrink-0">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle p-3">
-                                        <i class="fas fa-calendar-alt text-primary fs-4"></i>
+                                    <div class="bg-primary bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
+                                        <i class="fas fa-calendar-alt text-primary"></i>
                                     </div>
                                 </div>
-                                <div class="flex-grow-1">
-                                    <div class="fw-bold text-dark">On-Peak Requests</div>
-                                    <div class="small text-muted">Submit & View</div>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="fw-bold text-dark quick-link-text">On-Peak Requests</div>
+                                    <div class="small text-muted quick-link-subtext">Submit & View</div>
                                 </div>
                             </div>
                         </a>
                     </div>
                     <div class="col-6 col-md-4 col-lg-3">
                         <a href="<?php echo APP_URL; ?>/bus-season-requests" class="text-decoration-none">
-                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-success border-opacity-25 hover-lift">
+                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-success border-opacity-25 hover-lift quick-link-card">
                                 <div class="flex-shrink-0">
-                                    <div class="bg-success bg-opacity-10 rounded-circle p-3">
-                                        <i class="fas fa-bus text-success fs-4"></i>
+                                    <div class="bg-success bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
+                                        <i class="fas fa-bus text-success"></i>
                                     </div>
                                 </div>
-                                <div class="flex-grow-1">
-                                    <div class="fw-bold text-dark">Bus Season Request</div>
-                                    <div class="small text-muted">Season Ticket</div>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="fw-bold text-dark quick-link-text">Bus Season Request</div>
+                                    <div class="small text-muted quick-link-subtext">Season Ticket</div>
                                 </div>
                             </div>
                         </a>
                     </div>
                     <div class="col-6 col-md-4 col-lg-3">
                         <a href="<?php echo APP_URL; ?>/student/profile" class="text-decoration-none">
-                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-primary border-opacity-25 hover-lift">
+                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-primary border-opacity-25 hover-lift quick-link-card">
                                 <div class="flex-shrink-0">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle p-3">
-                                        <i class="fas fa-user text-primary fs-4"></i>
+                                    <div class="bg-primary bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
+                                        <i class="fas fa-user text-primary"></i>
                                     </div>
                                 </div>
-                                <div class="flex-grow-1">
-                                    <div class="fw-bold text-dark">My Profile</div>
-                                    <div class="small text-muted">View & Edit</div>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="fw-bold text-dark quick-link-text">My Profile</div>
+                                    <div class="small text-muted quick-link-subtext">View & Edit</div>
                                 </div>
                             </div>
                         </a>
                     </div>
                     <div class="col-6 col-md-4 col-lg-3">
                         <a href="<?php echo APP_URL; ?>/student/attendance" class="text-decoration-none">
-                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-primary border-opacity-25 hover-lift">
+                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-primary border-opacity-25 hover-lift quick-link-card">
                                 <div class="flex-shrink-0">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle p-3">
-                                        <i class="fas fa-calendar-check text-primary fs-4"></i>
+                                    <div class="bg-primary bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
+                                        <i class="fas fa-calendar-check text-primary"></i>
                                     </div>
                                 </div>
-                                <div class="flex-grow-1">
-                                    <div class="fw-bold text-dark">Attendance</div>
-                                    <div class="small text-muted">View Calendar</div>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="fw-bold text-dark quick-link-text">Attendance</div>
+                                    <div class="small text-muted quick-link-subtext">View Calendar</div>
                                 </div>
                             </div>
                         </a>
                     </div>
                     <div class="col-6 col-md-4 col-lg-3">
                         <a href="<?php echo APP_URL; ?>/group-timetable/student-view" class="text-decoration-none">
-                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-info border-opacity-25 hover-lift">
+                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-info border-opacity-25 hover-lift quick-link-card">
                                 <div class="flex-shrink-0">
-                                    <div class="bg-info bg-opacity-10 rounded-circle p-3">
-                                        <i class="fas fa-calendar-alt text-info fs-4"></i>
+                                    <div class="bg-info bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
+                                        <i class="fas fa-calendar-alt text-info"></i>
                                     </div>
                                 </div>
-                                <div class="flex-grow-1">
-                                    <div class="fw-bold text-dark">Timetable</div>
-                                    <div class="small text-muted">View Schedule</div>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="fw-bold text-dark quick-link-text">Timetable</div>
+                                    <div class="small text-muted quick-link-subtext">View Schedule</div>
                                 </div>
                             </div>
                         </a>
@@ -260,9 +377,9 @@
     </div>
     
     <!-- Statistics Cards -->
-    <div class="row g-3 g-md-4 mb-3 mb-md-4">
-        <div class="col-md-3">
-            <div class="student-dashboard-card p-4">
+    <div class="row g-2 g-md-3 g-lg-4 mb-3 mb-md-4">
+        <div class="col-6 col-md-3">
+            <div class="student-dashboard-card p-3 p-md-4">
                 <div class="text-center">
                     <div class="stat-value"><?php echo $attendancePercentage; ?>%</div>
                     <div class="stat-label mt-2">Attendance Rate</div>
@@ -270,8 +387,8 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="student-dashboard-card p-4">
+        <div class="col-6 col-md-3">
+            <div class="student-dashboard-card p-3 p-md-4">
                 <div class="text-center">
                     <div class="stat-value text-success"><?php echo $presentDays; ?></div>
                     <div class="stat-label mt-2">Present Days</div>
@@ -279,8 +396,8 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="student-dashboard-card p-4">
+        <div class="col-6 col-md-3">
+            <div class="student-dashboard-card p-3 p-md-4">
                 <div class="text-center">
                     <div class="stat-value text-danger"><?php echo $absentDays; ?></div>
                     <div class="stat-label mt-2">Absent Days</div>
@@ -288,8 +405,8 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="student-dashboard-card p-4">
+        <div class="col-6 col-md-3">
+            <div class="student-dashboard-card p-3 p-md-4">
                 <div class="text-center">
                     <div class="stat-value text-warning"><?php echo $holidayDays; ?></div>
                     <div class="stat-label mt-2">Holidays</div>
@@ -300,13 +417,13 @@
     </div>
     
     <!-- Quick Info Row -->
-    <div class="row g-3 g-md-4 mb-3 mb-md-4">
+    <div class="row g-2 g-md-3 g-lg-4 mb-3 mb-md-4 quick-info-row">
         <div class="col-12 col-md-6">
             <div class="student-dashboard-card p-3 p-md-4">
                 <h5 class="fw-bold mb-3">
                     <i class="fas fa-info-circle me-2" style="color: var(--student-primary);"></i>Quick Information
                 </h5>
-                <div class="row g-3">
+                <div class="row g-2 g-md-3">
                     <div class="col-6 col-sm-6">
                         <div class="small text-muted mb-1">Student ID</div>
                         <div class="fw-semibold"><?php echo htmlspecialchars($student['student_id']); ?></div>
@@ -337,7 +454,7 @@
                     <i class="fas fa-bed me-2" style="color: var(--student-primary);"></i>Hostel Information
                 </h5>
                 <?php if ($hostelAllocation): ?>
-                    <div class="row g-3">
+                    <div class="row g-2 g-md-3">
                         <div class="col-6">
                             <div class="small text-muted mb-1">Hostel</div>
                             <div class="fw-semibold"><?php echo htmlspecialchars($hostelAllocation['hostel_name'] ?? 'N/A'); ?></div>
@@ -356,7 +473,7 @@
     
     <!-- Attendance Calendar View -->
     <div class="student-dashboard-card p-3 p-md-4 mb-4">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2 calendar-header">
             <h5 class="fw-bold mb-0">
                 <i class="fas fa-calendar-check me-2" style="color: var(--student-primary);"></i>Attendance Calendar - <?php echo date('F Y', strtotime($currentMonth . '-01')); ?>
             </h5>

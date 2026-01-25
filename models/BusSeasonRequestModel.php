@@ -17,14 +17,14 @@ class BusSeasonRequestModel extends Model {
     public function addRequiredColumnsIfNotExists() {
         // Add HOD approval columns for requests table
         $columns = [
+            'department_id' => "ALTER TABLE `{$this->table}` ADD COLUMN `department_id` VARCHAR(6) DEFAULT NULL AFTER `student_id`",
             'hod_approver_id' => "ALTER TABLE `{$this->table}` ADD COLUMN `hod_approver_id` INT(11) DEFAULT NULL COMMENT 'User ID of HOD who approved' AFTER `approved_by`",
             'hod_approval_date' => "ALTER TABLE `{$this->table}` ADD COLUMN `hod_approval_date` DATETIME DEFAULT NULL AFTER `hod_approver_id`",
             'hod_comments' => "ALTER TABLE `{$this->table}` ADD COLUMN `hod_comments` TEXT DEFAULT NULL AFTER `hod_approval_date`",
             'second_approver_id' => "ALTER TABLE `{$this->table}` ADD COLUMN `second_approver_id` INT(11) DEFAULT NULL COMMENT 'User ID of second approver (DIR, DPA, DPI, REG)' AFTER `hod_comments`",
             'second_approver_role' => "ALTER TABLE `{$this->table}` ADD COLUMN `second_approver_role` VARCHAR(10) DEFAULT NULL COMMENT 'DIR, DPA, DPI, REG' AFTER `second_approver_id`",
             'second_approval_date' => "ALTER TABLE `{$this->table}` ADD COLUMN `second_approval_date` DATETIME DEFAULT NULL AFTER `second_approver_role`",
-            'second_comments' => "ALTER TABLE `{$this->table}` ADD COLUMN `second_comments` TEXT DEFAULT NULL AFTER `second_approval_date`",
-            'department_id' => "ALTER TABLE `{$this->table}` ADD COLUMN `department_id` VARCHAR(6) DEFAULT NULL AFTER `student_id`"
+            'second_comments' => "ALTER TABLE `{$this->table}` ADD COLUMN `second_comments` TEXT DEFAULT NULL AFTER `second_approval_date`"
         ];
         
         foreach ($columns as $columnName => $sql) {
@@ -32,10 +32,23 @@ class BusSeasonRequestModel extends Model {
                 $checkSql = "SHOW COLUMNS FROM `{$this->table}` LIKE '{$columnName}'";
                 $result = $this->db->query($checkSql);
                 if (!$result || $result->num_rows == 0) {
-                    $this->db->query($sql);
+                    $alterResult = $this->db->query($sql);
+                    if (!$alterResult) {
+                        $conn = $this->db->getConnection();
+                        $error = $conn ? $conn->error : 'Unknown error';
+                        error_log("Error adding column {$columnName} to {$this->table}: " . $error);
+                        // Try without AFTER clause if it fails
+                        if (strpos($sql, 'AFTER') !== false) {
+                            $simpleSql = preg_replace('/\s+AFTER\s+`?[\w]+`?/i', '', $sql);
+                            $simpleResult = $this->db->query($simpleSql);
+                            if (!$simpleResult) {
+                                error_log("Error adding column {$columnName} without AFTER clause: " . ($conn ? $conn->error : 'Unknown error'));
+                            }
+                        }
+                    }
                 }
             } catch (Exception $e) {
-                error_log("Error adding column {$columnName}: " . $e->getMessage());
+                error_log("Exception adding column {$columnName}: " . $e->getMessage());
             }
         }
         
@@ -72,6 +85,12 @@ class BusSeasonRequestModel extends Model {
         
         $stmt = $this->db->prepare($sql);
         
+        if (!$stmt) {
+            $conn = $this->db->getConnection();
+            error_log("BusSeasonRequestModel::createRequest - Prepare failed: " . ($conn ? $conn->error : 'Unknown error'));
+            return false;
+        }
+        
         // Extract values to variables (bind_param requires variables, not direct array access)
         $studentId = $data['student_id'];
         $departmentId = $data['department_id'] ?? null;
@@ -98,9 +117,15 @@ class BusSeasonRequestModel extends Model {
         );
         
         if ($stmt->execute()) {
-            return $this->db->lastInsertId();
+            $insertId = $this->db->lastInsertId();
+            $stmt->close();
+            return $insertId;
+        } else {
+            $error = $stmt->error;
+            error_log("BusSeasonRequestModel::createRequest - Execute failed: " . $error);
+            $stmt->close();
+            return false;
         }
-        return false;
     }
     
     /**
