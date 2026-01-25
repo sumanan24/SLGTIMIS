@@ -129,12 +129,10 @@
                 
                 <form method="POST" action="<?php echo APP_URL; ?>/bus-season-requests/create" id="busSeasonForm" novalidate>
                     <?php 
-                    // Generate CSRF token for nginx compatibility
-                    if (!isset($_SESSION['csrf_token'])) {
-                        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-                    }
+                    require_once BASE_PATH . '/core/SeasonRequestHelper.php';
+                    $csrfToken = SeasonRequestHelper::generateCSRFToken();
                     ?>
-                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                     <input type="hidden" name="form_submitted" value="1">
                     
                     <div class="row g-3">
@@ -437,37 +435,38 @@
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <?php if (isset($request['payment'])): ?>
-                                            Rs. <?php echo number_format($request['payment']['student_paid'] ?? 0, 2); ?>
+                                        <?php
+                                        require_once BASE_PATH . '/core/SeasonRequestHelper.php';
+                                        if (isset($request['payment'])): ?>
+                                            <?php echo SeasonRequestHelper::formatCurrency($request['payment']['student_paid'] ?? 0); ?>
                                         <?php else: ?>
                                             <span class="text-muted">Not Collected</span>
                                         <?php endif; ?>
                                     </td>
                                     <td>
                                         <?php if (isset($request['payment'])): ?>
-                                            Rs. <?php echo number_format($request['payment']['total_amount'] ?? 0, 2); ?>
+                                            <?php echo SeasonRequestHelper::formatCurrency($request['payment']['total_amount'] ?? 0); ?>
                                         <?php else: ?>
                                             <span class="text-muted">Pending Collection</span>
                                         <?php endif; ?>
                                     </td>
                                     <td>
                                         <?php
+                                        require_once BASE_PATH . '/core/SeasonRequestHelper.php';
                                         $status = $request['status'] ?? 'pending';
                                         $statusClass = 'status-' . strtolower($status);
-                                        $statusLabels = [
-                                            'pending' => 'Pending HOD Approval',
-                                            'hod_approved' => 'HOD Approved - Pending Second Approval',
-                                            'approved' => 'Approved',
-                                            'paid' => 'Paid',
-                                            'rejected' => 'Rejected'
-                                        ];
-                                        $statusLabel = $statusLabels[$status] ?? ucfirst($status);
+                                        $statusLabel = SeasonRequestHelper::formatStatusLabel($status);
                                         ?>
                                         <span class="status-badge <?php echo $statusClass; ?>">
-                                            <?php echo $statusLabel; ?>
+                                            <?php echo htmlspecialchars($statusLabel); ?>
                                         </span>
                                     </td>
-                                    <td><?php echo $request['created_at'] ? date('M d, Y', strtotime($request['created_at'])) : 'N/A'; ?></td>
+                                    <td>
+                                        <?php
+                                        require_once BASE_PATH . '/core/SeasonRequestHelper.php';
+                                        echo SeasonRequestHelper::formatDate($request['created_at'] ?? null);
+                                        ?>
+                                    </td>
                                     <td>
                                         <a href="<?php echo APP_URL; ?>/bus-season-requests/view?id=<?php echo $request['id']; ?>" class="btn btn-sm btn-outline-primary">
                                             <i class="fas fa-eye"></i> View

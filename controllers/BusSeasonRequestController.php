@@ -1,416 +1,239 @@
 <?php
 /**
  * Bus Season Request Controller
+ * MVC Architecture - Handles all bus season request operations
  */
+
+require_once BASE_PATH . '/core/SeasonRequestHelper.php';
 
 class BusSeasonRequestController extends Controller {
     
     /**
-     * Student view - List and submit bus season requests
+     * Index - Display requests based on user role
      */
     public function index() {
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return;
-        }
+        $this->requireAuth();
         
         $requestModel = $this->model('BusSeasonRequestModel');
-        $studentModel = $this->model('StudentModel');
-        $requestModel->addRequiredColumnsIfNotExists();
-
-        // Check if user is a student
-        if (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student') {
-            $studentId = $_SESSION['user_name'];
-            
-            // Get student info
-            $student = $studentModel->find($studentId);
-            if (!$student) {
-                $_SESSION['error'] = 'Student record not found.';
-                $this->redirect('student/dashboard');
-                return;
-            }
-            
-            // Get current enrollment
-            $enrollmentModel = $this->model('StudentEnrollmentModel');
-            $currentEnrollment = $enrollmentModel->getCurrentEnrollment($studentId);
-            $seasonYear = $currentEnrollment['academic_year'] ?? date('Y');
-            
-            // Get department ID
-            $departmentId = null;
-            if ($currentEnrollment && isset($currentEnrollment['course_id'])) {
-                $courseModel = $this->model('CourseModel');
-                $course = $courseModel->find($currentEnrollment['course_id']);
-                if ($course && isset($course['department_id'])) {
-                    $departmentId = $course['department_id'];
-                }
-            }
-            
-            // Get academic years
-            $academicYears = $studentModel->getAcademicYears();
-            
-            // Get requests for student (with payment info)
-            $requests = $requestModel->getByStudentId($studentId);
-            
-            // Add payment collection info to each request
-            foreach ($requests as &$request) {
-                $payment = $requestModel->getPaymentCollectionByRequestId($request['id']);
-                if ($payment) {
-                    $request['payment'] = $payment;
-                }
-            }
-            unset($request);
-            
-            // Check if student already has request for current season year
-            $hasExistingRequest = $requestModel->hasExistingRequest($studentId, $seasonYear);
-            
-            $data = [
-                'title' => 'Bus Season Request',
-                'page' => 'bus-season-requests',
-                'student' => $student,
-                'currentEnrollment' => $currentEnrollment,
-                'seasonYear' => $seasonYear,
-                'departmentId' => $departmentId,
-                'requests' => $requests,
-                'hasExistingRequest' => $hasExistingRequest,
-                'academicYears' => $academicYears,
-                'message' => $_SESSION['message'] ?? null,
-                'error' => $_SESSION['error'] ?? null
-            ];
-            
-            unset($_SESSION['message'], $_SESSION['error']);
-            return $this->view('bus-season-requests/index', $data);
-        } else {
-            // Staff/Admin view - Show all requests
-            $requests = $requestModel->getRequestsForSAO();
-            
-            $data = [
-                'title' => 'All Bus Season Requests',
-                'page' => 'bus-season-requests-all',
-                'requests' => $requests,
-                'message' => $_SESSION['message'] ?? null,
-                'error' => $_SESSION['error'] ?? null
-            ];
-            
-            unset($_SESSION['message'], $_SESSION['error']);
-            return $this->view('bus-season-requests/index', $data);
+        $requestModel->ensureTableStructure();
+        
+        // Student view
+        if ($this->isStudent()) {
+            return $this->studentIndex($requestModel);
         }
+        
+        // Staff/Admin view
+        return $this->staffIndex($requestModel);
     }
     
     /**
-     * Student submit bus season request
+     * Student index view
+     */
+    private function studentIndex($requestModel) {
+        $studentId = $_SESSION['user_name'];
+        $studentModel = $this->model('StudentModel');
+        
+        // Get student data
+        $student = $studentModel->find($studentId);
+        if (!$student) {
+            $this->setError('Student record not found.');
+            $this->redirect('student/dashboard');
+            return;
+        }
+        
+        // Get student context using helper
+        $seasonYear = SeasonRequestHelper::getCurrentSeasonYear($studentId);
+        $departmentId = SeasonRequestHelper::getStudentDepartmentId($studentId);
+        
+        // Get requests with payments
+        $requests = $requestModel->getByStudentId($studentId);
+        foreach ($requests as &$request) {
+            $payment = $requestModel->getPaymentCollectionByRequestId($request['id']);
+            if ($payment) {
+                $request['payment'] = $payment;
+            }
+        }
+        unset($request);
+        
+        // Check eligibility
+        $eligibility = SeasonRequestHelper::canStudentSubmitRequest($studentId, $seasonYear);
+        
+        $data = [
+            'title' => 'Bus Season Request',
+            'page' => 'bus-season-requests',
+            'student' => $student,
+            'seasonYear' => $seasonYear,
+            'departmentId' => $departmentId,
+            'requests' => $requests,
+            'hasExistingRequest' => !$eligibility['can_submit'],
+            'eligibilityReason' => $eligibility['reason'],
+            'message' => $this->getFlashMessage(),
+            'error' => $this->getFlashError()
+        ];
+        
+        return $this->view('bus-season-requests/index', $data);
+    }
+    
+    /**
+     * Staff/Admin index view
+     */
+    private function staffIndex($requestModel) {
+        $requests = $requestModel->getRequestsForSAO();
+        
+        $data = [
+            'title' => 'All Bus Season Requests',
+            'page' => 'bus-season-requests-all',
+            'requests' => $requests,
+            'message' => $this->getFlashMessage(),
+            'error' => $this->getFlashError()
+        ];
+        
+        return $this->view('bus-season-requests/index', $data);
+    }
+    
+    /**
+     * Create new request (Student submission)
      */
     public function create() {
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return;
-        }
+        $this->requireAuth();
+        $this->requireStudent();
+        $this->requirePost();
         
-        // Check if user is a student
-        if (!isset($_SESSION['user_table']) || $_SESSION['user_table'] !== 'student') {
-            $_SESSION['error'] = 'Access denied. This section is only available for students.';
-            $this->redirect('dashboard');
-            return;
-        }
+        $isAjax = SeasonRequestHelper::isAjaxRequest();
         
-        // Check if it's an AJAX request (nginx compatible)
-        $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
-        
-        // Check request method (nginx compatible)
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'error' => 'Invalid request method.']);
-                exit;
-            }
-            $_SESSION['error'] = 'Invalid request method.';
-            $this->redirect('bus-season-requests');
-            return;
-        }
-        
-        // Verify CSRF token for nginx security
+        // Verify CSRF token
         $csrfToken = $this->post('csrf_token', '');
-        if (empty($csrfToken) || !isset($_SESSION['csrf_token']) || $csrfToken !== $_SESSION['csrf_token']) {
+        if (!SeasonRequestHelper::verifyCSRFToken($csrfToken)) {
             $errorMsg = 'Invalid security token. Please refresh the page and try again.';
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'error' => $errorMsg]);
-                exit;
-            }
-            $_SESSION['error'] = $errorMsg;
-            $this->redirect('bus-season-requests');
+            $this->handleResponse($isAjax, false, $errorMsg);
             return;
         }
         
         $studentId = $_SESSION['user_name'];
-        $studentModel = $this->model('StudentModel');
         $requestModel = $this->model('BusSeasonRequestModel');
+        $requestModel->ensureTableStructure();
         
-        // Ensure columns exist
-        $requestModel->addRequiredColumnsIfNotExists();
+        // Get season year and check eligibility
+        $seasonYear = SeasonRequestHelper::getCurrentSeasonYear($studentId);
+        $eligibility = SeasonRequestHelper::canStudentSubmitRequest($studentId, $seasonYear);
         
-        // Get current enrollment
-        $enrollmentModel = $this->model('StudentEnrollmentModel');
-        $currentEnrollment = $enrollmentModel->getCurrentEnrollment($studentId);
-        $seasonYear = $currentEnrollment['academic_year'] ?? date('Y');
-        
-        // Check if student already has request for this season year
-        if ($requestModel->hasExistingRequest($studentId, $seasonYear)) {
-            $errorMsg = 'You already have a bus season request for this season year. Only one request per year is allowed.';
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'error' => $errorMsg]);
-                exit;
-            }
-            $_SESSION['error'] = $errorMsg;
-            $this->redirect('bus-season-requests');
+        if (!$eligibility['can_submit']) {
+            $this->handleResponse($isAjax, false, $eligibility['reason']);
             return;
         }
         
-        // Get department ID
-        $departmentId = null;
-        if ($currentEnrollment && isset($currentEnrollment['course_id'])) {
-            $courseModel = $this->model('CourseModel');
-            $course = $courseModel->find($currentEnrollment['course_id']);
-            if ($course && isset($course['department_id'])) {
-                $departmentId = $course['department_id'];
-            }
-        }
-        
-        // Get form data (only route information from students)
-        $routeFrom = trim($this->post('route_from', ''));
-        $routeTo = trim($this->post('route_to', ''));
-        $changePoint = trim($this->post('change_point', ''));
-        $distanceKm = floatval($this->post('distance_km', 0));
-        
-        // Validate required fields (nginx compatible - strict validation)
-        $validationErrors = [];
-        
-        if (empty($routeFrom) || strlen(trim($routeFrom)) === 0) {
-            $validationErrors[] = 'Route From is required.';
-        } elseif (strlen($routeFrom) > 255) {
-            $validationErrors[] = 'Route From cannot exceed 255 characters.';
-        }
-        
-        if (empty($routeTo) || strlen(trim($routeTo)) === 0) {
-            $validationErrors[] = 'Route To is required.';
-        } elseif (strlen($routeTo) > 255) {
-            $validationErrors[] = 'Route To cannot exceed 255 characters.';
-        }
-        
-        if (empty($distanceKm) || $distanceKm <= 0 || !is_numeric($distanceKm)) {
-            $validationErrors[] = 'Distance must be a valid number greater than 0.';
-        } elseif ($distanceKm > 9999.9) {
-            $validationErrors[] = 'Distance cannot exceed 9999.9 KM.';
-        }
-        
-        if (!empty($changePoint) && strlen($changePoint) > 255) {
-            $validationErrors[] = 'Change Point cannot exceed 255 characters.';
-        }
-        
-        if (!empty($validationErrors)) {
-            $errorMsg = implode(' ', $validationErrors);
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'error' => $errorMsg]);
-                exit;
-            }
-            $_SESSION['error'] = $errorMsg;
-            $this->redirect('bus-season-requests');
-            return;
-        }
-        
-        // Prepare data (approval only, no payment details)
-        $data = [
+        // Prepare and validate form data
+        $formData = [
+            'route_from' => $this->post('route_from', ''),
+            'route_to' => $this->post('route_to', ''),
+            'change_point' => $this->post('change_point', ''),
+            'distance_km' => $this->post('distance_km', 0),
             'student_id' => $studentId,
-            'department_id' => $departmentId,
-            'season_year' => $seasonYear,
-            'season_name' => '', // Empty for students
-            'depot_name' => '', // Empty for students
-            'route_from' => $routeFrom,
-            'route_to' => $routeTo,
-            'change_point' => $changePoint,
-            'distance_km' => $distanceKm,
-            'notes' => '' // Empty for students
+            'season_year' => $seasonYear
         ];
+        
+        // Validate using helper
+        $validation = SeasonRequestHelper::validateRequestData($formData);
+        if (!$validation['valid']) {
+            $errorMsg = implode(' ', $validation['errors']);
+            $this->handleResponse($isAjax, false, $errorMsg);
+            return;
+        }
+        
+        // Prepare request data using helper
+        $requestData = SeasonRequestHelper::prepareRequestData($formData, $studentId);
         
         // Create request
         try {
-            // Log request attempt
-            error_log("BusSeasonRequestController::create - Attempting to create request for student: {$studentId}, Season: {$seasonYear}");
-            error_log("BusSeasonRequestController::create - Request data: " . json_encode($data));
-            
-            // Check database connection
-            $db = Database::getInstance();
-            $conn = $db->getConnection();
-            if (!$conn || $conn->connect_error) {
-                error_log("BusSeasonRequestController::create - Database connection failed: " . ($conn ? $conn->connect_error : 'Connection object is null'));
-                $_SESSION['error'] = 'Database connection error. Please contact the administrator.';
-                $this->redirect('bus-season-requests');
-                return;
-            }
-            
-            $newRequestId = $requestModel->createRequest($data);
+            $newRequestId = $requestModel->create($requestData);
             
             if ($newRequestId) {
-                error_log("BusSeasonRequestController::create - Request created successfully. ID: {$newRequestId}");
+                // Log activity using helper
+                SeasonRequestHelper::logActivity(
+                    'CREATE',
+                    $newRequestId,
+                    "Student {$studentId} created bus season request for season year {$seasonYear}",
+                    $requestData
+                );
                 
-                // Log activity
-                try {
-                    $activityModel = $this->model('ActivityLogModel');
-                    $activityModel->logActivity([
-                        'activity_type' => 'CREATE',
-                        'module' => 'bus_season_request',
-                        'record_id' => $newRequestId,
-                        'description' => "Student {$studentId} created bus season request for season year {$seasonYear}",
-                        'new_values' => $data
-                    ]);
-                } catch (Exception $e) {
-                    // Log activity error but don't fail the request
-                    error_log("BusSeasonRequestController::create - Activity log error: " . $e->getMessage());
-                }
+                // Regenerate CSRF token
+                SeasonRequestHelper::generateCSRFToken();
                 
                 $successMsg = 'Bus season request submitted successfully. Waiting for HOD approval.';
-                
-                // Regenerate CSRF token after successful submission
-                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-                
-                if ($isAjax) {
-                    header('Content-Type: application/json');
-                    echo json_encode(['success' => true, 'message' => $successMsg, 'redirect' => APP_URL . '/bus-season-requests']);
-                    exit;
-                }
-                
-                $_SESSION['message'] = $successMsg;
+                $this->handleResponse($isAjax, true, $successMsg);
             } else {
-                error_log("BusSeasonRequestController::create - Request creation failed. Student: {$studentId}");
-                $errorMsg = 'Failed to submit request. Please check your input and try again. If the problem persists, contact the administrator.';
-                
-                if ($isAjax) {
-                    header('Content-Type: application/json');
-                    echo json_encode(['success' => false, 'error' => $errorMsg]);
-                    exit;
-                }
-                
-                $_SESSION['error'] = $errorMsg;
+                $errorMsg = 'Failed to submit request. Please check your input and try again.';
+                $this->handleResponse($isAjax, false, $errorMsg);
             }
         } catch (Exception $e) {
             error_log("BusSeasonRequestController::create - Exception: " . $e->getMessage());
-            error_log("BusSeasonRequestController::create - Stack trace: " . $e->getTraceAsString());
-            error_log("BusSeasonRequestController::create - File: " . $e->getFile() . ", Line: " . $e->getLine());
-            $_SESSION['error'] = 'An error occurred while submitting your request. Please try again or contact support.';
-        } catch (Error $e) {
-            error_log("BusSeasonRequestController::create - Fatal Error: " . $e->getMessage());
-            error_log("BusSeasonRequestController::create - Stack trace: " . $e->getTraceAsString());
-            error_log("BusSeasonRequestController::create - File: " . $e->getFile() . ", Line: " . $e->getLine());
-            $errorMsg = 'A system error occurred. Please contact the administrator.';
-            
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'error' => $errorMsg]);
-                exit;
-            }
-            
-            $_SESSION['error'] = $errorMsg;
-        }
-        
-        // Only redirect if not AJAX (nginx compatible)
-        if (!$isAjax) {
-            $this->redirect('bus-season-requests');
+            $errorMsg = 'An error occurred while submitting your request. Please try again.';
+            $this->handleResponse($isAjax, false, $errorMsg);
         }
     }
     
     /**
-     * HOD approval view
+     * HOD Approval View
      */
     public function hodApproval() {
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return;
-        }
-        
-        // Check if user is HOD
-        if (!$this->isHOD()) {
-            $_SESSION['error'] = 'Access denied. Only Head of Department can approve requests.';
-            $this->redirect('dashboard');
-            return;
-        }
+        $this->requireAuth();
+        $this->requireHOD();
         
         $requestModel = $this->model('BusSeasonRequestModel');
-        $requestModel->addRequiredColumnsIfNotExists();
+        $requestModel->ensureTableStructure();
         
-        // Get HOD's department
         $hodDepartmentId = $this->getHODDepartment();
         if (!$hodDepartmentId) {
-            $_SESSION['error'] = 'Department not found for your HOD account.';
+            $this->setError('Department not found for your HOD account.');
             $this->redirect('dashboard');
             return;
         }
         
-        // Get pending requests
         $requests = $requestModel->getPendingHODRequests($hodDepartmentId);
         
         $data = [
             'title' => 'Bus Season Requests - HOD Approval',
             'page' => 'bus-season-requests-hod',
             'requests' => $requests,
-            'message' => $_SESSION['message'] ?? null,
-            'error' => $_SESSION['error'] ?? null
+            'message' => $this->getFlashMessage(),
+            'error' => $this->getFlashError()
         ];
         
-        unset($_SESSION['message'], $_SESSION['error']);
         return $this->view('bus-season-requests/hod-approval', $data);
     }
     
     /**
-     * HOD approve/reject request
+     * HOD Approve/Reject Request
      */
     public function hodApprove() {
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return;
-        }
-        
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $_SESSION['error'] = 'Invalid request method.';
-            $this->redirect('bus-season-requests/hod-approval');
-            return;
-        }
-        
-        // Check if user is HOD
-        if (!$this->isHOD()) {
-            $_SESSION['error'] = 'Access denied. Only Head of Department can approve requests.';
-            $this->redirect('dashboard');
-            return;
-        }
+        $this->requireAuth();
+        $this->requireHOD();
+        $this->requirePost();
         
         $requestId = (int)$this->post('request_id', 0);
         $approved = $this->post('action') === 'approve';
         $comments = trim($this->post('comments', ''));
         
         if (empty($requestId)) {
-            $_SESSION['error'] = 'Request ID is required.';
+            $this->setError('Request ID is required.');
             $this->redirect('bus-season-requests/hod-approval');
             return;
         }
         
         $requestModel = $this->model('BusSeasonRequestModel');
-        $requestModel->addRequiredColumnsIfNotExists();
+        $requestModel->ensureTableStructure();
         
         // Verify request belongs to HOD's department
-        $request = $requestModel->getRequestWithDetails($requestId);
+        $request = $requestModel->findWithDetails($requestId);
         if (!$request) {
-            $_SESSION['error'] = 'Request not found.';
+            $this->setError('Request not found.');
             $this->redirect('bus-season-requests/hod-approval');
             return;
         }
         
         $hodDepartmentId = $this->getHODDepartment();
         if ($request['department_id'] !== $hodDepartmentId) {
-            $_SESSION['error'] = 'Access denied. You can only approve requests from your department.';
+            $this->setError('Access denied. You can only approve requests from your department.');
             $this->redirect('bus-season-requests/hod-approval');
             return;
         }
@@ -420,42 +243,25 @@ class BusSeasonRequestController extends Controller {
         
         if ($result) {
             $action = $approved ? 'approved' : 'rejected';
-            $_SESSION['message'] = "Request {$action} successfully.";
+            $this->setMessage("Request {$action} successfully.");
         } else {
-            $_SESSION['error'] = 'Failed to update request. Please try again.';
+            $this->setError('Failed to update request. Please try again.');
         }
         
         $this->redirect('bus-season-requests/hod-approval');
     }
     
     /**
-     * Second approval view (DIR, DPA, DPI, REG)
+     * Second Approval View (DIR, DPA, DPI, REG)
      */
     public function secondApproval() {
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return;
-        }
-        
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        
-        // Check if user is authorized for second approval (DIR, DPA, DPI, REG)
-        $allowedRoles = ['DIR', 'DPA', 'DPI', 'REG'];
-        $canApprove = in_array($userRole, $allowedRoles) || $userModel->isAdmin($_SESSION['user_id']);
-        
-        if (!$canApprove) {
-            $_SESSION['error'] = 'Access denied. Only Director, DPA, DPI, or Registrar can approve requests.';
-            $this->redirect('dashboard');
-            return;
-        }
+        $this->requireAuth();
+        $this->requireSecondApprover();
         
         $requestModel = $this->model('BusSeasonRequestModel');
-        $requestModel->addRequiredColumnsIfNotExists();
+        $requestModel->ensureTableStructure();
         
-        // Get pending requests for second approval
+        $userRole = $this->getUserRole();
         $requests = $requestModel->getPendingSecondRequests($userRole);
         
         $data = [
@@ -463,139 +269,65 @@ class BusSeasonRequestController extends Controller {
             'page' => 'bus-season-requests-second',
             'requests' => $requests,
             'userRole' => $userRole,
-            'message' => $_SESSION['message'] ?? null,
-            'error' => $_SESSION['error'] ?? null
+            'message' => $this->getFlashMessage(),
+            'error' => $this->getFlashError()
         ];
         
-        unset($_SESSION['message'], $_SESSION['error']);
         return $this->view('bus-season-requests/second-approval', $data);
     }
     
     /**
-     * Second approve/reject request
+     * Second Approve/Reject Request
      */
     public function secondApprove() {
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return;
-        }
-        
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $_SESSION['error'] = 'Invalid request method.';
-            $this->redirect('bus-season-requests/second-approval');
-            return;
-        }
-        
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        
-        // Check if user is authorized for second approval (DIR, DPA, DPI, REG)
-        $allowedRoles = ['DIR', 'DPA', 'DPI', 'REG'];
-        $canApprove = in_array($userRole, $allowedRoles) || $userModel->isAdmin($_SESSION['user_id']);
-        
-        if (!$canApprove) {
-            $_SESSION['error'] = 'Access denied. Only Director, DPA, DPI, or Registrar can approve requests.';
-            $this->redirect('dashboard');
-            return;
-        }
+        $this->requireAuth();
+        $this->requireSecondApprover();
+        $this->requirePost();
         
         $requestId = (int)$this->post('request_id', 0);
         $approved = $this->post('action') === 'approve';
         $comments = trim($this->post('comments', ''));
         
         if (empty($requestId)) {
-            $_SESSION['error'] = 'Request ID is required.';
+            $this->setError('Request ID is required.');
             $this->redirect('bus-season-requests/second-approval');
             return;
         }
         
         $requestModel = $this->model('BusSeasonRequestModel');
-        $requestModel->addRequiredColumnsIfNotExists();
+        $requestModel->ensureTableStructure();
         
-        // Get request details before update
-        $request = $requestModel->getRequestWithDetails($requestId);
+        $request = $requestModel->findWithDetails($requestId);
         if (!$request) {
-            $_SESSION['error'] = 'Request not found.';
+            $this->setError('Request not found.');
             $this->redirect('bus-season-requests/second-approval');
             return;
         }
         
-        // Get old values before update
-        $oldValues = [
-            'status' => $request['status'],
-            'second_approver_id' => $request['second_approver_id'],
-            'second_approver_role' => $request['second_approver_role'],
-            'second_approval_date' => $request['second_approval_date'],
-            'second_comments' => $request['second_comments']
-        ];
-        
-        // Update second approval
+        $userRole = $this->getUserRole();
         $result = $requestModel->updateSecondApproval($requestId, $_SESSION['user_id'], $userRole, $approved, $comments);
         
         if ($result) {
-            // Get updated request to log new values
-            $updatedRequest = $requestModel->getRequestWithDetails($requestId);
-            
-            // Log activity
-            $activityModel = $this->model('ActivityLogModel');
-            $action = $approved ? 'APPROVE' : 'REJECT';
-            $activityModel->logActivity([
-                'activity_type' => $action,
-                'module' => 'bus_season_request',
-                'record_id' => (string)$requestId,
-                'description' => "{$userRole} {$action}D bus season request #{$requestId} for student {$request['student_id']}",
-                'old_values' => $oldValues,
-                'new_values' => [
-                    'status' => $updatedRequest['status'],
-                    'second_approver_id' => $updatedRequest['second_approver_id'],
-                    'second_approver_role' => $updatedRequest['second_approver_role'],
-                    'second_approval_date' => $updatedRequest['second_approval_date'],
-                    'second_comments' => $updatedRequest['second_comments']
-                ]
-            ]);
-            
-            $actionText = $approved ? 'approved' : 'rejected';
-            $_SESSION['message'] = "Request {$actionText} successfully.";
+            $action = $approved ? 'approved' : 'rejected';
+            $this->setMessage("Request {$action} successfully.");
         } else {
-            $_SESSION['error'] = 'Failed to update request. Please try again.';
+            $this->setError('Failed to update request. Please try again.');
         }
         
         $this->redirect('bus-season-requests/second-approval');
     }
     
     /**
-     * SAO process requests - view all requests (HOD approved or not, need second approval or not)
+     * SAO Process - View all requests for payment collection
      */
     public function saoProcess() {
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return;
-        }
-        
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $isSAO = $userModel->isSAO($_SESSION['user_id']);
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isADM = ($userRole === 'ADM');
-        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-        
-        // Only SAO and ADM can access
-        if (!$isSAO && !$isADM && !$isAdmin) {
-            $_SESSION['error'] = 'Access denied. Only Student Affairs Office (SAO) and Administrators (ADM) can collect payments.';
-            $this->redirect('dashboard');
-            return;
-        }
+        $this->requireAuth();
+        $this->requireSAOAccess();
         
         $requestModel = $this->model('BusSeasonRequestModel');
-        $requestModel->addRequiredColumnsIfNotExists();
+        $requestModel->ensureTableStructure();
         
-        // Get all requests (HOD approved or not, need second approval or not)
         $requests = $requestModel->getRequestsForSAO();
-        
-        // Get academic years for filter
         $studentModel = $this->model('StudentModel');
         $academicYears = $studentModel->getAcademicYears();
         
@@ -604,81 +336,56 @@ class BusSeasonRequestController extends Controller {
             'page' => 'bus-season-requests-sao',
             'requests' => $requests,
             'academicYears' => $academicYears,
-            'message' => $_SESSION['message'] ?? null,
-            'error' => $_SESSION['error'] ?? null
+            'message' => $this->getFlashMessage(),
+            'error' => $this->getFlashError()
         ];
         
-        unset($_SESSION['message'], $_SESSION['error']);
         return $this->view('bus-season-requests/sao-process', $data);
     }
     
     /**
-     * SAO save payment collection
+     * SAO Save Payment Collection
      */
     public function saoProcessSave() {
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return;
-        }
-        
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $_SESSION['error'] = 'Invalid request method.';
-            $this->redirect('bus-season-requests/sao-process');
-            return;
-        }
-        
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $isSAO = $userModel->isSAO($_SESSION['user_id']);
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isADM = ($userRole === 'ADM');
-        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-        
-        // Only SAO and ADM can access
-        if (!$isSAO && !$isADM && !$isAdmin) {
-            $_SESSION['error'] = 'Access denied. Only Student Affairs Office (SAO) and Administrators (ADM) can collect payments.';
-            $this->redirect('dashboard');
-            return;
-        }
+        $this->requireAuth();
+        $this->requireSAOAccess();
+        $this->requirePost();
         
         $requestId = (int)$this->post('request_id', 0);
-        $studentPayment = floatval($this->post('student_payment_amount', 0));
+        $studentPayment = floatval($this->post('paid_amount', 0));
+        $paymentMethod = trim($this->post('payment_method', 'cash'));
         $paymentReference = trim($this->post('payment_reference', ''));
         $notes = trim($this->post('notes', ''));
-        $paymentMethod = trim($this->post('payment_method', 'cash'));
         
         if (empty($requestId)) {
-            $_SESSION['error'] = 'Request ID is required.';
+            $this->setError('Request ID is required.');
             $this->redirect('bus-season-requests/sao-process');
             return;
         }
         
         if ($studentPayment <= 0) {
-            $_SESSION['error'] = 'Please enter a valid student payment amount.';
+            $this->setError('Please enter a valid payment amount.');
             $this->redirect('bus-season-requests/sao-process');
             return;
         }
         
         $requestModel = $this->model('BusSeasonRequestModel');
-        $requestModel->addRequiredColumnsIfNotExists();
+        $requestModel->ensureTableStructure();
         
-        // Check if request exists
-        $request = $requestModel->getRequestWithDetails($requestId);
+        $request = $requestModel->findWithDetails($requestId);
         if (!$request) {
-            $_SESSION['error'] = 'Request not found.';
+            $this->setError('Request not found.');
             $this->redirect('bus-season-requests/sao-process');
             return;
         }
         
-        // Check if payment already collected
         if ($requestModel->hasPaymentCollection($requestId)) {
-            $_SESSION['error'] = 'Payment has already been collected for this request.';
+            $this->setError('Payment has already been collected for this request.');
             $this->redirect('bus-season-requests/sao-process');
             return;
         }
         
-        // Create initial payment collection record (status: paid)
+        // Create payment collection
         $paymentId = $requestModel->createPaymentCollection(
             $requestId,
             $request['student_id'],
@@ -691,53 +398,70 @@ class BusSeasonRequestController extends Controller {
         );
         
         if ($paymentId) {
-            // Update request status to 'paid'
             $requestModel->updateStatus($requestId, 'paid');
-
-            // Log activity
-            $activityModel = $this->model('ActivityLogModel');
-            $activityModel->logActivity([
-                'activity_type' => 'CREATE',
-                'module' => 'bus_season_payment',
-                'record_id' => $paymentId,
-                'description' => "SAO/ADM collected initial payment for bus season request #{$requestId} - Student: Rs. {$studentPayment}. Status: paid",
-                'new_values' => [
+            
+            SeasonRequestHelper::logActivity(
+                'CREATE',
+                $paymentId,
+                "SAO collected initial payment for bus season request #{$requestId} - Student: Rs. {$studentPayment}",
+                [
                     'request_id' => $requestId,
                     'student_id' => $request['student_id'],
-                    'student_paid' => $studentPayment,
+                    'paid_amount' => $studentPayment,
                     'payment_method' => $paymentMethod,
-                    'payment_reference' => $paymentReference,
                     'status' => 'paid'
                 ]
-            ]);
+            );
             
-            $_SESSION['message'] = 'Payment recorded successfully. Status set to paid.';
+            $this->setMessage('Payment recorded successfully. Status set to paid.');
         } else {
-            $_SESSION['error'] = 'Failed to record payment collection. Please try again.';
+            $this->setError('Failed to record payment collection. Please try again.');
         }
         
         $this->redirect('bus-season-requests/sao-process');
     }
-
+    
     /**
-     * Update payment status (paid -> processing -> issued)
+     * Payment Collections View
+     */
+    public function paymentCollections() {
+        $this->requireAuth();
+        $this->requireSAOAccess();
+        
+        $requestModel = $this->model('BusSeasonRequestModel');
+        $requestModel->ensureTableStructure();
+        
+        $filters = [
+            'season_year' => $this->get('season_year', ''),
+            'student_id' => $this->get('student_id', ''),
+            'month' => $this->get('month', ''),
+            'status' => $this->get('status', '')
+        ];
+        
+        $collections = $requestModel->getAllPaymentCollections($filters);
+        $studentModel = $this->model('StudentModel');
+        $academicYears = $studentModel->getAcademicYears();
+        
+        $data = [
+            'title' => 'Bus Season Payment Collections',
+            'page' => 'bus-season-payments',
+            'collections' => $collections,
+            'academicYears' => $academicYears,
+            'filters' => $filters,
+            'message' => $this->getFlashMessage(),
+            'error' => $this->getFlashError()
+        ];
+        
+        return $this->view('bus-season-requests/payment-collections', $data);
+    }
+    
+    /**
+     * Update Payment Status (AJAX)
      */
     public function updatePaymentStatus() {
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            $this->json(['success' => false, 'message' => 'Unauthorized'], 401);
-            return;
-        }
-        
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $isSAO = $userModel->isSAO($_SESSION['user_id']);
-        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-        
-        if (!$isSAO && !$isAdmin) {
-            $this->json(['success' => false, 'message' => 'Access denied.'], 403);
-            return;
-        }
+        $this->requireAuth();
+        $this->requireSAOAccess();
+        $this->requirePost();
         
         $paymentId = (int)$this->post('payment_id', 0);
         $newStatus = trim($this->post('status', ''));
@@ -760,60 +484,68 @@ class BusSeasonRequestController extends Controller {
         
         $updateData = [];
         if ($newStatus === 'issued') {
-            // Use provided values or calculate defaults
-            $totalAmount = $actualPrice > 0 ? $actualPrice : ($studentPortion > 0 ? $studentPortion / 0.30 : $requestModel->calculateSeasonTotal($payment['paid_amount']));
-            
-            // Student portion should be what was confirmed in the modal
-            $finalStudentPaid = $studentPortion > 0 ? $studentPortion : $totalAmount * 0.30;
-            
-            // SLGTI pays 35%, CTB pays 35%
-            $slgtiPaid = $totalAmount * 0.35;
-            $ctbPaid = $totalAmount * 0.35;
-            
-            // Calculate balance (Difference between what they should pay now and what they initially paid)
-            $remainingBalance = $finalStudentPaid - $payment['paid_amount'];
+            // Calculate payment breakdown using helper
+            $totalAmount = $actualPrice > 0 ? $actualPrice : ($studentPortion > 0 ? $studentPortion / 0.30 : 0);
+            $breakdown = SeasonRequestHelper::calculatePaymentBreakdown($totalAmount, $payment['paid_amount']);
             
             $updateData = [
-                'total_amount' => $totalAmount,
-                'student_paid' => $finalStudentPaid,
-                'slgti_paid' => $slgtiPaid,
-                'ctb_paid' => $ctbPaid,
-                'season_rate' => $totalAmount,
-                'remaining_balance' => $remainingBalance,
+                'total_amount' => $breakdown['total_amount'],
+                'student_paid' => $breakdown['student_paid'],
+                'slgti_paid' => $breakdown['slgti_paid'],
+                'ctb_paid' => $breakdown['ctb_paid'],
+                'season_rate' => $breakdown['total_amount'],
+                'remaining_balance' => $breakdown['remaining_balance'],
                 'payment_reference' => $paymentReference ?: $payment['payment_reference']
             ];
         }
         
         if ($requestModel->updatePaymentStatus($paymentId, $newStatus, $updateData)) {
-            // Also update request status
             $requestModel->updateStatus($payment['request_id'], $newStatus);
-            
             $this->json(['success' => true, 'message' => 'Status updated successfully.']);
         } else {
             $this->json(['success' => false, 'message' => 'Failed to update status.']);
         }
     }
-
+    
     /**
-     * Export payments to Excel
+     * Bulk Update Payment Status (AJAX)
+     */
+    public function bulkUpdateStatus() {
+        $this->requireAuth();
+        $this->requireSAOAccess();
+        $this->requirePost();
+        
+        $paymentIds = $this->post('payment_ids', []);
+        $newStatus = $this->post('status', '');
+        
+        if (empty($paymentIds) || empty($newStatus)) {
+            $this->json(['success' => false, 'message' => 'No records or status provided'], 400);
+            return;
+        }
+        
+        $requestModel = $this->model('BusSeasonRequestModel');
+        $successCount = 0;
+        
+        foreach ($paymentIds as $id) {
+            $payment = $requestModel->getPaymentCollectionById($id);
+            if ($payment && $requestModel->updatePaymentStatus($id, $newStatus)) {
+                $requestModel->updateStatus($payment['request_id'], $newStatus);
+                $successCount++;
+            }
+        }
+        
+        $this->json([
+            'success' => true,
+            'message' => "Successfully updated {$successCount} records to {$newStatus}."
+        ]);
+    }
+    
+    /**
+     * Export Payments to Excel
      */
     public function exportPaymentsExcel() {
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return;
-        }
-        
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $isSAO = $userModel->isSAO($_SESSION['user_id']);
-        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-        
-        if (!$isSAO && !$isAdmin) {
-            $_SESSION['error'] = 'Access denied.';
-            $this->redirect('dashboard');
-            return;
-        }
+        $this->requireAuth();
+        $this->requireSAOAccess();
         
         $requestModel = $this->model('BusSeasonRequestModel');
         $status = $this->get('status', 'paid');
@@ -835,19 +567,24 @@ class BusSeasonRequestController extends Controller {
         echo "\xEF\xBB\xBF"; // BOM for UTF-8
         $output = fopen('php://output', 'w');
         
-        // CSV Headers based on status
+        // CSV Headers
         if ($status === 'issued') {
             fputcsv($output, [
-                'Name', 'NIC Number', 'Route', 'Total Price', 'Student Portion (30%)', 'SLGTI (35%)', 'CTB (35%)', 'Issued Date', 'Reference'
+                'Name', 'NIC Number', 'Route', 'Total Price', 'Student Portion (30%)',
+                'SLGTI Portion (35%)', 'CTB Portion (35%)', 'Issued Date', 'Reference Number'
             ]);
         } else {
             fputcsv($output, [
-                'Name', 'NIC Number', 'Route', 'Paid Amount', 'Date', 'Status', 'Reference'
+                'Name', 'NIC Number', 'Route', 'Paid Amount', 'Paid Date', 'Status', 'Reference Number'
             ]);
         }
         
         foreach ($collections as $c) {
-            $route = ($c['route_from'] ?? '') . ' to ' . ($c['route_to'] ?? '');
+            $route = SeasonRequestHelper::formatRoute(
+                $c['route_from'] ?? '',
+                $c['route_to'] ?? '',
+                $c['change_point'] ?? ''
+            );
             
             if ($status === 'issued') {
                 fputcsv($output, [
@@ -858,7 +595,7 @@ class BusSeasonRequestController extends Controller {
                     number_format($c['student_paid'] ?? 0, 2, '.', ''),
                     number_format($c['slgti_paid'] ?? 0, 2, '.', ''),
                     number_format($c['ctb_paid'] ?? 0, 2, '.', ''),
-                    !empty($c['issued_at']) ? date('Y-m-d', strtotime($c['issued_at'])) : 'N/A',
+                    SeasonRequestHelper::formatDate($c['issued_at'] ?? null, 'Y-m-d'),
                     $c['payment_reference'] ?? 'N/A'
                 ]);
             } else {
@@ -867,8 +604,8 @@ class BusSeasonRequestController extends Controller {
                     $c['student_nic'] ?? 'N/A',
                     $route,
                     number_format($c['paid_amount'] ?? 0, 2, '.', ''),
-                    !empty($c['payment_date']) ? date('Y-m-d', strtotime($c['payment_date'])) : 'N/A',
-                    ucfirst($c['payment_status'] ?? 'paid'),
+                    SeasonRequestHelper::formatDate($c['payment_date'] ?? null, 'Y-m-d'),
+                    ucfirst($c['payment_status'] ?? 'N/A'),
                     $c['payment_reference'] ?? 'N/A'
                 ]);
             }
@@ -877,182 +614,254 @@ class BusSeasonRequestController extends Controller {
         fclose($output);
         exit;
     }
-
-    /**
-     * Bulk update payment status
-     */
-    public function bulkUpdateStatus() {
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            $this->json(['success' => false, 'message' => 'Unauthorized'], 401);
-            return;
-        }
-        
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $this->json(['success' => false, 'message' => 'Invalid request method'], 405);
-            return;
-        }
-
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $isSAO = $userModel->isSAO($_SESSION['user_id']);
-        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-        
-        if (!$isSAO && !$isAdmin) {
-            $this->json(['success' => false, 'message' => 'Access denied'], 403);
-            return;
-        }
-
-        $paymentIds = $this->post('payment_ids', []);
-        $newStatus = $this->post('status', '');
-
-        if (empty($paymentIds) || empty($newStatus)) {
-            $this->json(['success' => false, 'message' => 'No records or status provided'], 400);
-            return;
-        }
-
-        $requestModel = $this->model('BusSeasonRequestModel');
-        $successCount = 0;
-
-        foreach ($paymentIds as $id) {
-            $payment = $requestModel->getPaymentCollectionById($id);
-            if ($payment) {
-                if ($requestModel->updatePaymentStatus($id, $newStatus)) {
-                    $requestModel->updateStatus($payment['request_id'], $newStatus);
-                    $successCount++;
-                }
-            }
-        }
-
-        $this->json([
-            'success' => true, 
-            'message' => "Successfully updated {$successCount} records to {$newStatus}."
-        ]);
-    }
     
     /**
-     * View payment collections (SAO/ADM)
-     */
-    public function paymentCollections() {
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return;
-        }
-        
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $isSAO = $userModel->isSAO($_SESSION['user_id']);
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isADM = ($userRole === 'ADM');
-        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-        
-        // Only SAO and ADM can access
-        if (!$isSAO && !$isADM && !$isAdmin) {
-            $_SESSION['error'] = 'Access denied. Only Student Affairs Office (SAO) and Administrators (ADM) can view payment collections.';
-            $this->redirect('dashboard');
-            return;
-        }
-        
-        $requestModel = $this->model('BusSeasonRequestModel');
-        $requestModel->addRequiredColumnsIfNotExists();
-        
-        // Get filters
-        $filters = [
-            'season_year' => $this->get('season_year', ''),
-            'student_id' => $this->get('student_id', ''),
-            'month' => $this->get('month', '')
-        ];
-        
-        // Get all payment collections
-        $collections = $requestModel->getAllPaymentCollections($filters);
-        
-        // Get academic years for filter
-        $studentModel = $this->model('StudentModel');
-        $academicYears = $studentModel->getAcademicYears();
-        
-        $data = [
-            'title' => 'Bus Season Payment Collections',
-            'page' => 'bus-season-payments',
-            'collections' => $collections,
-            'academicYears' => $academicYears,
-            'filters' => $filters,
-            'message' => $_SESSION['message'] ?? null,
-            'error' => $_SESSION['error'] ?? null
-        ];
-        
-        unset($_SESSION['message'], $_SESSION['error']);
-        return $this->view('bus-season-requests/payment-collections', $data);
-    }
-    
-    /**
-     * View request details
+     * View Request Details
      */
     public function show() {
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return;
-        }
+        $this->requireAuth();
         
         $requestId = (int)$this->get('id', 0);
         if (empty($requestId)) {
-            $_SESSION['error'] = 'Request ID is required.';
+            $this->setError('Request ID is required.');
             $this->redirect('dashboard');
             return;
         }
         
         $requestModel = $this->model('BusSeasonRequestModel');
-        $requestModel->addRequiredColumnsIfNotExists();
-        $request = $requestModel->getRequestWithDetails($requestId);
+        $requestModel->ensureTableStructure();
+        $request = $requestModel->findWithDetails($requestId);
         
         if (!$request) {
-            $_SESSION['error'] = 'Request not found.';
+            $this->setError('Request not found.');
             $this->redirect('dashboard');
             return;
         }
         
-        // Check access permissions
-        $isStudent = isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student';
-        $isHOD = $this->isHOD();
-        
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isSAO = $userModel->isSAO($_SESSION['user_id']);
-        $isADM = ($userRole === 'ADM');
-        $allowedSecondRoles = ['DIR', 'DPA', 'DPI', 'REG'];
-        $canSecondApprove = in_array($userRole, $allowedSecondRoles) || $userModel->isAdmin($_SESSION['user_id']);
-        
-        // Verify access
-        if ($isStudent && $request['student_id'] !== $_SESSION['user_name']) {
-            $_SESSION['error'] = 'Access denied. You can only view your own requests.';
-            $this->redirect('bus-season-requests');
+        // Verify access permissions
+        if (!$this->canViewRequest($request)) {
+            $this->setError('Access denied.');
+            $this->redirect('dashboard');
             return;
-        }
-        
-        if ($isHOD) {
-            $hodDepartmentId = $this->getHODDepartment();
-            if ($request['department_id'] !== $hodDepartmentId) {
-                $_SESSION['error'] = 'Access denied. You can only view requests from your department.';
-                $this->redirect('bus-season-requests/hod-approval');
-                return;
-            }
         }
         
         $data = [
             'title' => 'Bus Season Request Details',
             'page' => 'bus-season-requests',
             'request' => $request,
-            'isStudent' => $isStudent,
-            'isHOD' => $isHOD,
-            'isSAO' => $isSAO,
-            'isADM' => $isADM,
-            'canSecondApprove' => $canSecondApprove,
-            'userRole' => $userRole
+            'isStudent' => $this->isStudent(),
+            'isHOD' => $this->isHOD(),
+            'isSAO' => $this->isSAO(),
+            'canSecondApprove' => $this->canSecondApprove(),
+            'userRole' => $this->getUserRole()
         ];
         
         return $this->view('bus-season-requests/view', $data);
     }
+    
+    // ==================== Helper Methods ====================
+    
+    /**
+     * Handle response (AJAX or redirect)
+     */
+    private function handleResponse($isAjax, $success, $message) {
+        if ($isAjax) {
+            SeasonRequestHelper::sendJsonResponse([
+                'success' => $success,
+                'message' => $message,
+                'redirect' => $success ? APP_URL . '/bus-season-requests' : null
+            ]);
+        } else {
+            if ($success) {
+                $this->setMessage($message);
+            } else {
+                $this->setError($message);
+            }
+            $this->redirect('bus-season-requests');
+        }
+    }
+    
+    /**
+     * Check if user can view request
+     */
+    private function canViewRequest($request) {
+        if ($this->isStudent()) {
+            return $request['student_id'] === $_SESSION['user_name'];
+        }
+        
+        if ($this->isHOD()) {
+            $hodDepartmentId = $this->getHODDepartment();
+            return $request['department_id'] === $hodDepartmentId;
+        }
+        
+        return true; // SAO, Admin, etc. can view all
+    }
+    
+    /**
+     * Require authentication
+     */
+    private function requireAuth() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            exit;
+        }
+    }
+    
+    /**
+     * Require student role
+     */
+    private function requireStudent() {
+        if (!isset($_SESSION['user_table']) || $_SESSION['user_table'] !== 'student') {
+            $this->setError('Access denied. This section is only available for students.');
+            $this->redirect('dashboard');
+            exit;
+        }
+    }
+    
+    /**
+     * Require HOD role
+     */
+    private function requireHOD() {
+        if (!$this->isHOD()) {
+            $this->setError('Access denied. Only Head of Department can access this section.');
+            $this->redirect('dashboard');
+            exit;
+        }
+    }
+    
+    /**
+     * Require second approver role
+     */
+    private function requireSecondApprover() {
+        if (!$this->canSecondApprove()) {
+            $this->setError('Access denied. Only Director, DPA, DPI, or Registrar can access this section.');
+            $this->redirect('dashboard');
+            exit;
+        }
+    }
+    
+    /**
+     * Require SAO access
+     */
+    private function requireSAOAccess() {
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $isSAO = $userModel->isSAO($_SESSION['user_id']);
+        $userRole = $userModel->getUserRole($_SESSION['user_id']);
+        $isADM = ($userRole === 'ADM');
+        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
+        
+        if (!$isSAO && !$isADM && !$isAdmin) {
+            $this->setError('Access denied. Only SAO and Administrators can access this section.');
+            $this->redirect('dashboard');
+            exit;
+        }
+    }
+    
+    /**
+     * Require POST method
+     */
+    private function requirePost() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->setError('Invalid request method.');
+            $this->redirect('dashboard');
+            exit;
+        }
+    }
+    
+    /**
+     * Check if user is student
+     */
+    private function isStudent() {
+        return isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student';
+    }
+    
+    /**
+     * Check if user is HOD
+     */
+    private function isHOD() {
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        return $userModel->isHOD($_SESSION['user_id']);
+    }
+    
+    /**
+     * Check if user is SAO
+     */
+    private function isSAO() {
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        return $userModel->isSAO($_SESSION['user_id']);
+    }
+    
+    /**
+     * Check if user can second approve
+     */
+    private function canSecondApprove() {
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $userRole = $userModel->getUserRole($_SESSION['user_id']);
+        $allowedRoles = ['DIR', 'DPA', 'DPI', 'REG'];
+        return in_array($userRole, $allowedRoles) || $userModel->isAdmin($_SESSION['user_id']);
+    }
+    
+    /**
+     * Get user role
+     */
+    private function getUserRole() {
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        return $userModel->getUserRole($_SESSION['user_id']);
+    }
+    
+    /**
+     * Get HOD department ID
+     */
+    private function getHODDepartment() {
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        return $userModel->getHODDepartment($_SESSION['user_id']);
+    }
+    
+    /**
+     * Set flash message
+     */
+    private function setMessage($message) {
+        $_SESSION['message'] = $message;
+    }
+    
+    /**
+     * Set flash error
+     */
+    private function setError($error) {
+        $_SESSION['error'] = $error;
+    }
+    
+    /**
+     * Get flash message
+     */
+    private function getFlashMessage() {
+        $message = $_SESSION['message'] ?? null;
+        unset($_SESSION['message']);
+        return $message;
+    }
+    
+    /**
+     * Get flash error
+     */
+    private function getFlashError() {
+        $error = $_SESSION['error'] ?? null;
+        unset($_SESSION['error']);
+        return $error;
+    }
+    
+    /**
+     * Send JSON response
+     */
+    private function json($data, $statusCode = 200) {
+        http_response_code($statusCode);
+        header('Content-Type: application/json');
+        echo json_encode($data);
+        exit;
+    }
 }
-

@@ -4229,3 +4229,25 @@
 [24-Jan-2026 16:01:05 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:469
 [24-Jan-2026 16:02:28 UTC] Error adding column old_values: Unknown column 'description' in 'activity_log'
 [24-Jan-2026 16:02:28 UTC] Error adding column new_values: Unknown column 'old_values' in 'activity_log'
+[25-Jan-2026 04:55:06 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:55:16 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:55:16 UTC] BusSeasonRequestController::create - Attempting to create request for student: 2022/EET/4EL02, Season: 2024/2025
+[25-Jan-2026 04:55:16 UTC] BusSeasonRequestController::create - Request data: {"student_id":"2022\/EET\/4EL02","department_id":"EET","season_year":"2024\/2025","season_name":"","depot_name":"","route_from":"Nelliyady","route_to":"SLGTI","change_point":"","distance_km":50,"notes":""}
+[25-Jan-2026 04:55:16 UTC] BusSeasonRequestModel::createRequest - Success. Insert ID: 5, Student: 2022/EET/4EL02
+[25-Jan-2026 04:55:16 UTC] BusSeasonRequestController::create - Request created successfully. ID: 5
+[25-Jan-2026 04:55:18 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:56:51 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:56:51 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:56:53 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:56:57 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:56:57 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:57:01 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:57:19 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:57:19 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:57:23 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:57:47 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:57:48 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:58:38 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:58:39 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:58:54 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 04:59:09 UTC] Database::connect - Connection successful to sisslgti
