@@ -398,11 +398,15 @@ class BusSeasonRequestController extends Controller {
         $studentModel = $this->model('StudentModel');
         $academicYears = $studentModel->getAcademicYears();
         
+        // Get all active students for the dropdown
+        $allStudents = $studentModel->getStudents(1, 1000, ['status' => 'Active']); // Get up to 1000 active students
+        
         $data = [
             'title' => 'Bus Season Requests - Payment Collection',
             'page' => 'bus-season-requests-sao',
             'requests' => $requests,
             'academicYears' => $academicYears,
+            'students' => $allStudents,
             'message' => $this->getFlashMessage(),
             'error' => $this->getFlashError()
         ];

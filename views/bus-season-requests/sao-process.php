@@ -43,6 +43,35 @@
         padding-top: 1rem;
         margin-top: 0.5rem;
     }
+    
+    /* Student Search Dropdown */
+    #studentDropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        z-index: 1000;
+        margin-top: 2px;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    #studentDropdown .student-option {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    #studentDropdown .student-option:hover {
+        background-color: #f8f9fa;
+    }
+    
+    #studentDropdown .student-option:active {
+        background-color: #e9ecef;
+    }
+    
+    #selectedStudentInfo {
+        min-height: 40px;
+    }
 </style>
 
 <div class="container-fluid px-3 px-md-4 py-4">
@@ -265,18 +294,34 @@
                         
                         <div class="row g-3">
                             <div class="col-md-12">
-                                <label for="student_id" class="form-label fw-bold">
-                                    Student ID <span class="text-danger">*</span>
+                                <label for="student_search" class="form-label fw-bold">
+                                    <i class="fas fa-user-graduate me-2"></i>Select Student <span class="text-danger">*</span>
                                 </label>
-                                <input type="text" 
-                                       class="form-control" 
-                                       id="student_id" 
-                                       name="student_id" 
-                                       placeholder="Enter student ID"
-                                       required
-                                       autocomplete="off">
-                                <small class="text-muted">Enter the student ID to create a request for</small>
-                                <div id="studentInfo" class="mt-2"></div>
+                                <div class="position-relative">
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="student_search" 
+                                           placeholder="Search by name or student ID..."
+                                           autocomplete="off">
+                                    <input type="hidden" id="student_id" name="student_id" required>
+                                    <div id="studentDropdown" class="dropdown-menu w-100" style="max-height: 300px; overflow-y: auto; display: none;">
+                                        <?php if (!empty($students)): ?>
+                                            <?php foreach ($students as $student): ?>
+                                                <a class="dropdown-item student-option" 
+                                                   href="#" 
+                                                   data-student-id="<?php echo htmlspecialchars($student['student_id']); ?>"
+                                                   data-student-name="<?php echo htmlspecialchars($student['student_fullname'] ?? ''); ?>">
+                                                    <div class="fw-bold"><?php echo htmlspecialchars($student['student_fullname'] ?? 'N/A'); ?></div>
+                                                    <small class="text-muted">ID: <?php echo htmlspecialchars($student['student_id']); ?></small>
+                                                </a>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <div class="dropdown-item text-muted">No students found</div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <small class="text-muted">Type to search and select a student</small>
+                                <div id="selectedStudentInfo" class="mt-2"></div>
                             </div>
                             
                             <div class="col-md-6">
@@ -331,27 +376,76 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const createRequestForm = document.getElementById('createRequestForm');
+    const studentSearchInput = document.getElementById('student_search');
     const studentIdInput = document.getElementById('student_id');
-    const studentInfo = document.getElementById('studentInfo');
+    const studentDropdown = document.getElementById('studentDropdown');
+    const selectedStudentInfo = document.getElementById('selectedStudentInfo');
     const createRequestError = document.getElementById('createRequestError');
     const createRequestErrorText = document.getElementById('createRequestErrorText');
     const createRequestSuccess = document.getElementById('createRequestSuccess');
     const createRequestSuccessText = document.getElementById('createRequestSuccessText');
     const createRequestBtn = document.getElementById('createRequestBtn');
+    const studentOptions = document.querySelectorAll('.student-option');
     
-    // Student ID lookup (optional - can be enhanced with AJAX)
-    let studentLookupTimeout;
-    studentIdInput.addEventListener('input', function() {
-        clearTimeout(studentLookupTimeout);
-        const studentId = this.value.trim();
+    // Student search and filter
+    studentSearchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        const options = studentDropdown.querySelectorAll('.student-option');
+        let hasVisibleOptions = false;
         
-        if (studentId.length >= 3) {
-            studentLookupTimeout = setTimeout(function() {
-                // Could add AJAX lookup here to show student name
-                studentInfo.innerHTML = '<small class="text-muted">Checking student...</small>';
-            }, 500);
+        if (searchTerm === '') {
+            // Show all options when search is empty
+            options.forEach(option => {
+                option.style.display = '';
+                hasVisibleOptions = true;
+            });
+            studentDropdown.style.display = hasVisibleOptions ? 'block' : 'none';
         } else {
-            studentInfo.innerHTML = '';
+            // Filter options
+            options.forEach(option => {
+                const studentName = (option.dataset.studentName || '').toLowerCase();
+                const studentId = (option.dataset.studentId || '').toLowerCase();
+                const matches = studentName.includes(searchTerm) || studentId.includes(searchTerm);
+                
+                option.style.display = matches ? '' : 'none';
+                if (matches) hasVisibleOptions = true;
+            });
+            studentDropdown.style.display = hasVisibleOptions ? 'block' : 'none';
+        }
+    });
+    
+    // Handle student selection
+    studentOptions.forEach(option => {
+        option.addEventListener('click', function(e) {
+            e.preventDefault();
+            const studentId = this.dataset.studentId;
+            const studentName = this.dataset.studentName;
+            
+            studentIdInput.value = studentId;
+            studentSearchInput.value = studentName + ' (' + studentId + ')';
+            studentDropdown.style.display = 'none';
+            
+            // Show selected student info
+            selectedStudentInfo.innerHTML = `
+                <div class="alert alert-success py-2 small mb-0">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>Selected:</strong> ${studentName} (ID: ${studentId})
+                </div>
+            `;
+        });
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!studentSearchInput.contains(e.target) && !studentDropdown.contains(e.target)) {
+            studentDropdown.style.display = 'none';
+        }
+    });
+    
+    // Show dropdown on focus
+    studentSearchInput.addEventListener('focus', function() {
+        if (this.value.trim() === '') {
+            studentDropdown.style.display = 'block';
         }
     });
     
