@@ -4296,3 +4296,17 @@
 [25-Jan-2026 05:13:50 UTC] Database::connect - Connection successful to sisslgti
 [25-Jan-2026 05:13:59 UTC] Database::connect - Connection successful to sisslgti
 [25-Jan-2026 05:14:01 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:40:11 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:40:12 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:40:13 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:40:16 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:40:17 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:40:20 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:40:29 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:40:29 UTC] BusSeasonRequestModel::create - SQL: INSERT INTO `season_requests` 
+                    (`student_id`, `department_id`, `season_year`, `season_name`, `depot_name`, 
+                     `route_from`, `route_to`, `change_point`, `distance_km`, `status`, `notes`) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+[25-Jan-2026 05:40:29 UTC] BusSeasonRequestModel::create - Data: {"student_id":"2025\/MET\/5PT009","department_id":"MEC","season_year":"2026","season_name":"","depot_name":"","route_from":"Nelliyady","route_to":"SLGTI","change_point":"","distance_km":0,"notes":"Created by SAO"}
+[25-Jan-2026 05:40:29 UTC] BusSeasonRequestModel::create - Success. Insert ID: 7
+[25-Jan-2026 05:40:30 UTC] Database::connect - Connection successful to sisslgti
