@@ -127,30 +127,47 @@
                     <p class="mb-0"><small><strong>Payment Structure:</strong> Student pays 30%, SLGTI pays 35%, CTB pays 35%</small></p>
                 </div>
                 
-                <form method="POST" action="<?php echo APP_URL; ?>/bus-season-requests/create" id="busSeasonForm">
+                <form method="POST" action="<?php echo APP_URL; ?>/bus-season-requests/create" id="busSeasonForm" novalidate>
+                    <?php 
+                    // Generate CSRF token for nginx compatibility
+                    if (!isset($_SESSION['csrf_token'])) {
+                        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+                    }
+                    ?>
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                    <input type="hidden" name="form_submitted" value="1">
+                    
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label for="route_from" class="form-label fw-semibold">Route From <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="route_from" name="route_from" 
-                                   placeholder="Starting point" required>
+                                   placeholder="Starting point" required maxlength="255"
+                                   value="<?php echo htmlspecialchars($_POST['route_from'] ?? ''); ?>">
+                            <div class="invalid-feedback">Please provide a valid route from location.</div>
                         </div>
                         
                         <div class="col-md-6">
                             <label for="route_to" class="form-label fw-semibold">Route To <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="route_to" name="route_to" 
-                                   placeholder="Destination" required>
+                                   placeholder="Destination" required maxlength="255"
+                                   value="<?php echo htmlspecialchars($_POST['route_to'] ?? ''); ?>">
+                            <div class="invalid-feedback">Please provide a valid route to location.</div>
                         </div>
                         
                         <div class="col-md-6">
                             <label for="change_point" class="form-label fw-semibold">Change Point</label>
                             <input type="text" class="form-control" id="change_point" name="change_point" 
-                                   placeholder="Transfer point if any">
+                                   placeholder="Transfer point if any" maxlength="255"
+                                   value="<?php echo htmlspecialchars($_POST['change_point'] ?? ''); ?>">
+                            <small class="text-muted">Optional: Enter if you need to change buses</small>
                         </div>
                         
                         <div class="col-md-6">
                             <label for="distance_km" class="form-label fw-semibold">Distance (KM) <span class="text-danger">*</span></label>
                             <input type="number" class="form-control" id="distance_km" name="distance_km" 
-                                   step="0.1" min="0" placeholder="0.0" required>
+                                   step="0.1" min="0.1" max="9999.9" placeholder="0.0" required
+                                   value="<?php echo htmlspecialchars($_POST['distance_km'] ?? ''); ?>">
+                            <div class="invalid-feedback">Please enter a valid distance greater than 0.</div>
                         </div>
                         
                         <div class="col-12">
@@ -161,8 +178,19 @@
                         </div>
                         
                         <div class="col-12">
-                            <button type="submit" class="btn btn-success">
-                                <i class="fas fa-paper-plane me-2"></i>Submit Request
+                            <div id="formError" class="alert alert-danger d-none" role="alert">
+                                <i class="fas fa-exclamation-circle me-2"></i>
+                                <span id="formErrorText"></span>
+                            </div>
+                            <div id="formSuccess" class="alert alert-success d-none" role="alert">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <span id="formSuccessText"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-success" id="submitBtn">
+                                <i class="fas fa-paper-plane me-2"></i><span id="submitBtnText">Submit Request</span>
                             </button>
                             <a href="<?php echo APP_URL; ?>/student/dashboard" class="btn btn-outline-secondary ms-2">
                                 <i class="fas fa-times me-2"></i>Cancel
@@ -170,6 +198,201 @@
                         </div>
                     </div>
                 </form>
+                
+                <script>
+                (function() {
+                    'use strict';
+                    
+                    const form = document.getElementById('busSeasonForm');
+                    const submitBtn = document.getElementById('submitBtn');
+                    const submitBtnText = document.getElementById('submitBtnText');
+                    const formError = document.getElementById('formError');
+                    const formErrorText = document.getElementById('formErrorText');
+                    const formSuccess = document.getElementById('formSuccess');
+                    const formSuccessText = document.getElementById('formSuccessText');
+                    
+                    let isSubmitting = false;
+                    
+                    // Hide alerts on page load
+                    formError.classList.add('d-none');
+                    formSuccess.classList.add('d-none');
+                    
+                    // Client-side validation
+                    function validateForm() {
+                        const routeFrom = document.getElementById('route_from').value.trim();
+                        const routeTo = document.getElementById('route_to').value.trim();
+                        const distanceKm = parseFloat(document.getElementById('distance_km').value);
+                        
+                        if (!routeFrom) {
+                            showError('Please enter the route from location.');
+                            document.getElementById('route_from').focus();
+                            return false;
+                        }
+                        
+                        if (!routeTo) {
+                            showError('Please enter the route to location.');
+                            document.getElementById('route_to').focus();
+                            return false;
+                        }
+                        
+                        if (!distanceKm || distanceKm <= 0 || isNaN(distanceKm)) {
+                            showError('Please enter a valid distance greater than 0.');
+                            document.getElementById('distance_km').focus();
+                            return false;
+                        }
+                        
+                        if (distanceKm > 9999.9) {
+                            showError('Distance cannot exceed 9999.9 KM.');
+                            document.getElementById('distance_km').focus();
+                            return false;
+                        }
+                        
+                        return true;
+                    }
+                    
+                    function showError(message) {
+                        formErrorText.textContent = message;
+                        formError.classList.remove('d-none');
+                        formSuccess.classList.add('d-none');
+                    }
+                    
+                    function showSuccess(message) {
+                        formSuccessText.textContent = message;
+                        formSuccess.classList.remove('d-none');
+                        formError.classList.add('d-none');
+                    }
+                    
+                    function setSubmitting(state) {
+                        isSubmitting = state;
+                        submitBtn.disabled = state;
+                        if (state) {
+                            submitBtnText.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Submitting...';
+                            submitBtn.classList.add('disabled');
+                        } else {
+                            submitBtnText.textContent = 'Submit Request';
+                            submitBtn.classList.remove('disabled');
+                        }
+                    }
+                    
+                    // Bootstrap validation
+                    form.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        if (isSubmitting) {
+                            return false;
+                        }
+                        
+                        // Hide previous messages
+                        formError.classList.add('d-none');
+                        formSuccess.classList.add('d-none');
+                        
+                        // Validate form
+                        if (!validateForm()) {
+                            form.classList.add('was-validated');
+                            return false;
+                        }
+                        
+                        // Check if form is valid
+                        if (!form.checkValidity()) {
+                            form.classList.add('was-validated');
+                            return false;
+                        }
+                        
+                        // Try AJAX submission first (nginx compatible)
+                        setSubmitting(true);
+                        
+                        const formData = new FormData(form);
+                        
+                        fetch(form.action, {
+                            method: 'POST',
+                            body: formData,
+                            credentials: 'same-origin',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        })
+                        .then(response => {
+                            // Check if response is a redirect
+                            if (response.redirected) {
+                                window.location.href = response.url;
+                                return;
+                            }
+                            
+                            return response.text().then(text => {
+                                // Try to parse as JSON if possible
+                                try {
+                                    const data = JSON.parse(text);
+                                    if (data.success) {
+                                        showSuccess(data.message || 'Request submitted successfully!');
+                                        setTimeout(() => {
+                                            window.location.href = '<?php echo APP_URL; ?>/bus-season-requests';
+                                        }, 1500);
+                                    } else {
+                                        showError(data.error || 'Failed to submit request. Please try again.');
+                                        setSubmitting(false);
+                                    }
+                                } catch (e) {
+                                    // If not JSON, check if it's HTML (likely a redirect page)
+                                    if (text.includes('bus-season-requests') || text.includes('successfully')) {
+                                        // Redirect to form page (session message will be shown)
+                                        window.location.href = '<?php echo APP_URL; ?>/bus-season-requests';
+                                    } else {
+                                        // Fallback to regular form submission
+                                        form.submit();
+                                    }
+                                }
+                            });
+                        })
+                        .catch(error => {
+                            console.error('AJAX submission error:', error);
+                            // Fallback to regular form submission for nginx compatibility
+                            showError('Switching to standard submission...');
+                            setTimeout(() => {
+                                form.submit();
+                            }, 500);
+                        });
+                        
+                        return false;
+                    });
+                    
+                    // Real-time validation
+                    const inputs = form.querySelectorAll('input[required]');
+                    inputs.forEach(input => {
+                        input.addEventListener('blur', function() {
+                            if (this.value.trim() === '' && this.hasAttribute('required')) {
+                                this.classList.add('is-invalid');
+                            } else {
+                                this.classList.remove('is-invalid');
+                                this.classList.add('is-valid');
+                            }
+                        });
+                        
+                        input.addEventListener('input', function() {
+                            if (this.classList.contains('is-invalid') && this.value.trim() !== '') {
+                                this.classList.remove('is-invalid');
+                                this.classList.add('is-valid');
+                            }
+                        });
+                    });
+                    
+                    // Distance validation
+                    const distanceInput = document.getElementById('distance_km');
+                    distanceInput.addEventListener('input', function() {
+                        const value = parseFloat(this.value);
+                        if (value <= 0 || isNaN(value)) {
+                            this.classList.add('is-invalid');
+                            this.classList.remove('is-valid');
+                        } else if (value > 9999.9) {
+                            this.classList.add('is-invalid');
+                            this.classList.remove('is-valid');
+                        } else {
+                            this.classList.remove('is-invalid');
+                            this.classList.add('is-valid');
+                        }
+                    });
+                })();
+                </script>
             </div>
         <?php endif; ?>
         

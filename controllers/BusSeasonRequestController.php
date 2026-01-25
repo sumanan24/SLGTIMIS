@@ -114,8 +114,31 @@ class BusSeasonRequestController extends Controller {
             return;
         }
         
+        // Check if it's an AJAX request (nginx compatible)
+        $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+        
+        // Check request method (nginx compatible)
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => 'Invalid request method.']);
+                exit;
+            }
             $_SESSION['error'] = 'Invalid request method.';
+            $this->redirect('bus-season-requests');
+            return;
+        }
+        
+        // Verify CSRF token for nginx security
+        $csrfToken = $this->post('csrf_token', '');
+        if (empty($csrfToken) || !isset($_SESSION['csrf_token']) || $csrfToken !== $_SESSION['csrf_token']) {
+            $errorMsg = 'Invalid security token. Please refresh the page and try again.';
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => $errorMsg]);
+                exit;
+            }
+            $_SESSION['error'] = $errorMsg;
             $this->redirect('bus-season-requests');
             return;
         }
@@ -134,7 +157,13 @@ class BusSeasonRequestController extends Controller {
         
         // Check if student already has request for this season year
         if ($requestModel->hasExistingRequest($studentId, $seasonYear)) {
-            $_SESSION['error'] = 'You already have a bus season request for this season year. Only one request per year is allowed.';
+            $errorMsg = 'You already have a bus season request for this season year. Only one request per year is allowed.';
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => $errorMsg]);
+                exit;
+            }
+            $_SESSION['error'] = $errorMsg;
             $this->redirect('bus-season-requests');
             return;
         }
@@ -155,9 +184,39 @@ class BusSeasonRequestController extends Controller {
         $changePoint = trim($this->post('change_point', ''));
         $distanceKm = floatval($this->post('distance_km', 0));
         
-        // Validate required fields
-        if (empty($routeFrom) || empty($routeTo) || $distanceKm <= 0) {
-            $_SESSION['error'] = 'Please fill in all required fields: Route From, Route To, and Distance (KM).';
+        // Validate required fields (nginx compatible - strict validation)
+        $validationErrors = [];
+        
+        if (empty($routeFrom) || strlen(trim($routeFrom)) === 0) {
+            $validationErrors[] = 'Route From is required.';
+        } elseif (strlen($routeFrom) > 255) {
+            $validationErrors[] = 'Route From cannot exceed 255 characters.';
+        }
+        
+        if (empty($routeTo) || strlen(trim($routeTo)) === 0) {
+            $validationErrors[] = 'Route To is required.';
+        } elseif (strlen($routeTo) > 255) {
+            $validationErrors[] = 'Route To cannot exceed 255 characters.';
+        }
+        
+        if (empty($distanceKm) || $distanceKm <= 0 || !is_numeric($distanceKm)) {
+            $validationErrors[] = 'Distance must be a valid number greater than 0.';
+        } elseif ($distanceKm > 9999.9) {
+            $validationErrors[] = 'Distance cannot exceed 9999.9 KM.';
+        }
+        
+        if (!empty($changePoint) && strlen($changePoint) > 255) {
+            $validationErrors[] = 'Change Point cannot exceed 255 characters.';
+        }
+        
+        if (!empty($validationErrors)) {
+            $errorMsg = implode(' ', $validationErrors);
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => $errorMsg]);
+                exit;
+            }
+            $_SESSION['error'] = $errorMsg;
             $this->redirect('bus-season-requests');
             return;
         }
@@ -212,10 +271,29 @@ class BusSeasonRequestController extends Controller {
                     error_log("BusSeasonRequestController::create - Activity log error: " . $e->getMessage());
                 }
                 
-                $_SESSION['message'] = 'Bus season request submitted successfully. Waiting for HOD approval.';
+                $successMsg = 'Bus season request submitted successfully. Waiting for HOD approval.';
+                
+                // Regenerate CSRF token after successful submission
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+                
+                if ($isAjax) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => true, 'message' => $successMsg, 'redirect' => APP_URL . '/bus-season-requests']);
+                    exit;
+                }
+                
+                $_SESSION['message'] = $successMsg;
             } else {
                 error_log("BusSeasonRequestController::create - Request creation failed. Student: {$studentId}");
-                $_SESSION['error'] = 'Failed to submit request. Please check your input and try again. If the problem persists, contact the administrator.';
+                $errorMsg = 'Failed to submit request. Please check your input and try again. If the problem persists, contact the administrator.';
+                
+                if ($isAjax) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'error' => $errorMsg]);
+                    exit;
+                }
+                
+                $_SESSION['error'] = $errorMsg;
             }
         } catch (Exception $e) {
             error_log("BusSeasonRequestController::create - Exception: " . $e->getMessage());
@@ -226,10 +304,21 @@ class BusSeasonRequestController extends Controller {
             error_log("BusSeasonRequestController::create - Fatal Error: " . $e->getMessage());
             error_log("BusSeasonRequestController::create - Stack trace: " . $e->getTraceAsString());
             error_log("BusSeasonRequestController::create - File: " . $e->getFile() . ", Line: " . $e->getLine());
-            $_SESSION['error'] = 'A system error occurred. Please contact the administrator.';
+            $errorMsg = 'A system error occurred. Please contact the administrator.';
+            
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => $errorMsg]);
+                exit;
+            }
+            
+            $_SESSION['error'] = $errorMsg;
         }
         
-        $this->redirect('bus-season-requests');
+        // Only redirect if not AJAX (nginx compatible)
+        if (!$isAjax) {
+            $this->redirect('bus-season-requests');
+        }
     }
     
     /**
