@@ -41,8 +41,8 @@ class BusSeasonRequestController extends Controller {
             return;
         }
         
-        // Get student context using helper
-        $seasonYear = SeasonRequestHelper::getCurrentSeasonYear($studentId);
+        // Season year is fixed to 2026
+        $seasonYear = '2026';
         $departmentId = SeasonRequestHelper::getStudentDepartmentId($studentId);
         
         // Get requests with payments
@@ -55,18 +55,17 @@ class BusSeasonRequestController extends Controller {
         }
         unset($request);
         
-        // Check eligibility
-        $eligibility = SeasonRequestHelper::canStudentSubmitRequest($studentId, $seasonYear);
+        // Check if student already has request for 2026
+        $hasExistingRequest = $requestModel->hasExistingRequest($studentId, '2026');
         
         $data = [
-            'title' => 'Bus Season Request',
+            'title' => 'Bus Season Request - 2026',
             'page' => 'bus-season-requests',
             'student' => $student,
             'seasonYear' => $seasonYear,
             'departmentId' => $departmentId,
             'requests' => $requests,
-            'hasExistingRequest' => !$eligibility['can_submit'],
-            'eligibilityReason' => $eligibility['reason'],
+            'hasExistingRequest' => $hasExistingRequest,
             'message' => $this->getFlashMessage(),
             'error' => $this->getFlashError()
         ];
@@ -92,31 +91,27 @@ class BusSeasonRequestController extends Controller {
     }
     
     /**
-     * Create new request (Student submission)
+     * Create new request (Student submission) - Simplified version
+     * Only requires route_from and route_to, season year is 2026
      */
     public function create() {
         $this->requireAuth();
         $this->requireStudent();
         
-        // Enhanced logging for nginx debugging
         $logPrefix = "BusSeasonRequestController::create";
         error_log("{$logPrefix} - Request started. Method: " . $_SERVER['REQUEST_METHOD']);
-        error_log("{$logPrefix} - POST data: " . json_encode($_POST));
-        error_log("{$logPrefix} - Content-Type: " . ($_SERVER['CONTENT_TYPE'] ?? 'not set'));
-        error_log("{$logPrefix} - Content-Length: " . ($_SERVER['CONTENT_LENGTH'] ?? 'not set'));
         
         // Check POST method
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            error_log("{$logPrefix} - Invalid request method: " . $_SERVER['REQUEST_METHOD']);
             $this->requirePost();
             return;
         }
         
-        // Check if POST data is empty (nginx issue)
+        // Check if POST data is empty
         if (empty($_POST) && empty(file_get_contents('php://input'))) {
-            error_log("{$logPrefix} - POST data is empty. This may be an nginx configuration issue.");
+            error_log("{$logPrefix} - POST data is empty.");
             $isAjax = SeasonRequestHelper::isAjaxRequest();
-            $errorMsg = 'No form data received. This may be a server configuration issue. Please contact the administrator.';
+            $errorMsg = 'No form data received. Please try again.';
             $this->handleResponse($isAjax, false, $errorMsg);
             return;
         }
@@ -126,7 +121,6 @@ class BusSeasonRequestController extends Controller {
         // Verify CSRF token
         $csrfToken = $this->post('csrf_token', '');
         if (!SeasonRequestHelper::verifyCSRFToken($csrfToken)) {
-            error_log("{$logPrefix} - CSRF token verification failed");
             $errorMsg = 'Invalid security token. Please refresh the page and try again.';
             $this->handleResponse($isAjax, false, $errorMsg);
             return;
@@ -134,61 +128,73 @@ class BusSeasonRequestController extends Controller {
         
         $studentId = $_SESSION['user_name'] ?? null;
         if (!$studentId) {
-            error_log("{$logPrefix} - Student ID not found in session");
             $errorMsg = 'Session error. Please log in again.';
             $this->handleResponse($isAjax, false, $errorMsg);
             return;
         }
         
-        error_log("{$logPrefix} - Processing request for student: {$studentId}");
+        // Get form data - only route_from and route_to
+        $routeFrom = trim($this->post('route_from', ''));
+        $routeTo = trim($this->post('route_to', ''));
+        
+        // Simple validation - only check if fields are not empty
+        if (empty($routeFrom)) {
+            $errorMsg = 'Please enter the route from location.';
+            $this->handleResponse($isAjax, false, $errorMsg);
+            return;
+        }
+        
+        if (empty($routeTo)) {
+            $errorMsg = 'Please enter the route to location.';
+            $this->handleResponse($isAjax, false, $errorMsg);
+            return;
+        }
         
         try {
             $requestModel = $this->model('BusSeasonRequestModel');
             $requestModel->ensureTableStructure();
             
-            // Get season year and check eligibility
-            $seasonYear = SeasonRequestHelper::getCurrentSeasonYear($studentId);
-            error_log("{$logPrefix} - Season year: {$seasonYear}");
-            
-            $eligibility = SeasonRequestHelper::canStudentSubmitRequest($studentId, $seasonYear);
-            
-            if (!$eligibility['can_submit']) {
-                error_log("{$logPrefix} - Student not eligible: " . $eligibility['reason']);
-                $this->handleResponse($isAjax, false, $eligibility['reason']);
-                return;
-            }
-            
-            // Prepare and validate form data
-            $formData = [
-                'route_from' => $this->post('route_from', ''),
-                'route_to' => $this->post('route_to', ''),
-                'change_point' => $this->post('change_point', ''),
-                'distance_km' => $this->post('distance_km', 0),
-                'student_id' => $studentId,
-                'season_year' => $seasonYear
-            ];
-            
-            error_log("{$logPrefix} - Form data: " . json_encode($formData));
-            
-            // Validate using helper
-            $validation = SeasonRequestHelper::validateRequestData($formData);
-            if (!$validation['valid']) {
-                error_log("{$logPrefix} - Validation failed: " . json_encode($validation['errors']));
-                $errorMsg = implode(' ', $validation['errors']);
+            // Check if student already has request for 2026
+            if ($requestModel->hasExistingRequest($studentId, '2026')) {
+                $errorMsg = 'You already have a bus season request for 2026. Only one request per year is allowed.';
                 $this->handleResponse($isAjax, false, $errorMsg);
                 return;
             }
             
-            // Prepare request data using helper
-            $requestData = SeasonRequestHelper::prepareRequestData($formData, $studentId);
-            error_log("{$logPrefix} - Prepared request data: " . json_encode($requestData));
+            // Get department ID (optional)
+            $departmentId = null;
+            if (isset($_SESSION['user_id'])) {
+                $enrollmentModel = $this->model('StudentEnrollmentModel');
+                $currentEnrollment = $enrollmentModel->getCurrentEnrollment($studentId);
+                if ($currentEnrollment && isset($currentEnrollment['course_id'])) {
+                    $courseModel = $this->model('CourseModel');
+                    $course = $courseModel->find($currentEnrollment['course_id']);
+                    if ($course && isset($course['department_id'])) {
+                        $departmentId = $course['department_id'];
+                    }
+                }
+            }
+            
+            // Prepare request data - season year is 2026
+            $requestData = [
+                'student_id' => $studentId,
+                'department_id' => $departmentId,
+                'season_year' => '2026',
+                'season_name' => '',
+                'depot_name' => '',
+                'route_from' => $routeFrom,
+                'route_to' => $routeTo,
+                'change_point' => '',
+                'distance_km' => 0,
+                'notes' => ''
+            ];
+            
+            error_log("{$logPrefix} - Request data: " . json_encode($requestData));
             
             // Check database connection
             $db = Database::getInstance();
             $conn = $db->getConnection();
             if (!$conn || $conn->connect_error) {
-                $dbError = $conn ? $conn->connect_error : 'Connection object is null';
-                error_log("{$logPrefix} - Database connection failed: " . $dbError);
                 $errorMsg = 'Database connection error. Please contact the administrator.';
                 $this->handleResponse($isAjax, false, $errorMsg);
                 return;
@@ -200,12 +206,12 @@ class BusSeasonRequestController extends Controller {
             if ($newRequestId) {
                 error_log("{$logPrefix} - Request created successfully. ID: {$newRequestId}");
                 
-                // Log activity using helper
+                // Log activity
                 try {
                     SeasonRequestHelper::logActivity(
                         'CREATE',
                         $newRequestId,
-                        "Student {$studentId} created bus season request for season year {$seasonYear}",
+                        "Student {$studentId} created bus season request for season year 2026",
                         $requestData
                     );
                 } catch (Exception $e) {
@@ -218,19 +224,16 @@ class BusSeasonRequestController extends Controller {
                 $successMsg = 'Bus season request submitted successfully. Waiting for HOD approval.';
                 $this->handleResponse($isAjax, true, $successMsg);
             } else {
-                error_log("{$logPrefix} - Request creation failed. No insert ID returned.");
-                $errorMsg = 'Failed to submit request. Please check your input and try again. If the problem persists, contact the administrator.';
+                error_log("{$logPrefix} - Request creation failed.");
+                $errorMsg = 'Failed to submit request. Please try again.';
                 $this->handleResponse($isAjax, false, $errorMsg);
             }
         } catch (Exception $e) {
             error_log("{$logPrefix} - Exception: " . $e->getMessage());
-            error_log("{$logPrefix} - Stack trace: " . $e->getTraceAsString());
-            error_log("{$logPrefix} - File: " . $e->getFile() . ", Line: " . $e->getLine());
-            $errorMsg = 'An error occurred while submitting your request. Please try again or contact support.';
+            $errorMsg = 'An error occurred. Please try again.';
             $this->handleResponse($isAjax, false, $errorMsg);
         } catch (Error $e) {
             error_log("{$logPrefix} - Fatal Error: " . $e->getMessage());
-            error_log("{$logPrefix} - Stack trace: " . $e->getTraceAsString());
             $errorMsg = 'A system error occurred. Please contact the administrator.';
             $this->handleResponse($isAjax, false, $errorMsg);
         }
@@ -903,3 +906,4 @@ class BusSeasonRequestController extends Controller {
     }
     
 }
+

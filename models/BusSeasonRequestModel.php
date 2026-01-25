@@ -116,12 +116,20 @@ class BusSeasonRequestModel extends Model {
             $distanceKm = floatval($data['distance_km'] ?? 0);
             $notes = $data['notes'] ?? null;
             
-            // Validate critical fields
+            // Validate critical fields - only route_from and route_to are required
             if (empty($studentId) || empty($seasonYear) || empty($routeFrom) || empty($routeTo)) {
                 error_log("{$logPrefix} - Validation failed. Missing required fields.");
                 error_log("{$logPrefix} - studentId: {$studentId}, seasonYear: {$seasonYear}, routeFrom: {$routeFrom}, routeTo: {$routeTo}");
                 $stmt->close();
                 return false;
+            }
+            
+            // Set defaults for optional fields
+            if (empty($changePoint)) {
+                $changePoint = '';
+            }
+            if ($distanceKm <= 0) {
+                $distanceKm = 0;
             }
             
             $bindResult = $stmt->bind_param("ssssssssds",

@@ -70,15 +70,6 @@
             gap: 1rem;
         }
     }
-    
-    .payment-info {
-        background: #e7f3ff;
-        border-left: 4px solid #0d6efd;
-        padding: 1rem;
-        border-radius: 8px;
-        margin-bottom: 1rem;
-    }
-    
 </style>
 
 <div class="container-fluid px-3 px-md-4 py-4">
@@ -88,7 +79,7 @@
                 <i class="fas fa-bus me-2" style="color: #198754;"></i>
                 Bus Season Request
             </h2>
-            <p class="text-muted mb-0">Apply for Bus Season Ticket</p>
+            <p class="text-muted mb-0">Apply for Bus Season Ticket - Season Year 2026</p>
         </div>
     </div>
     
@@ -110,21 +101,21 @@
         <?php if ($hasExistingRequest): ?>
             <div class="alert alert-info">
                 <i class="fas fa-info-circle me-2"></i>
-                You already have a bus season request for the season year <strong><?php echo htmlspecialchars($seasonYear ?? ''); ?></strong>. Only one request per year is allowed.
+                You already have a bus season request for the season year <strong>2026</strong>. Only one request per year is allowed.
             </div>
         <?php else: ?>
             <!-- Request Form -->
             <div class="form-card">
                 <div class="form-header">
                     <h4 class="fw-bold mb-0">
-                        <i class="fas fa-bus me-2 text-success"></i>New Bus Season Request
+                        <i class="fas fa-bus me-2 text-success"></i>New Bus Season Request - 2026
                     </h4>
                 </div>
                 
                 <div class="alert alert-info">
                     <h6 class="fw-bold mb-2"><i class="fas fa-info-circle me-2"></i>Request Information</h6>
                     <p class="mb-2">Submit a bus season request for approval. Payment collection will be handled separately by the Student Affairs Office (SAO) after your request is approved.</p>
-                    <p class="mb-0"><small><strong>Payment Structure:</strong> Student pays 30%, SLGTI pays 35%, CTB pays 35%</small></p>
+                    <p class="mb-0"><small><strong>Season Year:</strong> 2026</small></p>
                 </div>
                 
                 <form method="POST" action="<?php echo APP_URL; ?>/bus-season-requests/create" id="busSeasonForm" novalidate>
@@ -133,46 +124,26 @@
                     $csrfToken = SeasonRequestHelper::generateCSRFToken();
                     ?>
                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
-                    <input type="hidden" name="form_submitted" value="1">
                     
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label for="route_from" class="form-label fw-semibold">Route From <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="route_from" name="route_from" 
-                                   placeholder="Starting point" required maxlength="255"
+                            <label for="route_from" class="form-label fw-semibold">
+                                <i class="fas fa-map-marker-alt text-danger me-2"></i>Route From <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control form-control-lg" id="route_from" name="route_from" 
+                                   placeholder="Enter starting point" required
                                    value="<?php echo htmlspecialchars($_POST['route_from'] ?? ''); ?>">
-                            <div class="invalid-feedback">Please provide a valid route from location.</div>
+                            <div class="invalid-feedback">Please provide a starting point.</div>
                         </div>
                         
                         <div class="col-md-6">
-                            <label for="route_to" class="form-label fw-semibold">Route To <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="route_to" name="route_to" 
-                                   placeholder="Destination" required maxlength="255"
+                            <label for="route_to" class="form-label fw-semibold">
+                                <i class="fas fa-map-marker-alt text-success me-2"></i>Route To <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control form-control-lg" id="route_to" name="route_to" 
+                                   placeholder="Enter destination" required
                                    value="<?php echo htmlspecialchars($_POST['route_to'] ?? ''); ?>">
-                            <div class="invalid-feedback">Please provide a valid route to location.</div>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label for="change_point" class="form-label fw-semibold">Change Point</label>
-                            <input type="text" class="form-control" id="change_point" name="change_point" 
-                                   placeholder="Transfer point if any" maxlength="255"
-                                   value="<?php echo htmlspecialchars($_POST['change_point'] ?? ''); ?>">
-                            <small class="text-muted">Optional: Enter if you need to change buses</small>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label for="distance_km" class="form-label fw-semibold">Distance (KM) <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="distance_km" name="distance_km" 
-                                   step="0.1" min="0.1" max="9999.9" placeholder="0.0" required
-                                   value="<?php echo htmlspecialchars($_POST['distance_km'] ?? ''); ?>">
-                            <div class="invalid-feedback">Please enter a valid distance greater than 0.</div>
-                        </div>
-                        
-                        <div class="col-12">
-                            <div class="alert alert-info">
-                                <i class="fas fa-info-circle me-2"></i>
-                                <strong>Note:</strong> Only one bus season request per season year is allowed. Season year (<?php echo htmlspecialchars($seasonYear ?? ''); ?>) is automatically set from your current enrollment. Once approved, payment collection will be handled by SAO.
-                            </div>
+                            <div class="invalid-feedback">Please provide a destination.</div>
                         </div>
                         
                         <div class="col-12">
@@ -187,10 +158,10 @@
                         </div>
                         
                         <div class="col-12">
-                            <button type="submit" class="btn btn-success" id="submitBtn">
+                            <button type="submit" class="btn btn-success btn-lg" id="submitBtn">
                                 <i class="fas fa-paper-plane me-2"></i><span id="submitBtnText">Submit Request</span>
                             </button>
-                            <a href="<?php echo APP_URL; ?>/student/dashboard" class="btn btn-outline-secondary ms-2">
+                            <a href="<?php echo APP_URL; ?>/student/dashboard" class="btn btn-outline-secondary btn-lg ms-2">
                                 <i class="fas fa-times me-2"></i>Cancel
                             </a>
                         </div>
@@ -215,11 +186,10 @@
                     formError.classList.add('d-none');
                     formSuccess.classList.add('d-none');
                     
-                    // Client-side validation
+                    // Simple validation - only check if fields are not empty
                     function validateForm() {
                         const routeFrom = document.getElementById('route_from').value.trim();
                         const routeTo = document.getElementById('route_to').value.trim();
-                        const distanceKm = parseFloat(document.getElementById('distance_km').value);
                         
                         if (!routeFrom) {
                             showError('Please enter the route from location.');
@@ -230,18 +200,6 @@
                         if (!routeTo) {
                             showError('Please enter the route to location.');
                             document.getElementById('route_to').focus();
-                            return false;
-                        }
-                        
-                        if (!distanceKm || distanceKm <= 0 || isNaN(distanceKm)) {
-                            showError('Please enter a valid distance greater than 0.');
-                            document.getElementById('distance_km').focus();
-                            return false;
-                        }
-                        
-                        if (distanceKm > 9999.9) {
-                            showError('Distance cannot exceed 9999.9 KM.');
-                            document.getElementById('distance_km').focus();
                             return false;
                         }
                         
@@ -272,7 +230,7 @@
                         }
                     }
                     
-                    // Bootstrap validation
+                    // Form submission
                     form.addEventListener('submit', function(e) {
                         e.preventDefault();
                         e.stopPropagation();
@@ -297,7 +255,7 @@
                             return false;
                         }
                         
-                        // Try AJAX submission first (nginx compatible)
+                        // Try AJAX submission first
                         setSubmitting(true);
                         
                         const formData = new FormData(form);
@@ -344,7 +302,7 @@
                         })
                         .catch(error => {
                             console.error('AJAX submission error:', error);
-                            // Fallback to regular form submission for nginx compatibility
+                            // Fallback to regular form submission
                             showError('Switching to standard submission...');
                             setTimeout(() => {
                                 form.submit();
@@ -373,22 +331,6 @@
                             }
                         });
                     });
-                    
-                    // Distance validation
-                    const distanceInput = document.getElementById('distance_km');
-                    distanceInput.addEventListener('input', function() {
-                        const value = parseFloat(this.value);
-                        if (value <= 0 || isNaN(value)) {
-                            this.classList.add('is-invalid');
-                            this.classList.remove('is-valid');
-                        } else if (value > 9999.9) {
-                            this.classList.add('is-invalid');
-                            this.classList.remove('is-valid');
-                        } else {
-                            this.classList.remove('is-invalid');
-                            this.classList.add('is-valid');
-                        }
-                    });
                 })();
                 </script>
             </div>
@@ -405,12 +347,9 @@
                     <table class="table table-hover">
                         <thead>
                             <tr>
-                                <th>Academic Year</th>
-                                <th>Payment Status</th>
-                                <th>Payment Period</th>
-                                <th>Student Payment</th>
-                                <th>Total Value</th>
-                                <th>Request Status</th>
+                                <th>Route</th>
+                                <th>Season Year</th>
+                                <th>Status</th>
                                 <th>Request Date</th>
                                 <th>Actions</th>
                             </tr>
@@ -418,38 +357,13 @@
                         <tbody>
                             <?php foreach ($requests as $request): ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars($request['season_year'] ?? ''); ?></td>
                                     <td>
-                                        <?php if (isset($request['payment'])): ?>
-                                            <span class="badge bg-success">Payment Collected</span>
-                                            <br><small class="text-muted"><?php echo $request['payment']['payment_date'] ? date('M d, Y', strtotime($request['payment']['payment_date'])) : ''; ?></small>
-                                        <?php else: ?>
-                                            <span class="badge bg-warning">Pending Collection</span>
-                                        <?php endif; ?>
+                                        <i class="fas fa-map-marker-alt text-danger me-1"></i>
+                                        <?php echo htmlspecialchars($request['route_from'] ?? ''); ?> 
+                                        <i class="fas fa-arrow-right mx-1 text-muted"></i> 
+                                        <?php echo htmlspecialchars($request['route_to'] ?? ''); ?>
                                     </td>
-                                    <td>
-                                        <?php if (isset($request['payment'])): ?>
-                                            <?php echo htmlspecialchars($request['payment']['payment_method'] ?? 'N/A'); ?>
-                                        <?php else: ?>
-                                            <span class="text-muted">N/A</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php
-                                        require_once BASE_PATH . '/core/SeasonRequestHelper.php';
-                                        if (isset($request['payment'])): ?>
-                                            <?php echo SeasonRequestHelper::formatCurrency($request['payment']['student_paid'] ?? 0); ?>
-                                        <?php else: ?>
-                                            <span class="text-muted">Not Collected</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php if (isset($request['payment'])): ?>
-                                            <?php echo SeasonRequestHelper::formatCurrency($request['payment']['total_amount'] ?? 0); ?>
-                                        <?php else: ?>
-                                            <span class="text-muted">Pending Collection</span>
-                                        <?php endif; ?>
-                                    </td>
+                                    <td><?php echo htmlspecialchars($request['season_year'] ?? '2026'); ?></td>
                                     <td>
                                         <?php
                                         require_once BASE_PATH . '/core/SeasonRequestHelper.php';
@@ -484,7 +398,7 @@
         <div class="form-card">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="fw-bold mb-0">
-                    <i class="fas fa-list me-2"></i>All Bus Season Requests
+                    <i class="fas fa-list me-2"></i>All Bus Season Requests - 2026
                 </h4>
                 <div class="btn-group">
                     <a href="<?php echo APP_URL; ?>/bus-season-requests/sao-process" class="btn btn-success btn-sm">
@@ -498,8 +412,8 @@
                     <thead class="table-light">
                         <tr>
                             <th>Student Details</th>
-                            <th>Route Information</th>
-                            <th>Season</th>
+                            <th>Route</th>
+                            <th>Season Year</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -517,25 +431,15 @@
                                     <td>
                                         <div class="fw-bold"><?php echo htmlspecialchars($request['student_fullname'] ?? 'N/A'); ?></div>
                                         <small class="text-muted"><?php echo htmlspecialchars($request['student_id']); ?></small>
-                                        <div class="small text-muted"><?php echo htmlspecialchars($request['department_name'] ?? 'N/A'); ?></div>
                                     </td>
                                     <td>
-                                        <div>
-                                            <i class="fas fa-map-marker-alt text-danger me-1 small"></i>
-                                            <?php echo htmlspecialchars($request['route_from']); ?> 
-                                            <i class="fas fa-arrow-right mx-1 small text-muted"></i> 
-                                            <?php echo htmlspecialchars($request['route_to']); ?>
-                                        </div>
-                                        <small class="text-muted">
-                                            <?php echo number_format($request['distance_km'], 2); ?> km
-                                            <?php if (!empty($request['change_point'])): ?>
-                                                | Via: <?php echo htmlspecialchars($request['change_point']); ?>
-                                            <?php endif; ?>
-                                        </small>
+                                        <i class="fas fa-map-marker-alt text-danger me-1"></i>
+                                        <?php echo htmlspecialchars($request['route_from'] ?? ''); ?> 
+                                        <i class="fas fa-arrow-right mx-1 text-muted"></i> 
+                                        <?php echo htmlspecialchars($request['route_to'] ?? ''); ?>
                                     </td>
                                     <td>
-                                        <div class="fw-semibold text-primary"><?php echo htmlspecialchars($request['season_year']); ?></div>
-                                        <small class="text-muted"><?php echo htmlspecialchars($request['season_name'] ?? 'Bus Season'); ?></small>
+                                        <div class="fw-semibold text-primary"><?php echo htmlspecialchars($request['season_year'] ?? '2026'); ?></div>
                                     </td>
                                     <td>
                                         <?php 
@@ -558,23 +462,12 @@
                                         $label = $statusLabels[$status] ?? ucfirst($status);
                                         ?>
                                         <span class="badge bg-<?php echo $color; ?>"><?php echo $label; ?></span>
-                                        
-                                        <?php if (isset($request['has_payment']) && $request['has_payment'] > 0): ?>
-                                            <div class="mt-1 small text-success fw-bold">
-                                                <i class="fas fa-check-circle me-1"></i>Paid
-                                            </div>
-                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <div class="btn-group">
                                             <a href="<?php echo APP_URL; ?>/bus-season-requests/view?id=<?php echo $request['id']; ?>" class="btn btn-outline-primary btn-sm">
                                                 <i class="fas fa-eye"></i>
                                             </a>
-                                            <?php if ($status === 'approved' && !(isset($request['has_payment']) && $request['has_payment'] > 0)): ?>
-                                                <a href="<?php echo APP_URL; ?>/bus-season-requests/sao-process" class="btn btn-outline-success btn-sm">
-                                                    <i class="fas fa-cash-register"></i>
-                                                </a>
-                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>
@@ -586,5 +479,3 @@
         </div>
     <?php endif; ?>
 </div>
-
-
