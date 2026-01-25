@@ -4251,3 +4251,48 @@
 [25-Jan-2026 04:58:39 UTC] Database::connect - Connection successful to sisslgti
 [25-Jan-2026 04:58:54 UTC] Database::connect - Connection successful to sisslgti
 [25-Jan-2026 04:59:09 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:10:46 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:10:46 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:10:47 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:10:50 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:10:51 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:10:52 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:10:52 UTC] PHP Fatal error:  Access level to BusSeasonRequestController::json() must be protected (as in class Controller) or weaker in C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php on line 861
+[25-Jan-2026 05:10:52 UTC] PHP Stack trace:
+[25-Jan-2026 05:10:52 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[25-Jan-2026 05:10:52 UTC] PHP   2. Router->route($uri = 'bus-season-requests') C:\wamp64\www\SLGTIMIS\index.php:144
+[25-Jan-2026 05:10:52 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@index', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[25-Jan-2026 05:12:00 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:12:00 UTC] PHP Fatal error:  Access level to BusSeasonRequestController::getHODDepartment() must be protected (as in class Controller) or weaker in C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php on line 820
+[25-Jan-2026 05:12:00 UTC] PHP Stack trace:
+[25-Jan-2026 05:12:00 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[25-Jan-2026 05:12:00 UTC] PHP   2. Router->route($uri = 'bus-season-requests') C:\wamp64\www\SLGTIMIS\index.php:144
+[25-Jan-2026 05:12:00 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@index', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[25-Jan-2026 05:12:02 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:12:02 UTC] PHP Fatal error:  Access level to BusSeasonRequestController::getHODDepartment() must be protected (as in class Controller) or weaker in C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php on line 820
+[25-Jan-2026 05:12:02 UTC] PHP Stack trace:
+[25-Jan-2026 05:12:02 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[25-Jan-2026 05:12:02 UTC] PHP   2. Router->route($uri = 'bus-season-requests') C:\wamp64\www\SLGTIMIS\index.php:144
+[25-Jan-2026 05:12:02 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@index', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[25-Jan-2026 05:12:02 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:12:03 UTC] PHP Fatal error:  Access level to BusSeasonRequestController::getHODDepartment() must be protected (as in class Controller) or weaker in C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php on line 820
+[25-Jan-2026 05:12:03 UTC] PHP Stack trace:
+[25-Jan-2026 05:12:03 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[25-Jan-2026 05:12:03 UTC] PHP   2. Router->route($uri = 'bus-season-requests') C:\wamp64\www\SLGTIMIS\index.php:144
+[25-Jan-2026 05:12:03 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@index', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[25-Jan-2026 05:12:03 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:12:03 UTC] PHP Fatal error:  Access level to BusSeasonRequestController::getHODDepartment() must be protected (as in class Controller) or weaker in C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php on line 820
+[25-Jan-2026 05:12:03 UTC] PHP Stack trace:
+[25-Jan-2026 05:12:03 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[25-Jan-2026 05:12:03 UTC] PHP   2. Router->route($uri = 'bus-season-requests') C:\wamp64\www\SLGTIMIS\index.php:144
+[25-Jan-2026 05:12:03 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@index', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[25-Jan-2026 05:12:03 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:12:03 UTC] PHP Fatal error:  Access level to BusSeasonRequestController::getHODDepartment() must be protected (as in class Controller) or weaker in C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php on line 820
+[25-Jan-2026 05:12:03 UTC] PHP Stack trace:
+[25-Jan-2026 05:12:03 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[25-Jan-2026 05:12:03 UTC] PHP   2. Router->route($uri = 'bus-season-requests') C:\wamp64\www\SLGTIMIS\index.php:144
+[25-Jan-2026 05:12:03 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@index', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[25-Jan-2026 05:13:39 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:13:50 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:13:59 UTC] Database::connect - Connection successful to sisslgti
+[25-Jan-2026 05:14:01 UTC] Database::connect - Connection successful to sisslgti

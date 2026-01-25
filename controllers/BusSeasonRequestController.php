@@ -777,15 +777,6 @@ class BusSeasonRequestController extends Controller {
     }
     
     /**
-     * Check if user is HOD
-     */
-    private function isHOD() {
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        return $userModel->isHOD($_SESSION['user_id']);
-    }
-    
-    /**
      * Check if user is SAO
      */
     private function isSAO() {
@@ -814,14 +805,6 @@ class BusSeasonRequestController extends Controller {
         return $userModel->getUserRole($_SESSION['user_id']);
     }
     
-    /**
-     * Get HOD department ID
-     */
-    private function getHODDepartment() {
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        return $userModel->getHODDepartment($_SESSION['user_id']);
-    }
     
     /**
      * Set flash message
@@ -855,13 +838,4 @@ class BusSeasonRequestController extends Controller {
         return $error;
     }
     
-    /**
-     * Send JSON response
-     */
-    private function json($data, $statusCode = 200) {
-        http_response_code($statusCode);
-        header('Content-Type: application/json');
-        echo json_encode($data);
-        exit;
-    }
 }
