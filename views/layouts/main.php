@@ -413,6 +413,16 @@
                                 $canProcessBusSeason = $isSAO || $isADM || $isAdmin;
                             }
                             ?>
+                            <?php if ($isHOD): ?>
+                            <!-- Bus Season HOD Approval - For HOD -->
+                            <li>
+                                <a href="<?php echo APP_URL; ?>/bus-season-requests/hod-approval" class="<?php echo (isset($page) && $page === 'bus-season-requests-hod') ? 'active' : ''; ?>">
+                                    <i class="fas fa-bus"></i>
+                                    <span>Bus Season Requests</span>
+                                </a>
+                            </li>
+                            <?php endif; ?>
+                            
                             <?php if ($canProcessBusSeason): ?>
                             <!-- Bus Season Processing - For SAO, ADM, Admin -->
                             <li>
