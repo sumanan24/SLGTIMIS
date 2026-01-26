@@ -90,7 +90,9 @@ class CourseController extends Controller {
         $isDepartmentRestricted = $this->isDepartmentRestricted();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
+        $isHOD = $this->isHOD();
         $canEdit = $isDepartmentRestricted || $isADM;
+        $canCreate = $isHOD || $isADM; // Only HOD and ADM can create courses
         
         $data = [
             'title' => 'Courses',
@@ -104,6 +106,7 @@ class CourseController extends Controller {
             ],
             'isHOD' => $isHOD,
             'canEdit' => $canEdit,
+            'canCreate' => $canCreate,
             'message' => $_SESSION['message'] ?? null,
             'error' => $_SESSION['error'] ?? null
         ];

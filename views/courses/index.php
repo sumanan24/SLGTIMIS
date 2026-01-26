@@ -98,7 +98,7 @@
         <div class="card-header bg-primary text-white">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <h5 class="mb-0 fw-bold"><i class="fas fa-book me-2"></i>Courses Management</h5>
-                <?php if (isset($canEdit) && $canEdit): ?>
+                <?php if (isset($canCreate) && $canCreate): ?>
                 <a href="<?php echo APP_URL; ?>/courses/create" class="btn btn-light courses-header-btn mt-2 mt-md-0">
                     <i class="fas fa-plus me-1"></i>Add New Course
                 </a>
@@ -236,7 +236,7 @@
                     <div class="text-center py-5">
                         <i class="fas fa-book-open fa-3x text-muted mb-3"></i>
                         <p class="text-muted mb-3">No courses found.</p>
-                        <?php if (isset($canEdit) && $canEdit): ?>
+                        <?php if (isset($canCreate) && $canCreate): ?>
                         <a href="<?php echo APP_URL; ?>/courses/create" class="btn btn-primary">
                             <i class="fas fa-plus me-1"></i>Create one now
                         </a>

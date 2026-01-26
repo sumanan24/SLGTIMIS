@@ -50,7 +50,7 @@
                 </a>
                 <?php endif; ?>
                 <?php if (isset($isADM) && $isADM): ?>
-                <a href="<?php echo APP_URL; ?>/students/import-images" class="btn btn-info btn-sm" onclick="return confirm('This will scan the img/Student_profile directory and update student records with matching image files. Continue?');">
+                <a href="<?php echo APP_URL; ?>/students/import-images" class="btn btn-info btn-sm" onclick="return confirm('This will scan the img/Studnet_profile directory and update student records with matching image files. Continue?');">
                     <i class="fas fa-images me-1"></i>Import Profile Images
                 </a>
                 <?php endif; ?>

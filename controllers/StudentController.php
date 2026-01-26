@@ -656,13 +656,16 @@ class StudentController extends Controller {
                         if (strpos($normalizedPath, 'assets/') === 0) {
                             $normalizedPath = substr($normalizedPath, 7);
                         }
-                        // Convert old lowercase path to new capital path if needed
-                        if (strpos($normalizedPath, 'img/student_profile/') === 0) {
-                            $normalizedPath = str_replace('img/student_profile/', 'img/Student_profile/', $normalizedPath);
-                        }
-                        if (strpos($normalizedPath, 'img/Student_profile/') !== 0) {
-                            $normalizedPath = 'img/Student_profile/' . basename($normalizedPath);
-                        }
+                                // Convert old paths to new Studnet_profile path
+                                if (strpos($normalizedPath, 'img/student_profile/') === 0) {
+                                    $normalizedPath = str_replace('img/student_profile/', 'img/Studnet_profile/', $normalizedPath);
+                                }
+                                if (strpos($normalizedPath, 'img/Student_profile/') === 0) {
+                                    $normalizedPath = str_replace('img/Student_profile/', 'img/Studnet_profile/', $normalizedPath);
+                                }
+                                if (strpos($normalizedPath, 'img/Studnet_profile/') !== 0) {
+                                    $normalizedPath = 'img/Studnet_profile/' . basename($normalizedPath);
+                                }
                         $oldImagePath = BASE_PATH . '/assets/' . $normalizedPath;
                         if (file_exists($oldImagePath)) {
                             @unlink($oldImagePath);
@@ -679,8 +682,8 @@ class StudentController extends Controller {
                     $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
                     
                     if (in_array($fileExtension, $allowedExtensions) && in_array($file['type'], $allowedMimeTypes)) {
-                        // Standardized directory: assets/img/Student_profile
-                        $imageDirectory = BASE_PATH . '/assets/img/Student_profile';
+                        // Standardized directory: assets/img/Studnet_profile
+                        $imageDirectory = BASE_PATH . '/assets/img/Studnet_profile';
                         
                         // Create directory if it doesn't exist
                         if (!is_dir($imageDirectory)) {
@@ -698,12 +701,15 @@ class StudentController extends Controller {
                                 if (strpos($normalizedPath, 'assets/') === 0) {
                                     $normalizedPath = substr($normalizedPath, 7);
                                 }
-                                // Convert old lowercase path to new capital path if needed
+                                // Convert old paths to new Studnet_profile path
                                 if (strpos($normalizedPath, 'img/student_profile/') === 0) {
-                                    $normalizedPath = str_replace('img/student_profile/', 'img/Student_profile/', $normalizedPath);
+                                    $normalizedPath = str_replace('img/student_profile/', 'img/Studnet_profile/', $normalizedPath);
                                 }
-                                if (strpos($normalizedPath, 'img/Student_profile/') !== 0) {
-                                    $normalizedPath = 'img/Student_profile/' . basename($normalizedPath);
+                                if (strpos($normalizedPath, 'img/Student_profile/') === 0) {
+                                    $normalizedPath = str_replace('img/Student_profile/', 'img/Studnet_profile/', $normalizedPath);
+                                }
+                                if (strpos($normalizedPath, 'img/Studnet_profile/') !== 0) {
+                                    $normalizedPath = 'img/Studnet_profile/' . basename($normalizedPath);
                                 }
                                 $oldImagePath = BASE_PATH . '/assets/' . $normalizedPath;
                                 if (file_exists($oldImagePath)) {
@@ -718,8 +724,8 @@ class StudentController extends Controller {
                             
                             // Move uploaded file
                             if (move_uploaded_file($file['tmp_name'], $targetPath)) {
-                                // Store path relative to assets: img/Student_profile/filename.jpg
-                                $newImagePath = 'img/Student_profile/' . $newFilename;
+                                // Store path relative to assets: img/Studnet_profile/filename.jpg
+                                $newImagePath = 'img/Studnet_profile/' . $newFilename;
                                 $studentModel->updateStudentImage($id, $newImagePath);
                                 $successMessage .= ' Profile image updated.';
                             } else {
@@ -1778,7 +1784,7 @@ class StudentController extends Controller {
         }
         
         $targetDir = $imageDirectory;
-        $imagePathPrefix = 'img/Student_profile';
+        $imagePathPrefix = 'img/Studnet_profile';
         
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
         $existingImages = [];
@@ -1906,7 +1912,7 @@ class StudentController extends Controller {
         }
         
         $targetDir = $imageDirectory;
-        $imagePathPrefix = 'img/Student_profile';
+        $imagePathPrefix = 'img/Studnet_profile';
         
         $processed = 0;
         $skipped = 0;
@@ -2031,35 +2037,35 @@ class StudentController extends Controller {
         // GET request - show upload form
         $studentModel = $this->model('StudentModel');
         
-        // Get directory info - use Student_profile (capital S) as standard
-        $imageDirectory = BASE_PATH . '/assets/img/Student_profile';
+        // Get directory info - use Studnet_profile as standard
+        $imageDirectory = BASE_PATH . '/assets/img/Studnet_profile';
         $imageDirectoryAlt = BASE_PATH . '/assets/img/student_profile';
-        $imageDirectoryTypo = BASE_PATH . '/assets/img/Studnet_profile';
+        $imageDirectoryAlt2 = BASE_PATH . '/assets/img/Student_profile';
         
         $targetDir = null;
-        $imagePathPrefix = 'img/Student_profile';
+        $imagePathPrefix = 'img/Studnet_profile';
         $dirExists = false;
         
-        // Check for Student_profile first (preferred)
+        // Check for Studnet_profile first (preferred)
         if (is_dir($imageDirectory)) {
             $targetDir = $imageDirectory;
+            $imagePathPrefix = 'img/Studnet_profile';
+            $dirExists = true;
+        } elseif (is_dir($imageDirectoryAlt2)) {
+            $targetDir = $imageDirectoryAlt2;
             $imagePathPrefix = 'img/Student_profile';
             $dirExists = true;
         } elseif (is_dir($imageDirectoryAlt)) {
             $targetDir = $imageDirectoryAlt;
             $imagePathPrefix = 'img/student_profile';
             $dirExists = true;
-        } elseif (is_dir($imageDirectoryTypo)) {
-            $targetDir = $imageDirectoryTypo;
-            $imagePathPrefix = 'img/Studnet_profile';
-            $dirExists = true;
         }
         
-        // If directory doesn't exist, create it with Student_profile (capital S)
+        // If directory doesn't exist, create it with Studnet_profile
         if (!$dirExists) {
             if (mkdir($imageDirectory, 0755, true)) {
                 $targetDir = $imageDirectory;
-                $imagePathPrefix = 'img/Student_profile';
+                $imagePathPrefix = 'img/Studnet_profile';
                 $dirExists = true;
             }
         }
@@ -2157,7 +2163,7 @@ class StudentController extends Controller {
         }
         
         $targetDir = $imageDirectory;
-        $imagePathPrefix = 'img/Student_profile';
+        $imagePathPrefix = 'img/Studnet_profile';
         
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
         $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];

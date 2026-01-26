@@ -11,9 +11,22 @@ class StudentModel extends Model {
     }
     
     /**
+     * Override find to ensure student_profile_img column exists
+     */
+    public function find($id) {
+        // Ensure student_profile_img column exists
+        $this->addStudentProfileImgColumnIfNotExists();
+        
+        return parent::find($id);
+    }
+    
+    /**
      * Get students with pagination and filters
      */
     public function getStudents($page = 1, $perPage = 20, $filters = []) {
+        // Ensure student_profile_img column exists
+        $this->addStudentProfileImgColumnIfNotExists();
+        
         $offset = ($page - 1) * $perPage;
         
         $sql = "SELECT DISTINCT s.* FROM `{$this->table}` s";
@@ -107,7 +120,7 @@ class StudentModel extends Model {
             $sql .= " WHERE " . implode(' AND ', $conditions);
         }
         
-        $sql .= " ORDER BY s.student_id DESC LIMIT $perPage OFFSET $offset";
+        $sql .= " ORDER BY s.student_id ASC LIMIT $perPage OFFSET $offset";
         
         if (!empty($params)) {
             $stmt = $this->db->prepare($sql);
@@ -277,7 +290,7 @@ class StudentModel extends Model {
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
                 WHERE se.student_enroll_status = 'Following'
                 GROUP BY s.`student_id`
-                ORDER BY s.`student_id` DESC 
+                ORDER BY s.`student_id` ASC 
                 LIMIT " . (int)$limit;
         
         $result = $this->db->query($sql);
@@ -866,7 +879,7 @@ class StudentModel extends Model {
      * Add student_profile_img column to student table if it doesn't exist
      * Also migrates data from file_path column if it exists
      */
-    private function addStudentProfileImgColumnIfNotExists() {
+    public function addStudentProfileImgColumnIfNotExists() {
         try {
             // Check if student_profile_img field exists
             $checkSql = "SHOW COLUMNS FROM `{$this->table}` LIKE 'student_profile_img'";
@@ -894,10 +907,13 @@ class StudentModel extends Model {
     
     /**
      * Get profile image path for a student
-     * Database stores path relative to assets (e.g., "img/Student_profile/filename.jpg")
-     * Returns: assets/{student_profile_img} format
+     * Database stores path relative to assets (e.g., "img/Studnet_profile/filename.jpg")
+     * Returns: assets/img/Studnet_profile/filename.jpg format
      */
     public function getProfileImagePath($student) {
+        // Ensure student_profile_img column exists
+        $this->addStudentProfileImgColumnIfNotExists();
+        
         // Check both student_profile_img and file_path (for backward compatibility)
         $imagePath = $student['student_profile_img'] ?? $student['file_path'] ?? null;
         
@@ -913,21 +929,24 @@ class StudentModel extends Model {
             $imagePath = substr($imagePath, 7);
         }
         
-        // Convert old lowercase path to new capital path if needed
+        // Convert old paths to new Studnet_profile path
         if (strpos($imagePath, 'img/student_profile/') === 0) {
-            $imagePath = str_replace('img/student_profile/', 'img/Student_profile/', $imagePath);
+            $imagePath = str_replace('img/student_profile/', 'img/Studnet_profile/', $imagePath);
+        }
+        if (strpos($imagePath, 'img/Student_profile/') === 0) {
+            $imagePath = str_replace('img/Student_profile/', 'img/Studnet_profile/', $imagePath);
         }
         
-        // If path doesn't start with 'img/Student_profile/', assume it's just a filename
-        if (strpos($imagePath, 'img/Student_profile/') !== 0) {
+        // If path doesn't start with 'img/Studnet_profile/', assume it's just a filename
+        if (strpos($imagePath, 'img/Studnet_profile/') !== 0) {
             // If it's just a filename, prepend the standard path
-            $imagePath = 'img/Student_profile/' . basename($imagePath);
+            $imagePath = 'img/Studnet_profile/' . basename($imagePath);
         }
         
         // Check if file exists in assets directory
         $fullPath = BASE_PATH . '/assets/' . $imagePath;
         if (file_exists($fullPath)) {
-            // Return in format: assets/{student_profile_img}
+            // Return in format: assets/img/Studnet_profile/filename.jpg
             return APP_URL . '/assets/' . $imagePath;
         }
         
