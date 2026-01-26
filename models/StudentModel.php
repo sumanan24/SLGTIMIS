@@ -876,6 +876,26 @@ class StudentModel extends Model {
     }
     
     /**
+     * Add student_documents_pdf column to student table if it doesn't exist
+     */
+    public function addStudentDocumentsPdfColumnIfNotExists() {
+        try {
+            // Check if student_documents_pdf field exists
+            $checkSql = "SHOW COLUMNS FROM `{$this->table}` LIKE 'student_documents_pdf'";
+            $result = $this->db->query($checkSql);
+            
+            if ($result->num_rows == 0) {
+                // Add student_documents_pdf field
+                $sql = "ALTER TABLE `{$this->table}` ADD COLUMN `student_documents_pdf` VARCHAR(255) DEFAULT NULL COMMENT 'Compressed PDF documents filename (student_id.pdf)' AFTER `student_profile_img`";
+                $this->db->query($sql);
+            }
+        } catch (Exception $e) {
+            // Column might already exist or other error
+            // Silently continue
+        }
+    }
+    
+    /**
      * Add student_profile_img column to student table if it doesn't exist
      * Also migrates data from file_path column if it exists
      */

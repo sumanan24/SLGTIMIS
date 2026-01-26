@@ -277,6 +277,104 @@ class StudentController extends Controller {
                     'bank_branch' => trim($this->post('bank_branch', ''))
                 ];
                 $successMessage = 'Bank details updated successfully.';
+            } elseif ($updateSection === 'documents') {
+                // Handle PDF document upload
+                $successMessage = 'Documents uploaded successfully.';
+                $data = [];
+                
+                // Ensure student_documents_pdf column exists
+                $studentModel->addStudentDocumentsPdfColumnIfNotExists();
+                
+                // Check if file was uploaded
+                if (!isset($_FILES['student_documents_pdf']) || $_FILES['student_documents_pdf']['error'] !== UPLOAD_ERR_OK) {
+                    $_SESSION['error'] = 'Please select a PDF file to upload.';
+                    $_SESSION['active_tab'] = 'documents';
+                    $this->redirect('student/profile/edit');
+                    return;
+                }
+                
+                $file = $_FILES['student_documents_pdf'];
+                
+                // Validate file type
+                $allowedMimeTypes = ['application/pdf'];
+                $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                
+                if ($fileExtension !== 'pdf' || !in_array($file['type'], $allowedMimeTypes)) {
+                    $_SESSION['error'] = 'Only PDF files are allowed.';
+                    $_SESSION['active_tab'] = 'documents';
+                    $this->redirect('student/profile/edit');
+                    return;
+                }
+                
+                // Check file size (max 10MB before compression)
+                $maxSize = 10 * 1024 * 1024; // 10MB
+                if ($file['size'] > $maxSize) {
+                    $_SESSION['error'] = 'File size exceeds 10MB limit. Please compress the PDF before uploading.';
+                    $_SESSION['active_tab'] = 'documents';
+                    $this->redirect('student/profile/edit');
+                    return;
+                }
+                
+                // Create directory if it doesn't exist
+                $docDirectory = BASE_PATH . '/assets/studentdoc';
+                if (!is_dir($docDirectory)) {
+                    if (!mkdir($docDirectory, 0755, true)) {
+                        $_SESSION['error'] = 'Could not create documents directory. Please check folder permissions.';
+                        $_SESSION['active_tab'] = 'documents';
+                        $this->redirect('student/profile/edit');
+                        return;
+                    }
+                }
+                
+                // Generate filename: student_id.pdf
+                $safeStudentId = preg_replace('/[^a-zA-Z0-9._-]/', '_', $studentId);
+                $newFilename = $safeStudentId . '.pdf';
+                $targetPath = $docDirectory . '/' . $newFilename;
+                
+                // Delete old file if exists
+                if (file_exists($targetPath)) {
+                    @unlink($targetPath);
+                }
+                
+                // Move uploaded file temporarily
+                $tempPath = $docDirectory . '/temp_' . $newFilename;
+                if (!move_uploaded_file($file['tmp_name'], $tempPath)) {
+                    $_SESSION['error'] = 'Failed to upload file. Please try again.';
+                    $_SESSION['active_tab'] = 'documents';
+                    $this->redirect('student/profile/edit');
+                    return;
+                }
+                
+                // Compress PDF to 1MB or less
+                $compressed = $this->compressPdf($tempPath, $targetPath, 1024 * 1024); // 1MB limit
+                
+                if (!$compressed) {
+                    // If compression fails, use original file if it's already under 1MB
+                    if (filesize($tempPath) <= 1024 * 1024) {
+                        rename($tempPath, $targetPath);
+                    } else {
+                        @unlink($tempPath);
+                        $_SESSION['error'] = 'Failed to compress PDF. Please ensure the file is under 1MB or use a PDF compression tool.';
+                        $_SESSION['active_tab'] = 'documents';
+                        $this->redirect('student/profile/edit');
+                        return;
+                    }
+                } else {
+                    // Remove temp file if compression succeeded
+                    @unlink($tempPath);
+                }
+                
+                // Verify final file size
+                if (filesize($targetPath) > 1024 * 1024) {
+                    @unlink($targetPath);
+                    $_SESSION['error'] = 'PDF compression failed. File size is still over 1MB. Please compress the PDF manually before uploading.';
+                    $_SESSION['active_tab'] = 'documents';
+                    $this->redirect('student/profile/edit');
+                    return;
+                }
+                
+                // Update database with filename
+                $data['student_documents_pdf'] = $newFilename;
             } else {
                 $_SESSION['error'] = 'Invalid update section.';
                 $this->redirect('student/profile/edit');
@@ -335,6 +433,144 @@ class StudentController extends Controller {
         unset($_SESSION['message'], $_SESSION['error']);
         
         return $this->view('student/profile-edit', $data);
+    }
+    
+    /**
+     * Compress PDF file to target size (1MB or less)
+     * Uses Ghostscript if available, otherwise tries alternative methods
+     */
+    private function compressPdf($inputPath, $outputPath, $maxSizeBytes) {
+        // Check if Ghostscript is available (most reliable method)
+        $gsCommand = $this->findGhostscriptCommand();
+        
+        if ($gsCommand) {
+            // Use Ghostscript to compress PDF
+            // /screen = 72 dpi (lowest quality, smallest size)
+            // /ebook = 150 dpi (medium quality)
+            // /printer = 300 dpi (high quality)
+            // /prepress = 300 dpi (highest quality)
+            
+            $quality = '/screen'; // Start with lowest quality for maximum compression
+            
+            $command = escapeshellarg($gsCommand) . 
+                ' -sDEVICE=pdfwrite' .
+                ' -dCompatibilityLevel=1.4' .
+                ' -dPDFSETTINGS=' . $quality .
+                ' -dNOPAUSE' .
+                ' -dQUIET' .
+                ' -dBATCH' .
+                ' -sOutputFile=' . escapeshellarg($outputPath) .
+                ' ' . escapeshellarg($inputPath) . ' 2>&1';
+            
+            exec($command, $output, $returnCode);
+            
+            if ($returnCode === 0 && file_exists($outputPath)) {
+                $fileSize = filesize($outputPath);
+                
+                // If still too large, try with even more aggressive compression
+                if ($fileSize > $maxSizeBytes) {
+                    // Try with additional compression options
+                    $command = escapeshellarg($gsCommand) . 
+                        ' -sDEVICE=pdfwrite' .
+                        ' -dCompatibilityLevel=1.4' .
+                        ' -dPDFSETTINGS=/screen' .
+                        ' -dColorImageResolution=72' .
+                        ' -dGrayImageResolution=72' .
+                        ' -dMonoImageResolution=72' .
+                        ' -dDownsampleColorImages=true' .
+                        ' -dDownsampleGrayImages=true' .
+                        ' -dDownsampleMonoImages=true' .
+                        ' -dColorImageDownsampleThreshold=1.0' .
+                        ' -dGrayImageDownsampleThreshold=1.0' .
+                        ' -dMonoImageDownsampleThreshold=1.0' .
+                        ' -dNOPAUSE' .
+                        ' -dQUIET' .
+                        ' -dBATCH' .
+                        ' -sOutputFile=' . escapeshellarg($outputPath) .
+                        ' ' . escapeshellarg($inputPath) . ' 2>&1';
+                    
+                    exec($command, $output, $returnCode);
+                }
+                
+                if ($returnCode === 0 && file_exists($outputPath) && filesize($outputPath) <= $maxSizeBytes) {
+                    return true;
+                }
+            }
+        }
+        
+        // Fallback: If Ghostscript is not available or compression failed,
+        // try using Imagick if available
+        if (extension_loaded('imagick')) {
+            try {
+                $imagick = new Imagick();
+                $imagick->setResolution(72, 72);
+                $imagick->readImage($inputPath);
+                $imagick->setImageCompressionQuality(50);
+                $imagick->writeImages($outputPath, true);
+                $imagick->clear();
+                $imagick->destroy();
+                
+                if (file_exists($outputPath) && filesize($outputPath) <= $maxSizeBytes) {
+                    return true;
+                }
+            } catch (Exception $e) {
+                // Imagick failed, continue to next method
+            }
+        }
+        
+        // Last resort: If file is already small enough, just copy it
+        if (filesize($inputPath) <= $maxSizeBytes) {
+            return copy($inputPath, $outputPath);
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Find Ghostscript command path
+     */
+    private function findGhostscriptCommand() {
+        $possiblePaths = [
+            'gs',
+            '/usr/bin/gs',
+            '/usr/local/bin/gs',
+            'C:\\Program Files\\gs\\gs9.*\\bin\\gswin64c.exe',
+            'C:\\Program Files\\gs\\gs9.*\\bin\\gswin32c.exe',
+        ];
+        
+        foreach ($possiblePaths as $path) {
+            if (strpos($path, '*') !== false) {
+                // Handle wildcard paths (Windows)
+                $pattern = str_replace('\\', '/', $path);
+                $basePath = dirname($pattern);
+                $filename = basename($pattern);
+                
+                if (is_dir($basePath)) {
+                    $files = glob($basePath . '/' . $filename);
+                    if (!empty($files)) {
+                        $testPath = $files[0];
+                        if ($this->testCommand($testPath)) {
+                            return $testPath;
+                        }
+                    }
+                }
+            } else {
+                if ($this->testCommand($path)) {
+                    return $path;
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Test if a command exists and works
+     */
+    private function testCommand($command) {
+        $testCommand = escapeshellarg($command) . ' --version 2>&1';
+        exec($testCommand, $output, $returnCode);
+        return $returnCode === 0;
     }
     
     /**

@@ -207,7 +207,10 @@
                                                         $isPresent = ($currentStatus === 1);
                                                         $isHoliday = ($currentStatus === -1);
                                                         ?>
-                                                        <div class="form-check d-flex justify-content-center align-items-center">
+                                                        <div class="form-check d-flex justify-content-center align-items-center" 
+                                                             data-bs-toggle="tooltip" 
+                                                             data-bs-placement="top" 
+                                                             title="Student: <?php echo htmlspecialchars($student['student_id']); ?> | Date: <?php echo date('Y-m-d', strtotime($date)); ?>">
                                                             <input type="checkbox" 
                                                                    class="form-check-input attendance-checkbox <?php echo $isHoliday ? 'holiday-checkbox' : ''; ?>" 
                                                                    data-student="<?php echo htmlspecialchars($student['student_id']); ?>" 
@@ -215,7 +218,8 @@
                                                                    id="attendance_<?php echo $uniqueId; ?>" 
                                                                    <?php echo $isPresent ? 'checked' : ''; ?>
                                                                    <?php echo ($isHoliday || (isset($isMonthLocked) && $isMonthLocked && (!isset($isAdmin) || !$isAdmin))) ? 'disabled' : ''; ?>
-                                                                   style="width: 1.5rem; height: 1.5rem; cursor: pointer;">
+                                                                   style="width: 1.5rem; height: 1.5rem; cursor: pointer;"
+                                                                   title="Student: <?php echo htmlspecialchars($student['student_id']); ?> | Date: <?php echo date('Y-m-d', strtotime($date)); ?>">
                                                             <label class="form-check-label" 
                                                                    for="attendance_<?php echo $uniqueId; ?>"
                                                                    style="cursor: pointer; user-select: none; margin: 0;">
@@ -263,6 +267,15 @@
 <script>
 // Load courses when department is selected
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Bootstrap tooltips for attendance checkboxes
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl, {
+            trigger: 'hover',
+            placement: 'top',
+            delay: { show: 100, hide: 50 }
+        });
+    });
     const departmentSelect = document.getElementById('department_id');
     const courseSelect = document.getElementById('course_id');
     const academicYearSelect = document.getElementById('academic_year');

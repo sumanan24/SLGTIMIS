@@ -268,6 +268,11 @@
                                 <i class="fas fa-university me-1"></i>Bank Details
                             </button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link <?php echo $activeTab === 'documents' ? 'active' : ''; ?>" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents" type="button" role="tab">
+                                <i class="fas fa-file-pdf me-1"></i>Required Documents
+                            </button>
+                        </li>
                     </ul>
                     
                     <div class="tab-content" id="studentTabsContent">
@@ -451,10 +456,12 @@
                                     
                                     <div class="col-12 col-md-4 mb-3">
                                         <label for="student_nationality" class="form-label fw-semibold">Nationality <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="student_nationality" name="student_nationality" 
-                                               value="<?php echo htmlspecialchars($student['student_nationality'] ?? ''); ?>" 
-                                               maxlength="50" required>
-                                        <div class="invalid-feedback">Please enter nationality.</div>
+                                        <select class="form-select" id="student_nationality" name="student_nationality" required>
+                                            <option value="">Select Nationality</option>
+                                            <option value="Sinhala" <?php echo ($student['student_nationality'] ?? '') === 'Sinhala' ? 'selected' : ''; ?>>Sinhala</option>
+                                            <option value="Tamil" <?php echo ($student['student_nationality'] ?? '') === 'Tamil' ? 'selected' : ''; ?>>Tamil</option>
+                                        </select>
+                                        <div class="invalid-feedback">Please select nationality.</div>
                                     </div>
                                     
                                     <div class="col-12 col-md-4 mb-3">
@@ -567,6 +574,52 @@
                                 <div class="d-flex gap-2 mt-4">
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-save me-1"></i>Update Bank Details
+                                    </button>
+                                    <a href="<?php echo APP_URL; ?>/student/profile" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times me-1"></i>Cancel
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <!-- Documents Tab -->
+                        <div class="tab-pane fade <?php echo $activeTab === 'documents' ? 'show active' : ''; ?>" id="documents" role="tabpanel">
+                            <form method="POST" action="<?php echo APP_URL; ?>/student/profile/edit" id="documentsForm" enctype="multipart/form-data" novalidate>
+                                <input type="hidden" name="update_section" value="documents">
+                                
+                                <?php if (!empty($student['student_documents_pdf'])): ?>
+                                    <div class="alert alert-success mb-3">
+                                        <i class="fas fa-check-circle me-2"></i>
+                                        <strong>Current Document:</strong> 
+                                        <a href="<?php echo APP_URL . '/assets/studentdoc/' . htmlspecialchars($student['student_documents_pdf']); ?>" target="_blank" class="btn btn-sm btn-outline-primary ms-2">
+                                            <i class="fas fa-download me-1"></i>View/Download PDF
+                                        </a>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="alert alert-warning mb-3">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>
+                                        <strong>No documents uploaded yet.</strong> Please upload your required documents as a single PDF file.
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <div class="row">
+                                    <div class="col-12 mb-3">
+                                        <label for="student_documents_pdf" class="form-label fw-semibold">
+                                            Required Documents (PDF) <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="file" class="form-control" id="student_documents_pdf" name="student_documents_pdf" 
+                                               accept="application/pdf" required>
+                                        <div class="form-text">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Upload a single PDF file containing all required documents. File will be compressed automatically.
+                                        </div>
+                                        <div class="invalid-feedback">Please upload a PDF file.</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex gap-2 mt-4">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-upload me-1"></i>Upload Documents
                                     </button>
                                     <a href="<?php echo APP_URL; ?>/student/profile" class="btn btn-outline-secondary">
                                         <i class="fas fa-times me-1"></i>Cancel
@@ -696,6 +749,70 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         });
+    }
+    
+    // Documents Form
+    const documentsForm = document.getElementById('documentsForm');
+    if (documentsForm) {
+        documentsForm.addEventListener('submit', function(event) {
+            const fileInput = document.getElementById('student_documents_pdf');
+            
+            if (!fileInput.files || fileInput.files.length === 0) {
+                event.preventDefault();
+                event.stopPropagation();
+                fileInput.classList.add('is-invalid');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            
+            if (file.size > maxSize) {
+                event.preventDefault();
+                event.stopPropagation();
+                fileInput.classList.add('is-invalid');
+                fileInput.setCustomValidity('File size exceeds 10MB limit. Please compress the PDF before uploading.');
+                return;
+            }
+            
+            if (file.type !== 'application/pdf') {
+                event.preventDefault();
+                event.stopPropagation();
+                fileInput.classList.add('is-invalid');
+                fileInput.setCustomValidity('Only PDF files are allowed.');
+                return;
+            }
+            
+            fileInput.setCustomValidity('');
+            fileInput.classList.remove('is-invalid');
+            fileInput.classList.add('is-valid');
+            documentsForm.classList.add('was-validated');
+        });
+        
+        // Real-time validation
+        const fileInput = document.getElementById('student_documents_pdf');
+        if (fileInput) {
+            fileInput.addEventListener('change', function() {
+                if (this.files && this.files.length > 0) {
+                    const file = this.files[0];
+                    const maxSize = 10 * 1024 * 1024; // 10MB
+                    
+                    if (file.size > maxSize) {
+                        this.classList.remove('is-valid');
+                        this.classList.add('is-invalid');
+                        this.setCustomValidity('File size exceeds 10MB limit.');
+                    } else if (file.type !== 'application/pdf') {
+                        this.classList.remove('is-valid');
+                        this.classList.add('is-invalid');
+                        this.setCustomValidity('Only PDF files are allowed.');
+                    } else {
+                        this.classList.remove('is-invalid');
+                        this.classList.add('is-valid');
+                        this.setCustomValidity('');
+                    }
+                }
+            });
+        }
     }
     
     // Bank Details Form
