@@ -23,13 +23,16 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     
-    # Increase client body size for form submissions
+    # Increase client body size for file uploads (PDF documents, images, etc.)
+    # Set to at least 10M for PDF uploads, increase if needed for larger files
     client_max_body_size 10M;
     client_body_buffer_size 128k;
     
-    # Timeouts for long-running requests
-    fastcgi_read_timeout 300;
-    fastcgi_send_timeout 300;
+    # Timeouts for file uploads and long-running requests
+    client_body_timeout 300s;
+    client_header_timeout 300s;
+    fastcgi_read_timeout 300s;
+    fastcgi_send_timeout 300s;
     
     # Main location block
     location / {
@@ -43,10 +46,15 @@ server {
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         include fastcgi_params;
         
-        # FastCGI buffer settings for POST data
+        # FastCGI buffer settings for POST data and file uploads
         fastcgi_buffer_size 128k;
         fastcgi_buffers 4 256k;
         fastcgi_busy_buffers_size 256k;
+        
+        # Additional settings for large file uploads
+        fastcgi_connect_timeout 300s;
+        fastcgi_read_timeout 300s;
+        fastcgi_send_timeout 300s;
         
         # Security: Prevent execution of PHP files in uploads directory
         fastcgi_param PHP_ADMIN_VALUE "open_basedir=$document_root/:/tmp/";

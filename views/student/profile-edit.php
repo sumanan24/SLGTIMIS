@@ -455,9 +455,9 @@
                                     </div>
                                     
                                     <div class="col-12 col-md-4 mb-3">
-                                        <label for="student_nationality" class="form-label fw-semibold">Nationality <span class="text-danger">*</span></label>
+                                        <label for="student_nationality" class="form-label fw-semibold">Language <span class="text-danger">*</span></label>
                                         <select class="form-select" id="student_nationality" name="student_nationality" required>
-                                            <option value="">Select Nationality</option>
+                                            <option value="">Select Language</option>
                                             <option value="Sinhala" <?php echo ($student['student_nationality'] ?? '') === 'Sinhala' ? 'selected' : ''; ?>>Sinhala</option>
                                             <option value="Tamil" <?php echo ($student['student_nationality'] ?? '') === 'Tamil' ? 'selected' : ''; ?>>Tamil</option>
                                         </select>

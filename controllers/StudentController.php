@@ -286,8 +286,35 @@ class StudentController extends Controller {
                 $studentModel->addStudentDocumentsPdfColumnIfNotExists();
                 
                 // Check if file was uploaded
-                if (!isset($_FILES['student_documents_pdf']) || $_FILES['student_documents_pdf']['error'] !== UPLOAD_ERR_OK) {
-                    $_SESSION['error'] = 'Please select a PDF file to upload.';
+                if (!isset($_FILES['student_documents_pdf'])) {
+                    $_SESSION['error'] = 'No file was uploaded. Please check Nginx configuration (client_max_body_size) and PHP settings (upload_max_filesize, post_max_size).';
+                    $_SESSION['active_tab'] = 'documents';
+                    $this->redirect('student/profile/edit');
+                    return;
+                }
+                
+                $file = $_FILES['student_documents_pdf'];
+                
+                // Check for upload errors
+                if ($file['error'] !== UPLOAD_ERR_OK) {
+                    $errorMessages = [
+                        UPLOAD_ERR_INI_SIZE => 'File exceeds PHP upload_max_filesize limit. Please increase upload_max_filesize in php.ini.',
+                        UPLOAD_ERR_FORM_SIZE => 'File exceeds form MAX_FILE_SIZE limit.',
+                        UPLOAD_ERR_PARTIAL => 'File was only partially uploaded. Please check Nginx client_max_body_size setting.',
+                        UPLOAD_ERR_NO_FILE => 'No file was uploaded.',
+                        UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder. Please check PHP temp directory.',
+                        UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk. Please check directory permissions.',
+                        UPLOAD_ERR_EXTENSION => 'File upload stopped by PHP extension.',
+                    ];
+                    
+                    $errorMsg = $errorMessages[$file['error']] ?? 'Unknown upload error (Code: ' . $file['error'] . ').';
+                    
+                    // Additional Nginx-specific check
+                    if ($file['error'] === UPLOAD_ERR_INI_SIZE || $file['error'] === UPLOAD_ERR_FORM_SIZE) {
+                        $errorMsg .= ' Also check Nginx client_max_body_size setting (should be at least 10M).';
+                    }
+                    
+                    $_SESSION['error'] = $errorMsg;
                     $_SESSION['active_tab'] = 'documents';
                     $this->redirect('student/profile/edit');
                     return;
