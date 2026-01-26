@@ -372,6 +372,7 @@ class AttendanceController extends Controller {
         $courseId = $this->get('course_id', '');
         $academicYear = $this->get('academic_year', '');
         $month = $this->get('month', date('Y-m'));
+        $eligibleOnly = $this->get('eligible_only', '0') === '1';
         
         // Get filter options - only show user's department if department-restricted
         if ($userDepartmentId) {
@@ -416,7 +417,8 @@ class AttendanceController extends Controller {
             $filters = [
                 'department_id' => $departmentId,
                 'course_id' => $courseId,
-                'academic_year' => $academicYear
+                'academic_year' => $academicYear,
+                'eligible_only' => $eligibleOnly
             ];
             
             $reportData = $attendanceModel->getAttendanceReport($month, $filters);
@@ -462,6 +464,7 @@ class AttendanceController extends Controller {
             'selectedCourse' => $courseId,
             'selectedAcademicYear' => $academicYear,
             'selectedMonth' => $month,
+            'eligibleOnly' => $eligibleOnly,
             'isHOD' => $isHOD,
             'isAdmin' => $isAdmin,
             'isMonthLocked' => $isMonthLocked,

@@ -595,6 +595,13 @@
                                         </div>
                                         <div class="form-text">Check if student is eligible for allowances</div>
                                     </div>
+                                    
+                                    <div class="col-md-6 mb-3">
+                                        <label for="allowance_eligible_date" class="form-label fw-semibold">Allowance Eligible Date</label>
+                                        <input type="date" class="form-control" id="allowance_eligible_date" name="allowance_eligible_date" 
+                                               value="<?php echo htmlspecialchars($student['allowance_eligible_date'] ?? ''); ?>">
+                                        <div class="form-text">Date from which student becomes eligible for allowance. Allowance will be calculated from this date onwards.</div>
+                                    </div>
                                 </div>
                                 
                                 <div class="row mt-3">

@@ -1180,8 +1180,11 @@ class StudentController extends Controller {
             } elseif ($updateSection === 'eligibility') {
                 // Eligibility fields only
                 $data = [
-                    'allowance_eligible' => $this->post('allowance_eligible', 0) ? 1 : 0
+                    'allowance_eligible' => $this->post('allowance_eligible', 0) ? 1 : 0,
+                    'allowance_eligible_date' => trim($this->post('allowance_eligible_date', ''))
                 ];
+                // Ensure allowance_eligible_date column exists
+                $studentModel->addAllowanceEligibleDateColumnIfNotExists();
                 $successMessage = 'Eligibility information updated successfully.';
             }
             

@@ -95,6 +95,18 @@
                                 <input type="month" class="form-control" id="month" name="month" 
                                        value="<?php echo htmlspecialchars($selectedMonth ?? date('Y-m')); ?>" required>
                             </div>
+                            
+                            <div class="col-md-2">
+                                <label class="form-label fw-semibold">&nbsp;</label>
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" id="eligible_only" name="eligible_only" value="1"
+                                           <?php echo (isset($eligibleOnly) && $eligibleOnly) ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="eligible_only">
+                                        Eligible Students Only
+                                    </label>
+                                </div>
+                                <div class="form-text small">Show only allowance eligible students</div>
+                            </div>
                         </div>
                         
                         <div class="row mt-3">

@@ -896,6 +896,26 @@ class StudentModel extends Model {
     }
     
     /**
+     * Add allowance_eligible_date column to student table if it doesn't exist
+     */
+    public function addAllowanceEligibleDateColumnIfNotExists() {
+        try {
+            // Check if allowance_eligible_date field exists
+            $checkSql = "SHOW COLUMNS FROM `{$this->table}` LIKE 'allowance_eligible_date'";
+            $result = $this->db->query($checkSql);
+            
+            if ($result->num_rows == 0) {
+                // Add allowance_eligible_date field
+                $sql = "ALTER TABLE `{$this->table}` ADD COLUMN `allowance_eligible_date` DATE DEFAULT NULL COMMENT 'Date from which student becomes eligible for allowance' AFTER `allowance_eligible`";
+                $this->db->query($sql);
+            }
+        } catch (Exception $e) {
+            // Column might already exist or other error
+            // Silently continue
+        }
+    }
+    
+    /**
      * Add student_profile_img column to student table if it doesn't exist
      * Also migrates data from file_path column if it exists
      */

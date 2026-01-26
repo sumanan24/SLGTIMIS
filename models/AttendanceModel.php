@@ -239,6 +239,8 @@ class AttendanceModel extends Model {
                     s.bank_name,
                     s.bank_account_no,
                     s.bank_branch,
+                    s.allowance_eligible,
+                    s.allowance_eligible_date,
                     se.course_id,
                     c.course_name,
                     d.department_name,
@@ -269,6 +271,11 @@ class AttendanceModel extends Model {
             $sql .= " AND se.academic_year = ?";
             $params[] = $filters['academic_year'];
             $types .= 's';
+        }
+        
+        // Filter by allowance eligible if requested
+        if (!empty($filters['eligible_only']) && $filters['eligible_only']) {
+            $sql .= " AND s.allowance_eligible = 1";
         }
         
         $sql .= " ORDER BY s.student_fullname ASC";
@@ -335,13 +342,36 @@ class AttendanceModel extends Model {
                 $attendancePercentage = ($presentDays / $effectiveWorkingDays) * 100;
             }
             
-            // Calculate allowance based on percentage
+            // Calculate allowance based on percentage and eligibility date
             // 90% - 100% = 5000, 75% - 89% = 4000
+            // Only provide allowance if student is eligible and eligible date is before or on the report month
             $allowance = 0;
-            if ($attendancePercentage >= 90) {
-                $allowance = 5000;
-            } elseif ($attendancePercentage >= 75) {
-                $allowance = 4000;
+            $isEligibleForMonth = false;
+            
+            // Check if student is eligible
+            if (!empty($row['allowance_eligible']) && $row['allowance_eligible'] == 1) {
+                // Check if eligible date is set and is before or on the report month
+                if (!empty($row['allowance_eligible_date'])) {
+                    $eligibleDate = $row['allowance_eligible_date'];
+                    $reportMonthStart = $startDate; // First day of report month
+                    
+                    // If eligible date is before or on the report month start, student is eligible
+                    if ($eligibleDate <= $reportMonthStart) {
+                        $isEligibleForMonth = true;
+                    }
+                } else {
+                    // If no eligible date set, assume eligible (backward compatibility)
+                    $isEligibleForMonth = true;
+                }
+            }
+            
+            // Calculate allowance only if eligible for this month
+            if ($isEligibleForMonth) {
+                if ($attendancePercentage >= 90) {
+                    $allowance = 5000;
+                } elseif ($attendancePercentage >= 75) {
+                    $allowance = 4000;
+                }
             }
             
             $row['present_days'] = $presentDays;
