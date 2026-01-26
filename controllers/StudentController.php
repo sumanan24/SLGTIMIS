@@ -315,11 +315,45 @@ class StudentController extends Controller {
                     return;
                 }
                 
-                // Create directory if it doesn't exist
+                // Ensure assets directory exists
+                $assetsDirectory = BASE_PATH . '/assets';
+                if (!is_dir($assetsDirectory)) {
+                    if (!mkdir($assetsDirectory, 0755, true)) {
+                        $_SESSION['error'] = 'Assets directory does not exist and could not be created. Please contact administrator.';
+                        $_SESSION['active_tab'] = 'documents';
+                        $this->redirect('student/profile/edit');
+                        return;
+                    }
+                }
+                
+                // Ensure assets directory is writable
+                if (!is_writable($assetsDirectory)) {
+                    @chmod($assetsDirectory, 0755);
+                    if (!is_writable($assetsDirectory)) {
+                        $_SESSION['error'] = 'Assets directory is not writable. Please contact administrator to set proper permissions (755 or 775) on the assets folder.';
+                        $_SESSION['active_tab'] = 'documents';
+                        $this->redirect('student/profile/edit');
+                        return;
+                    }
+                }
+                
+                // Create studentdoc directory if it doesn't exist
                 $docDirectory = BASE_PATH . '/assets/studentdoc';
                 if (!is_dir($docDirectory)) {
                     if (!mkdir($docDirectory, 0755, true)) {
                         $_SESSION['error'] = 'Could not create documents directory. Please check folder permissions.';
+                        $_SESSION['active_tab'] = 'documents';
+                        $this->redirect('student/profile/edit');
+                        return;
+                    }
+                }
+                
+                // Ensure directory is writable
+                if (!is_writable($docDirectory)) {
+                    // Try to change permissions
+                    @chmod($docDirectory, 0755);
+                    if (!is_writable($docDirectory)) {
+                        $_SESSION['error'] = 'Documents directory is not writable. Please contact administrator to set proper permissions (755 or 775) on assets/studentdoc folder.';
                         $_SESSION['active_tab'] = 'documents';
                         $this->redirect('student/profile/edit');
                         return;
@@ -338,8 +372,42 @@ class StudentController extends Controller {
                 
                 // Move uploaded file temporarily
                 $tempPath = $docDirectory . '/temp_' . $newFilename;
+                
+                // Check if we can write to the directory
+                if (!is_writable($docDirectory)) {
+                    $_SESSION['error'] = 'Cannot write to documents directory. Please contact administrator to set proper permissions.';
+                    $_SESSION['active_tab'] = 'documents';
+                    $this->redirect('student/profile/edit');
+                    return;
+                }
+                
+                // Try to move the uploaded file
                 if (!move_uploaded_file($file['tmp_name'], $tempPath)) {
-                    $_SESSION['error'] = 'Failed to upload file. Please try again.';
+                    $errorMsg = 'Failed to upload file. ';
+                    switch ($file['error']) {
+                        case UPLOAD_ERR_INI_SIZE:
+                        case UPLOAD_ERR_FORM_SIZE:
+                            $errorMsg .= 'File size exceeds limit.';
+                            break;
+                        case UPLOAD_ERR_PARTIAL:
+                            $errorMsg .= 'File was only partially uploaded.';
+                            break;
+                        case UPLOAD_ERR_NO_FILE:
+                            $errorMsg .= 'No file was uploaded.';
+                            break;
+                        case UPLOAD_ERR_NO_TMP_DIR:
+                            $errorMsg .= 'Missing temporary folder.';
+                            break;
+                        case UPLOAD_ERR_CANT_WRITE:
+                            $errorMsg .= 'Failed to write file to disk. Please check directory permissions.';
+                            break;
+                        case UPLOAD_ERR_EXTENSION:
+                            $errorMsg .= 'File upload stopped by extension.';
+                            break;
+                        default:
+                            $errorMsg .= 'Please check directory permissions (755 or 775 required).';
+                    }
+                    $_SESSION['error'] = $errorMsg;
                     $_SESSION['active_tab'] = 'documents';
                     $this->redirect('student/profile/edit');
                     return;
