@@ -50,7 +50,7 @@
                 </a>
                 <?php endif; ?>
                 <?php if (isset($isADM) && $isADM): ?>
-                <a href="<?php echo APP_URL; ?>/students/import-images" class="btn btn-info btn-sm" onclick="return confirm('This will scan the img/student_profile directory and update student records with matching image files. Continue?');">
+                <a href="<?php echo APP_URL; ?>/students/import-images" class="btn btn-info btn-sm" onclick="return confirm('This will scan the img/Student_profile directory and update student records with matching image files. Continue?');">
                     <i class="fas fa-images me-1"></i>Import Profile Images
                 </a>
                 <?php endif; ?>
@@ -215,7 +215,7 @@
                                     <td class="text-muted"><?php echo $rowNumber++; ?></td>
                                     <td>
                                         <?php if ($profileImageUrl): ?>
-                                            <img src="assets/<?php echo $student['student_profile_img']; ?>" 
+                                            <img src="<?php echo htmlspecialchars($profileImageUrl); ?>" 
                                                  alt="<?php echo htmlspecialchars($student['student_fullname']); ?>" 
                                                  class="rounded-circle" 
                                                  style="width: 40px; height: 40px; object-fit: cover; border: 2px solid #dee2e6;">

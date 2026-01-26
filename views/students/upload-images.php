@@ -37,7 +37,7 @@
                             <li><strong>Important:</strong> Image filenames should contain or match the student ID</li>
                             <li>Examples of valid filenames: <code>2025_AUT_4AM082.jpg</code>, <code>2025/AUT/4AM082.png</code>, or <code>4AM082.jpg</code></li>
                             <li>The system will automatically match images to students based on the filename</li>
-                            <li>Images will be saved to: <code>assets/img/student_profile/</code></li>
+                            <li>Images will be saved to: <code>assets/img/Student_profile/</code></li>
                             <li><strong>Note:</strong> Large uploads may take several minutes. Please be patient and do not close the browser.</li>
                         </ul>
                     </div>
@@ -49,7 +49,7 @@
                             <?php if ($dirExists): ?>
                                 <div class="d-flex align-items-center text-success mb-2">
                                     <i class="fas fa-check-circle me-2"></i>
-                                    <span>Image directory exists: <code><?php echo htmlspecialchars($targetDir ?? 'assets/img/student_profile'); ?></code></span>
+                                    <span>Image directory exists: <code><?php echo htmlspecialchars($targetDir ?? 'assets/img/Student_profile'); ?></code></span>
                                 </div>
                             <?php else: ?>
                                 <div class="d-flex align-items-center text-warning mb-2">
