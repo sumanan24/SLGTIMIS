@@ -12,6 +12,13 @@ class DashboardController extends Controller {
             return;
         }
         
+        // Redirect students to student dashboard
+        if (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student') {
+            $_SESSION['error'] = 'Access denied. Students must use the student portal.';
+            $this->redirect('student/dashboard');
+            return;
+        }
+        
         // Redirect HOD, IN1, IN2, IN3 users to their dedicated department dashboard
         if ($this->isDepartmentRestricted()) {
             $this->redirect('hod/dashboard');

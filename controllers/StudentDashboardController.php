@@ -12,9 +12,17 @@ class StudentDashboardController extends Controller {
             return;
         }
         
-        // Check if user is a student
+        // Check if user is a student - prevent non-students from accessing
         if (!isset($_SESSION['user_table']) || $_SESSION['user_table'] !== 'student') {
-            $this->redirect('dashboard');
+            $_SESSION['error'] = 'Access denied. This dashboard is only available for students.';
+            // Redirect to appropriate dashboard based on user type
+            require_once BASE_PATH . '/models/UserModel.php';
+            $userModel = new UserModel();
+            if ($userModel->isHOD($_SESSION['user_id'])) {
+                $this->redirect('hod/dashboard');
+            } else {
+                $this->redirect('dashboard');
+            }
             return;
         }
         
@@ -89,6 +97,9 @@ class StudentDashboardController extends Controller {
             // Payment model might not exist or have this method
         }
         
+        // Check if student has accepted code of conduct
+        $hasAcceptedConduct = !empty($student['student_conduct_accepted_at']);
+        
         $data = [
             'title' => 'Student Dashboard',
             'page' => 'student-dashboard',
@@ -103,7 +114,8 @@ class StudentDashboardController extends Controller {
             'attendancePercentage' => $attendancePercentage,
             'currentMonth' => $currentMonth,
             'recentAttendance' => $recentAttendance,
-            'recentPayments' => $recentPayments
+            'recentPayments' => $recentPayments,
+            'hasAcceptedConduct' => $hasAcceptedConduct
         ];
         
         return $this->view('student/dashboard', $data);

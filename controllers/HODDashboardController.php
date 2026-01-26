@@ -14,6 +14,13 @@ class HODDashboardController extends Controller {
             return;
         }
         
+        // Prevent students from accessing HOD dashboard
+        if (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student') {
+            $_SESSION['error'] = 'Access denied. Students cannot access this dashboard.';
+            $this->redirect('student/dashboard');
+            return;
+        }
+        
         // Check if user is HOD, IN1, IN2, or IN3 (department-restricted roles)
         if (!$this->isDepartmentRestricted()) {
             $_SESSION['error'] = 'Access denied. This dashboard is only available for Head of Department or Instructors.';

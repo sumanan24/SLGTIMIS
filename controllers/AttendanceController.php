@@ -68,6 +68,13 @@ class AttendanceController extends Controller {
             $courses = $courseModel->getCoursesWithDepartment(['department_id' => $departmentId]);
         }
         
+        // Get groups based on course and academic year
+        $groups = [];
+        if (!empty($courseId) && !empty($academicYear)) {
+            $groupModel = $this->model('GroupModel');
+            $groups = $groupModel->getGroupsByCourseAndYear($courseId, $academicYear);
+        }
+        
         // Get students based on filters
         $students = [];
         $attendanceData = [];
@@ -78,6 +85,11 @@ class AttendanceController extends Controller {
                 'course_id' => $courseId,
                 'academic_year' => $academicYear
             ];
+            
+            // Add group filter if provided
+            if (!empty($group)) {
+                $filters['group_id'] = $group;
+            }
             
             $students = $attendanceModel->getStudentsForAttendance($filters);
             
@@ -135,6 +147,7 @@ class AttendanceController extends Controller {
             'departments' => $departments,
             'courses' => $courses,
             'academicYears' => $academicYears,
+            'groups' => $groups,
             'students' => $students,
             'attendanceData' => $attendanceData,
             'calendarDays' => $calendarDays,
@@ -1465,6 +1478,33 @@ class AttendanceController extends Controller {
             $this->redirect('attendance/machine?start_date=' . $startDate . '&end_date=' . $endDate);
             return;
         }
+    }
+    
+    /**
+     * Get groups by course and academic year (AJAX endpoint)
+     */
+    public function getGroupsByCourseAndYear() {
+        // Check authentication
+        if (!isset($_SESSION['user_id'])) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+            return;
+        }
+        
+        $courseId = $this->get('course_id', '');
+        $academicYear = $this->get('academic_year', '');
+        
+        if (empty($courseId) || empty($academicYear)) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => true, 'groups' => []]);
+            return;
+        }
+        
+        $groupModel = $this->model('GroupModel');
+        $groups = $groupModel->getGroupsByCourseAndYear($courseId, $academicYear);
+        
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'groups' => $groups]);
     }
 }
 

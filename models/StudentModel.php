@@ -836,12 +836,19 @@ class StudentModel extends Model {
     
     /**
      * Update student profile image path
+     * Database stores path relative to assets folder (e.g., "img/student_profile/filename.jpg")
      */
     public function updateStudentImage($studentId, $imagePath) {
-        // First check if file_path column exists, if not, add it
-        $this->addFilePathColumnIfNotExists();
+        // First check if student_profile_img column exists, if not, add it
+        $this->addStudentProfileImgColumnIfNotExists();
         
-        $sql = "UPDATE `{$this->table}` SET `file_path` = ? WHERE `student_id` = ?";
+        // Normalize the path - ensure it's relative to assets folder
+        $imagePath = ltrim($imagePath, '/');
+        if (strpos($imagePath, 'assets/') === 0) {
+            $imagePath = substr($imagePath, 7); // Remove 'assets/' prefix
+        }
+        
+        $sql = "UPDATE `{$this->table}` SET `student_profile_img` = ? WHERE `student_id` = ?";
         $stmt = $this->db->prepare($sql);
         
         if (!$stmt) {
@@ -856,18 +863,28 @@ class StudentModel extends Model {
     }
     
     /**
-     * Add file_path column to student table if it doesn't exist
+     * Add student_profile_img column to student table if it doesn't exist
+     * Also migrates data from file_path column if it exists
      */
-    private function addFilePathColumnIfNotExists() {
+    private function addStudentProfileImgColumnIfNotExists() {
         try {
-            // Check if file_path field exists
-            $checkSql = "SHOW COLUMNS FROM `{$this->table}` LIKE 'file_path'";
+            // Check if student_profile_img field exists
+            $checkSql = "SHOW COLUMNS FROM `{$this->table}` LIKE 'student_profile_img'";
             $result = $this->db->query($checkSql);
             
             if ($result->num_rows == 0) {
-                // Add file_path field
-                $sql = "ALTER TABLE `{$this->table}` ADD COLUMN `file_path` VARCHAR(255) DEFAULT NULL COMMENT 'Profile image file path' AFTER `student_status`";
+                // Add student_profile_img field
+                $sql = "ALTER TABLE `{$this->table}` ADD COLUMN `student_profile_img` VARCHAR(255) DEFAULT NULL COMMENT 'Profile image path relative to assets folder' AFTER `student_status`";
                 $this->db->query($sql);
+                
+                // Migrate data from file_path if it exists
+                $checkFilePathSql = "SHOW COLUMNS FROM `{$this->table}` LIKE 'file_path'";
+                $filePathResult = $this->db->query($checkFilePathSql);
+                if ($filePathResult->num_rows > 0) {
+                    // Migrate existing data
+                    $migrateSql = "UPDATE `{$this->table}` SET `student_profile_img` = `file_path` WHERE `file_path` IS NOT NULL AND `file_path` != ''";
+                    $this->db->query($migrateSql);
+                }
             }
         } catch (Exception $e) {
             // Column might already exist or other error
@@ -878,17 +895,23 @@ class StudentModel extends Model {
     /**
      * Get profile image path for a student
      * Database stores path relative to assets (e.g., "img/student_profile/filename.jpg")
-     * Images are stored directly in assets/img/student_profile/ directory
+     * Returns: assets/{student_profile_img} format
      */
     public function getProfileImagePath($student) {
-        if (empty($student['file_path'])) {
+        // Check both student_profile_img and file_path (for backward compatibility)
+        $imagePath = $student['student_profile_img'] ?? $student['file_path'] ?? null;
+        
+        if (empty($imagePath)) {
             return null;
         }
         
-        $imagePath = $student['file_path'];
-        
         // Remove leading slash if present
         $imagePath = ltrim($imagePath, '/');
+        
+        // Remove 'assets/' prefix if present (shouldn't be, but handle it)
+        if (strpos($imagePath, 'assets/') === 0) {
+            $imagePath = substr($imagePath, 7);
+        }
         
         // If path doesn't start with 'img/student_profile/', assume it's just a filename
         if (strpos($imagePath, 'img/student_profile/') !== 0) {
@@ -899,7 +922,7 @@ class StudentModel extends Model {
         // Check if file exists in assets directory
         $fullPath = BASE_PATH . '/assets/' . $imagePath;
         if (file_exists($fullPath)) {
-            // Return the URL (path is already relative to assets)
+            // Return in format: assets/{student_profile_img}
             return APP_URL . '/assets/' . $imagePath;
         }
         

@@ -18,9 +18,19 @@ class AuthController extends Controller {
             }
         }
         
-        // If already logged in (and no timeout parameter), redirect to dashboard
+        // If already logged in (and no timeout parameter), redirect to appropriate dashboard
         if (isset($_SESSION['user_id']) && $_SESSION['user_id'] && !isset($_GET['timeout'])) {
-            $this->redirect('dashboard');
+            $userTable = $_SESSION['user_table'] ?? 'student';
+            require_once BASE_PATH . '/models/UserModel.php';
+            $userModel = new UserModel();
+            
+            if ($userTable === 'student') {
+                $this->redirect('student/dashboard');
+            } elseif ($userModel->isHOD($_SESSION['user_id'])) {
+                $this->redirect('hod/dashboard');
+            } else {
+                $this->redirect('dashboard');
+            }
             return;
         }
         

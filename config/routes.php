@@ -24,6 +24,8 @@ return [
     // Student Portal Routes
     'student/dashboard' => 'StudentDashboardController@index',
     'student/profile' => 'StudentController@showStudentProfile',
+    'student/profile/edit' => 'StudentController@editStudentProfile',
+    'student/accept-conduct' => 'StudentController@acceptConduct',
     'student/attendance' => 'StudentAttendanceController@index',
     'students' => 'StudentController@index',
     'students/view' => 'StudentController@show',
@@ -66,6 +68,7 @@ return [
     'attendance/hikvision-report' => 'AttendanceController@getHikvisionReport',
     'attendance/machine' => 'AttendanceController@machineAttendance',
     'attendance/export-machine' => 'AttendanceController@exportMachineAttendance',
+    'attendance/get-groups-by-course-and-year' => 'AttendanceController@getGroupsByCourseAndYear',
     'payments' => 'PaymentController@index',
     'payments/create' => 'PaymentController@create',
     'payments/edit' => 'PaymentController@edit',

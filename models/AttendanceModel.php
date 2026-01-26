@@ -18,8 +18,14 @@ class AttendanceModel extends Model {
                 FROM `student` s
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
                 INNER JOIN `course` c ON se.course_id = c.course_id
-                INNER JOIN `department` d ON c.department_id = d.department_id
-                WHERE se.student_enroll_status = 'Following'";
+                INNER JOIN `department` d ON c.department_id = d.department_id";
+        
+        // If group filter is provided, join with group_students table
+        if (!empty($filters['group_id'])) {
+            $sql .= " INNER JOIN `group_students` gs ON s.student_id = gs.student_id AND gs.status = 'active'";
+        }
+        
+        $sql .= " WHERE se.student_enroll_status = 'Following' AND s.student_status = 'Active'";
         
         $params = [];
         $types = '';
@@ -40,6 +46,12 @@ class AttendanceModel extends Model {
             $sql .= " AND se.academic_year = ?";
             $params[] = $filters['academic_year'];
             $types .= 's';
+        }
+        
+        if (!empty($filters['group_id'])) {
+            $sql .= " AND gs.group_id = ?";
+            $params[] = $filters['group_id'];
+            $types .= 'i';
         }
         
         $sql .= " ORDER BY s.student_fullname ASC";
@@ -235,7 +247,7 @@ class AttendanceModel extends Model {
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
                 INNER JOIN `course` c ON se.course_id = c.course_id
                 INNER JOIN `department` d ON c.department_id = d.department_id
-                WHERE se.student_enroll_status = 'Following'";
+                WHERE se.student_enroll_status = 'Following' AND s.student_status = 'Active'";
         
         $params = [];
         $types = '';

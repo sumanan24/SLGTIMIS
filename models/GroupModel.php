@@ -253,5 +253,31 @@ class GroupModel extends Model {
         
         return false;
     }
+    
+    /**
+     * Get groups by course and academic year
+     */
+    public function getGroupsByCourseAndYear($courseId, $academicYear) {
+        $sql = "SELECT g.*, c.course_name, d.department_name
+                FROM `{$this->table}` g
+                LEFT JOIN `course` c ON g.course_id = c.course_id
+                LEFT JOIN `department` d ON c.department_id = d.department_id
+                WHERE g.course_id = ? AND g.academic_year = ? AND g.status = 'active'
+                ORDER BY g.name ASC";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param("ss", $courseId, $academicYear);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        $data = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $data[] = $row;
+            }
+        }
+        
+        return $data;
+    }
 }
 

@@ -203,6 +203,215 @@ class StudentController extends Controller {
         return $this->view('students/view', $data);
     }
     
+    /**
+     * Edit student's own profile (for student portal)
+     * Students can edit personal information and bank details, but NOT photos or enrollment
+     */
+    public function editStudentProfile() {
+        // Check authentication
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        
+        // Check if user is a student
+        if (!isset($_SESSION['user_table']) || $_SESSION['user_table'] !== 'student') {
+            $_SESSION['error'] = 'Access denied. Only students can edit their own profile.';
+            $this->redirect('dashboard');
+            return;
+        }
+        
+        $studentId = $_SESSION['user_name'];
+        $studentModel = $this->model('StudentModel');
+        $student = $studentModel->find($studentId);
+        
+        if (!$student) {
+            $_SESSION['error'] = 'Student record not found.';
+            $this->redirect('logout');
+            return;
+        }
+        
+        // Handle POST request for updates
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $updateSection = $this->post('update_section', '');
+            $data = [];
+            $validationRequired = false;
+            $successMessage = '';
+            
+            // Handle updates based on section
+            if ($updateSection === 'personal') {
+                // Personal Information fields only (NO PHOTOS)
+                $data = [
+                    'student_title' => trim($this->post('student_title', '')),
+                    'student_fullname' => trim($this->post('student_fullname', '')),
+                    'student_ininame' => trim($this->post('student_ininame', '')),
+                    'student_gender' => trim($this->post('student_gender', '')),
+                    'student_civil' => trim($this->post('student_civil', '')),
+                    'student_email' => trim($this->post('student_email', '')),
+                    'student_nic' => trim($this->post('student_nic', '')),
+                    'student_dob' => trim($this->post('student_dob', '')),
+                    'student_phone' => trim($this->post('student_phone', '')),
+                    'student_address' => trim($this->post('student_address', '')),
+                    'student_zip' => trim($this->post('student_zip', '')),
+                    'student_district' => trim($this->post('student_district', '')),
+                    'student_divisions' => trim($this->post('student_divisions', '')),
+                    'student_provice' => trim($this->post('student_provice', '')),
+                    'student_blood' => trim($this->post('student_blood', '')),
+                    'student_em_name' => trim($this->post('student_em_name', '')),
+                    'student_em_address' => trim($this->post('student_em_address', '')),
+                    'student_em_phone' => trim($this->post('student_em_phone', '')),
+                    'student_em_relation' => trim($this->post('student_em_relation', '')),
+                    'student_nationality' => trim($this->post('student_nationality', '')),
+                    'student_whatsapp' => trim($this->post('student_whatsapp', '')),
+                    'student_religion' => trim($this->post('student_religion', ''))
+                ];
+                // Note: student_status is NOT included - students cannot change their status
+                $validationRequired = true;
+                $successMessage = 'Personal information updated successfully.';
+                
+            } elseif ($updateSection === 'bank') {
+                // Bank Details fields only
+                $data = [
+                    'bank_name' => trim($this->post('bank_name', '')),
+                    'bank_account_no' => trim($this->post('bank_account_no', '')),
+                    'bank_branch' => trim($this->post('bank_branch', ''))
+                ];
+                $successMessage = 'Bank details updated successfully.';
+            } else {
+                $_SESSION['error'] = 'Invalid update section.';
+                $this->redirect('student/profile/edit');
+                return;
+            }
+            
+            // Validation for personal information
+            if ($validationRequired) {
+                if (empty($data['student_fullname']) || empty($data['student_email']) || empty($data['student_nic'])) {
+                    $_SESSION['error'] = 'Full Name, Email, and NIC are required.';
+                    $_SESSION['active_tab'] = $updateSection;
+                    $this->redirect('student/profile/edit');
+                    return;
+                }
+                
+                // Validate email format
+                if (!filter_var($data['student_email'], FILTER_VALIDATE_EMAIL)) {
+                    $_SESSION['error'] = 'Invalid email format.';
+                    $_SESSION['active_tab'] = $updateSection;
+                    $this->redirect('student/profile/edit');
+                    return;
+                }
+            }
+            
+            // Update student
+            if (!empty($data)) {
+                $result = $studentModel->updateStudent($studentId, $data);
+                
+                if ($result) {
+                    $_SESSION['message'] = $successMessage;
+                    // Refresh student data after update
+                    $student = $studentModel->find($studentId);
+                    $_SESSION['active_tab'] = $updateSection;
+                } else {
+                    $_SESSION['error'] = 'Failed to update profile. Please try again.';
+                }
+            }
+            
+            $this->redirect('student/profile/edit');
+            return;
+        }
+        
+        // GET request - show edit form
+        $activeTab = $_SESSION['active_tab'] ?? 'personal';
+        unset($_SESSION['active_tab']);
+        
+        $data = [
+            'title' => 'Edit My Profile',
+            'page' => 'student-profile-edit',
+            'student' => $student,
+            'activeTab' => $activeTab,
+            'message' => $_SESSION['message'] ?? null,
+            'error' => $_SESSION['error'] ?? null
+        ];
+        
+        unset($_SESSION['message'], $_SESSION['error']);
+        
+        return $this->view('student/profile-edit', $data);
+    }
+    
+    /**
+     * Accept Code of Conduct (AJAX endpoint for students)
+     */
+    public function acceptConduct() {
+        // Check authentication
+        if (!isset($_SESSION['user_id'])) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+            return;
+        }
+        
+        // Check if user is a student
+        if (!isset($_SESSION['user_table']) || $_SESSION['user_table'] !== 'student') {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Access denied. Only students can accept the code of conduct.']);
+            return;
+        }
+        
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+            return;
+        }
+        
+        $studentId = $_SESSION['user_name'];
+        $studentModel = $this->model('StudentModel');
+        $student = $studentModel->find($studentId);
+        
+        if (!$student) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Student record not found.']);
+            return;
+        }
+        
+        // Check if already accepted
+        if (!empty($student['student_conduct_accepted_at'])) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true, 
+                'message' => 'Code of conduct already accepted.',
+                'accepted_at' => $student['student_conduct_accepted_at']
+            ]);
+            return;
+        }
+        
+        // Update acceptance date
+        $currentDateTime = date('Y-m-d H:i:s');
+        $result = $studentModel->updateStudent($studentId, [
+            'student_conduct_accepted_at' => $currentDateTime
+        ]);
+        
+        if ($result) {
+            // Log activity
+            require_once BASE_PATH . '/core/ActivityLogger.php';
+            $activityLogger = new ActivityLogger();
+            $activityLogger->log(
+                'student_conduct_accepted',
+                "Student {$studentId} accepted Code of Conduct",
+                'success',
+                $_SESSION['user_id'],
+                $studentId
+            );
+            
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'message' => 'Code of conduct accepted successfully.',
+                'accepted_at' => $currentDateTime
+            ]);
+        } else {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Failed to update acceptance. Please try again.']);
+        }
+    }
+    
     public function create() {
         // Check authentication
         if (!isset($_SESSION['user_id'])) {
@@ -440,10 +649,13 @@ class StudentController extends Controller {
                 $removeImage = $this->post('remove_profile_image', '');
                 if ($removeImage === '1') {
                     // Remove existing image
-                    $currentImagePath = $student['file_path'] ?? '';
+                    $currentImagePath = $student['student_profile_img'] ?? $student['file_path'] ?? '';
                     if (!empty($currentImagePath)) {
                         // Normalize path - remove leading slash, ensure it's relative to assets
                         $normalizedPath = ltrim($currentImagePath, '/');
+                        if (strpos($normalizedPath, 'assets/') === 0) {
+                            $normalizedPath = substr($normalizedPath, 7);
+                        }
                         if (strpos($normalizedPath, 'img/student_profile/') !== 0) {
                             $normalizedPath = 'img/student_profile/' . basename($normalizedPath);
                         }
@@ -475,10 +687,13 @@ class StudentController extends Controller {
                         
                         if (is_dir($imageDirectory)) {
                             // Delete old image if exists
-                            $currentImagePath = $student['file_path'] ?? '';
+                            $currentImagePath = $student['student_profile_img'] ?? $student['file_path'] ?? '';
                             if (!empty($currentImagePath)) {
                                 // Normalize path - remove leading slash, ensure it's relative to assets
                                 $normalizedPath = ltrim($currentImagePath, '/');
+                                if (strpos($normalizedPath, 'assets/') === 0) {
+                                    $normalizedPath = substr($normalizedPath, 7);
+                                }
                                 if (strpos($normalizedPath, 'img/student_profile/') !== 0) {
                                     $normalizedPath = 'img/student_profile/' . basename($normalizedPath);
                                 }
@@ -611,14 +826,14 @@ class StudentController extends Controller {
                         
                         // Log profile image update separately if changed
                         if (isset($removeImage) && $removeImage === '1') {
-                            $oldImagePath = isset($oldStudent['file_path']) ? $oldStudent['file_path'] : '';
+                            $oldImagePath = isset($oldStudent['student_profile_img']) ? $oldStudent['student_profile_img'] : (isset($oldStudent['file_path']) ? $oldStudent['file_path'] : '');
                             $this->logActivity(
                                 'UPDATE',
                                 'student_profile_image',
                                 $id,
                                 "Profile image removed for student {$id}",
-                                ['file_path' => $oldImagePath],
-                                ['file_path' => '']
+                                ['student_profile_img' => $oldImagePath],
+                                ['student_profile_img' => '']
                             );
                         }
                         
@@ -654,14 +869,14 @@ class StudentController extends Controller {
                         
                         // Log profile image update separately if changed
                         if (isset($removeImage) && $removeImage === '1') {
-                            $oldImagePath = isset($oldStudent['file_path']) ? $oldStudent['file_path'] : '';
+                            $oldImagePath = isset($oldStudent['student_profile_img']) ? $oldStudent['student_profile_img'] : (isset($oldStudent['file_path']) ? $oldStudent['file_path'] : '');
                             $this->logActivity(
                                 'UPDATE',
                                 'student_profile_image',
                                 $id,
                                 "Profile image removed for student {$id}",
-                                ['file_path' => $oldImagePath],
-                                ['file_path' => '']
+                                ['student_profile_img' => $oldImagePath],
+                                ['student_profile_img' => '']
                             );
                         }
                         
@@ -1620,7 +1835,7 @@ class StudentController extends Controller {
                 $isImported = false;
                 if ($studentId) {
                     $student = $studentModel->find($studentId);
-                    if (!empty($student['file_path'])) {
+                    if (!empty($student['student_profile_img']) || !empty($student['file_path'])) {
                         $isImported = true;
                         $matchStatus = 'already_imported';
                     }

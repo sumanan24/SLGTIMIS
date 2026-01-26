@@ -572,3 +572,125 @@
     </div>
 </div>
 
+<!-- Code of Conduct Acceptance Modal -->
+<?php if (!$hasAcceptedConduct): ?>
+<div class="modal fade" id="conductModal" tabindex="-1" aria-labelledby="conductModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="conductModalLabel">
+                    <i class="fas fa-file-contract me-2"></i>SLGTI STUDENT CODE OF CONDUCT
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Important:</strong> Please read the following declaration carefully before accepting.
+                </div>
+                
+                <div class="border rounded p-4 mb-3" style="background-color: #f8f9fa; max-height: 400px; overflow-y: auto;">
+                    <h6 class="fw-bold mb-3">SLGTI Student Code of Conduct and Honor</h6>
+                    <p class="text-justify">
+                        I hereby confirm that I have read, understood, and agreed to comply with the SLGTI Student Code of Conduct and Honor, including all rules, regulations, policies, and procedures of the Sri Lanka–German Training Institute (SLGTI). I acknowledge my responsibility to maintain discipline, academic integrity, professional conduct, and respect for all members of the SLGTI community and its property. I understand that this Code applies to my conduct on campus, off campus, and during all SLGTI-authorized activities, including industrial training and On-the-Job Training (OJT). I further understand that any violation of this Code may result in disciplinary action in accordance with SLGTI regulations, including warnings, suspension, or expulsion. By submitting this declaration electronically, I confirm that this acceptance is legally binding and equivalent to my handwritten signature.
+                    </p>
+                </div>
+                
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="agreeCheckbox" required>
+                    <label class="form-check-label" for="agreeCheckbox">
+                        <strong>I agree to the SLGTI Student Code of Conduct and Honor</strong>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="acceptConductBtn" disabled>
+                    <i class="fas fa-check me-2"></i>Accept & Continue
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Show modal on page load
+    const conductModal = new bootstrap.Modal(document.getElementById('conductModal'));
+    conductModal.show();
+    
+    // Enable/disable accept button based on checkbox
+    const agreeCheckbox = document.getElementById('agreeCheckbox');
+    const acceptBtn = document.getElementById('acceptConductBtn');
+    
+    agreeCheckbox.addEventListener('change', function() {
+        acceptBtn.disabled = !this.checked;
+    });
+    
+    // Handle acceptance
+    acceptBtn.addEventListener('click', function() {
+        if (!agreeCheckbox.checked) {
+            alert('Please check the agreement box to continue.');
+            return;
+        }
+        
+        // Disable button and show loading
+        acceptBtn.disabled = true;
+        const originalText = acceptBtn.innerHTML;
+        acceptBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+        
+        // Send AJAX request
+        fetch('<?php echo APP_URL; ?>/student/accept-conduct', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Close modal
+                conductModal.hide();
+                
+                // Show success message
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success alert-dismissible fade show';
+                alertDiv.innerHTML = `
+                    <i class="fas fa-check-circle me-2"></i>
+                    ${data.message || 'Code of conduct accepted successfully!'}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                document.querySelector('.container-fluid').insertBefore(alertDiv, document.querySelector('.container-fluid').firstChild);
+                
+                // Remove modal from DOM after hiding
+                setTimeout(() => {
+                    const modalElement = document.getElementById('conductModal');
+                    if (modalElement) {
+                        modalElement.remove();
+                    }
+                }, 300);
+            } else {
+                alert('Error: ' + (data.error || 'Failed to accept code of conduct. Please try again.'));
+                acceptBtn.disabled = false;
+                acceptBtn.innerHTML = originalText;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+            acceptBtn.disabled = false;
+            acceptBtn.innerHTML = originalText;
+        });
+    });
+    
+    // Prevent closing modal by clicking outside or pressing ESC
+    document.getElementById('conductModal').addEventListener('hide.bs.modal', function(e) {
+        if (!agreeCheckbox.checked || !document.getElementById('acceptConductBtn').disabled) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    });
+});
+</script>
+<?php endif; ?>
+

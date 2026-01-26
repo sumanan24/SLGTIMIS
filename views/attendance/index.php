@@ -95,9 +95,18 @@
                             
                             <div class="col-md-2">
                                 <label for="group" class="form-label fw-semibold">Group</label>
-                                <input type="text" class="form-control" id="group" name="group" 
-                                       value="<?php echo htmlspecialchars($selectedGroup ?? ''); ?>" 
-                                       placeholder="Optional">
+                                <select class="form-select" id="group" name="group" <?php echo (empty($selectedCourse) || empty($selectedAcademicYear)) ? 'disabled' : ''; ?>>
+                                    <option value="">Select Group (Optional)</option>
+                                    <?php 
+                                    // Load groups if course and academic year are selected
+                                    if (isset($groups) && !empty($groups)) {
+                                        foreach ($groups as $groupItem) {
+                                            $selected = ($selectedGroup ?? '') == $groupItem['id'] ? 'selected' : '';
+                                            echo '<option value="' . htmlspecialchars($groupItem['id']) . '" ' . $selected . '>' . htmlspecialchars($groupItem['name']) . '</option>';
+                                        }
+                                    }
+                                    ?>
+                                </select>
                             </div>
                         </div>
                         
@@ -256,6 +265,40 @@
 document.addEventListener('DOMContentLoaded', function() {
     const departmentSelect = document.getElementById('department_id');
     const courseSelect = document.getElementById('course_id');
+    const academicYearSelect = document.getElementById('academic_year');
+    const groupSelect = document.getElementById('group');
+    
+    // Function to load groups
+    function loadGroups() {
+        const courseId = courseSelect.value;
+        const academicYear = academicYearSelect.value;
+        
+        if (courseId && academicYear) {
+            groupSelect.disabled = false;
+            groupSelect.innerHTML = '<option value="">Loading groups...</option>';
+            
+            fetch('<?php echo APP_URL; ?>/attendance/get-groups-by-course-and-year?course_id=' + encodeURIComponent(courseId) + '&academic_year=' + encodeURIComponent(academicYear))
+                .then(response => response.json())
+                .then(data => {
+                    groupSelect.innerHTML = '<option value="">Select Group (Optional)</option>';
+                    if (data.success && data.groups) {
+                        data.groups.forEach(function(group) {
+                            const option = document.createElement('option');
+                            option.value = group.id;
+                            option.textContent = group.name;
+                            groupSelect.appendChild(option);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading groups:', error);
+                    groupSelect.innerHTML = '<option value="">Error loading groups</option>';
+                });
+        } else {
+            groupSelect.innerHTML = '<option value="">Select Group (Optional)</option>';
+            groupSelect.disabled = true;
+        }
+    }
     
     if (departmentSelect && courseSelect) {
         departmentSelect.addEventListener('change', function() {
@@ -276,6 +319,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             });
                         }
                         courseSelect.disabled = false;
+                        // Reset groups when department changes
+                        groupSelect.innerHTML = '<option value="">Select Group (Optional)</option>';
+                        groupSelect.disabled = true;
                     })
                     .catch(error => {
                         console.error('Error loading courses:', error);
@@ -284,8 +330,16 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 courseSelect.innerHTML = '<option value="">Select Course</option>';
                 courseSelect.disabled = true;
+                groupSelect.innerHTML = '<option value="">Select Group (Optional)</option>';
+                groupSelect.disabled = true;
             }
         });
+    }
+    
+    // Load groups when course or academic year changes
+    if (courseSelect && academicYearSelect && groupSelect) {
+        courseSelect.addEventListener('change', loadGroups);
+        academicYearSelect.addEventListener('change', loadGroups);
     }
     
     // Initialize holiday checkboxes on page load

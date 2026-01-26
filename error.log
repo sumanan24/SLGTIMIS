@@ -4310,3 +4310,45 @@
 [25-Jan-2026 05:40:29 UTC] BusSeasonRequestModel::create - Data: {"student_id":"2025\/MET\/5PT009","department_id":"MEC","season_year":"2026","season_name":"","depot_name":"","route_from":"Nelliyady","route_to":"SLGTI","change_point":"","distance_km":0,"notes":"Created by SAO"}
 [25-Jan-2026 05:40:29 UTC] BusSeasonRequestModel::create - Success. Insert ID: 7
 [25-Jan-2026 05:40:30 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:21:22 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:21:25 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:21:26 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:21:28 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:21:33 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:21:33 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:28:28 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:28:40 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:28:42 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:30:17 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:30:17 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:39:24 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:41:10 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:41:15 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:41:15 UTC] PHP Fatal error:  Access level to GroupTimetableController::getUserDepartment() must be protected (as in class Controller) or weaker in C:\wamp64\www\SLGTIMIS\controllers\GroupTimetableController.php on line 38
+[26-Jan-2026 13:41:15 UTC] PHP Stack trace:
+[26-Jan-2026 13:41:15 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[26-Jan-2026 13:41:15 UTC] PHP   2. Router->route($uri = 'group-timetable/student-view') C:\wamp64\www\SLGTIMIS\index.php:144
+[26-Jan-2026 13:41:15 UTC] PHP   3. Router->dispatch($route = 'GroupTimetableController@studentView', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[26-Jan-2026 13:41:21 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:41:21 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:41:22 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:41:26 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:41:26 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:41:26 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:41:29 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:43:59 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:44:03 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:44:03 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:44:03 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:46:55 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:47:02 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:47:06 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:56:23 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:56:23 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:56:25 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:57:12 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:57:12 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:58:27 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:58:35 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:58:55 UTC] Database::connect - Connection successful to sisslgti
+[26-Jan-2026 13:58:55 UTC] Database::connect - Connection successful to sisslgti

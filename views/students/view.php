@@ -399,6 +399,18 @@
                 </a>
             </div>
         </div>
+        <?php else: ?>
+        <!-- Student Profile Actions -->
+        <div class="d-flex justify-content-end align-items-center mb-4">
+            <div class="cv-actions">
+                <a href="<?php echo APP_URL; ?>/student/profile/edit" class="cv-btn cv-btn-primary">
+                    <i class="fas fa-edit"></i>Edit My Profile
+                </a>
+                <a href="<?php echo APP_URL; ?>/student/dashboard" class="cv-btn cv-btn-outline">
+                    <i class="fas fa-arrow-left"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
         <?php endif; ?>
 
         <!-- Profile Section -->
