@@ -342,49 +342,24 @@ class StudentController extends Controller {
                     return;
                 }
                 
-                // Ensure assets directory exists
+                // Ensure assets directory exists and is writable
                 $assetsDirectory = BASE_PATH . '/assets';
-                if (!is_dir($assetsDirectory)) {
-                    if (!mkdir($assetsDirectory, 0755, true)) {
-                        $_SESSION['error'] = 'Assets directory does not exist and could not be created. Please contact administrator.';
-                        $_SESSION['active_tab'] = 'documents';
-                        $this->redirect('student/profile/edit');
-                        return;
-                    }
+                $assetsCheck = $this->ensureDirectoryWritable($assetsDirectory, 'assets');
+                if (!$assetsCheck['success']) {
+                    $_SESSION['error'] = $assetsCheck['message'];
+                    $_SESSION['active_tab'] = 'documents';
+                    $this->redirect('student/profile/edit');
+                    return;
                 }
                 
-                // Ensure assets directory is writable
-                if (!is_writable($assetsDirectory)) {
-                    @chmod($assetsDirectory, 0755);
-                    if (!is_writable($assetsDirectory)) {
-                        $_SESSION['error'] = 'Assets directory is not writable. Please contact administrator to set proper permissions (755 or 775) on the assets folder.';
-                        $_SESSION['active_tab'] = 'documents';
-                        $this->redirect('student/profile/edit');
-                        return;
-                    }
-                }
-                
-                // Create studentdoc directory if it doesn't exist
+                // Create studentdoc directory if it doesn't exist and ensure it's writable
                 $docDirectory = BASE_PATH . '/assets/studentdoc';
-                if (!is_dir($docDirectory)) {
-                    if (!mkdir($docDirectory, 0755, true)) {
-                        $_SESSION['error'] = 'Could not create documents directory. Please check folder permissions.';
-                        $_SESSION['active_tab'] = 'documents';
-                        $this->redirect('student/profile/edit');
-                        return;
-                    }
-                }
-                
-                // Ensure directory is writable
-                if (!is_writable($docDirectory)) {
-                    // Try to change permissions
-                    @chmod($docDirectory, 0755);
-                    if (!is_writable($docDirectory)) {
-                        $_SESSION['error'] = 'Documents directory is not writable. Please contact administrator to set proper permissions (755 or 775) on assets/studentdoc folder.';
-                        $_SESSION['active_tab'] = 'documents';
-                        $this->redirect('student/profile/edit');
-                        return;
-                    }
+                $docCheck = $this->ensureDirectoryWritable($docDirectory, 'assets/studentdoc');
+                if (!$docCheck['success']) {
+                    $_SESSION['error'] = $docCheck['message'];
+                    $_SESSION['active_tab'] = 'documents';
+                    $this->redirect('student/profile/edit');
+                    return;
                 }
                 
                 // Generate filename: student_id.pdf
@@ -666,6 +641,77 @@ class StudentController extends Controller {
         $testCommand = escapeshellarg($command) . ' --version 2>&1';
         exec($testCommand, $output, $returnCode);
         return $returnCode === 0;
+    }
+    
+    /**
+     * Ensure directory exists and is writable, with automatic permission fixing
+     */
+    private function ensureDirectoryWritable($directory, $directoryName) {
+        // Check if directory exists
+        if (!is_dir($directory)) {
+            // Try to create directory
+            if (!@mkdir($directory, 0755, true)) {
+                $parentDir = dirname($directory);
+                $currentPerms = is_dir($parentDir) ? substr(sprintf('%o', fileperms($parentDir)), -4) : 'unknown';
+                return [
+                    'success' => false,
+                    'message' => "Directory '$directoryName' does not exist and could not be created. " .
+                                "Parent directory permissions: $currentPerms. " .
+                                "Please run: mkdir -p $directory && chmod 755 $directory"
+                ];
+            }
+        }
+        
+        // Check current permissions
+        $currentPerms = substr(sprintf('%o', fileperms($directory)), -4);
+        
+        // Check if writable
+        if (!is_writable($directory)) {
+            // Try multiple permission levels
+            $permissions = [0777, 0775, 0755, 0700];
+            $fixed = false;
+            
+            foreach ($permissions as $perm) {
+                if (@chmod($directory, $perm)) {
+                    if (is_writable($directory)) {
+                        $fixed = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!$fixed) {
+                // Get owner info if possible
+                $ownerInfo = '';
+                if (function_exists('posix_getpwuid')) {
+                    $stat = @stat($directory);
+                    if ($stat) {
+                        $owner = @posix_getpwuid($stat['uid']);
+                        $group = @posix_getgrgid($stat['gid']);
+                        $ownerInfo = " (Owner: " . ($owner['name'] ?? 'unknown') . ", Group: " . ($group['name'] ?? 'unknown') . ")";
+                    }
+                }
+                
+                $webServerUser = 'www-data'; // Default, common for Nginx
+                if (function_exists('posix_geteuid')) {
+                    $currentUid = posix_geteuid();
+                    $currentUser = posix_getpwuid($currentUid);
+                    if ($currentUser) {
+                        $webServerUser = $currentUser['name'];
+                    }
+                }
+                
+                return [
+                    'success' => false,
+                    'message' => "Directory '$directoryName' is not writable. Current permissions: $currentPerms$ownerInfo. " .
+                                "Please run: chmod 755 $directory " .
+                                "or: chmod 775 $directory (if web server needs group write access). " .
+                                "If using Nginx/PHP-FPM, you may also need: chown -R $webServerUser:$webServerUser $directory"
+                ];
+            }
+        }
+        
+        return ['success' => true, 'message' => ''];
     }
     
     /**
