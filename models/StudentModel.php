@@ -836,7 +836,7 @@ class StudentModel extends Model {
     
     /**
      * Update student profile image path
-     * Database stores path relative to assets folder (e.g., "img/student_profile/filename.jpg")
+     * Database stores path relative to assets folder (e.g., "img/Student_profile/filename.jpg")
      */
     public function updateStudentImage($studentId, $imagePath) {
         // First check if student_profile_img column exists, if not, add it
@@ -894,7 +894,7 @@ class StudentModel extends Model {
     
     /**
      * Get profile image path for a student
-     * Database stores path relative to assets (e.g., "img/student_profile/filename.jpg")
+     * Database stores path relative to assets (e.g., "img/Student_profile/filename.jpg")
      * Returns: assets/{student_profile_img} format
      */
     public function getProfileImagePath($student) {
@@ -913,10 +913,15 @@ class StudentModel extends Model {
             $imagePath = substr($imagePath, 7);
         }
         
-        // If path doesn't start with 'img/student_profile/', assume it's just a filename
-        if (strpos($imagePath, 'img/student_profile/') !== 0) {
+        // Convert old lowercase path to new capital path if needed
+        if (strpos($imagePath, 'img/student_profile/') === 0) {
+            $imagePath = str_replace('img/student_profile/', 'img/Student_profile/', $imagePath);
+        }
+        
+        // If path doesn't start with 'img/Student_profile/', assume it's just a filename
+        if (strpos($imagePath, 'img/Student_profile/') !== 0) {
             // If it's just a filename, prepend the standard path
-            $imagePath = 'img/student_profile/' . basename($imagePath);
+            $imagePath = 'img/Student_profile/' . basename($imagePath);
         }
         
         // Check if file exists in assets directory
