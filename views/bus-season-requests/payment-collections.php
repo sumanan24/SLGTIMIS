@@ -184,17 +184,11 @@
         <!-- Processing Table -->
         <div class="tab-pane fade" id="processing" role="tabpanel">
             <div class="table-container">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold mb-0">Currently Processing</h5>
-                    <button onclick="bulkUpdate('issued')" id="btnBulkIssue" class="btn btn-success btn-sm" disabled>
-                        <i class="fas fa-check-circle me-1"></i> Mark Selected as Issued
-                    </button>
-                </div>
+                <h5 class="fw-bold mb-3">Currently Processing</h5>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th width="40"><input type="checkbox" id="checkAllProcessing"></th>
                                 <th>Student Details</th>
                                 <th>Route</th>
                                 <th>NIC</th>
@@ -207,10 +201,9 @@
                             <?php 
                             $procItems = array_filter($collections, fn($c) => strtolower($c['payment_status'] ?? '') === 'processing');
                             if (empty($procItems)): ?>
-                                <tr><td colspan="7" class="text-center py-4">No records found</td></tr>
+                                <tr><td colspan="6" class="text-center py-4">No records found</td></tr>
                             <?php else: foreach ($procItems as $c): ?>
                                 <tr>
-                                    <td><input type="checkbox" class="proc-check" value="<?php echo $c['payment_id']; ?>"></td>
                                     <td>
                                         <div class="fw-bold"><?php echo htmlspecialchars($c['student_fullname'] ?? 'N/A'); ?></div>
                                         <small class="text-muted"><?php echo htmlspecialchars($c['payment_student_id'] ?? $c['profile_student_id'] ?? $c['request_student_id'] ?? 'N/A'); ?></small>
@@ -372,22 +365,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     paidChecks.forEach(cb => {
         cb.addEventListener('change', () => toggleBulkBtn(paidChecks, btnBulkProcess));
-    });
-
-    // Checkbox handling for Processing tab
-    const checkAllProcessing = document.getElementById('checkAllProcessing');
-    const procChecks = document.querySelectorAll('.proc-check');
-    const btnBulkIssue = document.getElementById('btnBulkIssue');
-
-    if (checkAllProcessing) {
-        checkAllProcessing.addEventListener('change', function() {
-            procChecks.forEach(cb => cb.checked = this.checked);
-            toggleBulkBtn(procChecks, btnBulkIssue);
-        });
-    }
-
-    procChecks.forEach(cb => {
-        cb.addEventListener('change', () => toggleBulkBtn(procChecks, btnBulkIssue));
     });
 });
 

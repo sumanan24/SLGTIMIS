@@ -403,10 +403,20 @@ class BusSeasonRequestModel extends Model {
     public function createPaymentCollection($requestId, $studentId, $paidAmount, $seasonRate, $collectedBy, $paymentMethod = 'cash', $paymentReference = null, $notes = null) {
         $this->ensureTableStructure();
         
+        // Map payment method to DB enum values (case-sensitive: 'Cash','Bank Transfer')
+        $methodMap = ['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer', 'cheque' => 'Cash'];
+        $paymentMethodDb = $methodMap[strtolower(trim($paymentMethod))] ?? 'Cash';
+        
+        // Required columns: total_amount, remaining_balance (NOT NULL in schema)
+        $totalAmount = ($seasonRate > 0) ? (float)$seasonRate : (float)$paidAmount;
+        $remainingBalance = max(0, $totalAmount - (float)$paidAmount);
+        
+        // Status enum is case-sensitive: 'Paid' or 'Completed'
         $sql = "INSERT INTO `{$this->paymentTable}` 
-                (`request_id`, `student_id`, `paid_amount`, `season_rate`, `status`, 
+                (`request_id`, `student_id`, `paid_amount`, `season_rate`, `total_amount`, 
+                 `student_paid`, `slgti_paid`, `ctb_paid`, `remaining_balance`, `status`, 
                  `payment_method`, `payment_reference`, `collected_by`, `notes`, `payment_date`) 
-                VALUES (?, ?, ?, ?, 'paid', ?, ?, ?, ?, NOW())";
+                VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, 'Paid', ?, ?, ?, ?, NOW())";
         
         $stmt = $this->db->prepare($sql);
         
@@ -416,10 +426,15 @@ class BusSeasonRequestModel extends Model {
             return false;
         }
         
-        // Fix: student_id is VARCHAR (string), not integer
-        $stmt->bind_param("isddssis",
-            $requestId, $studentId, $paidAmount, $seasonRate,
-            $paymentMethod, $paymentReference, $collectedBy, $notes
+        // student_id VARCHAR, collected_by VARCHAR (stores user_id as string)
+        $collectedByStr = (string)$collectedBy;
+        $studentPaid = (float)$paidAmount;
+        $paymentRef = $paymentReference !== null ? (string)$paymentReference : '';
+        $notesStr = $notes !== null ? (string)$notes : '';
+        $stmt->bind_param("isdddddssss",
+            $requestId, $studentId, $paidAmount, $seasonRate, $totalAmount,
+            $studentPaid, $remainingBalance,
+            $paymentMethodDb, $paymentRef, $collectedByStr, $notesStr
         );
         
         if ($stmt->execute()) {
