@@ -405,6 +405,33 @@ class StudentModel extends Model {
     }
     
     /**
+     * Sync user_active with student_status for student login accounts.
+     * When student_status is Active, set user_active=1; otherwise user_active=0.
+     */
+    public function syncUserActiveWithStudentStatus($studentId) {
+        $student = $this->find($studentId);
+        if (!$student || !isset($student['student_status'])) {
+            return false;
+        }
+        $isActive = (strtoupper(trim($student['student_status'])) === 'ACTIVE');
+        $userActive = $isActive ? 1 : 0;
+        
+        $check = $this->db->query("SHOW TABLES LIKE 'user'");
+        if (!$check || $check->num_rows === 0) {
+            return false;
+        }
+        $sql = "UPDATE `user` SET `user_active` = ? WHERE `user_table` = 'student' AND `user_name` = ?";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param("is", $userActive, $studentId);
+        $result = $stmt->execute();
+        $stmt->close();
+        return $result;
+    }
+    
+    /**
      * Delete student
      */
     public function deleteStudent($id) {

@@ -1175,6 +1175,8 @@ class StudentController extends Controller {
                         );
                     }
                     if ($enrollResult) {
+                        // Sync user_active with student_status (e.g. re-register: Active -> user_active=1)
+                        $studentModel->syncUserActiveWithStudentStatus($id);
                         $_SESSION['message'] = ($_SESSION['message'] ?? '') . ' Enrollment updated successfully.' . 
                             ($enrollStatus === 'Following' && $editableEnrollment['student_enroll_status'] !== 'Following' ? ' Student re-registered.' : '');
                     } else {
@@ -1220,6 +1222,10 @@ class StudentController extends Controller {
                     $result = $studentModel->updateStudent($id, $data);
                     
                     if ($result) {
+                        // Sync user_active when student_status changes (e.g. Active -> user_active=1)
+                        if (isset($data['student_status'])) {
+                            $studentModel->syncUserActiveWithStudentStatus($id);
+                        }
                         // Log activity
                         $studentName = isset($data['student_fullname']) ? $data['student_fullname'] : ($oldStudent['student_fullname'] ?? 'Unknown');
                         $this->logActivity(
