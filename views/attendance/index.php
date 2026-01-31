@@ -160,40 +160,64 @@
                             <input type="hidden" name="department_id" value="<?php echo htmlspecialchars($selectedDepartment ?? ''); ?>">
                             <input type="hidden" name="month" value="<?php echo htmlspecialchars($selectedMonth ?? date('Y-m')); ?>">
                             
-                            <div class="table-responsive" style="max-height: 70vh; overflow-x: auto; overflow-y: auto;">
-                                <table class="table table-bordered align-middle mb-0" id="attendanceTable">
-                                    <thead class="table-light" style="position: sticky; top: 0; z-index: 10; background: #f8f9fa;">
-                                        <tr>
-                                            <th class="fw-bold student-col" style="width: 250px; min-width: 250px; max-width: 250px; padding: 0.5rem; position: sticky; left: 0; z-index: 11; background: #f8f9fa;">
-                                                <div>Student ID / Name</div>
-                                                <div style="height: 60px;"></div>
-                                            </th>
-                                            <?php foreach ($calendarDays as $day): ?>
-                                                <th class="text-center fw-bold date-header" style="min-width: 100px;" data-date="<?php echo $day['date']; ?>">
+                            <style>
+                                .attendance-fixed-layout .name-col { 
+                                    width: 130px; min-width: 130px; padding: 0.25rem 0.35rem; font-size: 0.78rem;
+                                    position: sticky !important; left: 0 !important; z-index: 5;
+                                    box-shadow: 2px 0 4px rgba(0,0,0,0.08);
+                                }
+                                .attendance-fixed-layout .attendance-header-wrap .name-col { 
+                                    background: #f8f9fa !important; z-index: 6;
+                                }
+                                .attendance-fixed-layout .attendance-body-wrap .name-col { 
+                                    background: #fff !important;
+                                }
+                                .attendance-fixed-layout .date-header, .attendance-fixed-layout .date-cell { width: 40px; min-width: 40px; padding: 0.15rem 0.1rem; font-size: 0.75rem; }
+                                .attendance-fixed-layout .date-cell .form-check-input { width: 1rem; height: 1rem; }
+                                .attendance-header-wrap { overflow-x: auto; overflow-y: hidden; background: #f8f9fa; border: 1px solid #dee2e6; border-bottom: none; scrollbar-width: none; -ms-overflow-style: none; }
+                                .attendance-header-wrap::-webkit-scrollbar { display: none; }
+                                .attendance-body-wrap { max-height: 70vh; overflow: auto; border: 1px solid #dee2e6; }
+                                .attendance-header-wrap table, .attendance-body-wrap table { table-layout: fixed; }
+                                .attendance-body-wrap .table { margin-bottom: 0; }
+                            </style>
+                            <div class="attendance-fixed-layout">
+                                <!-- Dates row: fixed, does not scroll -->
+                                <div class="attendance-header-wrap" id="attendanceHeaderScroll">
+                                    <table class="table table-bordered align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th class="fw-bold name-col">
+                                                    <div>Student ID / Name</div>
+                                                    <div style="height: 45px;"></div>
+                                                </th>
+                                                <?php foreach ($calendarDays as $day): ?>
+                                                <th class="text-center fw-bold date-header" data-date="<?php echo $day['date']; ?>">
                                                     <div><?php echo htmlspecialchars($day['day']); ?></div>
-                                                    <div class="small text-muted"><?php echo htmlspecialchars($day['day_name']); ?></div>
-                                                    <div class="mt-1">
-                                                        <label class="form-check-label small d-block" style="cursor: pointer;">
-                                                            <input type="checkbox" 
-                                                                   class="form-check-input holiday-date-checkbox" 
-                                                                   data-date="<?php echo $day['date']; ?>"
+                                                    <div class="small text-muted" style="font-size: 0.65rem;"><?php echo htmlspecialchars($day['day_name']); ?></div>
+                                                    <div class="mt-0">
+                                                        <label class="form-check-label d-block" style="cursor: pointer; font-size: 0.6rem;">
+                                                            <input type="checkbox" class="form-check-input holiday-date-checkbox" data-date="<?php echo $day['date']; ?>"
                                                                    id="holiday_date_<?php echo str_replace(['-'], '_', $day['date']); ?>"
                                                                    onchange="toggleHolidayForDate('<?php echo $day['date']; ?>', this.checked)"
                                                                    <?php echo (isset($isMonthLocked) && $isMonthLocked && (!isset($isAdmin) || !$isAdmin)) ? 'disabled' : ''; ?>
-                                                                   style="cursor: pointer; margin-right: 0.25rem;">
-                                                            Holiday
+                                                                   style="cursor: pointer; width: 0.9rem; height: 0.9rem;"> H
                                                         </label>
                                                     </div>
                                                 </th>
-                                            <?php endforeach; ?>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
+                                                <?php endforeach; ?>
+                                            </tr>
+                                        </thead>
+                                    </table>
+                                </div>
+                                <!-- Names and checkboxes: scroll vertically -->
+                                <div class="attendance-body-wrap" id="attendanceBodyScroll">
+                                    <table class="table table-bordered align-middle mb-0" id="attendanceTable">
+                                        <tbody>
                                         <?php foreach ($students as $student): ?>
                                             <tr>
-                                                <td class="fw-semibold student-col" style="width: 250px; min-width: 250px; max-width: 250px; padding: 0.5rem; position: sticky; left: 0; z-index: 9; background: #ffffff;">
-                                                    <div><?php echo htmlspecialchars($student['student_id']); ?></div>
-                                                    <div class="small text-muted"><?php echo htmlspecialchars($student['student_fullname']); ?></div>
+                                                <td class="fw-semibold name-col">
+                                                    <div style="font-size: 0.75rem;"><?php echo htmlspecialchars($student['student_id']); ?></div>
+                                                    <div class="small text-muted" style="font-size: 0.7rem; line-height: 1.2;"><?php echo htmlspecialchars($student['student_fullname']); ?></div>
                                                 </td>
                                                 <?php 
                                                 $studentAttendance = $attendanceData[$student['student_id']] ?? [];
@@ -201,7 +225,7 @@
                                                     $date = $day['date'];
                                                     $currentStatus = $studentAttendance[$date] ?? null;
                                                 ?>
-                                                    <td class="text-center">
+                                                    <td class="text-center date-cell">
                                                         <?php 
                                                         $uniqueId = str_replace(['-', '/'], '_', $student['student_id'] . '_' . $date);
                                                         $isPresent = ($currentStatus === 1);
@@ -218,7 +242,7 @@
                                                                    id="attendance_<?php echo $uniqueId; ?>" 
                                                                    <?php echo $isPresent ? 'checked' : ''; ?>
                                                                    <?php echo ($isHoliday || (isset($isMonthLocked) && $isMonthLocked && (!isset($isAdmin) || !$isAdmin))) ? 'disabled' : ''; ?>
-                                                                   style="width: 1.5rem; height: 1.5rem; cursor: pointer;"
+                                                                   style="width: 1rem; height: 1rem; cursor: pointer;"
                                                                    title="Student: <?php echo htmlspecialchars($student['student_id']); ?> | Date: <?php echo date('Y-m-d', strtotime($date)); ?>">
                                                             <label class="form-check-label" 
                                                                    for="attendance_<?php echo $uniqueId; ?>"
@@ -229,8 +253,9 @@
                                                 <?php endforeach; ?>
                                             </tr>
                                         <?php endforeach; ?>
-                                    </tbody>
-                                </table>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                             
                             <div class="d-flex gap-2 mt-4">
@@ -362,6 +387,18 @@ document.addEventListener('DOMContentLoaded', function() {
             toggleHolidayForDate(date, true);
         }
     });
+    
+    // Sync horizontal scroll: dates header and body stay aligned
+    const headerScroll = document.getElementById('attendanceHeaderScroll');
+    const bodyScroll = document.getElementById('attendanceBodyScroll');
+    if (headerScroll && bodyScroll) {
+        bodyScroll.addEventListener('scroll', function() {
+            headerScroll.scrollLeft = bodyScroll.scrollLeft;
+        });
+        headerScroll.addEventListener('scroll', function() {
+            bodyScroll.scrollLeft = headerScroll.scrollLeft;
+        });
+    }
     
             // Handle form submission with AJAX
     const attendanceForm = document.getElementById('attendanceForm');

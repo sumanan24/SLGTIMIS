@@ -1125,14 +1125,16 @@ class StudentController extends Controller {
                 
             } elseif ($updateSection === 'enrollment') {
                 // Enrollment update - handled separately
-                // Get current enrollment first
                 $enrollmentModel = $this->model('StudentEnrollmentModel');
                 $currentEnrollment = $enrollmentModel->getCurrentEnrollment($id);
+                $editableEnrollment = $currentEnrollment ?: $enrollmentModel->getLatestEnrollment($id);
                 
                 $newStudentId = trim($this->post('student_id_new', ''));
                 $courseId = trim($this->post('course_id', ''));
                 $academicYear = trim($this->post('academic_year', ''));
-                $courseMode = trim($this->post('course_mode', ''));
+                $courseMode = trim($this->post('course_mode', 'Full'));
+                if ($courseMode === 'Full Time') $courseMode = 'Full';
+                if ($courseMode === 'Part Time') $courseMode = 'Part';
                 $enrollStatus = trim($this->post('student_enroll_status', 'Following'));
                 
                 // Update student_id (registration number) if changed
@@ -1152,8 +1154,8 @@ class StudentController extends Controller {
                     }
                 }
                 
-                // Update enrollment if current enrollment exists
-                if (empty($_SESSION['error']) && !empty($currentEnrollment)) {
+                // Update enrollment if we have an enrollment record to update
+                if (empty($_SESSION['error']) && !empty($editableEnrollment) && !empty($courseId) && !empty($academicYear)) {
                     $enrollmentData = [
                         'course_id' => $courseId,
                         'academic_year' => $academicYear,
@@ -1161,14 +1163,25 @@ class StudentController extends Controller {
                         'student_enroll_status' => $enrollStatus
                     ];
                     
-                    $enrollResult = $enrollmentModel->updateEnrollment($id, $enrollmentData);
+                    // Use updateEnrollment for Following; updateEnrollmentByRecord for Dropout/Long Absent
+                    if ($editableEnrollment['student_enroll_status'] === 'Following') {
+                        $enrollResult = $enrollmentModel->updateEnrollment($id, $enrollmentData);
+                    } else {
+                        $enrollResult = $enrollmentModel->updateEnrollmentByRecord(
+                            $id,
+                            $editableEnrollment['course_id'],
+                            $editableEnrollment['academic_year'],
+                            $enrollmentData
+                        );
+                    }
                     if ($enrollResult) {
-                        $_SESSION['message'] = ($_SESSION['message'] ?? '') . ' Enrollment updated successfully.';
+                        $_SESSION['message'] = ($_SESSION['message'] ?? '') . ' Enrollment updated successfully.' . 
+                            ($enrollStatus === 'Following' && $editableEnrollment['student_enroll_status'] !== 'Following' ? ' Student re-registered.' : '');
                     } else {
                         $_SESSION['error'] = ($_SESSION['error'] ?? '') . ' Failed to update enrollment.';
                     }
-                } elseif (empty($_SESSION['error']) && empty($currentEnrollment)) {
-                    $_SESSION['error'] = 'No active enrollment found to update.';
+                } elseif (empty($_SESSION['error']) && empty($editableEnrollment)) {
+                    $_SESSION['error'] = 'No enrollment found to update.';
                 }
                 
                 // Refresh student data after update
@@ -1290,6 +1303,10 @@ class StudentController extends Controller {
         $enrollmentModel = $this->model('StudentEnrollmentModel');
         $enrollments = $enrollmentModel->getByStudentId($id);
         $currentEnrollment = $enrollmentModel->getCurrentEnrollment($id);
+        // For dropout/long absent: use latest enrollment so they can re-register (change status to Following)
+        if (empty($currentEnrollment)) {
+            $currentEnrollment = $enrollmentModel->getLatestEnrollment($id);
+        }
         
         // Get hostel information
         $roomAllocationModel = $this->model('RoomAllocationModel');

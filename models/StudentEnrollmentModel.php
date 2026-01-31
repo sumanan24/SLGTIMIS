@@ -38,7 +38,7 @@ class StudentEnrollmentModel extends Model {
     }
     
     /**
-     * Get current enrollment
+     * Get current enrollment (status = Following only)
      */
     public function getCurrentEnrollment($studentId) {
         $sql = "SELECT se.*, c.course_name, c.department_id, d.department_name
@@ -47,6 +47,26 @@ class StudentEnrollmentModel extends Model {
                 LEFT JOIN `department` d ON c.department_id = d.department_id
                 WHERE se.student_id = ? AND se.student_enroll_status = 'Following'
                 ORDER BY se.academic_year DESC
+                LIMIT 1";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param("s", $studentId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        return $result->fetch_assoc();
+    }
+    
+    /**
+     * Get latest enrollment (any status - for editing Dropout/Long Absent to re-register)
+     */
+    public function getLatestEnrollment($studentId) {
+        $sql = "SELECT se.*, c.course_name, c.department_id, d.department_name
+                FROM `{$this->table}` se
+                LEFT JOIN `course` c ON se.course_id = c.course_id
+                LEFT JOIN `department` d ON c.department_id = d.department_id
+                WHERE se.student_id = ?
+                ORDER BY se.academic_year DESC, se.student_enroll_date DESC
                 LIMIT 1";
         
         $stmt = $this->db->prepare($sql);
@@ -80,10 +100,9 @@ class StudentEnrollmentModel extends Model {
     }
     
     /**
-     * Update enrollment for a student
+     * Update enrollment for a student (active Following only)
      */
     public function updateEnrollment($studentId, $data) {
-        // Update the current active enrollment
         $sql = "UPDATE `{$this->table}` SET 
                 `course_id` = ?, 
                 `academic_year` = ?, 
@@ -100,6 +119,31 @@ class StudentEnrollmentModel extends Model {
             $data['course_mode'],
             $data['student_enroll_status'],
             $studentId
+        );
+        
+        return $stmt->execute();
+    }
+    
+    /**
+     * Update enrollment by record (student_id, course_id, academic_year) - for Dropout re-registration
+     */
+    public function updateEnrollmentByRecord($studentId, $courseId, $academicYear, $data) {
+        $sql = "UPDATE `{$this->table}` SET 
+                `course_id` = ?, 
+                `academic_year` = ?, 
+                `course_mode` = ?, 
+                `student_enroll_status` = ?
+                WHERE `student_id` = ? AND `course_id` = ? AND `academic_year` = ?";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param("sssssss", 
+            $data['course_id'],
+            $data['academic_year'],
+            $data['course_mode'],
+            $data['student_enroll_status'],
+            $studentId,
+            $courseId,
+            $academicYear
         );
         
         return $stmt->execute();

@@ -54,7 +54,7 @@ class AttendanceModel extends Model {
             $types .= 'i';
         }
         
-        $sql .= " ORDER BY s.student_fullname ASC";
+        $sql .= " ORDER BY s.student_id ASC";
         
         if (!empty($params)) {
             $stmt = $this->db->prepare($sql);
@@ -231,7 +231,7 @@ class AttendanceModel extends Model {
     public function getAttendanceReportByDateRange($startDate, $endDate, $filters = []) {
         $conn = $this->db->getConnection();
         
-        // Build query for active students with bank details
+        // Build query for active students with bank details (allowance_eligible_date may not exist in all DBs)
         $sql = "SELECT DISTINCT 
                     s.student_id,
                     s.student_fullname,
@@ -240,7 +240,6 @@ class AttendanceModel extends Model {
                     s.bank_account_no,
                     s.bank_branch,
                     s.allowance_eligible,
-                    s.allowance_eligible_date,
                     se.course_id,
                     c.course_name,
                     d.department_name,
@@ -281,10 +280,18 @@ class AttendanceModel extends Model {
         $sql .= " ORDER BY s.student_fullname ASC";
         
         $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            error_log("AttendanceModel::getAttendanceReportByDateRange - Prepare failed: " . $conn->error);
+            return [];
+        }
         if (!empty($params)) {
             $stmt->bind_param($types, ...$params);
         }
-        $stmt->execute();
+        if (!$stmt->execute()) {
+            error_log("AttendanceModel::getAttendanceReportByDateRange - Execute failed: " . $stmt->error);
+            $stmt->close();
+            return [];
+        }
         $result = $stmt->get_result();
         
         $students = [];
@@ -297,6 +304,10 @@ class AttendanceModel extends Model {
                             WHERE `student_id` = ? AND `date` >= ? AND `date` <= ?
                             ORDER BY `date` ASC";
             $attendanceStmt = $conn->prepare($attendanceSql);
+            if (!$attendanceStmt) {
+                error_log("AttendanceModel::getAttendanceReportByDateRange - Attendance prepare failed: " . $conn->error);
+                continue;
+            }
             $attendanceStmt->bind_param("sss", $studentId, $startDate, $endDate);
             $attendanceStmt->execute();
             $attendanceResult = $attendanceStmt->get_result();

@@ -83,6 +83,18 @@ class Database {
         return $this->connect()->affected_rows;
     }
     
+    public function begin_transaction() {
+        return $this->connect()->begin_transaction();
+    }
+    
+    public function commit() {
+        return $this->connect()->commit();
+    }
+    
+    public function rollback() {
+        return $this->connect()->rollback();
+    }
+    
     // Prevent cloning
     private function __clone() {}
     

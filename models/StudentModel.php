@@ -354,6 +354,45 @@ class StudentModel extends Model {
                 throw new Exception("Failed to update student_id in student_enroll table");
             }
             
+            // Update attendance and group_students tables (no FK, must update explicitly)
+            $tablesWithStudentId = ['attendance', 'group_students'];
+            foreach ($tablesWithStudentId as $tbl) {
+                $check = $this->db->query("SHOW TABLES LIKE '{$tbl}'");
+                if ($check && $check->num_rows > 0) {
+                    $sqlT = "UPDATE `{$tbl}` SET `student_id` = ? WHERE `student_id` = ?";
+                    $stmtT = $this->db->prepare($sqlT);
+                    if ($stmtT) {
+                        $stmtT->bind_param("ss", $newId, $oldId);
+                        $stmtT->execute();
+                        $stmtT->close();
+                    }
+                }
+            }
+            
+            // Update user table (student login username = student_id)
+            $checkUser = $this->db->query("SHOW TABLES LIKE 'user'");
+            if ($checkUser && $checkUser->num_rows > 0) {
+                $sqlUser = "UPDATE `user` SET `user_name` = ? WHERE `user_table` = 'student' AND `user_name` = ?";
+                $stmtUser = $this->db->prepare($sqlUser);
+                if ($stmtUser) {
+                    $stmtUser->bind_param("ss", $newId, $oldId);
+                    $stmtUser->execute();
+                    $stmtUser->close();
+                }
+            }
+            
+            // Update login_attempts so failed-attempt history follows the account
+            $checkLoginAttempts = $this->db->query("SHOW TABLES LIKE 'login_attempts'");
+            if ($checkLoginAttempts && $checkLoginAttempts->num_rows > 0) {
+                $sqlLa = "UPDATE `login_attempts` SET `username` = ? WHERE `username` = ?";
+                $stmtLa = $this->db->prepare($sqlLa);
+                if ($stmtLa) {
+                    $stmtLa->bind_param("ss", $newId, $oldId);
+                    $stmtLa->execute();
+                    $stmtLa->close();
+                }
+            }
+            
             // Commit transaction
             $this->db->commit();
             return true;

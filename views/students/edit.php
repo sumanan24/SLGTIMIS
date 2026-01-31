@@ -362,28 +362,20 @@
                             <form method="POST" action="<?php echo APP_URL; ?>/students/edit?id=<?php echo urlencode($student['student_id']); ?>">
                                 <input type="hidden" name="update_section" value="enrollment">
                                 
-                                <div class="row mb-4">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="student_id_new" class="form-label fw-semibold">
-                                            Registration Number (Student ID) <span class="text-danger">*</span>
-                                        </label>
-                                        <input type="text" class="form-control" id="student_id_new" name="student_id_new" 
-                                               value="<?php echo htmlspecialchars($student['student_id']); ?>" 
-                                               maxlength="50" required>
-                                        <div class="form-text">Current: <?php echo htmlspecialchars($student['student_id']); ?></div>
-                                    </div>
-                                </div>
-                                
                                 <?php if (!empty($currentEnrollment)): ?>
-                                    <div class="alert alert-info mb-4">
-                                        <i class="fas fa-info-circle me-2"></i>
-                                        <strong>Current Enrollment:</strong>
+                                    <?php $isDropoutReregister = in_array($currentEnrollment['student_enroll_status'] ?? '', ['Dropout', 'Long Absent']); ?>
+                                    <div class="alert alert-<?php echo $isDropoutReregister ? 'warning' : 'info'; ?> mb-4">
+                                        <i class="fas fa-<?php echo $isDropoutReregister ? 'exclamation-triangle' : 'info-circle'; ?> me-2"></i>
+                                        <strong><?php echo $isDropoutReregister ? 'Previous Enrollment (Re-register):' : 'Current Enrollment:'; ?></strong>
                                         <?php echo htmlspecialchars($currentEnrollment['course_name'] ?? 'N/A'); ?> - 
                                         <?php echo htmlspecialchars($currentEnrollment['academic_year'] ?? 'N/A'); ?> 
                                         (<?php echo htmlspecialchars($currentEnrollment['student_enroll_status'] ?? 'N/A'); ?>)
+                                        <?php if ($isDropoutReregister): ?>
+                                            <br><small>Change status to <strong>Following</strong> to re-register this student.</small>
+                                        <?php endif; ?>
                                     </div>
                                     
-                                    <h6 class="fw-bold mb-3">Update Current Enrollment</h6>
+                                    <h6 class="fw-bold mb-3">Update Course & Enrollment</h6>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
                                             <label for="course_id" class="form-label fw-semibold">Course <span class="text-danger">*</span></label>
@@ -413,12 +405,30 @@
                                         </div>
                                     </div>
                                     
+                                    <div class="row mb-4">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="student_id_new" class="form-label fw-semibold">
+                                                Registration Number (Student ID) <span class="text-danger">*</span>
+                                            </label>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="student_id_new" name="student_id_new" 
+                                                       value="<?php echo htmlspecialchars($student['student_id']); ?>" 
+                                                       maxlength="50" required>
+                                                <button type="button" class="btn btn-outline-secondary" id="btnSuggestRegNumber" title="Get next available number for selected course">
+                                                    <i class="fas fa-magic"></i> Suggest
+                                                </button>
+                                            </div>
+                                            <div class="form-text">Changing course? Registration number auto-updates when you select course & year.</div>
+                                        </div>
+                                    </div>
+                                    
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
                                             <label for="course_mode" class="form-label fw-semibold">Course Mode</label>
                                             <select class="form-select" id="course_mode" name="course_mode">
-                                                <option value="Full Time" <?php echo ($currentEnrollment['course_mode'] ?? '') === 'Full Time' ? 'selected' : ''; ?>>Full Time</option>
-                                                <option value="Part Time" <?php echo ($currentEnrollment['course_mode'] ?? '') === 'Part Time' ? 'selected' : ''; ?>>Part Time</option>
+                                                <?php $mode = $currentEnrollment['course_mode'] ?? ''; ?>
+                                                <option value="Full" <?php echo in_array($mode, ['Full', 'Full Time']) ? 'selected' : ''; ?>>Full Time</option>
+                                                <option value="Part" <?php echo in_array($mode, ['Part', 'Part Time']) ? 'selected' : ''; ?>>Part Time</option>
                                             </select>
                                         </div>
                                         
@@ -771,6 +781,35 @@ document.addEventListener('DOMContentLoaded', function() {
         provinceSelect.addEventListener('change', function() {
             loadDistricts(this.value);
         });
+    }
+    
+    // Enrollment tab: Auto-suggest next registration number when course/year selected
+    const editCourseSelect = document.getElementById('course_id');
+    const editAcademicYearSelect = document.getElementById('academic_year');
+    const studentIdNewInput = document.getElementById('student_id_new');
+    const btnSuggestRegNumber = document.getElementById('btnSuggestRegNumber');
+    
+    function suggestNextRegNumber() {
+        const courseId = editCourseSelect ? editCourseSelect.value : '';
+        const academicYear = editAcademicYearSelect ? editAcademicYearSelect.value : '';
+        if (!courseId || !academicYear || !studentIdNewInput) return;
+        
+        fetch('<?php echo APP_URL; ?>/students/get-last-reg-number?course_id=' + encodeURIComponent(courseId) + '&academic_year=' + encodeURIComponent(academicYear))
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.nextRegNumber) {
+                    studentIdNewInput.value = data.nextRegNumber;
+                }
+            })
+            .catch(err => console.error('Error fetching next reg number:', err));
+    }
+    
+    if (editCourseSelect && editAcademicYearSelect && studentIdNewInput) {
+        editCourseSelect.addEventListener('change', suggestNextRegNumber);
+        editAcademicYearSelect.addEventListener('change', suggestNextRegNumber);
+        if (btnSuggestRegNumber) {
+            btnSuggestRegNumber.addEventListener('click', suggestNextRegNumber);
+        }
     }
 });
 </script>
