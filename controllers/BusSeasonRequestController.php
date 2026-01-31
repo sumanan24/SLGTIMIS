@@ -77,7 +77,7 @@ class BusSeasonRequestController extends Controller {
      * Staff/Admin index view
      */
     private function staffIndex($requestModel) {
-        $requests = $requestModel->getRequestsForSAO();
+        $requests = $requestModel->getRequestsForSAO(['payment_filter' => 'all']);
         
         $data = [
             'title' => 'All Bus Season Requests',
@@ -393,7 +393,12 @@ class BusSeasonRequestController extends Controller {
         $requestModel = $this->model('BusSeasonRequestModel');
         $requestModel->ensureTableStructure();
         
-        $requests = $requestModel->getRequestsForSAO();
+        $filters = [
+            'payment_filter' => $this->get('payment_filter', 'needs_payment'),
+            'student_id' => trim($this->get('student_id', '')),
+            'request_id' => trim($this->get('request_id', ''))
+        ];
+        $requests = $requestModel->getRequestsForSAO($filters);
         $studentModel = $this->model('StudentModel');
         $academicYears = $studentModel->getAcademicYears();
         
@@ -404,6 +409,7 @@ class BusSeasonRequestController extends Controller {
             'title' => 'Bus Season Requests - Payment Collection',
             'page' => 'bus-season-requests-sao',
             'requests' => $requests,
+            'filters' => $filters,
             'academicYears' => $academicYears,
             'students' => $allStudents,
             'message' => $this->getFlashMessage(),
@@ -557,11 +563,7 @@ class BusSeasonRequestController extends Controller {
             return;
         }
         
-        if ($requestModel->hasPaymentCollection($requestId)) {
-            $this->setError('Payment has already been collected for this request.');
-            $this->redirect('bus-season-requests/sao-process');
-            return;
-        }
+        // Allow multiple payments per request (e.g. monthly collections) - no blocking check
         
         // Create payment collection
         $paymentId = $requestModel->createPaymentCollection(
@@ -591,7 +593,7 @@ class BusSeasonRequestController extends Controller {
                 ]
             );
             
-            $this->setMessage('Payment recorded successfully. Status set to paid.');
+            $this->setMessage('Payment recorded successfully. You can collect again each month on the same request.');
         } else {
             $this->setError('Failed to record payment collection. Please try again.');
         }

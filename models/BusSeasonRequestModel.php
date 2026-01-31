@@ -75,6 +75,16 @@ class BusSeasonRequestModel extends Model {
             }
         }
         
+        // Drop unique constraint on request_id to allow multiple payments per request (monthly collections)
+        try {
+            $idxCheck = $this->db->query("SHOW INDEX FROM `{$this->paymentTable}` WHERE Key_name = 'uniq_request_payment'");
+            if ($idxCheck && $idxCheck->num_rows > 0) {
+                $this->db->query("ALTER TABLE `{$this->paymentTable}` DROP INDEX `uniq_request_payment`");
+            }
+        } catch (Exception $e) {
+            error_log("Error dropping uniq_request_payment: " . $e->getMessage());
+        }
+        
         return true;
     }
     
@@ -313,9 +323,15 @@ class BusSeasonRequestModel extends Model {
     
     /**
      * Get requests for SAO processing
+     * @param array $filters Optional: payment_filter ('needs_payment'|'issued'|'all'), student_id, request_id
+     *   - needs_payment: only requests with NO season_payments record
+     *   - issued: only requests with payment status = issued (or issued_at set)
+     *   - all: no filter
      */
-    public function getRequestsForSAO() {
+    public function getRequestsForSAO($filters = []) {
         $this->ensureTableStructure();
+        
+        $paymentFilter = $filters['payment_filter'] ?? 'needs_payment';
         
         $sql = "SELECT r.*, 
                 s.student_fullname, s.student_email, s.student_id, s.student_gender, s.student_nic,
@@ -327,10 +343,44 @@ class BusSeasonRequestModel extends Model {
                 INNER JOIN `student` s ON r.student_id = s.student_id
                 LEFT JOIN `department` d ON r.department_id = d.department_id
                 LEFT JOIN `user` hod ON r.hod_approver_id = hod.user_id
-                LEFT JOIN `user` second ON r.second_approver_id = second.user_id
-                ORDER BY r.created_at DESC";
+                LEFT JOIN `user` second ON r.second_approver_id = second.user_id";
         
-        $result = $this->db->query($sql);
+        $conditions = [];
+        $params = [];
+        $types = '';
+        
+        if ($paymentFilter === 'needs_payment') {
+            $conditions[] = "NOT EXISTS (SELECT 1 FROM `{$this->paymentTable}` p WHERE p.request_id = r.id)";
+        } elseif ($paymentFilter === 'issued') {
+            $conditions[] = "EXISTS (SELECT 1 FROM `{$this->paymentTable}` p WHERE p.request_id = r.id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL))";
+        }
+        /* 'all' = no payment filter */
+        
+        if (!empty($filters['student_id'])) {
+            $conditions[] = "r.student_id = ?";
+            $params[] = $filters['student_id'];
+            $types .= 's';
+        }
+        if (!empty($filters['request_id'])) {
+            $conditions[] = "r.id = ?";
+            $params[] = $filters['request_id'];
+            $types .= 'i';
+        }
+        
+        if (!empty($conditions)) {
+            $sql .= " WHERE " . implode(" AND ", $conditions);
+        }
+        
+        $sql .= " ORDER BY r.created_at DESC";
+        
+        if (!empty($params)) {
+            $stmt = $this->db->prepare($sql);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+        } else {
+            $result = $this->db->query($sql);
+        }
         
         $data = [];
         if ($result && $result->num_rows > 0) {

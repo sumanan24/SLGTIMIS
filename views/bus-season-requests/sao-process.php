@@ -109,7 +109,59 @@
         </div>
     <?php endif; ?>
     
+    <!-- Filter -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <form method="GET" action="<?php echo APP_URL; ?>/bus-season-requests/sao-process" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Show</label>
+                    <select class="form-select" name="payment_filter">
+                        <option value="needs_payment" <?php echo (($filters['payment_filter'] ?? 'needs_payment') === 'needs_payment') ? 'selected' : ''; ?>>
+                            First payment only (no payments yet)
+                        </option>
+                        <option value="all" <?php echo (($filters['payment_filter'] ?? '') === 'all') ? 'selected' : ''; ?>>
+                            All (collect or add monthly payment)
+                        </option>
+                        <option value="issued" <?php echo (($filters['payment_filter'] ?? '') === 'issued') ? 'selected' : ''; ?>>
+                            Issued Only
+                        </option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">Student ID</label>
+                    <input type="text" class="form-control" name="student_id" 
+                           value="<?php echo htmlspecialchars($filters['student_id'] ?? ''); ?>" 
+                           placeholder="e.g. 2025/ICT/4TE001">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">Request ID</label>
+                    <input type="text" class="form-control" name="request_id" 
+                           value="<?php echo htmlspecialchars($filters['request_id'] ?? ''); ?>" 
+                           placeholder="e.g. 123">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Filter
+                    </button>
+                </div>
+                <div class="col-md-2">
+                    <a href="<?php echo APP_URL; ?>/bus-season-requests/sao-process" class="btn btn-outline-secondary w-100">Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
     <div class="table-container">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="text-muted">
+                <?php 
+                $filterLabel = 'Needs Payment';
+                if (($filters['payment_filter'] ?? '') === 'issued') $filterLabel = 'Issued';
+                elseif (($filters['payment_filter'] ?? '') === 'all') $filterLabel = 'All';
+                ?>
+                <i class="fas fa-list me-1"></i> <?php echo count($requests); ?> request(s) - <?php echo $filterLabel; ?>
+            </span>
+        </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle" id="requestsTable">
                 <thead class="table-light">
@@ -178,18 +230,18 @@
                                     
                                     <?php if (isset($request['has_payment']) && $request['has_payment'] > 0): ?>
                                         <div class="mt-1 small text-success fw-bold">
-                                            <i class="fas fa-check-circle me-1"></i>Collected
+                                            <i class="fas fa-check-circle me-1"></i><?php echo $request['has_payment']; ?> payment(s)
                                         </div>
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-end">
                                     <div class="btn-group">
-                                        <?php if (!(isset($request['has_payment']) && $request['has_payment'] > 0) && $status !== 'paid'): ?>
+                                        <?php if ($status !== 'rejected'): ?>
                                             <button type="button" 
                                                     class="btn btn-success btn-sm px-3" 
                                                     data-bs-toggle="modal" 
                                                     data-bs-target="#paymentModal_<?php echo $request['id']; ?>">
-                                                <i class="fas fa-cash-register me-1"></i> Collect Payment
+                                                <i class="fas fa-cash-register me-1"></i> <?php echo (isset($request['has_payment']) && $request['has_payment'] > 0) ? 'Add Payment' : 'Collect Payment'; ?>
                                             </button>
                                         <?php endif; ?>
                                         <a href="<?php echo APP_URL; ?>/bus-season-requests/view?id=<?php echo $request['id']; ?>" class="btn btn-outline-secondary btn-sm">

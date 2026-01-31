@@ -111,3 +111,30 @@
 [31-Jan-2026 05:23:20 UTC] Database::connect - Connection successful to sisslgti
 [31-Jan-2026 05:23:21 UTC] Database::connect - Connection successful to sisslgti
 [31-Jan-2026 05:23:21 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:45:57 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:45:58 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:46:01 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:46:01 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:46:02 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:46:02 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:46:02 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:46:12 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:46:12 UTC] BusSeasonRequestModel::create - SQL: INSERT INTO `season_requests` 
+                    (`student_id`, `department_id`, `season_year`, `season_name`, 
+                     `route_from`, `route_to`, `change_point`, `distance_km`, `status`, `notes`) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+[31-Jan-2026 05:46:12 UTC] BusSeasonRequestModel::create - Data: {"student_id":"2022\/EET\/4EL02","department_id":"EET","season_year":"2026","season_name":"","route_from":"point pedro","route_to":"slgti","change_point":"","distance_km":0,"notes":"Created by SAO"}
+[31-Jan-2026 05:46:12 UTC] BusSeasonRequestModel::create - Success. Insert ID: 5
+[31-Jan-2026 05:46:12 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:59:25 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:59:39 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:59:42 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:59:47 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:59:50 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:59:53 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 05:59:56 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 06:00:00 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 06:00:05 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 06:00:08 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 06:00:23 UTC] Database::connect - Connection successful to sisslgti
+[31-Jan-2026 06:30:28 UTC] Database::connect - Connection successful to sisslgti
