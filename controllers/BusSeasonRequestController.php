@@ -530,7 +530,7 @@ class BusSeasonRequestController extends Controller {
         $this->requirePost();
         
         $requestId = (int)$this->post('request_id', 0);
-        $studentPayment = floatval($this->post('paid_amount', 0));
+        $studentPayment = floatval($this->post('student_payment_amount', $this->post('paid_amount', 0)));
         $paymentMethod = trim($this->post('payment_method', 'cash'));
         $paymentReference = trim($this->post('payment_reference', ''));
         $notes = trim($this->post('notes', ''));
