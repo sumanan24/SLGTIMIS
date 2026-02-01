@@ -513,6 +513,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+                            <div class="col-md-6">
+                                <label for="export_group_id" class="form-label small fw-bold">Group</label>
+                                <select class="form-select form-select-sm" id="export_group_id" name="group_id">
+                                    <option value="">All Groups</option>
+                                </select>
+                                <small class="text-muted">Select course & academic year first to load groups</small>
+                            </div>
                         </div>
                     </div>
                     
@@ -595,10 +602,12 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <script>
-// Handle department change in export modal - filter courses
+// Handle department change in export modal - filter courses, load groups
 document.addEventListener('DOMContentLoaded', function() {
     const exportDeptSelect = document.getElementById('export_department_id');
     const exportCourseSelect = document.getElementById('export_course_id');
+    const exportAcademicYearSelect = document.getElementById('export_academic_year');
+    const exportGroupSelect = document.getElementById('export_group_id');
     
     if (exportDeptSelect && exportCourseSelect) {
         exportDeptSelect.addEventListener('change', function() {
@@ -623,7 +632,37 @@ document.addEventListener('DOMContentLoaded', function() {
             if (exportCourseSelect.value && exportCourseSelect.options[exportCourseSelect.selectedIndex].style.display === 'none') {
                 exportCourseSelect.value = '';
             }
+            loadExportGroups();
         });
+    }
+    
+    function loadExportGroups() {
+        if (!exportCourseSelect || !exportAcademicYearSelect || !exportGroupSelect) return;
+        const courseId = exportCourseSelect.value;
+        const academicYear = exportAcademicYearSelect.value;
+        
+        exportGroupSelect.innerHTML = '<option value="">All Groups</option>';
+        if (!courseId || !academicYear) return;
+        
+        fetch('<?php echo APP_URL; ?>/attendance/get-groups-by-course-and-year?course_id=' + encodeURIComponent(courseId) + '&academic_year=' + encodeURIComponent(academicYear))
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.groups && data.groups.length) {
+                    data.groups.forEach(function(g) {
+                        const opt = document.createElement('option');
+                        opt.value = g.id;
+                        opt.textContent = g.name + (g.course_name ? ' - ' + g.course_name : '');
+                        exportGroupSelect.appendChild(opt);
+                    });
+                }
+            })
+            .catch(function() {});
+    }
+    
+    if (exportCourseSelect && exportAcademicYearSelect) {
+        exportCourseSelect.addEventListener('change', loadExportGroups);
+        exportAcademicYearSelect.addEventListener('change', loadExportGroups);
+        loadExportGroups();
     }
 });
 

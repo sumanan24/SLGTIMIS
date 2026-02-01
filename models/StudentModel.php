@@ -35,9 +35,14 @@ class StudentModel extends Model {
         $params = [];
         $types = '';
         
-        // Join with student_enroll if filtering by course or academic_year
-        if (!empty($filters['course_id']) || !empty($filters['academic_year'])) {
+        // Join with student_enroll if filtering by course, academic_year, or group
+        if (!empty($filters['course_id']) || !empty($filters['academic_year']) || !empty($filters['group_id'])) {
             $joins[] = "LEFT JOIN `student_enroll` se ON s.student_id = se.student_id";
+        }
+        
+        // Join with group_students when filtering by group
+        if (!empty($filters['group_id'])) {
+            $joins[] = "INNER JOIN `group_students` gs ON s.student_id = gs.student_id AND gs.status = 'active'";
         }
         
         // Join with course if filtering by course or department
@@ -116,6 +121,13 @@ class StudentModel extends Model {
             $types .= 's';
         }
         
+        // Group filter
+        if (!empty($filters['group_id'])) {
+            $conditions[] = "gs.group_id = ?";
+            $params[] = $filters['group_id'];
+            $types .= 'i';
+        }
+        
         if (!empty($conditions)) {
             $sql .= " WHERE " . implode(' AND ', $conditions);
         }
@@ -167,6 +179,10 @@ class StudentModel extends Model {
         
         if ($needsDeptJoin) {
             $joins[] = "LEFT JOIN `department` d ON c.department_id = d.department_id";
+        }
+        
+        if (!empty($filters['group_id'])) {
+            $joins[] = "INNER JOIN `group_students` gs ON s.student_id = gs.student_id AND gs.status = 'active'";
         }
         
         // Add joins to SQL
@@ -225,6 +241,13 @@ class StudentModel extends Model {
             $conditions[] = "se.academic_year = ?";
             $params[] = $filters['academic_year'];
             $types .= 's';
+        }
+        
+        // Group filter
+        if (!empty($filters['group_id'])) {
+            $conditions[] = "gs.group_id = ?";
+            $params[] = $filters['group_id'];
+            $types .= 'i';
         }
         
         // Add WHERE clause with all conditions

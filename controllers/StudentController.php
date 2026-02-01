@@ -66,7 +66,8 @@ class StudentController extends Controller {
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isSAO = $userModel->isSAO($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM');
-        $canExport = $isADM || $isSAO;
+        $isHOD = $this->isHOD();
+        $canExport = $isADM || $isSAO || $isHOD;
         $canEdit = $isADM || $isSAO; // Only SAO and ADM can add, edit, delete students
         
         $data = [
@@ -2725,15 +2726,16 @@ class StudentController extends Controller {
             return;
         }
         
-        // Check if user is ADM or SAO
+        // Check if user is ADM, SAO, or HOD
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isSAO = $userModel->isSAO($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM');
+        $isHOD = $this->isHOD();
         
-        if (!$isADM && !$isSAO) {
-            $_SESSION['error'] = 'Access denied. Only ADM and SAO users can export students.';
+        if (!$isADM && !$isSAO && !$isHOD) {
+            $_SESSION['error'] = 'Access denied. Only ADM, SAO, and HOD users can export students.';
             $this->redirect('students');
             return;
         }
@@ -2754,7 +2756,8 @@ class StudentController extends Controller {
             'gender' => $this->get('gender', $this->post('gender', '')),
             'department_id' => $hodDepartmentId ? $hodDepartmentId : $this->get('department_id', $this->post('department_id', '')),
             'course_id' => $this->get('course_id', $this->post('course_id', '')),
-            'academic_year' => $this->get('academic_year', $this->post('academic_year', ''))
+            'academic_year' => $this->get('academic_year', $this->post('academic_year', '')),
+            'group_id' => $this->get('group_id', $this->post('group_id', ''))
         ];
         
         // Get selected columns from POST
