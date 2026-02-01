@@ -154,6 +154,12 @@
                             </select>
                         </div>
                         <div class="col-md-6 col-lg-2">
+                            <label for="group_id" class="form-label fw-bold small">Group</label>
+                            <select class="form-select form-select-sm" id="group_id" name="group_id">
+                                <option value="">All Groups</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 col-lg-2">
                             <label for="district" class="form-label fw-bold small">District</label>
                             <select class="form-select form-select-sm" id="district" name="district">
                                 <option value="">All Districts</option>
@@ -362,9 +368,34 @@
 document.addEventListener('DOMContentLoaded', function() {
     const departmentSelect = document.getElementById('department_id');
     const courseSelect = document.getElementById('course_id');
+    const academicYearSelect = document.getElementById('academic_year');
+    const groupSelect = document.getElementById('group_id');
+    const selectedGroupId = '<?php echo htmlspecialchars($filters['group_id'] ?? ''); ?>';
     
     // Store all course options
     const allCourseOptions = Array.from(courseSelect.options).slice(1); // Exclude "All Courses"
+    
+    // Load groups by course and academic year
+    function loadFilterGroups() {
+        if (!groupSelect || !courseSelect || !academicYearSelect) return;
+        const courseId = courseSelect.value;
+        const academicYear = academicYearSelect.value;
+        groupSelect.innerHTML = '<option value="">All Groups</option>';
+        if (!courseId || !academicYear) return;
+        fetch('<?php echo APP_URL; ?>/attendance/get-groups-by-course-and-year?course_id=' + encodeURIComponent(courseId) + '&academic_year=' + encodeURIComponent(academicYear))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success && data.groups && data.groups.length) {
+                    data.groups.forEach(function(g) {
+                        const opt = document.createElement('option');
+                        opt.value = g.id;
+                        opt.textContent = g.name + (g.course_name ? ' - ' + g.course_name : '');
+                        if (selectedGroupId && g.id == selectedGroupId) opt.selected = true;
+                        groupSelect.appendChild(opt);
+                    });
+                }
+            });
+    }
     
     // Function to filter courses by department
     function filterCoursesByDepartment(departmentId) {
@@ -406,13 +437,21 @@ document.addEventListener('DOMContentLoaded', function() {
     departmentSelect.addEventListener('change', function() {
         const selectedDepartmentId = this.value;
         filterCoursesByDepartment(selectedDepartmentId);
+        loadFilterGroups();
     });
+    
+    // Handle course and academic year change - load groups
+    if (courseSelect && academicYearSelect) {
+        courseSelect.addEventListener('change', loadFilterGroups);
+        academicYearSelect.addEventListener('change', loadFilterGroups);
+    }
     
     // Initialize on page load if department is already selected
     const initialDept = departmentSelect.value;
     if (initialDept) {
         filterCoursesByDepartment(initialDept);
     }
+    loadFilterGroups();
 });
 </script>
 

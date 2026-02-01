@@ -36,7 +36,8 @@ class StudentController extends Controller {
             'gender' => $this->get('gender', ''),
             'department_id' => $userDepartmentId ? $userDepartmentId : $this->get('department_id', ''),
             'course_id' => $this->get('course_id', ''),
-            'academic_year' => $this->get('academic_year', '')
+            'academic_year' => $this->get('academic_year', ''),
+            'group_id' => $this->get('group_id', '')
         ];
         
         $students = $studentModel->getStudents($page, 20, $filters);
