@@ -126,172 +126,177 @@
                                 </div>
                                 
                                 <div class="row">
-                                    <div class="col-md-12">
-                                        <div class="row">
-                                            <div class="col-md-6 mb-3">
-                                                <label for="student_id" class="form-label fw-semibold">Student ID</label>
-                                                <input type="text" class="form-control" id="student_id" 
-                                                       value="<?php echo htmlspecialchars($student['student_id']); ?>" 
-                                                       disabled>
-                                                <div class="form-text">Student ID cannot be changed</div>
-                                            </div>
-                                            
-                                            <div class="col-md-3 mb-3">
-                                                <label for="student_title" class="form-label fw-semibold">Title</label>
-                                                <select class="form-select" id="student_title" name="student_title">
-                                                    <option value="">Select</option>
-                                                    <option value="Mr." <?php echo ($student['student_title'] ?? '') === 'Mr.' ? 'selected' : ''; ?>>Mr.</option>
-                                                    <option value="Mrs." <?php echo ($student['student_title'] ?? '') === 'Mrs.' ? 'selected' : ''; ?>>Mrs.</option>
-                                                    <option value="Miss" <?php echo ($student['student_title'] ?? '') === 'Miss' ? 'selected' : ''; ?>>Miss</option>
-                                                    <option value="Ms." <?php echo ($student['student_title'] ?? '') === 'Ms.' ? 'selected' : ''; ?>>Ms.</option>
-                                                </select>
-                                            </div>
-                                            
-                                            <div class="col-md-3 mb-3">
-                                                <label for="student_gender" class="form-label fw-semibold">Gender</label>
-                                                <select class="form-select" id="student_gender" name="student_gender">
-                                                    <option value="">Select</option>
-                                                    <option value="Male" <?php echo ($student['student_gender'] ?? '') === 'Male' ? 'selected' : ''; ?>>Male</option>
-                                                    <option value="Female" <?php echo ($student['student_gender'] ?? '') === 'Female' ? 'selected' : ''; ?>>Female</option>
-                                                </select>
-                                            </div>
-                                        </div>
+                                    <div class="col-12 col-md-6 mb-3">
+                                        <label for="student_id" class="form-label fw-semibold">Student ID</label>
+                                        <input type="text" class="form-control" id="student_id" 
+                                               value="<?php echo htmlspecialchars($student['student_id']); ?>" 
+                                               disabled>
+                                        <div class="form-text">Student ID cannot be changed</div>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-3 mb-3">
+                                        <label for="student_title" class="form-label fw-semibold">Title</label>
+                                        <select class="form-select" id="student_title" name="student_title">
+                                            <option value="">Select</option>
+                                            <option value="Mr." <?php echo ($student['student_title'] ?? '') === 'Mr.' ? 'selected' : ''; ?>>Mr.</option>
+                                            <option value="Mrs." <?php echo ($student['student_title'] ?? '') === 'Mrs.' ? 'selected' : ''; ?>>Mrs.</option>
+                                            <option value="Miss" <?php echo ($student['student_title'] ?? '') === 'Miss' ? 'selected' : ''; ?>>Miss</option>
+                                            <option value="Ms." <?php echo ($student['student_title'] ?? '') === 'Ms.' ? 'selected' : ''; ?>>Ms.</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-3 mb-3">
+                                        <label for="student_gender" class="form-label fw-semibold">Gender</label>
+                                        <select class="form-select" id="student_gender" name="student_gender">
+                                            <option value="">Select</option>
+                                            <option value="Male" <?php echo ($student['student_gender'] ?? '') === 'Male' ? 'selected' : ''; ?>>Male</option>
+                                            <option value="Female" <?php echo ($student['student_gender'] ?? '') === 'Female' ? 'selected' : ''; ?>>Female</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-12 col-md-6 mb-3">
+                                        <label for="student_fullname" class="form-label fw-semibold">
+                                            Full Name <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="student_fullname" name="student_fullname" 
+                                               value="<?php echo htmlspecialchars($student['student_fullname']); ?>" 
+                                               maxlength="255" required>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-6 mb-3">
+                                        <label for="student_ininame" class="form-label fw-semibold">Name with Initials</label>
+                                        <input type="text" class="form-control" id="student_ininame" name="student_ininame" 
+                                               value="<?php echo htmlspecialchars($student['student_ininame'] ?? ''); ?>" 
+                                               maxlength="255">
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-12 col-md-6 mb-3">
+                                        <label for="student_email" class="form-label fw-semibold">
+                                            Email <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="email" class="form-control" id="student_email" name="student_email" 
+                                               value="<?php echo htmlspecialchars($student['student_email']); ?>" 
+                                               maxlength="254" required>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-6 mb-3">
+                                        <label for="student_nic" class="form-label fw-semibold">
+                                            NIC <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="student_nic" name="student_nic" 
+                                               value="<?php echo htmlspecialchars($student['student_nic']); ?>" 
+                                               maxlength="12" required>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-12 col-md-4 mb-3">
+                                        <label for="student_dob" class="form-label fw-semibold">Date of Birth</label>
+                                        <input type="date" class="form-control" id="student_dob" name="student_dob" 
+                                               value="<?php echo htmlspecialchars($student['student_dob'] ?? ''); ?>">
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-4 mb-3">
+                                        <label for="student_phone" class="form-label fw-semibold">Phone</label>
+                                        <input type="tel" class="form-control" id="student_phone" name="student_phone" 
+                                               value="<?php echo htmlspecialchars($student['student_phone'] ?? ''); ?>"
+                                               pattern="[0-9]{9,10}">
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-4 mb-3">
+                                        <label for="student_civil" class="form-label fw-semibold">Civil Status</label>
+                                        <select class="form-select" id="student_civil" name="student_civil">
+                                            <option value="">Select</option>
+                                            <option value="Single" <?php echo ($student['student_civil'] ?? '') === 'Single' ? 'selected' : ''; ?>>Single</option>
+                                            <option value="Married" <?php echo ($student['student_civil'] ?? '') === 'Married' ? 'selected' : ''; ?>>Married</option>
+                                            <option value="Divorced" <?php echo ($student['student_civil'] ?? '') === 'Divorced' ? 'selected' : ''; ?>>Divorced</option>
+                                        </select>
+                                    </div>
+                                </div>
                                         
-                                        <div class="row">
-                                            <div class="col-md-6 mb-3">
-                                                <label for="student_fullname" class="form-label fw-semibold">
-                                                    Full Name <span class="text-danger">*</span>
-                                                </label>
-                                                <input type="text" class="form-control" id="student_fullname" name="student_fullname" 
-                                                       value="<?php echo htmlspecialchars($student['student_fullname']); ?>" 
-                                                       maxlength="255" required>
-                                            </div>
-                                            
-                                            <div class="col-md-6 mb-3">
-                                                <label for="student_ininame" class="form-label fw-semibold">Name with Initials</label>
-                                                <input type="text" class="form-control" id="student_ininame" name="student_ininame" 
-                                                       value="<?php echo htmlspecialchars($student['student_ininame'] ?? ''); ?>" 
-                                                       maxlength="255">
-                                            </div>
-                                        </div>
+                                <div class="mb-3">
+                                    <label for="student_address" class="form-label fw-semibold">Address</label>
+                                    <textarea class="form-control" id="student_address" name="student_address" rows="2" maxlength="255"><?php echo htmlspecialchars($student['student_address'] ?? ''); ?></textarea>
+                                </div>
                                         
-                                        <div class="row">
-                                            <div class="col-md-6 mb-3">
-                                                <label for="student_email" class="form-label fw-semibold">
-                                                    Email <span class="text-danger">*</span>
-                                                </label>
-                                                <input type="email" class="form-control" id="student_email" name="student_email" 
-                                                       value="<?php echo htmlspecialchars($student['student_email']); ?>" 
-                                                       maxlength="254" required>
-                                            </div>
-                                            
-                                            <div class="col-md-6 mb-3">
-                                                <label for="student_nic" class="form-label fw-semibold">
-                                                    NIC <span class="text-danger">*</span>
-                                                </label>
-                                                <input type="text" class="form-control" id="student_nic" name="student_nic" 
-                                                       value="<?php echo htmlspecialchars($student['student_nic']); ?>" 
-                                                       maxlength="12" required>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="row">
-                                            <div class="col-md-4 mb-3">
-                                                <label for="student_dob" class="form-label fw-semibold">Date of Birth</label>
-                                                <input type="date" class="form-control" id="student_dob" name="student_dob" 
-                                                       value="<?php echo htmlspecialchars($student['student_dob'] ?? ''); ?>">
-                                            </div>
-                                            
-                                            <div class="col-md-4 mb-3">
-                                                <label for="student_phone" class="form-label fw-semibold">Phone</label>
-                                                <input type="tel" class="form-control" id="student_phone" name="student_phone" 
-                                                       value="<?php echo htmlspecialchars($student['student_phone'] ?? ''); ?>"
-                                                       pattern="[0-9]{9,10}">
-                                            </div>
-                                            
-                                            <div class="col-md-4 mb-3">
-                                                <label for="student_civil" class="form-label fw-semibold">Civil Status</label>
-                                                <select class="form-select" id="student_civil" name="student_civil">
-                                                    <option value="Single" <?php echo ($student['student_civil'] ?? '') === 'Single' ? 'selected' : ''; ?>>Single</option>
-                                                    <option value="Married" <?php echo ($student['student_civil'] ?? '') === 'Married' ? 'selected' : ''; ?>>Married</option>
-                                                    <option value="Divorced" <?php echo ($student['student_civil'] ?? '') === 'Divorced' ? 'selected' : ''; ?>>Divorced</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <label for="student_address" class="form-label fw-semibold">Address</label>
-                                            <textarea class="form-control" id="student_address" name="student_address" rows="2" maxlength="255"><?php echo htmlspecialchars($student['student_address'] ?? ''); ?></textarea>
-                                        </div>
-                                        
-                                        <div class="row">
-                                            <div class="col-md-3 mb-3">
-                                                <label for="student_zip" class="form-label fw-semibold">ZIP Code</label>
-                                                <input type="number" class="form-control" id="student_zip" name="student_zip" 
-                                                       value="<?php echo htmlspecialchars($student['student_zip'] ?? ''); ?>" required>
-                                            </div>
-                                            
-                                            <div class="col-md-3 mb-3">
-                                                <label for="student_provice" class="form-label fw-semibold">Province <span class="text-danger">*</span></label>
-                                                <select class="form-select" id="student_provice" name="student_provice" required>
-                                                    <option value="">Select Province</option>
-                                                    <option value="Western Province" <?php echo ($student['student_provice'] ?? '') === 'Western Province' ? 'selected' : ''; ?>>Western Province</option>
-                                                    <option value="Central Province" <?php echo ($student['student_provice'] ?? '') === 'Central Province' ? 'selected' : ''; ?>>Central Province</option>
-                                                    <option value="Southern Province" <?php echo ($student['student_provice'] ?? '') === 'Southern Province' ? 'selected' : ''; ?>>Southern Province</option>
-                                                    <option value="Northern Province" <?php echo ($student['student_provice'] ?? '') === 'Northern Province' ? 'selected' : ''; ?>>Northern Province</option>
-                                                    <option value="Eastern Province" <?php echo ($student['student_provice'] ?? '') === 'Eastern Province' ? 'selected' : ''; ?>>Eastern Province</option>
-                                                    <option value="North Western Province" <?php echo ($student['student_provice'] ?? '') === 'North Western Province' ? 'selected' : ''; ?>>North Western Province</option>
-                                                    <option value="North Central Province" <?php echo ($student['student_provice'] ?? '') === 'North Central Province' ? 'selected' : ''; ?>>North Central Province</option>
-                                                    <option value="Uva Province" <?php echo ($student['student_provice'] ?? '') === 'Uva Province' ? 'selected' : ''; ?>>Uva Province</option>
-                                                    <option value="Sabaragamuwa Province" <?php echo ($student['student_provice'] ?? '') === 'Sabaragamuwa Province' ? 'selected' : ''; ?>>Sabaragamuwa Province</option>
-                                                </select>
-                                            </div>
-                                            
-                                            <div class="col-md-3 mb-3">
-                                                <label for="student_district" class="form-label fw-semibold">District <span class="text-danger">*</span></label>
-                                                <select class="form-select" id="student_district" name="student_district" required>
-                                                    <option value="">Select District</option>
-                                                </select>
-                                            </div>
-                                            
-                                            <div class="col-md-3 mb-3">
-                                                <label for="student_divisions" class="form-label fw-semibold">Divisions</label>
-                                                <input type="text" class="form-control" id="student_divisions" name="student_divisions" 
-                                                       value="<?php echo htmlspecialchars($student['student_divisions'] ?? ''); ?>" 
-                                                       maxlength="50" required>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="row">
-                                            <div class="col-md-4 mb-3">
-                                                <label for="student_blood" class="form-label fw-semibold">Blood Group</label>
-                                                <select class="form-select" id="student_blood" name="student_blood">
-                                                    <option value="">Select</option>
-                                                    <option value="A+" <?php echo ($student['student_blood'] ?? '') === 'A+' ? 'selected' : ''; ?>>A+</option>
-                                                    <option value="A-" <?php echo ($student['student_blood'] ?? '') === 'A-' ? 'selected' : ''; ?>>A-</option>
-                                                    <option value="B+" <?php echo ($student['student_blood'] ?? '') === 'B+' ? 'selected' : ''; ?>>B+</option>
-                                                    <option value="B-" <?php echo ($student['student_blood'] ?? '') === 'B-' ? 'selected' : ''; ?>>B-</option>
-                                                    <option value="AB+" <?php echo ($student['student_blood'] ?? '') === 'AB+' ? 'selected' : ''; ?>>AB+</option>
-                                                    <option value="AB-" <?php echo ($student['student_blood'] ?? '') === 'AB-' ? 'selected' : ''; ?>>AB-</option>
-                                                    <option value="O+" <?php echo ($student['student_blood'] ?? '') === 'O+' ? 'selected' : ''; ?>>O+</option>
-                                                    <option value="O-" <?php echo ($student['student_blood'] ?? '') === 'O-' ? 'selected' : ''; ?>>O-</option>
-                                                </select>
-                                            </div>
-                                            
-                                            <div class="col-md-4 mb-3">
-                                                <label for="student_nationality" class="form-label fw-semibold">Nationality</label>
-                                                <input type="text" class="form-control" id="student_nationality" name="student_nationality" 
-                                                       value="<?php echo htmlspecialchars($student['student_nationality'] ?? ''); ?>" 
-                                                       maxlength="50">
-                                            </div>
-                                            
-                                            <div class="col-md-4 mb-3">
-                                                <label for="student_religion" class="form-label fw-semibold">Religion</label>
-                                                <input type="text" class="form-control" id="student_religion" name="student_religion" 
-                                                       value="<?php echo htmlspecialchars($student['student_religion'] ?? ''); ?>" 
-                                                       maxlength="20">
-                                            </div>
-                                        </div>
+                                <div class="row">
+                                    <div class="col-12 col-md-3 mb-3">
+                                        <label for="student_zip" class="form-label fw-semibold">ZIP Code</label>
+                                        <input type="number" class="form-control" id="student_zip" name="student_zip" 
+                                               value="<?php echo htmlspecialchars($student['student_zip'] ?? ''); ?>">
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-3 mb-3">
+                                        <label for="student_provice" class="form-label fw-semibold">Province <span class="text-danger">*</span></label>
+                                        <select class="form-select" id="student_provice" name="student_provice" required>
+                                            <option value="">Select Province</option>
+                                            <option value="Western Province" <?php echo ($student['student_provice'] ?? '') === 'Western Province' ? 'selected' : ''; ?>>Western Province</option>
+                                            <option value="Central Province" <?php echo ($student['student_provice'] ?? '') === 'Central Province' ? 'selected' : ''; ?>>Central Province</option>
+                                            <option value="Southern Province" <?php echo ($student['student_provice'] ?? '') === 'Southern Province' ? 'selected' : ''; ?>>Southern Province</option>
+                                            <option value="Northern Province" <?php echo ($student['student_provice'] ?? '') === 'Northern Province' ? 'selected' : ''; ?>>Northern Province</option>
+                                            <option value="Eastern Province" <?php echo ($student['student_provice'] ?? '') === 'Eastern Province' ? 'selected' : ''; ?>>Eastern Province</option>
+                                            <option value="North Western Province" <?php echo ($student['student_provice'] ?? '') === 'North Western Province' ? 'selected' : ''; ?>>North Western Province</option>
+                                            <option value="North Central Province" <?php echo ($student['student_provice'] ?? '') === 'North Central Province' ? 'selected' : ''; ?>>North Central Province</option>
+                                            <option value="Uva Province" <?php echo ($student['student_provice'] ?? '') === 'Uva Province' ? 'selected' : ''; ?>>Uva Province</option>
+                                            <option value="Sabaragamuwa Province" <?php echo ($student['student_provice'] ?? '') === 'Sabaragamuwa Province' ? 'selected' : ''; ?>>Sabaragamuwa Province</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-3 mb-3">
+                                        <label for="student_district" class="form-label fw-semibold">District <span class="text-danger">*</span></label>
+                                        <select class="form-select" id="student_district" name="student_district" required>
+                                            <option value="">Select District</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-3 mb-3">
+                                        <label for="student_divisions" class="form-label fw-semibold">Divisions</label>
+                                        <input type="text" class="form-control" id="student_divisions" name="student_divisions" 
+                                               value="<?php echo htmlspecialchars($student['student_divisions'] ?? ''); ?>" 
+                                               maxlength="50">
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-12 col-md-4 mb-3">
+                                        <label for="student_blood" class="form-label fw-semibold">Blood Group</label>
+                                        <select class="form-select" id="student_blood" name="student_blood">
+                                            <option value="">Select</option>
+                                            <option value="A+" <?php echo ($student['student_blood'] ?? '') === 'A+' ? 'selected' : ''; ?>>A+</option>
+                                            <option value="A-" <?php echo ($student['student_blood'] ?? '') === 'A-' ? 'selected' : ''; ?>>A-</option>
+                                            <option value="B+" <?php echo ($student['student_blood'] ?? '') === 'B+' ? 'selected' : ''; ?>>B+</option>
+                                            <option value="B-" <?php echo ($student['student_blood'] ?? '') === 'B-' ? 'selected' : ''; ?>>B-</option>
+                                            <option value="AB+" <?php echo ($student['student_blood'] ?? '') === 'AB+' ? 'selected' : ''; ?>>AB+</option>
+                                            <option value="AB-" <?php echo ($student['student_blood'] ?? '') === 'AB-' ? 'selected' : ''; ?>>AB-</option>
+                                            <option value="O+" <?php echo ($student['student_blood'] ?? '') === 'O+' ? 'selected' : ''; ?>>O+</option>
+                                            <option value="O-" <?php echo ($student['student_blood'] ?? '') === 'O-' ? 'selected' : ''; ?>>O-</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-4 mb-3">
+                                        <label for="student_nationality" class="form-label fw-semibold">Language</label>
+                                        <select class="form-select" id="student_nationality" name="student_nationality">
+                                            <option value="">Select Language</option>
+                                            <option value="Sinhala" <?php echo ($student['student_nationality'] ?? '') === 'Sinhala' ? 'selected' : ''; ?>>Sinhala</option>
+                                            <option value="Tamil" <?php echo ($student['student_nationality'] ?? '') === 'Tamil' ? 'selected' : ''; ?>>Tamil</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-4 mb-3">
+                                        <label for="student_religion" class="form-label fw-semibold">Religion</label>
+                                        <select class="form-select" id="student_religion" name="student_religion">
+                                            <option value="">Select Religion</option>
+                                            <option value="Buddhism" <?php echo (isset($student['student_religion']) && $student['student_religion'] === 'Buddhism') ? 'selected' : ''; ?>>Buddhism</option>
+                                            <option value="Hinduism" <?php echo (isset($student['student_religion']) && $student['student_religion'] === 'Hinduism') ? 'selected' : ''; ?>>Hinduism</option>
+                                            <option value="Christianity" <?php echo (isset($student['student_religion']) && $student['student_religion'] === 'Christianity') ? 'selected' : ''; ?>>Christianity</option>
+                                            <option value="Islam" <?php echo (isset($student['student_religion']) && $student['student_religion'] === 'Islam') ? 'selected' : ''; ?>>Islam</option>
+                                        </select>
+                                    </div>
+                                </div>
                                         
                                         <div class="row">
                                             <div class="col-md-6 mb-3">
@@ -739,18 +744,48 @@ const sriLankaDistricts = {
 // Function to load districts based on selected province
 function loadDistricts(province, selectedDistrict = '') {
     const districtSelect = document.getElementById('student_district');
+    if (!districtSelect) {
+        console.error('District select element not found!');
+        return;
+    }
+    
     districtSelect.innerHTML = '<option value="">Select District</option>';
     
     if (province && sriLankaDistricts[province]) {
+        console.log('Loading districts for province:', province, 'Selected district:', selectedDistrict);
+        const normalizedSelectedDistrict = selectedDistrict ? selectedDistrict.trim() : '';
+        
         sriLankaDistricts[province].forEach(function(district) {
             const option = document.createElement('option');
             option.value = district;
             option.textContent = district;
-            if (district === selectedDistrict) {
+            // Case-insensitive comparison for district matching
+            if (normalizedSelectedDistrict && district.toLowerCase() === normalizedSelectedDistrict.toLowerCase()) {
                 option.selected = true;
+                console.log('Selected district matched:', district);
             }
             districtSelect.appendChild(option);
         });
+        
+        // If selected district wasn't found in the list, add it as an option
+        if (normalizedSelectedDistrict && !sriLankaDistricts[province].some(d => d.toLowerCase() === normalizedSelectedDistrict.toLowerCase())) {
+            const option = document.createElement('option');
+            option.value = normalizedSelectedDistrict;
+            option.textContent = normalizedSelectedDistrict;
+            option.selected = true;
+            districtSelect.appendChild(option);
+            console.log('Added custom district:', normalizedSelectedDistrict);
+        }
+    } else {
+        console.warn('No districts found for province:', province);
+        // If province is selected but not in our list, still try to preserve the district value
+        if (selectedDistrict && selectedDistrict.trim()) {
+            const option = document.createElement('option');
+            option.value = selectedDistrict.trim();
+            option.textContent = selectedDistrict.trim();
+            option.selected = true;
+            districtSelect.appendChild(option);
+        }
     }
 }
 
@@ -772,16 +807,37 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentProvince = provinceSelect ? provinceSelect.value : '';
     const currentDistrict = '<?php echo htmlspecialchars($student['student_district'] ?? ''); ?>';
     
+    console.log('Initializing province/district:', { currentProvince, currentDistrict });
+    
+    // Load districts immediately if province is selected
     if (provinceSelect && currentProvince) {
+        console.log('Loading districts for province:', currentProvince);
         loadDistricts(currentProvince, currentDistrict);
+    } else if (provinceSelect) {
+        // Even if no province selected, ensure district dropdown has placeholder
+        if (districtSelect) {
+            districtSelect.innerHTML = '<option value="">Select District</option>';
+        }
     }
     
     // Handle province change
     if (provinceSelect) {
         provinceSelect.addEventListener('change', function() {
+            console.log('Province changed to:', this.value);
             loadDistricts(this.value);
         });
     }
+    
+    // Also trigger on page load to ensure districts are loaded
+    // Use setTimeout to ensure DOM is fully ready
+    setTimeout(function() {
+        if (provinceSelect && provinceSelect.value) {
+            const province = provinceSelect.value;
+            const district = currentDistrict;
+            console.log('Delayed load districts:', { province, district });
+            loadDistricts(province, district);
+        }
+    }, 100);
     
     // Enrollment tab: Auto-suggest next registration number when course/year selected
     const editCourseSelect = document.getElementById('course_id');

@@ -35,8 +35,8 @@ class StudentModel extends Model {
         $params = [];
         $types = '';
         
-        // Join with student_enroll if filtering by course, academic_year, or group
-        if (!empty($filters['course_id']) || !empty($filters['academic_year']) || !empty($filters['group_id'])) {
+        // Join with student_enroll if filtering by course, academic_year, course_mode, or group
+        if (!empty($filters['course_id']) || !empty($filters['academic_year']) || !empty($filters['course_mode']) || !empty($filters['group_id'])) {
             $joins[] = "LEFT JOIN `student_enroll` se ON s.student_id = se.student_id";
         }
         
@@ -121,6 +121,22 @@ class StudentModel extends Model {
             $types .= 's';
         }
         
+        // Course mode filter
+        if (!empty($filters['course_mode'])) {
+            // Normalize course_mode: 'Full Time' -> 'Full', 'Part Time' -> 'Part'
+            $courseMode = $filters['course_mode'];
+            $courseModeUpper = strtoupper(trim($courseMode));
+            if ($courseModeUpper === 'FULL TIME' || $courseModeUpper === 'FULL') {
+                $courseMode = 'Full';
+            } elseif ($courseModeUpper === 'PART TIME' || $courseModeUpper === 'PART') {
+                $courseMode = 'Part';
+            }
+            // Use case-insensitive comparison for course_mode
+            $conditions[] = "LOWER(TRIM(se.`course_mode`)) = LOWER(TRIM(?))";
+            $params[] = $courseMode;
+            $types .= 's';
+        }
+        
         // Group filter
         if (!empty($filters['group_id'])) {
             $conditions[] = "gs.group_id = ?";
@@ -155,7 +171,8 @@ class StudentModel extends Model {
     }
     
     /**
-     * Get total count of students with filters (only active students with status 'Following')
+     * Get total count of students with filters
+     * Counts students where student_status = 'Active' AND student_enroll_status = 'Following'
      */
     public function getTotalStudents($filters = []) {
         $sql = "SELECT COUNT(DISTINCT s.student_id) as total FROM `{$this->table}` s";
@@ -164,9 +181,10 @@ class StudentModel extends Model {
         $params = [];
         $types = '';
         
-        // Always join with student_enroll to filter by active status (Following)
+        // Always join with student_enroll to filter by enrollment status
         $joins[] = "INNER JOIN `student_enroll` se ON s.student_id = se.student_id";
-        // Always filter by active enrollment status
+        // Filter by: student_status = 'Active' AND student_enroll_status = 'Following'
+        $conditions[] = "s.student_status = 'Active'";
         $conditions[] = "se.student_enroll_status = 'Following'";
         
         // Join with course if filtering by course or department
@@ -243,6 +261,26 @@ class StudentModel extends Model {
             $types .= 's';
         }
         
+        // Course mode filter
+        if (!empty($filters['course_mode'])) {
+            // Normalize course_mode: 'Full Time' -> 'Full', 'Part Time' -> 'Part'
+            // Also handle if already 'Full' or 'Part'
+            $courseMode = trim($filters['course_mode']);
+            $courseModeUpper = strtoupper($courseMode);
+            if ($courseModeUpper === 'FULL TIME' || $courseModeUpper === 'FULL') {
+                $courseMode = 'Full';
+            } elseif ($courseModeUpper === 'PART TIME' || $courseModeUpper === 'PART') {
+                $courseMode = 'Part';
+            }
+            // Ensure we have a valid course_mode value
+            if (in_array($courseMode, ['Full', 'Part'])) {
+                // Use case-insensitive comparison for course_mode with backticks
+                $conditions[] = "LOWER(TRIM(se.`course_mode`)) = LOWER(TRIM(?))";
+                $params[] = $courseMode;
+                $types .= 's';
+            }
+        }
+        
         // Group filter
         if (!empty($filters['group_id'])) {
             $conditions[] = "gs.group_id = ?";
@@ -303,15 +341,16 @@ class StudentModel extends Model {
     }
     
     /**
-     * Get recent students without duplicates (only active students with status 'Following')
+     * Get recent students without duplicates (only active students with status 'Active' AND enrollment 'Following')
      * Ensures each student_id appears only once
      */
     public function getRecentStudents($limit = 5) {
-        // Get only active students (status 'Following')
+        // Get only active students (status 'Active' AND enrollment 'Following')
         $sql = "SELECT DISTINCT s.`student_id`, s.`student_fullname`, s.`student_email`, s.`student_status` 
                 FROM `{$this->table}` s
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
-                WHERE se.student_enroll_status = 'Following'
+                WHERE s.student_status = 'Active'
+                AND se.student_enroll_status = 'Following'
                 GROUP BY s.`student_id`
                 ORDER BY s.`student_id` ASC 
                 LIMIT " . (int)$limit;
@@ -336,9 +375,62 @@ class StudentModel extends Model {
     
     /**
      * Create new student
+     * Override to handle NULL values properly (especially student_email)
+     * Generate a default email if student_email is NULL to avoid trigger errors
      */
     public function createStudent($data) {
-        return $this->create($data);
+        // Generate a default email if student_email is NULL or empty
+        // This is needed because database triggers may create user accounts that require email
+        if (empty($data['student_email']) && !empty($data['student_id'])) {
+            // Generate email: student_id@slgtimis.local (or use student_id as email)
+            $data['student_email'] = $data['student_id'] . '@slgtimis.local';
+        }
+        
+        // Separate NULL values from regular values
+        $columns = [];
+        $placeholders = [];
+        $types = '';
+        $values = [];
+        
+        foreach ($data as $column => $value) {
+            $columns[] = "`$column`";
+            if ($value === null) {
+                $placeholders[] = 'NULL';
+                // Don't add to values array for NULL
+            } else {
+                $placeholders[] = '?';
+                $types .= 's';
+                $values[] = $value;
+            }
+        }
+        
+        $columnsStr = implode(', ', $columns);
+        $placeholdersStr = implode(', ', $placeholders);
+        
+        $sql = "INSERT INTO `{$this->table}` ($columnsStr) VALUES ($placeholdersStr)";
+        $stmt = $this->db->prepare($sql);
+        
+        if (!$stmt) {
+            error_log("SQL Error in createStudent: " . $this->db->error . " | SQL: " . $sql);
+            return false;
+        }
+        
+        if (!empty($values)) {
+            $stmt->bind_param($types, ...$values);
+        }
+        
+        if ($stmt->execute()) {
+            // For string primary keys (student_id), return the student_id instead of lastInsertId()
+            // lastInsertId() works for auto-increment integer keys, not string keys
+            if (isset($data['student_id'])) {
+                return $data['student_id'];
+            }
+            // Fallback to lastInsertId() for integer keys
+            return $this->db->lastInsertId();
+        } else {
+            error_log("SQL Execute Error in createStudent: " . $stmt->error . " | SQL: " . $sql);
+            return false;
+        }
     }
     
     /**
@@ -470,59 +562,276 @@ class StudentModel extends Model {
     }
     
     /**
-     * Get last registration number for a course and academic year
+     * Get last registration number for a course, academic year, and course mode
+     * Note: Database stores course_mode as enum('Part','Full'), so we normalize the input
      */
-    public function getLastRegistrationNumber($courseId, $academicYear) {
-        $sql = "SELECT s.student_id 
+    public function getLastRegistrationNumber($courseId, $academicYear, $courseMode = null) {
+        $sql = "SELECT s.`student_id` 
                 FROM `{$this->table}` s
-                INNER JOIN `student_enroll` se ON s.student_id = se.student_id
-                WHERE se.course_id = ? AND se.academic_year = ?
-                ORDER BY s.student_id DESC
-                LIMIT 1";
+                INNER JOIN `student_enroll` se ON s.`student_id` = se.`student_id`
+                WHERE se.`course_id` = ? AND se.`academic_year` = ?";
+        
+        $params = [$courseId, $academicYear];
+        $types = "ss";
+        
+        // Filter by course mode if provided
+        // Normalize course_mode to match database enum: 'Full Time' -> 'Full', 'Part Time' -> 'Part'
+        if (!empty($courseMode)) {
+            $normalizedCourseMode = $courseMode;
+            // Handle various input formats (case-insensitive)
+            $courseModeUpper = strtoupper(trim($courseMode));
+            if ($courseModeUpper === 'FULL TIME' || $courseModeUpper === 'FULL') {
+                $normalizedCourseMode = 'Full';
+            } elseif ($courseModeUpper === 'PART TIME' || $courseModeUpper === 'PART') {
+                $normalizedCourseMode = 'Part';
+            }
+            // Use case-insensitive comparison for course_mode with proper backticks
+            $sql .= " AND LOWER(TRIM(se.`course_mode`)) = LOWER(TRIM(?))";
+            $params[] = $normalizedCourseMode;
+            $types .= "s";
+        }
+        
+        // Order by student_id DESC to get the latest/highest student ID, limit 1
+        $sql .= " ORDER BY s.`student_id` DESC LIMIT 1";
         
         $stmt = $this->db->prepare($sql);
-        $stmt->bind_param("ss", $courseId, $academicYear);
+        if (!$stmt) {
+            error_log("SQL Error in getLastRegistrationNumber: " . $this->db->error);
+            return null;
+        }
+        
+        $stmt->bind_param($types, ...$params);
         $stmt->execute();
         $result = $stmt->get_result();
         
         if ($result && $result->num_rows > 0) {
             $row = $result->fetch_assoc();
-            return $row['student_id'];
+            $lastStudentId = $row['student_id'];
+            error_log("Last Student ID found: " . $lastStudentId . " for course: " . $courseId . ", year: " . $academicYear . ", mode: " . $courseMode);
+            return $lastStudentId;
         }
         
+        error_log("No last Student ID found for course: " . $courseId . ", year: " . $academicYear . ", mode: " . $courseMode);
         return null;
     }
     
     /**
-     * Generate next registration number
+     * Get next available registration number that doesn't exist yet
+     * This method finds the last ID, increments it, and keeps checking until it finds an available ID
      */
-    public function generateNextRegistrationNumber($courseId, $academicYear) {
-        $lastRegNumber = $this->getLastRegistrationNumber($courseId, $academicYear);
+    public function getNextAvailableRegistrationNumber($courseId, $academicYear, $courseMode = null) {
+        $lastRegNumber = $this->getLastRegistrationNumber($courseId, $academicYear, $courseMode);
+        
+        // If no last registration number found, return null (will need to generate from scratch)
+        if (!$lastRegNumber) {
+            return null;
+        }
+        
+        // Extract last 3 digits from the student ID
+        $match = preg_match('/(\d{3})$/', $lastRegNumber, $matches);
+        if (!$match) {
+            // If no 3 digits found, return the last ID as is (let frontend handle it)
+            return $lastRegNumber;
+        }
+        
+        $lastNumber = intval($matches[1]);
+        $baseId = preg_replace('/\d{3}$/', '', $lastRegNumber);
+        
+        // Try up to 1000 iterations to find an available ID
+        $maxAttempts = 1000;
+        $attempt = 0;
+        
+        while ($attempt < $maxAttempts) {
+            $nextNumber = $lastNumber + 1 + $attempt;
+            $nextNumberStr = str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+            $nextId = $baseId . $nextNumberStr;
+            
+            // Check if this ID already exists
+            if (!$this->exists($nextId)) {
+                error_log("Next available Student ID: " . $nextId . " for course: " . $courseId . ", year: " . $academicYear . ", mode: " . $courseMode);
+                return $nextId;
+            }
+            
+            $attempt++;
+        }
+        
+        // If we couldn't find an available ID after many attempts, return the incremented last ID
+        // (This shouldn't happen in normal circumstances)
+        $nextNumber = $lastNumber + 1;
+        $nextNumberStr = str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+        $nextId = $baseId . $nextNumberStr;
+        error_log("Warning: Could not find available ID after " . $maxAttempts . " attempts. Returning: " . $nextId);
+        return $nextId;
+    }
+    
+    /**
+     * Generate next registration number based on course, academic year, and course mode
+     * Format: 
+     * - Full Time: YYYY/DEPARTMENT_CODE/COURSE_CODE_NNN (e.g., 2025/COT/5CT001)
+     * - Part Time: YYYY/DEPARTMENT_CODE/COURSE_CODE/PT_NNN (e.g., 2025/COT/5CT/PT001)
+     */
+    public function generateNextRegistrationNumber($courseId, $academicYear, $courseMode = 'Full Time') {
+        $lastRegNumber = $this->getLastRegistrationNumber($courseId, $academicYear, $courseMode);
+        
+        // Check if Part Time (only PT students have mode in ID)
+        $isPartTime = ($courseMode === 'Part Time');
+        
+        // Get course code and department code from course table
+        $sql = "SELECT c.`course_code`, c.`course_id`, c.`department_id`, d.`department_id` as dept_code
+                FROM `course` c
+                LEFT JOIN `department` d ON c.department_id = d.department_id
+                WHERE c.`course_id` = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param("s", $courseId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $course = $result->fetch_assoc();
+        
+        if (!$course) {
+            // Fallback if course not found
+            $courseCode = strtoupper(substr($courseId, 0, 3));
+            $departmentCode = 'GEN';
+        } else {
+            $courseCode = !empty($course['course_code']) ? $course['course_code'] : strtoupper(substr($courseId, 0, 3));
+            $departmentCode = !empty($course['department_id']) ? $course['department_id'] : 'GEN';
+        }
+        
+        $year = explode('/', $academicYear)[0] ?: date('Y');
         
         if (!$lastRegNumber) {
             // No previous registration number, generate first one
-            // Get course code from course table
-            $sql = "SELECT `course_code`, `course_id` FROM `course` WHERE `course_id` = ?";
-            $stmt = $this->db->prepare($sql);
-            $stmt->bind_param("s", $courseId);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $course = $result->fetch_assoc();
-            
-            $courseCode = !empty($course['course_code']) ? $course['course_code'] : strtoupper(substr($courseId, 0, 3));
-            $year = explode('/', $academicYear)[0] ?: date('Y');
-            return $year . '_' . strtoupper($courseCode) . '_001';
+            if ($isPartTime) {
+                // Part Time: YYYY/DEPARTMENT_CODE/COURSE_CODE/PT001
+                return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . '/PT001';
+            } else {
+                // Full Time: YYYY/DEPARTMENT_CODE/COURSE_CODE001
+                return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . '001';
+            }
         }
         
         // Parse the last registration number and increment
-        // Format: YYYY_COURSECODE_NNN or similar
-        $parts = explode('_', $lastRegNumber);
+        // Handle multiple formats for backward compatibility:
+        // - New format Part Time: YYYY/DEPARTMENT_CODE/COURSE_CODE/PT_NNN (e.g., 2025/COT/5CT/PT001)
+        // - New format Full Time: YYYY/DEPARTMENT_CODE/COURSE_CODE_NNN (e.g., 2025/COT/5CT001)
+        // - Old format: YYYY/COURSECODE/NNN (e.g., 2024/ABC/001)
+        // - Old format: YYYY_COURSECODE_NNN (e.g., 2024_ABC_001)
+        // - Old format with mode: YYYY_COURSECODE_MODE_NNN (e.g., 2024_ABC_FT_001)
+        
+        $parts = [];
+        if (strpos($lastRegNumber, '/') !== false) {
+            $parts = explode('/', $lastRegNumber);
+        } else {
+            $parts = explode('_', $lastRegNumber);
+        }
+        
+        // First, detect the format of the last registration number
+        // Check if format is new format Part Time (4 parts: YYYY/DEPARTMENT_CODE/COURSE_CODE/PT_NNN)
+        if (count($parts) >= 4) {
+            $year = $parts[0];
+            $deptCode = $parts[1];
+            $lastCourseCode = $parts[2];
+            
+            // Check if last part contains PT and number (e.g., PT001)
+            $lastPart = $parts[3];
+            preg_match('/^PT(\d+)$/i', $lastPart, $ptMatches);
+            
+            if (!empty($ptMatches)) {
+                // Format: YYYY/DEPARTMENT_CODE/COURSE_CODE/PT_NNN
+                $number = intval($ptMatches[1]);
+                $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
+                
+                if ($isPartTime) {
+                    // Generating Part Time, increment PT number
+                    return $year . '/' . $deptCode . '/' . strtoupper($courseCode) . '/PT' . $nextNumber;
+                } else {
+                    // Generating Full Time, start new sequence
+                    return $year . '/' . $deptCode . '/' . strtoupper($courseCode) . '001';
+                }
+            }
+        }
+        
+        // Check if format is new format Full Time (3 parts: YYYY/DEPARTMENT_CODE/COURSE_CODE_NNN)
+        // Last part should contain course code and number together (e.g., 5CT001)
         if (count($parts) >= 3) {
             $year = $parts[0];
-            $courseCode = $parts[1];
-            $number = intval($parts[2]);
-            $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
-            return $year . '_' . $courseCode . '_' . $nextNumber;
+            $deptCode = $parts[1];
+            $lastPart = $parts[2];
+            
+            // Check if last part contains both course code and number (e.g., 5CT001)
+            preg_match('/^([A-Za-z]+)(\d+)$/', $lastPart, $matches);
+            
+            if (!empty($matches)) {
+                // Format: YYYY/DEPARTMENT_CODE/COURSE_CODE_NNN
+                $lastCourseCode = $matches[1];
+                $number = intval($matches[2]);
+                $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
+                
+                if (!$isPartTime) {
+                    // Generating Full Time, increment number
+                    return $year . '/' . $deptCode . '/' . strtoupper($courseCode) . $nextNumber;
+                } else {
+                    // Generating Part Time, start new PT sequence
+                    return $year . '/' . $deptCode . '/' . strtoupper($courseCode) . '/PT001';
+                }
+            }
+        }
+        
+        // Check if format is old format with mode in underscores (4 parts: YYYY_COURSECODE_MODE_NNN)
+        if (count($parts) >= 4) {
+            $year = $parts[0];
+            $oldCourseCode = $parts[1];
+            $oldMode = strtoupper($parts[2]);
+            $number = intval($parts[3]);
+            
+            // Convert old format to new format
+            if ($isPartTime && ($oldMode === 'PT' || $oldMode === 'PART')) {
+                // Part Time: convert to YYYY/DEPARTMENT_CODE/COURSE_CODE/PT_NNN
+                $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
+                return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . '/PT' . $nextNumber;
+            } elseif (!$isPartTime && ($oldMode === 'FT' || $oldMode === 'FULL' || empty($oldMode))) {
+                // Full Time: convert to YYYY/DEPARTMENT_CODE/COURSE_CODE_NNN
+                $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
+                return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . $nextNumber;
+            } else {
+                // Different mode, start from 001
+                if ($isPartTime) {
+                    return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . '/PT001';
+                } else {
+                    return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . '001';
+                }
+            }
+        }
+        
+        // Check if format is old format without mode (3 parts: YYYY/COURSECODE/NNN or YYYY_COURSECODE_NNN)
+        if (count($parts) >= 3) {
+            $year = $parts[0];
+            $deptOrCourseCode = $parts[1];
+            $lastPart = $parts[2];
+            
+            // Check if last part is just a number
+            if (is_numeric($lastPart)) {
+                $number = intval($lastPart);
+                $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
+                
+                if ($isPartTime) {
+                    return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . '/PT' . $nextNumber;
+                } else {
+                    return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . $nextNumber;
+                }
+            }
+            
+            // Check if last part contains course code and number (e.g., 5CT006)
+            preg_match('/^([A-Za-z]+)(\d+)$/', $lastPart, $matches);
+            if (!empty($matches)) {
+                $number = intval($matches[2]);
+                $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
+                
+                if ($isPartTime) {
+                    return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . '/PT' . $nextNumber;
+                } else {
+                    return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . $nextNumber;
+                }
+            }
         }
         
         // If format doesn't match, try to extract number from end
@@ -530,11 +839,32 @@ class StudentModel extends Model {
         if (!empty($matches[1])) {
             $number = intval($matches[1]);
             $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
-            return substr($lastRegNumber, 0, -strlen($matches[1])) . $nextNumber;
+            // Extract prefix and normalize
+            $prefix = substr($lastRegNumber, 0, -strlen($matches[1]));
+            // Normalize separator to slash (handle both _ and /)
+            $prefix = str_replace('_', '/', $prefix);
+            // Remove mode abbreviations if present
+            $prefix = preg_replace('/\/(FT|PT)\/?$/', '', $prefix);
+            // Remove trailing separator if present
+            $prefix = rtrim($prefix, '/');
+            // Extract year if present, otherwise use current year
+            $prefixParts = explode('/', $prefix);
+            $year = !empty($prefixParts[0]) && is_numeric($prefixParts[0]) ? $prefixParts[0] : date('Y');
+            
+            if ($isPartTime) {
+                return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . '/PT' . $nextNumber;
+            } else {
+                return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . $nextNumber;
+            }
         }
         
-        // Fallback: append _001
-        return $lastRegNumber . '_001';
+        // Fallback: use current format
+        $normalized = str_replace('_', '/', $lastRegNumber);
+        if ($isPartTime) {
+            return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . '/PT001';
+        } else {
+            return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . '001';
+        }
     }
     
     /**
@@ -545,7 +875,8 @@ class StudentModel extends Model {
                 FROM `{$this->table}` s
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
                 INNER JOIN `course` c ON se.course_id = c.course_id
-                WHERE se.student_enroll_status = 'Following' 
+                WHERE s.student_status = 'Active'
+                AND se.student_enroll_status = 'Following' 
                 AND c.course_nvq_level IN ('04', '05', '06') 
                 AND c.course_nvq_level IS NOT NULL";
         
@@ -581,7 +912,8 @@ class StudentModel extends Model {
     }
     
     /**
-     * Get course enrollment counts by department (only active students with status 'Following')
+     * Get course enrollment counts by department with gender breakdown and course mode
+     * Only active students with status 'Active' AND enrollment status 'Following'
      */
     public function getCourseEnrollmentByDepartment($academicYear = null) {
         $sql = "SELECT 
@@ -590,12 +922,15 @@ class StudentModel extends Model {
                     c.course_id,
                     c.course_name,
                     c.course_nvq_level,
+                    se.course_mode,
+                    s.student_gender,
                     COUNT(DISTINCT s.student_id) as enrollment_count 
                 FROM `{$this->table}` s
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
                 INNER JOIN `course` c ON se.course_id = c.course_id
                 INNER JOIN `department` d ON c.department_id = d.department_id
-                WHERE se.student_enroll_status = 'Following' 
+                WHERE s.student_status = 'Active'
+                AND se.student_enroll_status = 'Following' 
                 AND d.department_id IS NOT NULL
                 AND c.course_id IS NOT NULL";
         
@@ -608,8 +943,8 @@ class StudentModel extends Model {
             $types .= 's';
         }
         
-        $sql .= " GROUP BY d.department_id, d.department_name, c.course_id, c.course_name, c.course_nvq_level 
-                  ORDER BY d.department_name, c.course_name";
+        $sql .= " GROUP BY d.department_id, d.department_name, c.course_id, c.course_name, c.course_nvq_level, se.course_mode, s.student_gender 
+                  ORDER BY d.department_name, c.course_nvq_level, c.course_name, se.course_mode";
         
         if (!empty($params)) {
             $stmt = $this->db->prepare($sql);
@@ -626,25 +961,66 @@ class StudentModel extends Model {
             while ($row = $result->fetch_assoc()) {
                 $deptId = $row['department_id'];
                 $deptName = $row['department_name'];
+                $courseId = $row['course_id'];
+                $courseMode = $row['course_mode'] ?? 'Full';
+                $nvqLevel = $row['course_nvq_level'];
+                $gender = $row['student_gender'] ?? 'Unknown';
+                $count = (int)$row['enrollment_count'];
                 
                 if (!isset($data[$deptId])) {
                     $data[$deptId] = [
                         'department_id' => $deptId,
                         'department_name' => $deptName,
                         'total_enrollment' => 0,
-                        'courses' => []
+                        'nvq_levels' => []
                     ];
                 }
                 
-                $enrollmentCount = (int)$row['enrollment_count'];
-                $data[$deptId]['total_enrollment'] += $enrollmentCount;
+                // Group by NVQ Level
+                if (!isset($data[$deptId]['nvq_levels'][$nvqLevel])) {
+                    $data[$deptId]['nvq_levels'][$nvqLevel] = [];
+                }
                 
-                $data[$deptId]['courses'][] = [
-                    'course_id' => $row['course_id'],
-                    'course_name' => $row['course_name'],
-                    'course_nvq_level' => $row['course_nvq_level'],
-                    'enrollment_count' => $enrollmentCount
-                ];
+                // Find or create course entry (group by course_id and course_mode)
+                $courseFound = false;
+                foreach ($data[$deptId]['nvq_levels'][$nvqLevel] as &$course) {
+                    if ($course['course_id'] === $courseId && $course['course_mode'] === $courseMode) {
+                        // Update gender counts
+                        if ($gender === 'Female') {
+                            $course['female_count'] = ($course['female_count'] ?? 0) + $count;
+                        } elseif ($gender === 'Male') {
+                            $course['male_count'] = ($course['male_count'] ?? 0) + $count;
+                        }
+                        $course['total_count'] = ($course['total_count'] ?? 0) + $count;
+                        $courseFound = true;
+                        break;
+                    }
+                }
+                
+                if (!$courseFound) {
+                    $courseData = [
+                        'course_id' => $courseId,
+                        'course_name' => $row['course_name'],
+                        'course_nvq_level' => $nvqLevel,
+                        'course_mode' => $courseMode,
+                        'female_count' => ($gender === 'Female') ? $count : 0,
+                        'male_count' => ($gender === 'Male') ? $count : 0,
+                        'total_count' => $count
+                    ];
+                    $data[$deptId]['nvq_levels'][$nvqLevel][] = $courseData;
+                }
+                
+                $data[$deptId]['total_enrollment'] += $count;
+            }
+        }
+        
+        // Sort NVQ levels and courses within each level
+        foreach ($data as &$dept) {
+            ksort($dept['nvq_levels']);
+            foreach ($dept['nvq_levels'] as &$courses) {
+                usort($courses, function($a, $b) {
+                    return strcmp($a['course_name'], $b['course_name']);
+                });
             }
         }
         
@@ -664,7 +1040,8 @@ class StudentModel extends Model {
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
                 INNER JOIN `course` c ON se.course_id = c.course_id
                 INNER JOIN `department` d ON c.department_id = d.department_id
-                WHERE se.student_enroll_status = 'Following' 
+                WHERE s.student_status = 'Active'
+                AND se.student_enroll_status = 'Following' 
                 AND c.course_nvq_level IN ('04', '05', '06') 
                 AND c.course_nvq_level IS NOT NULL
                 AND d.department_id IS NOT NULL";
@@ -722,6 +1099,7 @@ class StudentModel extends Model {
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id";
         
         $conditions = [
+            "s.student_status = 'Active'",
             "se.student_enroll_status = 'Following'",
             "s.student_religion IS NOT NULL AND s.student_religion != ''"
         ];
@@ -766,6 +1144,7 @@ class StudentModel extends Model {
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id";
         
         $conditions = [
+            "s.student_status = 'Active'",
             "se.student_enroll_status = 'Following'",
             "s.student_gender IS NOT NULL AND s.student_gender != ''"
         ];
@@ -810,7 +1189,8 @@ class StudentModel extends Model {
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
                 INNER JOIN `course` c ON se.course_id = c.course_id
                 INNER JOIN `department` d ON c.department_id = d.department_id
-                WHERE se.student_enroll_status = 'Following' 
+                WHERE s.student_status = 'Active'
+                AND se.student_enroll_status = 'Following' 
                 AND d.department_id IS NOT NULL";
         
         $params = [];
@@ -857,6 +1237,7 @@ class StudentModel extends Model {
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id";
         
         $conditions = [
+            "s.student_status = 'Active'",
             "se.student_enroll_status = 'Following'",
             "s.student_district IS NOT NULL AND s.student_district != ''"
         ];
@@ -901,6 +1282,7 @@ class StudentModel extends Model {
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id";
         
         $conditions = [
+            "s.student_status = 'Active'",
             "se.student_enroll_status = 'Following'",
             "s.student_provice IS NOT NULL AND s.student_provice != ''"
         ];

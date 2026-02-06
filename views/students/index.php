@@ -154,6 +154,14 @@
                             </select>
                         </div>
                         <div class="col-md-6 col-lg-2">
+                            <label for="course_mode" class="form-label fw-bold small">Course Mode</label>
+                            <select class="form-select form-select-sm" id="course_mode" name="course_mode">
+                                <option value="">All Modes</option>
+                                <option value="Full" <?php echo (isset($filters['course_mode']) && $filters['course_mode'] === 'Full') ? 'selected' : ''; ?>>Full Time</option>
+                                <option value="Part" <?php echo (isset($filters['course_mode']) && $filters['course_mode'] === 'Part') ? 'selected' : ''; ?>>Part Time</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 col-lg-2">
                             <label for="group_id" class="form-label fw-bold small">Group</label>
                             <select class="form-select form-select-sm" id="group_id" name="group_id">
                                 <option value="">All Groups</option>

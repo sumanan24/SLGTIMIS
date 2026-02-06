@@ -2,87 +2,103 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <style>
-    /* Dashboard Styles - Navy Blue, White, Soft Gray Theme */
+    /* Dashboard Styles - Professional Modern Theme */
     .dashboard-container {
-        background-color: #f5f5f5;
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
         min-height: calc(100vh - 60px);
         padding: 2rem 1.5rem;
     }
     
     .dashboard-welcome-card {
-        background: #ffffff;
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
         border-radius: 16px;
-        border: 2px solid #001f3f;
-        box-shadow: 0 4px 12px rgba(0, 31, 63, 0.2);
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
         margin-bottom: 2rem;
     }
     
     .dashboard-welcome-card .card-body {
-        color: #001f3f;
+        color: #1e293b;
         padding: 2rem;
     }
     
     .dashboard-welcome-card h1 {
-        color: #001f3f;
+        color: #0f172a;
         font-size: 1.75rem;
         font-weight: 700;
         margin-bottom: 0.5rem;
     }
     
     .dashboard-welcome-card p {
-        color: #6c757d;
+        color: #64748b;
         font-size: 0.95rem;
     }
     
     .dashboard-welcome-card select {
         background-color: #ffffff;
-        border: 1px solid #001f3f;
-        color: #001f3f;
+        border: 1px solid #cbd5e1;
+        color: #1e293b;
         border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+    
+    .dashboard-welcome-card select:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
     }
     
     .dashboard-welcome-card select option {
         background-color: #ffffff;
-        color: #001f3f;
+        color: #1e293b;
     }
     
     .dashboard-welcome-card label {
-        color: #001f3f;
+        color: #475569;
+        font-weight: 500;
     }
     
     .dashboard-welcome-card small {
-        color: #6c757d;
+        color: #64748b;
     }
     
     .dashboard-welcome-card .border-top {
-        border-color: #e8e8e8 !important;
+        border-color: #e2e8f0 !important;
     }
     
     .dashboard-stats-card {
-        background: #ffffff;
-        border-radius: 12px;
-        border: none;
-        border-left: 4px solid #001f3f;
-        box-shadow: 0 2px 8px rgba(0, 31, 63, 0.1);
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        border-left: 4px solid #6366f1;
+        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
         transition: all 0.3s ease;
         height: 100%;
     }
     
     .dashboard-stats-card:hover {
         transform: translateY(-5px);
-        box-shadow: 0 4px 16px rgba(0, 31, 63, 0.15);
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+        border-left-color: #4f46e5;
     }
     
     .dashboard-stats-card:nth-child(2) {
-        border-left-color: #003366;
+        border-left-color: #10b981;
+    }
+    
+    .dashboard-stats-card:nth-child(2):hover {
+        border-left-color: #059669;
     }
     
     .dashboard-stats-card:nth-child(3) {
-        border-left-color: #1e3a5f;
+        border-left-color: #f59e0b;
+    }
+    
+    .dashboard-stats-card:nth-child(3):hover {
+        border-left-color: #d97706;
     }
     
     .stats-card-label {
-        color: #6c757d;
+        color: #64748b;
         font-size: 0.75rem;
         font-weight: 600;
         letter-spacing: 0.5px;
@@ -91,40 +107,56 @@
     }
     
     .stats-card-value {
-        color: #001f3f;
+        color: #0f172a;
         font-size: 2.5rem;
         font-weight: 700;
         margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
     
     .stats-card-subtitle {
-        color: #6c757d;
+        color: #64748b;
         font-size: 0.85rem;
     }
     
     .stats-card-icon {
         width: 60px;
         height: 60px;
-        border-radius: 12px;
+        border-radius: 14px;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 1.75rem;
-        background: rgba(0, 31, 63, 0.1);
-        color: #001f3f;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+    
+    .dashboard-stats-card:nth-child(2) .stats-card-icon {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    
+    .dashboard-stats-card:nth-child(3) .stats-card-icon {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
     }
     
     .dashboard-chart-card {
         background: #ffffff;
-        border-radius: 12px;
-        border: 1px solid #e8e8e8;
-        box-shadow: 0 2px 8px rgba(0, 31, 63, 0.08);
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
         transition: all 0.3s ease;
         height: 100%;
     }
     
     .dashboard-chart-card:hover {
-        box-shadow: 0 4px 16px rgba(0, 31, 63, 0.12);
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+        border-color: #cbd5e1;
     }
     
     .chart-card-header {
@@ -132,8 +164,9 @@
         color: #ffffff;
         padding: 1rem 1.25rem;
         font-weight: 600;
-        border-radius: 12px 12px 0 0;
+        border-radius: 14px 14px 0 0;
         border: none;
+        box-shadow: 0 2px 8px rgba(0, 31, 63, 0.2);
     }
     
     .chart-card-body {
@@ -142,47 +175,227 @@
     }
     
     .chart-stat-item {
-        background: #f5f5f5;
-        border-radius: 8px;
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border-radius: 10px;
         padding: 0.75rem 1rem;
         margin-bottom: 0.75rem;
-        border-left: 3px solid #001f3f;
+        border-left: 3px solid #6366f1;
+        transition: all 0.2s ease;
+    }
+    
+    .chart-stat-item:hover {
+        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+        border-left-color: #4f46e5;
     }
     
     .chart-stat-label {
-        color: #2c3e50;
+        color: #1e293b;
         font-weight: 600;
         font-size: 0.9rem;
     }
     
     .chart-stat-badge {
-        background: #001f3f;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
         color: #ffffff;
         padding: 0.5rem 0.75rem;
-        border-radius: 6px;
+        border-radius: 8px;
         font-size: 0.875rem;
         font-weight: 600;
+        box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
+    }
+    
+    /* Stat List Styles for Direct Value Display */
+    .stat-list-container {
+        padding: 0.5rem 0;
+    }
+    
+    .stat-list-item {
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #e2e8f0;
+        transition: all 0.2s ease;
+    }
+    
+    .stat-list-item:hover {
+        padding-left: 0.5rem;
+    }
+    
+    .stat-list-item:last-child {
+        border-bottom: none;
+    }
+    
+    .stat-list-label {
+        color: #475569;
+        font-weight: 500;
+        font-size: 0.95rem;
+    }
+    
+    .stat-list-badge {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: #ffffff;
+        padding: 0.5rem 1rem;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        min-width: 100px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
     }
     
     .department-grid-item {
-        background: #f5f5f5;
-        border: 1px solid #e8e8e8;
-        border-radius: 8px;
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
         padding: 1rem;
         text-align: center;
         transition: all 0.3s ease;
     }
     
     .department-grid-item:hover {
-        background: #e8e8e8;
-        border-color: #001f3f;
+        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+        border-color: #6366f1;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
     }
     
     .department-grid-item strong {
-        color: #2c3e50;
+        color: #1e293b;
         font-size: 0.9rem;
         display: block;
         margin-bottom: 0.5rem;
+    }
+    
+    /* Course Enrollment Card Styles */
+    .course-enrollment-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1rem;
+        transition: all 0.3s ease;
+        height: 100%;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    }
+    
+    .course-enrollment-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+        border-color: #cbd5e1;
+    }
+    
+    .course-enrollment-header {
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .course-name {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #0f172a;
+        margin-bottom: 0.5rem;
+        line-height: 1.4;
+    }
+    
+    .course-badges {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .badge-nvq {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: #ffffff;
+        padding: 0.25rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+    }
+    
+    .badge-mode {
+        color: #ffffff;
+        padding: 0.25rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .course-enrollment-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .dept-name {
+        font-size: 0.8rem;
+        color: #64748b;
+        font-weight: 500;
+    }
+    
+    .enrollment-stats {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .stat-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        flex: 1;
+    }
+    
+    .stat-item i {
+        font-size: 1rem;
+    }
+    
+    .stat-item .stat-value {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+    
+    .stat-item.stat-total {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: #ffffff;
+        padding: 0.5rem;
+        border-radius: 10px;
+        min-width: 60px;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+    
+    .stat-item.stat-total i {
+        color: #ffffff;
+        font-size: 0.9rem;
+    }
+    
+    .stat-item.stat-total .stat-value {
+        color: #ffffff;
+        font-size: 1.2rem;
+    }
+    
+    /* Department Section Styles */
+    .department-section {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    }
+    
+    .department-header h5 {
+        color: #0f172a;
+        font-weight: 700;
+        font-size: 1.25rem;
+    }
+    
+    .department-header hr {
+        border-top: 2px solid #6366f1;
+        margin: 0.75rem 0;
+        opacity: 1;
+        box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
     }
     
     /* Mobile Responsive Styles */
@@ -249,6 +462,26 @@
             padding-left: 0.75rem;
             padding-right: 0.75rem;
         }
+        
+        .course-enrollment-card {
+            margin-bottom: 1rem;
+        }
+        
+        .enrollment-stats {
+            flex-wrap: wrap;
+        }
+        
+        .stat-item {
+            min-width: 70px;
+        }
+        
+        .department-section {
+            padding: 1rem;
+        }
+        
+        .department-header h5 {
+            font-size: 1.1rem;
+        }
     }
     
     @media (max-width: 480px) {
@@ -291,7 +524,7 @@
             <div class="d-flex align-items-center justify-content-between flex-wrap">
                 <div class="flex-grow-1">
                     <h1>Welcome, <?php echo htmlspecialchars($user_name ?? 'User'); ?>!</h1>
-                    <p class="mb-0">Here's a comprehensive overview of your system</p>
+                    <p class="mb-0">SLGTI Management Information System</p>
                 </div>
                 <div class="d-flex align-items-center gap-3 mt-3 mt-md-0">
                     <div class="d-flex align-items-center gap-2">
@@ -326,14 +559,28 @@
     
     <!-- Main Stats Cards -->
     <div class="row g-4 mb-4">
-        <div class="col-md-4">
+        <div class="col-md-6">
             <div class="card dashboard-stats-card" style="border-left-color: #001f3f;">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="flex-grow-1">
                             <div class="stats-card-label">Total Students</div>
                             <div class="stats-card-value"><?php echo number_format($totalStudents); ?></div>
-                            <div class="stats-card-subtitle">Active Students</div>
+                            <div class="stats-card-subtitle">
+                                <?php 
+                                $maleCount = $genderStats['Male'] ?? 0;
+                                $femaleCount = $genderStats['Female'] ?? 0;
+                                ?>
+                                <span class="me-2">
+                                    <i class="fas fa-mars text-primary"></i> Male: <strong><?php echo number_format($maleCount); ?></strong>
+                                </span>
+                                <span>
+                                    <i class="fas fa-venus text-danger"></i> Female: <strong><?php echo number_format($femaleCount); ?></strong>
+                                </span>
+                            </div>
+                            <div class="mt-2" style="font-size: 0.75rem; color: #6c757d;">
+                                Active & Following Only
+                            </div>
                         </div>
                         <div class="stats-card-icon">
                             <i class="fas fa-user-graduate"></i>
@@ -343,24 +590,7 @@
             </div>
         </div>
         
-        <div class="col-md-4">
-            <div class="card dashboard-stats-card" style="border-left-color: #1e3a5f;">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div class="flex-grow-1">
-                            <div class="stats-card-label">Total Staff</div>
-                            <div class="stats-card-value" style="color: #003366;"><?php echo number_format($totalStaff); ?></div>
-                            <div class="stats-card-subtitle">Active Staff Members</div>
-                        </div>
-                        <div class="stats-card-icon" style="background: rgba(0, 51, 102, 0.1); color: #003366;">
-                            <i class="fas fa-chalkboard-teacher"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-4">
+        <div class="col-md-6">
             <div class="card dashboard-stats-card" style="border-left-color: #1e3a5f;">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center justify-content-between">
@@ -386,248 +616,72 @@
                 <div class="chart-card-header">
                     <i class="fas fa-book-reader me-2"></i>Course Enrollment by Department
                 </div>
-                <div class="card-body p-0">
-                    <div class="accordion accordion-custom" id="departmentAccordion">
-                        <?php $deptIndex = 0; foreach ($courseEnrollmentByDepartment as $dept): ?>
-                        <div class="accordion-item border-0 border-bottom">
-                            <h2 class="accordion-header" id="deptHeading<?php echo $dept['department_id']; ?>">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
-                                        data-bs-target="#deptCollapse<?php echo $dept['department_id']; ?>" 
-                                        aria-expanded="false" 
-                                        aria-controls="deptCollapse<?php echo $dept['department_id']; ?>"
-                                        style="background: linear-gradient(135deg, #001f3f 0%, #003366 100%); color: white; font-weight: 600; border: none; padding: 1.25rem 1.5rem;">
-                                    <div class="d-flex justify-content-between align-items-center w-100 me-3">
-                                        <div class="d-flex align-items-center">
-                                            <i class="fas fa-building me-3" style="font-size: 1.25rem;"></i>
-                                            <span style="font-size: 1.1rem;"><?php echo htmlspecialchars($dept['department_name']); ?></span>
-                                        </div>
-                                        <div class="d-flex align-items-center gap-3">
-                                            <div class="text-end">
-                                                <div style="font-size: 1.5rem; font-weight: 700; line-height: 1;">
-                                                    <?php echo number_format($dept['total_enrollment'] ?? 0); ?>
-                                                </div>
-                                                <small style="opacity: 0.9; font-size: 0.75rem;">Total Students</small>
-                                            </div>
-                                            <i class="fas fa-chevron-down accordion-icon" style="transition: transform 0.3s ease;"></i>
-                                        </div>
-                                    </div>
-                                </button>
-                            </h2>
-                            <div id="deptCollapse<?php echo $dept['department_id']; ?>" 
-                                 class="accordion-collapse collapse" 
-                                 aria-labelledby="deptHeading<?php echo $dept['department_id']; ?>" 
-                                 data-bs-parent="#departmentAccordion">
-                                <div class="accordion-body" style="background: #f8f9fa; padding: 1.5rem;">
-                                    <div class="row g-3">
-                                        <?php foreach ($dept['courses'] as $course): ?>
-                                        <div class="col-md-12">
-                                            <div class="card" style="border-left: 4px solid #003366; background: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                                <div class="card-body p-3">
-                                                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                                                        <div class="flex-grow-1">
-                                                            <h6 class="mb-1" style="color: #001f3f; font-weight: 600;">
-                                                                <?php echo htmlspecialchars($course['course_name']); ?>
-                                                                <?php if (!empty($course['course_nvq_level'])): ?>
-                                                                    <span class="badge ms-2" style="background: #003366; color: white;">
-                                                                        NVQ Level <?php echo htmlspecialchars($course['course_nvq_level']); ?>
-                                                                    </span>
-                                                                <?php endif; ?>
-                                                            </h6>
-                                                            <small class="text-muted">Course ID: <?php echo htmlspecialchars($course['course_id']); ?></small>
+                <div class="card-body p-4">
+                    <?php foreach ($courseEnrollmentByDepartment as $dept): ?>
+                        <?php if (!empty($dept['nvq_levels'])): ?>
+                            <!-- Department Section -->
+                            <div class="department-section mb-4">
+                                <div class="department-header mb-3">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-building me-2" style="color: #001f3f;"></i>
+                                        <?php echo htmlspecialchars($dept['department_name']); ?>
+                                    </h5>
+                                    <hr style="border-top: 2px solid #dc3545; margin: 0.5rem 0;">
+                                </div>
+                                
+                                <!-- Courses Grid -->
+                                <div class="row g-3">
+                                    <?php foreach ($dept['nvq_levels'] as $nvqLevel => $courses): ?>
+                                        <?php foreach ($courses as $course): 
+                                            $femaleCount = $course['female_count'] ?? 0;
+                                            $maleCount = $course['male_count'] ?? 0;
+                                            $totalCount = $course['total_count'] ?? 0;
+                                            $courseMode = $course['course_mode'] ?? 'Full';
+                                            $modeDisplay = ($courseMode === 'Full') ? 'FT' : (($courseMode === 'Part') ? 'PT' : $courseMode);
+                                            $modeColor = ($courseMode === 'Full') ? '#28a745' : '#ffc107';
+                                        ?>
+                                            <div class="col-md-6 col-lg-4">
+                                                <div class="course-enrollment-card">
+                                                    <div class="course-enrollment-header">
+                                                        <div class="course-name"><?php echo htmlspecialchars($course['course_name']); ?></div>
+                                                        <div class="course-badges">
+                                                            <span class="badge badge-nvq">NVQ <?php echo htmlspecialchars($nvqLevel); ?></span>
+                                                            <span class="badge badge-mode" style="background-color: <?php echo $modeColor; ?>;"><?php echo $modeDisplay; ?></span>
                                                         </div>
-                                                        <div class="text-end">
-                                                            <div class="h4 mb-0" style="color: #003366; font-weight: 700;">
-                                                                <?php echo number_format($course['enrollment_count']); ?>
+                                                    </div>
+                                                    <div class="course-enrollment-body">
+                                                        <div class="enrollment-stats">
+                                                            <div class="stat-item">
+                                                                <i class="fas fa-venus text-danger"></i>
+                                                                <span class="stat-value"><?php echo number_format($femaleCount); ?></span>
                                                             </div>
-                                                            <small class="text-muted">Students</small>
+                                                            <div class="stat-item">
+                                                                <i class="fas fa-mars text-primary"></i>
+                                                                <span class="stat-value"><?php echo number_format($maleCount); ?></span>
+                                                            </div>
+                                                            <div class="stat-item stat-total">
+                                                                <i class="fas fa-users"></i>
+                                                                <span class="stat-value"><?php echo number_format($totalCount); ?></span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
                                         <?php endforeach; ?>
-                                    </div>
+                                    <?php endforeach; ?>
                                 </div>
                             </div>
-                        </div>
-                        <?php $deptIndex++; endforeach; ?>
-                    </div>
+                            
+                            <?php if ($dept !== end($courseEnrollmentByDepartment)): ?>
+                                <hr style="border-top: 2px solid #e8e8e8; margin: 2rem 0;">
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
                 </div>
             </div>
         </div>
     </div>
-    
-    <style>
-        .accordion-custom .accordion-button {
-            transition: all 0.3s ease;
-        }
-        
-        .accordion-custom .accordion-button:not(.collapsed) .accordion-icon {
-            transform: rotate(180deg);
-        }
-        
-        .accordion-custom .accordion-button:focus {
-            box-shadow: none;
-            border-color: transparent;
-        }
-        
-        .accordion-custom .accordion-button::after {
-            display: none;
-        }
-        
-        .accordion-custom .accordion-item:first-of-type {
-            border-top: none;
-        }
-        
-        .accordion-custom .accordion-item:last-of-type {
-            border-bottom: 1px solid #dee2e6 !important;
-        }
-        
-        .accordion-custom .accordion-button:hover {
-            background: linear-gradient(135deg, #003366 0%, #004d99 100%) !important;
-        }
-        
-        .accordion-custom .accordion-collapse {
-            transition: height 0.35s ease;
-        }
-    </style>
-    
-    <script>
-        // Handle accordion behavior - ensure only one department is open at a time
-        document.addEventListener('DOMContentLoaded', function() {
-            const accordionButtons = document.querySelectorAll('#departmentAccordion .accordion-button');
-            
-            accordionButtons.forEach(function(button) {
-                button.addEventListener('click', function() {
-                    const targetId = this.getAttribute('data-bs-target');
-                    const targetCollapse = document.querySelector(targetId);
-                    
-                    // Bootstrap's accordion will handle the collapse/expand automatically
-                    // But we can add custom behavior here if needed
-                    
-                    // Close all other accordions (Bootstrap handles this with data-bs-parent)
-                    // But we ensure smooth animation
-                    setTimeout(function() {
-                        const allCollapses = document.querySelectorAll('#departmentAccordion .accordion-collapse');
-                        allCollapses.forEach(function(collapse) {
-                            if (collapse !== targetCollapse && collapse.classList.contains('show')) {
-                                // This will be handled by Bootstrap
-                            }
-                        });
-                    }, 100);
-                });
-            });
-            
-            // Handle accordion collapse events for icon rotation
-            const accordionCollapses = document.querySelectorAll('#departmentAccordion .accordion-collapse');
-            accordionCollapses.forEach(function(collapse) {
-                collapse.addEventListener('show.bs.collapse', function() {
-                    const button = document.querySelector('[data-bs-target="#' + this.id + '"]');
-                    if (button) {
-                        button.querySelector('.accordion-icon')?.style.setProperty('transform', 'rotate(180deg)');
-                    }
-                });
-                
-                collapse.addEventListener('hide.bs.collapse', function() {
-                    const button = document.querySelector('[data-bs-target="#' + this.id + '"]');
-                    if (button) {
-                        button.querySelector('.accordion-icon')?.style.setProperty('transform', 'rotate(0deg)');
-                    }
-                });
-            });
-        });
-    </script>
     <?php endif; ?>
-
-    <!-- NVQ Level by Department -->
-    <div class="row g-4 mb-4">
-        <div class="col-12">
-            <div class="card dashboard-chart-card">
-                <div class="chart-card-header">
-                    <i class="fas fa-graduation-cap me-2"></i>NVQ Level by Department
-                </div>
-                <div class="card-body">
-                    <?php if (!empty($nvqStatsByDepartment)): ?>
-                        <div class="table-responsive">
-                            <table class="table table-hover table-sm">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Department</th>
-                                        <th class="text-center">NVQ Level 04</th>
-                                        <th class="text-center">NVQ Level 05</th>
-                                        <th class="text-center">NVQ Level 06</th>
-                                        <th class="text-center">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($nvqStatsByDepartment as $dept): 
-                                        $dept04 = $dept['levels']['04'] ?? 0;
-                                        $dept05 = $dept['levels']['05'] ?? 0;
-                                        $dept06 = $dept['levels']['06'] ?? 0;
-                                        $deptTotal = $dept04 + $dept05 + $dept06;
-                                    ?>
-                                        <tr>
-                                            <td><strong><?php echo htmlspecialchars($dept['department_name']); ?></strong></td>
-                                            <td class="text-center">
-                                                <span class="badge" style="background: #0066cc; color: white;">
-                                                    <?php echo number_format($dept04); ?>
-                                                </span>
-                                            </td>
-                                            <td class="text-center">
-                                                <span class="badge" style="background: #003366; color: white;">
-                                                    <?php echo number_format($dept05); ?>
-                                                </span>
-                                            </td>
-                                            <td class="text-center">
-                                                <span class="badge" style="background: #004c99; color: white;">
-                                                    <?php echo number_format($dept06); ?>
-                                                </span>
-                                            </td>
-                                            <td class="text-center">
-                                                <strong><?php echo number_format($deptTotal); ?></strong>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                                <tfoot class="table-light">
-                                    <tr>
-                                        <th>Total</th>
-                                        <th class="text-center"><?php 
-                                            $total04 = 0;
-                                            foreach ($nvqStatsByDepartment as $dept) {
-                                                $total04 += $dept['levels']['04'] ?? 0;
-                                            }
-                                            echo number_format($total04);
-                                        ?></th>
-                                        <th class="text-center"><?php 
-                                            $total05 = 0;
-                                            foreach ($nvqStatsByDepartment as $dept) {
-                                                $total05 += $dept['levels']['05'] ?? 0;
-                                            }
-                                            echo number_format($total05);
-                                        ?></th>
-                                        <th class="text-center"><?php 
-                                            $total06 = 0;
-                                            foreach ($nvqStatsByDepartment as $dept) {
-                                                $total06 += $dept['levels']['06'] ?? 0;
-                                            }
-                                            echo number_format($total06);
-                                        ?></th>
-                                        <th class="text-center"><?php echo number_format($totalStudents); ?></th>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    <?php else: ?>
-                        <div class="text-center text-muted py-4">
-                            <i class="fas fa-info-circle me-2"></i>
-                            No NVQ Level data available by department
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Gender and Religion Statistics -->
     <div class="row g-4 mb-4">
@@ -638,14 +692,6 @@
                 </div>
                 <div class="chart-card-body">
                     <canvas id="genderChart" style="max-height: 280px;"></canvas>
-                    <div class="mt-4">
-                        <?php foreach ($genderStats as $gender => $count): ?>
-                        <div class="chart-stat-item d-flex justify-content-between align-items-center">
-                            <span class="chart-stat-label"><?php echo htmlspecialchars($gender); ?>:</span>
-                            <span class="chart-stat-badge"><?php echo number_format($count); ?> Students</span>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
                 </div>
             </div>
         </div>
@@ -657,17 +703,6 @@
                 </div>
                 <div class="chart-card-body">
                     <canvas id="religionChart" style="max-height: 280px;"></canvas>
-                    <div class="mt-4">
-                        <?php 
-                        $topReligions = array_slice($religionStats, 0, 5, true);
-                        foreach ($topReligions as $religion => $count): 
-                        ?>
-                        <div class="chart-stat-item d-flex justify-content-between align-items-center">
-                            <span class="chart-stat-label"><?php echo htmlspecialchars($religion); ?>:</span>
-                            <span class="chart-stat-badge"><?php echo number_format($count); ?> Students</span>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
                 </div>
             </div>
         </div>
@@ -682,16 +717,6 @@
                 </div>
                 <div class="chart-card-body">
                     <canvas id="departmentChart" style="max-height: 320px;"></canvas>
-                    <div class="row mt-4 g-3">
-                        <?php foreach ($departmentStats as $dept): ?>
-                        <div class="col-md-3 col-sm-6">
-                            <div class="department-grid-item">
-                                <strong><?php echo htmlspecialchars($dept['name'] ?? $dept['department_name'] ?? 'Unknown'); ?></strong>
-                                <span class="chart-stat-badge"><?php echo number_format($dept['count']); ?> Students</span>
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
                 </div>
             </div>
         </div>
@@ -706,17 +731,6 @@
                 </div>
                 <div class="chart-card-body">
                     <canvas id="districtChart" style="max-height: 320px;"></canvas>
-                    <div class="mt-4">
-                        <?php 
-                        $topDistricts = array_slice($districtStats, 0, 5, true);
-                        foreach ($topDistricts as $district => $count): 
-                        ?>
-                        <div class="chart-stat-item d-flex justify-content-between align-items-center">
-                            <span class="chart-stat-label"><?php echo htmlspecialchars($district); ?>:</span>
-                            <span class="chart-stat-badge" style="background: #003366;"><?php echo number_format($count); ?></span>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
                 </div>
             </div>
         </div>
@@ -728,14 +742,6 @@
                 </div>
                 <div class="chart-card-body">
                     <canvas id="provinceChart" style="max-height: 320px;"></canvas>
-                    <div class="mt-4">
-                        <?php foreach ($provinceStats as $province => $count): ?>
-                        <div class="chart-stat-item d-flex justify-content-between align-items-center">
-                            <span class="chart-stat-label"><?php echo htmlspecialchars($province); ?>:</span>
-                            <span class="chart-stat-badge" style="background: #1e3a5f;"><?php echo number_format($count); ?></span>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
                 </div>
             </div>
         </div>
@@ -743,14 +749,16 @@
 </div>
 
 <script>
-// Navy Blue color palette for charts
-const navyChartColors = {
-    primary: '#001f3f',
-    secondary: '#003366',
-    accent: '#1e3a5f',
-    light: '#003d7a',
-    shades: ['#001f3f', '#003366', '#1e3a5f', '#003d7a', '#004c8c'],
-    soft: ['#e8e8e8', '#d3d3d3', '#b8b8b8', '#9d9d9d', '#808080']
+// Professional Modern color palette for charts
+const professionalChartColors = {
+    primary: '#6366f1',
+    secondary: '#8b5cf6',
+    accent: '#10b981',
+    light: '#3b82f6',
+    emerald: '#10b981',
+    amber: '#f59e0b',
+    shades: ['#6366f1', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#06b6d4'],
+    soft: ['#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1', '#94a3b8']
 };
 
 // NVQ Level Chart removed - now displayed as department-wise table
@@ -765,7 +773,7 @@ new Chart(genderCtx, {
         labels: genderLabels.length > 0 ? genderLabels : ['No Data'],
         datasets: [{
             data: genderData.length > 0 ? genderData : [0],
-            backgroundColor: navyChartColors.shades,
+            backgroundColor: professionalChartColors.shades,
             borderWidth: 3,
             borderColor: '#ffffff'
         }]
@@ -800,8 +808,8 @@ new Chart(religionCtx, {
         datasets: [{
             label: 'Students',
             data: religionData.length > 0 ? religionData : [0],
-            backgroundColor: navyChartColors.primary,
-            borderColor: navyChartColors.secondary,
+            backgroundColor: professionalChartColors.primary,
+            borderColor: professionalChartColors.secondary,
             borderWidth: 2,
             borderRadius: 6
         }]
@@ -853,8 +861,8 @@ new Chart(deptCtx, {
         datasets: [{
             label: 'Students',
             data: deptData.length > 0 ? deptData : [0],
-            backgroundColor: navyChartColors.secondary,
-            borderColor: navyChartColors.primary,
+            backgroundColor: professionalChartColors.secondary,
+            borderColor: professionalChartColors.primary,
             borderWidth: 2,
             borderRadius: 6
         }]
@@ -907,8 +915,8 @@ new Chart(districtCtx, {
         datasets: [{
             label: 'Students',
             data: districtValues,
-            backgroundColor: navyChartColors.accent,
-            borderColor: navyChartColors.primary,
+            backgroundColor: professionalChartColors.accent,
+            borderColor: professionalChartColors.primary,
             borderWidth: 2,
             borderRadius: 6
         }]
@@ -952,15 +960,25 @@ new Chart(districtCtx, {
 
 // Province Chart
 const provinceCtx = document.getElementById('provinceChart').getContext('2d');
-const provinceLabels = [<?php echo !empty($provinceStats) ? implode(',', array_map(function($p) { return "'" . htmlspecialchars($p, ENT_QUOTES) . "'"; }, array_keys($provinceStats))) : ''; ?>];
-const provinceData = [<?php echo !empty($provinceStats) ? implode(',', array_values($provinceStats)) : '0'; ?>];
+<?php 
+// Limit to top 9 provinces, sorted by count (descending)
+$topProvinces = [];
+if (!empty($provinceStats)) {
+    // Sort by count in descending order
+    arsort($provinceStats);
+    // Take only the top 9 provinces
+    $topProvinces = array_slice($provinceStats, 0, 9, true);
+}
+?>
+const provinceLabels = [<?php echo !empty($topProvinces) ? implode(',', array_map(function($p) { return "'" . htmlspecialchars($p, ENT_QUOTES) . "'"; }, array_keys($topProvinces))) : ''; ?>];
+const provinceData = [<?php echo !empty($topProvinces) ? implode(',', array_values($topProvinces)) : '0'; ?>];
 new Chart(provinceCtx, {
     type: 'pie',
     data: {
         labels: provinceLabels.length > 0 ? provinceLabels : ['No Data'],
         datasets: [{
             data: provinceData.length > 0 ? provinceData : [0],
-            backgroundColor: navyChartColors.shades,
+            backgroundColor: professionalChartColors.shades,
             borderWidth: 3,
             borderColor: '#ffffff'
         }]

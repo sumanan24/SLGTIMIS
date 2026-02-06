@@ -37,6 +37,7 @@ class StudentController extends Controller {
             'department_id' => $userDepartmentId ? $userDepartmentId : $this->get('department_id', ''),
             'course_id' => $this->get('course_id', ''),
             'academic_year' => $this->get('academic_year', ''),
+            'course_mode' => $this->get('course_mode', ''),
             'group_id' => $this->get('group_id', '')
         ];
         
@@ -822,29 +823,31 @@ class StudentController extends Controller {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $studentModel = $this->model('StudentModel');
             
+            // Build data array - only include fields that have values
             $data = [
                 'student_id' => trim($this->post('student_id', '')),
-                'student_title' => trim($this->post('student_title', '')),
                 'student_fullname' => trim($this->post('student_fullname', '')),
-                'student_ininame' => trim($this->post('student_ininame', '')),
-                'student_gender' => trim($this->post('student_gender', '')),
-                'student_civil' => trim($this->post('student_civil', '')),
-                'student_email' => trim($this->post('student_email', '')),
                 'student_nic' => trim($this->post('student_nic', '')),
-                'student_dob' => trim($this->post('student_dob', '')),
-                'student_phone' => trim($this->post('student_phone', '')),
-                'student_address' => trim($this->post('student_address', '')),
-                'student_zip' => trim($this->post('student_zip', '')),
-                'student_district' => trim($this->post('student_district', '')),
-                'student_divisions' => trim($this->post('student_divisions', '')),
-                'student_provice' => trim($this->post('student_provice', '')),
-                'student_blood' => trim($this->post('student_blood', '')),
-                'student_em_name' => trim($this->post('student_em_name', '')),
-                'student_em_address' => trim($this->post('student_em_address', '')),
-                'student_em_phone' => trim($this->post('student_em_phone', '')),
-                'student_em_relation' => trim($this->post('student_em_relation', '')),
                 'student_status' => trim($this->post('student_status', 'Active'))
             ];
+            
+            // Add optional fields only if they have values (not empty strings)
+            $optionalFields = [
+                'student_title', 'student_gender', 'student_ininame', 'student_civil', 
+                'student_dob', 'student_phone', 'student_address', 'student_zip', 
+                'student_district', 'student_divisions', 'student_provice', 'student_blood', 
+                'student_em_name', 'student_em_address', 'student_em_phone', 'student_em_relation'
+            ];
+            
+            foreach ($optionalFields as $field) {
+                $value = trim($this->post($field, ''));
+                if ($value !== '') {
+                    $data[$field] = $value;
+                }
+            }
+            
+            // Set student_email to NULL - will be auto-generated in createStudent if needed
+            $data['student_email'] = null;
             
             // Get enrollment data first to validate
             $courseId = trim($this->post('course_id', ''));
@@ -861,9 +864,9 @@ class StudentController extends Controller {
                 }
             }
             
-            // Validation
-            if (empty($data['student_id']) || empty($data['student_fullname']) || empty($data['student_email']) || empty($data['student_nic'])) {
-                $_SESSION['error'] = 'Student ID, Full Name, Email, and NIC are required.';
+            // Validation - Only Student ID, Full Name, and NIC are required
+            if (empty($data['student_id']) || empty($data['student_fullname']) || empty($data['student_nic'])) {
+                $_SESSION['error'] = 'Student ID, Full Name, and NIC are required.';
                 $this->redirect('students/create');
                 return;
             }
@@ -892,11 +895,13 @@ class StudentController extends Controller {
                 // Create enrollment if course and academic year are provided
                 if (!empty($courseId) && !empty($academicYear)) {
                     $enrollmentModel = $this->model('StudentEnrollmentModel');
+                    // Convert course_mode to match database enum: 'Full Time' -> 'Full', 'Part Time' -> 'Part'
+                    $enrollmentCourseMode = ($courseMode === 'Full Time') ? 'Full' : (($courseMode === 'Part Time') ? 'Part' : $courseMode);
                     $enrollmentData = [
                         'student_id' => $data['student_id'],
                         'course_id' => $courseId,
                         'academic_year' => $academicYear,
-                        'course_mode' => $courseMode,
+                        'course_mode' => $enrollmentCourseMode,
                         'student_enroll_status' => $enrollStatus,
                         'student_enroll_date' => date('Y-m-d'),
                         'student_enroll_exit_date' => date('Y-m-d', strtotime('+1 year'))
@@ -933,7 +938,8 @@ class StudentController extends Controller {
             $departmentModel = $this->model('DepartmentModel');
             $academicYearModel = $this->model('StudentModel');
             
-            $courses = $courseModel->all('course_name ASC');
+            // Use getCoursesWithDepartment to ensure department_id is included
+            $courses = $courseModel->getCoursesWithDepartment();
             $departments = $departmentModel->getAll();
             $academicYears = $academicYearModel->getAcademicYears();
             
@@ -1502,33 +1508,50 @@ class StudentController extends Controller {
     }
     
     /**
-     * Get last registration number for a course and academic year (AJAX endpoint)
+     * Get last registration number for a course, academic year, and course mode (AJAX endpoint)
      */
     public function getLastRegNumber() {
+        // Set JSON header
+        header('Content-Type: application/json');
+        
         // Check authentication
         if (!isset($_SESSION['user_id'])) {
-            header('Content-Type: application/json');
             echo json_encode(['success' => false, 'error' => 'Unauthorized']);
             return;
         }
         
         $courseId = $this->get('course_id', '');
         $academicYear = $this->get('academic_year', '');
+        $courseMode = $this->get('course_mode', 'Full Time');
         
         if (empty($courseId) || empty($academicYear)) {
-            header('Content-Type: application/json');
             echo json_encode(['success' => false, 'error' => 'Course ID and Academic Year are required']);
             return;
         }
         
-        $studentModel = $this->model('StudentModel');
-        $nextRegNumber = $studentModel->generateNextRegistrationNumber($courseId, $academicYear);
-        
-        header('Content-Type: application/json');
-        echo json_encode([
-            'success' => true,
-            'nextRegNumber' => $nextRegNumber
-        ]);
+        try {
+            $studentModel = $this->model('StudentModel');
+            // Get next available registration number that doesn't exist yet
+            $nextAvailableId = $studentModel->getNextAvailableRegistrationNumber($courseId, $academicYear, $courseMode);
+            
+            if ($nextAvailableId) {
+                echo json_encode([
+                    'success' => true,
+                    'lastRegNumber' => $nextAvailableId // Actually returns next available ID
+                ]);
+            } else {
+                // If no previous ID found, return null so frontend can handle it
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'No previous registration number found. Please enter student ID manually.'
+                ]);
+            }
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Error fetching next available student ID: ' . $e->getMessage()
+            ]);
+        }
     }
     
     /**

@@ -157,7 +157,8 @@ class HODDashboardController extends Controller {
                 FROM `student` s
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
                 INNER JOIN `course` c ON se.course_id = c.course_id
-                WHERE se.student_enroll_status = 'Following' 
+                WHERE s.student_status = 'Active'
+                AND se.student_enroll_status = 'Following' 
                 AND c.department_id = ?
                 AND s.student_gender IS NOT NULL AND s.student_gender != ''";
         

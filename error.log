@@ -1,140 +1,467 @@
-[31-Jan-2026 03:29:33 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:29:38 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:29:38 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:33:06 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:33:26 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:33:29 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:33:32 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:33:41 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:33:42 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:38:44 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:38:48 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:38:54 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:38:54 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:39:22 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:39:28 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:39:29 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:39:37 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:39:39 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:39:44 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:40:15 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:40:18 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:40:18 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:40:19 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:40:23 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:40:24 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:40:34 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:40:38 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:40:40 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:42:44 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:44:43 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:45:49 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:46:00 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:46:00 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:52:13 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:52:13 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:52:14 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:52:17 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:52:17 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:52:17 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:52:21 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:52:31 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:52:34 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:55:33 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:56:01 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 03:57:53 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:09:07 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:12:52 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:13:33 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:13:38 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:13:38 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:13:39 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:13:42 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:13:42 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:13:45 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:13:49 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:13:51 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:13:54 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:15:25 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:17:31 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:18:23 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:19:00 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:17 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:21 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:21 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:22 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:23 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:23 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:26 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:26 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:27 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:30 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:30 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:32 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:37 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:39 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:21:42 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:28:12 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:28:21 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 04:28:41 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:04:37 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:04:37 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:04:40 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:04:40 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:04:43 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:04:50 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:04:52 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:04:59 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:05:09 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:05:20 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:05:21 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:05:21 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:05:24 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:05:31 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:05:42 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:05:43 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:05:48 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:05:56 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:06:37 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:20:42 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:20:48 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:20:52 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:21:11 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:21:16 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:21:27 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:21:31 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:21:38 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:22:48 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:22:56 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:22:59 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:23:13 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:23:20 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:23:21 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:23:21 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:45:57 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:45:58 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:46:01 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:46:01 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:46:02 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:46:02 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:46:02 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:46:12 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:46:12 UTC] BusSeasonRequestModel::create - SQL: INSERT INTO `season_requests` 
-                    (`student_id`, `department_id`, `season_year`, `season_name`, 
-                     `route_from`, `route_to`, `change_point`, `distance_km`, `status`, `notes`) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
-[31-Jan-2026 05:46:12 UTC] BusSeasonRequestModel::create - Data: {"student_id":"2022\/EET\/4EL02","department_id":"EET","season_year":"2026","season_name":"","route_from":"point pedro","route_to":"slgti","change_point":"","distance_km":0,"notes":"Created by SAO"}
-[31-Jan-2026 05:46:12 UTC] BusSeasonRequestModel::create - Success. Insert ID: 5
-[31-Jan-2026 05:46:12 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:59:25 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:59:39 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:59:42 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:59:47 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:59:50 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:59:53 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 05:59:56 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 06:00:00 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 06:00:05 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 06:00:08 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 06:00:23 UTC] Database::connect - Connection successful to sisslgti
-[31-Jan-2026 06:30:28 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:55:02 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:55:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:55:30 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:55:33 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:55:43 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:55:49 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:56:01 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:56:05 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:56:33 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:57:38 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:57:39 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:57:47 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:57:48 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:57:48 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:57:48 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:57:56 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:57:57 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:57:57 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:57:57 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 16:58:00 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:00:50 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:00:52 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:01:00 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:01:07 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:01:13 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:01:16 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:01:47 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:02:30 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:02:36 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:02:43 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:03:02 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:03:09 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:03:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:03:23 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:03:40 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:03:49 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:04:30 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:05:39 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:05:47 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:06:40 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:06:48 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:06:51 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:08:33 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:08:41 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:08:44 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:08:46 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:08:55 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:10:59 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:11:07 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:11:07 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:11:11 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:11:12 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:11:13 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:11:13 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:12:06 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:13:16 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:13:18 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:13:24 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:13:24 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:13:27 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:13:27 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:15:55 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:16:03 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:16:03 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:16:05 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:16:05 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:20:58 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:20:59 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:21:07 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:21:07 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:21:14 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:21:14 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:22:57 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:23:07 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:23:07 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:23:07 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:23:07 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:23:07 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:23:07 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:28:08 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:28:18 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:28:18 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:28:18 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:28:18 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:28:24 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:28:24 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:28:24 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:28:24 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:28:26 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:28:26 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:28:26 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:28:26 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:28:37 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:28:37 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:28:37 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:28:37 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:28:39 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:28:39 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:28:39 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:28:39 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:30:27 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:30:27 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:31:37 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:32:13 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:32:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:32:31 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:33:34 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:34:50 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:37:48 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:37:48 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[06-Feb-2026 17:39:52 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:39:59 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:40:08 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:40:36 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:40:39 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:40:41 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:40:46 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:40:49 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:01 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:02 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:02 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[06-Feb-2026 17:41:12 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:12 UTC] Last Student ID found: 2025/ICT/4TE067 for course: 4IT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:41:12 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:12 UTC] Last Student ID found: 2025/ICT/4TE067 for course: 4IT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:41:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:15 UTC] Last Student ID found: 2025/ICT/5IT054 for course: 5IT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:41:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:15 UTC] Last Student ID found: 2025/ICT/5IT054 for course: 5IT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:41:18 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:18 UTC] No last Student ID found for course: 5IT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:41:18 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:18 UTC] No last Student ID found for course: 5IT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:41:24 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:24 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:41:24 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:24 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:41:26 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:26 UTC] No last Student ID found for course: 4CS, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:41:26 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:26 UTC] No last Student ID found for course: 4CS, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:41:28 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:28 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:41:28 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:28 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:41:29 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:29 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:41:29 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:29 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:41:43 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:44 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:44 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:44 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:48 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:48 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[06-Feb-2026 17:41:56 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:56 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:41:56 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:56 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:41:59 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:59 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:41:59 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:41:59 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:42:28 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:43:58 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:44:58 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:46:33 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:46:33 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:46:33 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[06-Feb-2026 17:47:24 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:47:24 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:47:24 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:47:24 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:47:29 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:47:29 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:47:29 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:47:29 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:47:57 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:47:57 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:47:57 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[06-Feb-2026 17:49:24 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:49:24 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[06-Feb-2026 17:49:57 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:49:57 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[06-Feb-2026 17:50:03 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:50:03 UTC] Last Student ID found: 2025/COT/4CS022 for course: 4CS, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:50:03 UTC] Next available Student ID: 2025/COT/4CS023 for course: 4CS, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:50:03 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:50:03 UTC] Last Student ID found: 2025/COT/4CS022 for course: 4CS, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:50:03 UTC] Next available Student ID: 2025/COT/4CS023 for course: 4CS, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:50:06 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:50:06 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:50:06 UTC] Next available Student ID: 2025/COT/5CT015 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:50:06 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:50:06 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:50:06 UTC] Next available Student ID: 2025/COT/5CT015 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:50:26 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:50:26 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:50:26 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[06-Feb-2026 17:52:21 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:52:22 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[06-Feb-2026 17:52:30 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:52:30 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:52:30 UTC] Next available Student ID: 2025/COT/5CT016 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:52:30 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:52:30 UTC] Last Student ID found: 2025/COT/5CT014 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:52:30 UTC] Next available Student ID: 2025/COT/5CT016 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:52:48 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:52:48 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:01 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:02 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:02 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:02 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:12 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:12 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[06-Feb-2026 17:53:18 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:18 UTC] Last Student ID found: 2025/COT/5CT016 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:53:18 UTC] Next available Student ID: 2025/COT/5CT017 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:53:18 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:18 UTC] Last Student ID found: 2025/COT/5CT016 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:53:18 UTC] Next available Student ID: 2025/COT/5CT017 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:53:20 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:20 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:53:20 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:20 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:53:23 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:23 UTC] Last Student ID found: 2025/COT/5CT016 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:53:23 UTC] Next available Student ID: 2025/COT/5CT017 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:53:23 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:23 UTC] Last Student ID found: 2025/COT/5CT016 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:53:23 UTC] Next available Student ID: 2025/COT/5CT017 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:53:27 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:27 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:53:27 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:27 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:53:53 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:53 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:53:53 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[06-Feb-2026 17:54:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:54:15 UTC] Last Student ID found: 2025/COT/5CT016 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:54:15 UTC] Next available Student ID: 2025/COT/5CT017 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:54:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:54:15 UTC] Last Student ID found: 2025/COT/5CT016 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:54:15 UTC] Next available Student ID: 2025/COT/5CT017 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:54:17 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:54:17 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:54:17 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:54:17 UTC] No last Student ID found for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:54:54 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:54:54 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:55:30 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:56:16 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:56:20 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:56:22 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:56:23 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:56:23 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:56:23 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:56:24 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:56:24 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:56:25 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:56:25 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:56:35 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:56:57 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:57:11 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:57:11 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[06-Feb-2026 17:57:17 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:57:17 UTC] Last Student ID found: 2025/COT/5CT016 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:57:17 UTC] Next available Student ID: 2025/COT/5CT017 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:57:17 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:57:17 UTC] Last Student ID found: 2025/COT/5CT016 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:57:17 UTC] Next available Student ID: 2025/COT/5CT017 for course: 5CT, year: 2025/2026, mode: Full Time
+[06-Feb-2026 17:57:19 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:57:19 UTC] Last Student ID found: 2025/COT/P/5CT001 for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:57:19 UTC] Next available Student ID: 2025/COT/P/5CT002 for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:57:19 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:57:19 UTC] Last Student ID found: 2025/COT/P/5CT001 for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:57:19 UTC] Next available Student ID: 2025/COT/P/5CT002 for course: 5CT, year: 2025/2026, mode: Part Time
+[06-Feb-2026 17:57:25 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:57:30 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:57:35 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:58:19 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:58:25 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 17:58:34 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:04:28 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:04:36 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:04:43 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:04:49 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:04:50 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:04:50 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:04:50 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:05:07 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:05:07 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:05:07 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:05:12 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:05:51 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:06:11 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:06:11 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:06:13 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:06:30 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:06:30 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:06:36 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:07:14 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:07:16 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:09:37 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:10:29 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:10:29 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:10:30 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:10:32 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:10:32 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:10:34 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:10:38 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:10:40 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:13:45 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:14:11 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:14:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:14:16 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:14:20 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:14:21 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:14:33 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:17:23 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:18:31 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:18:39 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:18:42 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:19:04 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:19:19 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:19:22 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:21:49 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:24:38 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:26:08 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:29:46 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:33:12 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:35:13 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:37:43 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:38:47 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:40:42 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:42:33 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:44:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:44:32 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:46:08 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:46:19 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:46:49 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:48:28 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:49:00 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:49:35 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:49:50 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:50:24 UTC] Database::connect - Connection successful to sisslgti
+[06-Feb-2026 18:53:03 UTC] Database::connect - Connection successful to sisslgti

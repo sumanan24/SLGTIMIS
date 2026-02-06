@@ -192,13 +192,49 @@
                                 <select class="form-select" id="course_id" name="course_id" required disabled>
                                     <option value="">Select Department First</option>
                                     <?php if (isset($courses) && !empty($courses)): ?>
+                                        <?php 
+                                        // Debug: Log first course structure (remove after debugging)
+                                        if (count($courses) > 0) {
+                                            error_log("First course structure: " . print_r(array_keys($courses[0]), true));
+                                        }
+                                        ?>
                                         <?php foreach ($courses as $course): ?>
-                                            <option value="<?php echo htmlspecialchars($course['course_id']); ?>" 
-                                                    data-department-id="<?php echo htmlspecialchars($course['department_id'] ?? ''); ?>"
-                                                    data-course-code="<?php echo htmlspecialchars($course['course_code'] ?? ''); ?>">
-                                                <?php echo htmlspecialchars($course['course_name']); ?>
+                                            <?php 
+                                            // Handle case-sensitive column names - try multiple variations
+                                            $courseId = '';
+                                            $departmentId = '';
+                                            $courseCode = '';
+                                            $courseName = '';
+                                            
+                                            // Try lowercase first (most common)
+                                            if (isset($course['course_id'])) $courseId = $course['course_id'];
+                                            elseif (isset($course['COURSE_ID'])) $courseId = $course['COURSE_ID'];
+                                            elseif (isset($course['Course_ID'])) $courseId = $course['Course_ID'];
+                                            
+                                            if (isset($course['department_id'])) $departmentId = $course['department_id'];
+                                            elseif (isset($course['DEPARTMENT_ID'])) $departmentId = $course['DEPARTMENT_ID'];
+                                            elseif (isset($course['Department_ID'])) $departmentId = $course['Department_ID'];
+                                            
+                                            if (isset($course['course_code'])) $courseCode = $course['course_code'];
+                                            elseif (isset($course['COURSE_CODE'])) $courseCode = $course['COURSE_CODE'];
+                                            elseif (isset($course['Course_Code'])) $courseCode = $course['Course_Code'];
+                                            
+                                            if (isset($course['course_name'])) $courseName = $course['course_name'];
+                                            elseif (isset($course['COURSE_NAME'])) $courseName = $course['COURSE_NAME'];
+                                            elseif (isset($course['Course_Name'])) $courseName = $course['Course_Name'];
+                                            
+                                            // Skip if essential data is missing
+                                            if (empty($courseId)) continue;
+                                            ?>
+                                            <option value="<?php echo htmlspecialchars($courseId); ?>" 
+                                                    data-department-id="<?php echo htmlspecialchars($departmentId); ?>"
+                                                    data-course-code="<?php echo htmlspecialchars($courseCode); ?>">
+                                                <?php echo htmlspecialchars($courseName ?: $courseId); ?>
                                             </option>
                                         <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <!-- Debug: No courses found -->
+                                        <option value="">No courses available</option>
                                     <?php endif; ?>
                                 </select>
                             </div>
@@ -208,8 +244,8 @@
                                     Registration Number (Student ID) <span class="text-danger">*</span>
                                 </label>
                                 <input type="text" class="form-control" id="student_id" name="student_id" 
-                                       maxlength="50" required readonly>
-                                <div class="form-text">Auto-generated based on course and academic year</div>
+                                       maxlength="50" required>
+                                
                             </div>
                         </div>
                         
@@ -237,7 +273,6 @@
                         <h6 class="fw-bold mb-3">Personal Information</h6>
                         
                         <div class="row">
-                            
                             <div class="col-md-3 mb-3">
                                 <label for="student_title" class="form-label fw-semibold">Title</label>
                                 <select class="form-select" id="student_title" name="student_title">
@@ -245,7 +280,6 @@
                                     <option value="Mr.">Mr.</option>
                                     <option value="Mrs.">Mrs.</option>
                                     <option value="Miss">Miss</option>
-                                    
                                 </select>
                             </div>
                             
@@ -269,143 +303,11 @@
                             </div>
                             
                             <div class="col-md-6 mb-3">
-                                <label for="student_ininame" class="form-label fw-semibold">Name with Initials</label>
-                                <input type="text" class="form-control" id="student_ininame" name="student_ininame" 
-                                       maxlength="255">
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="student_email" class="form-label fw-semibold">
-                                    Email <span class="text-danger">*</span>
-                                </label>
-                                <input type="email" class="form-control" id="student_email" name="student_email" 
-                                       maxlength="254" required>
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
                                 <label for="student_nic" class="form-label fw-semibold">
                                     NIC <span class="text-danger">*</span>
                                 </label>
                                 <input type="text" class="form-control" id="student_nic" name="student_nic" 
                                        maxlength="12" required>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label for="student_dob" class="form-label fw-semibold">Date of Birth</label>
-                                <input type="date" class="form-control" id="student_dob" name="student_dob">
-                            </div>
-                            
-                            <div class="col-md-4 mb-3">
-                                <label for="student_phone" class="form-label fw-semibold">Phone</label>
-                                <input type="tel" class="form-control" id="student_phone" name="student_phone" 
-                                       pattern="[0-9]{9,10}">
-                            </div>
-                            
-                            <div class="col-md-4 mb-3">
-                                <label for="student_civil" class="form-label fw-semibold">Civil Status</label>
-                                <select class="form-select" id="student_civil" name="student_civil">
-                                    <option value="Single">Single</option>
-                                    <option value="Married">Married</option>
-                                    <option value="Divorced">Divorced</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="student_address" class="form-label fw-semibold">Address</label>
-                            <textarea class="form-control" id="student_address" name="student_address" rows="2" maxlength="255"></textarea>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-3 mb-3">
-                                <label for="student_zip" class="form-label fw-semibold">ZIP Code</label>
-                                <input type="number" class="form-control" id="student_zip" name="student_zip" required>
-                            </div>
-                            
-                            <div class="col-md-3 mb-3">
-                                <label for="student_provice" class="form-label fw-semibold">Province <span class="text-danger">*</span></label>
-                                <select class="form-select" id="student_provice" name="student_provice" required>
-                                    <option value="">Select Province</option>
-                                    <option value="Western Province">Western Province</option>
-                                    <option value="Central Province">Central Province</option>
-                                    <option value="Southern Province">Southern Province</option>
-                                    <option value="Northern Province">Northern Province</option>
-                                    <option value="Eastern Province">Eastern Province</option>
-                                    <option value="North Western Province">North Western Province</option>
-                                    <option value="North Central Province">North Central Province</option>
-                                    <option value="Uva Province">Uva Province</option>
-                                    <option value="Sabaragamuwa Province">Sabaragamuwa Province</option>
-                                </select>
-                            </div>
-                            
-                            <div class="col-md-3 mb-3">
-                                <label for="student_district" class="form-label fw-semibold">District <span class="text-danger">*</span></label>
-                                <select class="form-select" id="student_district" name="student_district" required>
-                                    <option value="">Select District</option>
-                                </select>
-                            </div>
-                            
-                            <div class="col-md-3 mb-3">
-                                <label for="student_divisions" class="form-label fw-semibold">Divisions</label>
-                                <input type="text" class="form-control" id="student_divisions" name="student_divisions" maxlength="50" required>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="student_blood" class="form-label fw-semibold">Blood Group</label>
-                                <select class="form-select" id="student_blood" name="student_blood">
-                                    <option value="">Select</option>
-                                    <option value="A+">A+</option>
-                                    <option value="A-">A-</option>
-                                    <option value="B+">B+</option>
-                                    <option value="B-">B-</option>
-                                    <option value="AB+">AB+</option>
-                                    <option value="AB-">AB-</option>
-                                    <option value="O+">O+</option>
-                                    <option value="O-">O-</option>
-                                </select>
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="student_status" class="form-label fw-semibold">Status</label>
-                                <select class="form-select" id="student_status" name="student_status">
-                                    <option value="Active" selected>Active</option>
-                                    <option value="Inactive">Inactive</option>
-                                    <option value="Graduated">Graduated</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <hr class="my-4">
-                        <h6 class="fw-bold mb-3">Emergency Contact</h6>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="student_em_name" class="form-label fw-semibold">Emergency Contact Name</label>
-                                <input type="text" class="form-control" id="student_em_name" name="student_em_name" maxlength="255">
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="student_em_relation" class="form-label fw-semibold">Relation</label>
-                                <input type="text" class="form-control" id="student_em_relation" name="student_em_relation" maxlength="20">
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="student_em_address" class="form-label fw-semibold">Emergency Address</label>
-                                <textarea class="form-control" id="student_em_address" name="student_em_address" rows="2" maxlength="255"></textarea>
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="student_em_phone" class="form-label fw-semibold">Emergency Phone</label>
-                                <input type="tel" class="form-control" id="student_em_phone" name="student_em_phone" 
-                                       pattern="[0-9]{9,10}">
                             </div>
                         </div>
                         
@@ -425,142 +327,234 @@
 </div>
 
 <script>
-// Sri Lanka Provinces and Districts mapping
-const sriLankaDistricts = {
-    'Western Province': ['Colombo', 'Gampaha', 'Kalutara'],
-    'Central Province': ['Kandy', 'Matale', 'Nuwara Eliya'],
-    'Southern Province': ['Galle', 'Matara', 'Hambantota'],
-    'Northern Province': ['Jaffna', 'Kilinochchi', 'Mannar', 'Mullaitivu', 'Vavuniya'],
-    'Eastern Province': ['Batticaloa', 'Ampara', 'Trincomalee'],
-    'North Western Province': ['Kurunegala', 'Puttalam'],
-    'North Central Province': ['Anuradhapura', 'Polonnaruwa'],
-    'Uva Province': ['Badulla', 'Monaragala'],
-    'Sabaragamuwa Province': ['Ratnapura', 'Kegalle']
-};
-
-// Function to load districts based on selected province
-function loadDistricts(province) {
-    const districtSelect = document.getElementById('student_district');
-    districtSelect.innerHTML = '<option value="">Select District</option>';
-    
-    if (province && sriLankaDistricts[province]) {
-        sriLankaDistricts[province].forEach(function(district) {
-            const option = document.createElement('option');
-            option.value = district;
-            option.textContent = district;
-            districtSelect.appendChild(option);
-        });
-    }
-}
-
-// Handle province change, department/course filtering, and auto-generate registration number
+// Complete rewrite: Handle department selection -> load courses -> generate student ID
 document.addEventListener('DOMContentLoaded', function() {
-    const provinceSelect = document.getElementById('student_provice');
-    if (provinceSelect) {
-        provinceSelect.addEventListener('change', function() {
-            loadDistricts(this.value);
-        });
-    }
+    console.log('=== Student Create Form Initialized ===');
     
-    // Department and Course filtering
+    // Get form elements
     const departmentSelect = document.getElementById('department_id');
     const courseSelect = document.getElementById('course_id');
     const academicYearSelect = document.getElementById('academic_year');
+    const courseModeSelect = document.getElementById('course_mode');
     const studentIdInput = document.getElementById('student_id');
+    const createForm = document.getElementById('createStudentForm');
     
-    // Store all course options
+    // Validate elements exist
+    if (!departmentSelect || !courseSelect || !academicYearSelect || !studentIdInput) {
+        console.error('Required form elements not found!', {
+            departmentSelect: !!departmentSelect,
+            courseSelect: !!courseSelect,
+            academicYearSelect: !!academicYearSelect,
+            studentIdInput: !!studentIdInput
+        });
+        return;
+    }
+    
+    // Step 1: Store all course options from HTML on page load
     const allCourseOptions = [];
-    if (courseSelect) {
-        for (let i = 0; i < courseSelect.options.length; i++) {
-            allCourseOptions.push(courseSelect.options[i]);
+    const wasCourseDisabled = courseSelect.disabled;
+    courseSelect.disabled = false; // Temporarily enable to read options
+    
+    for (let i = 0; i < courseSelect.options.length; i++) {
+        const option = courseSelect.options[i];
+        if (option.value) { // Only store actual course options, skip placeholders
+            const deptId = option.getAttribute('data-department-id') || '';
+            const courseCode = option.getAttribute('data-course-code') || '';
+            
+            // Store course data
+            allCourseOptions.push({
+                value: option.value,
+                text: option.textContent.trim(),
+                departmentId: deptId,
+                courseCode: courseCode
+            });
         }
     }
     
-    // Filter courses based on selected department
-    function filterCoursesByDepartment() {
-        const selectedDepartmentId = departmentSelect ? departmentSelect.value : '';
+    courseSelect.disabled = wasCourseDisabled; // Restore disabled state
+    console.log('✓ Stored', allCourseOptions.length, 'course options');
+    
+    // Step 2: Function to load courses when department is selected
+    function loadCoursesForDepartment() {
+        const selectedDeptId = departmentSelect.value.trim();
         
-        if (!courseSelect) return;
+        console.log('--- Loading courses for department:', selectedDeptId, '---');
         
-        // Clear current options
+        // Clear course dropdown and student ID
         courseSelect.innerHTML = '<option value="">Select Course</option>';
-        studentIdInput.value = ''; // Clear registration number when department changes
+        if (studentIdInput) {
+            studentIdInput.value = '';
+        }
         
-        if (!selectedDepartmentId) {
+        // If no department selected, disable course dropdown
+        if (!selectedDeptId) {
             courseSelect.disabled = true;
             courseSelect.innerHTML = '<option value="">Select Department First</option>';
             return;
         }
         
-        // Add courses that match the selected department
-        let hasCourses = false;
-        allCourseOptions.forEach(function(option) {
-            if (option.value && option.getAttribute('data-department-id') === selectedDepartmentId) {
-                courseSelect.appendChild(option.cloneNode(true));
-                hasCourses = true;
+        // Filter and add courses matching the selected department
+        let matchedCount = 0;
+        allCourseOptions.forEach(function(course) {
+            if (course.departmentId === selectedDeptId) {
+                const option = document.createElement('option');
+                option.value = course.value;
+                option.textContent = course.text;
+                option.setAttribute('data-department-id', course.departmentId);
+                option.setAttribute('data-course-code', course.courseCode);
+                courseSelect.appendChild(option);
+                matchedCount++;
             }
         });
         
-        if (hasCourses) {
+        // Enable course dropdown if courses found
+        if (matchedCount > 0) {
             courseSelect.disabled = false;
+            console.log('✓ Loaded', matchedCount, 'courses for department', selectedDeptId);
         } else {
             courseSelect.disabled = true;
             courseSelect.innerHTML = '<option value="">No courses available for this department</option>';
+            console.warn('✗ No courses found for department:', selectedDeptId);
         }
     }
     
-    // Auto-generate registration number when course and academic year are selected
-    function generateRegistrationNumber() {
-        const courseId = courseSelect.value;
-        const academicYear = academicYearSelect.value;
+    // Step 3: Function to generate student ID when course and academic year are selected
+    function generateStudentId() {
+        const courseId = courseSelect.value.trim();
+        const academicYear = academicYearSelect.value.trim();
+        const courseMode = courseModeSelect ? courseModeSelect.value : 'Full Time';
         
+        console.log('--- Generating Student ID ---');
+        console.log('Course:', courseId);
+        console.log('Academic Year:', academicYear);
+        console.log('Course Mode:', courseMode);
+        
+        // Clear student ID if course or academic year is missing
         if (!courseId || !academicYear) {
-            studentIdInput.value = '';
+            if (studentIdInput) {
+                studentIdInput.value = '';
+            }
+            console.log('Missing course or academic year');
             return;
         }
         
-        // Fetch last registration number via AJAX
-        fetch('<?php echo APP_URL; ?>/students/get-last-reg-number?course_id=' + encodeURIComponent(courseId) + '&academic_year=' + encodeURIComponent(academicYear))
-            .then(response => response.json())
+        // Show loading state
+        if (studentIdInput) {
+            studentIdInput.value = 'Loading...';
+        }
+        
+        // Fetch last student ID via AJAX
+        const url = '<?php echo APP_URL; ?>/students/get-last-reg-number?course_id=' + 
+                    encodeURIComponent(courseId) + 
+                    '&academic_year=' + encodeURIComponent(academicYear) + 
+                    '&course_mode=' + encodeURIComponent(courseMode);
+        
+        console.log('Fetching from:', url);
+        
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return response.json();
+            })
             .then(data => {
-                if (data.success && data.nextRegNumber) {
-                    studentIdInput.value = data.nextRegNumber;
+                console.log('Server response:', data);
+                
+                if (data.success && data.lastRegNumber && studentIdInput) {
+                    // Backend now returns the next available ID that doesn't exist yet
+                    const nextAvailableId = data.lastRegNumber;
+                    console.log('Next Available Student ID:', nextAvailableId);
+                    
+                    // Use the ID directly (backend already found the next available one)
+                    studentIdInput.value = nextAvailableId;
+                    console.log('✓ Generated Student ID:', nextAvailableId);
                 } else {
-                    // Generate first registration number if none exists
-                    const courseOption = courseSelect.options[courseSelect.selectedIndex];
-                    const courseCode = courseOption.getAttribute('data-course-code') || courseId.substring(0, 3).toUpperCase();
-                    const year = academicYear.split('/')[0] || new Date().getFullYear();
-                    studentIdInput.value = year + '_' + courseCode + '_001';
+                    if (studentIdInput) {
+                        studentIdInput.value = '';
+                    }
+                    console.log('No student ID found:', data.error || 'Unknown error');
                 }
             })
             .catch(error => {
-                console.error('Error generating registration number:', error);
-                // Fallback: generate basic format
-                const courseOption = courseSelect.options[courseSelect.selectedIndex];
-                const courseCode = courseOption.getAttribute('data-course-code') || courseId.substring(0, 3).toUpperCase();
-                const year = academicYear.split('/')[0] || new Date().getFullYear();
-                studentIdInput.value = year + '_' + courseCode + '_001';
+                console.error('Error:', error);
+                if (studentIdInput) {
+                    studentIdInput.value = '';
+                }
             });
     }
     
-    // Event listeners
-    if (departmentSelect) {
-        departmentSelect.addEventListener('change', function() {
-            filterCoursesByDepartment();
-            // Clear course selection and registration number when department changes
-            if (courseSelect) {
-                courseSelect.value = '';
-            }
+    // Step 4: Set up event listeners
+    
+    // Department change: Load courses
+    departmentSelect.addEventListener('change', function() {
+        console.log('Department changed to:', this.value);
+        loadCoursesForDepartment();
+        // Clear course and student ID
+        courseSelect.value = '';
+        if (studentIdInput) {
             studentIdInput.value = '';
+        }
+    });
+    
+    // Course change: Generate student ID (if academic year is also selected)
+    courseSelect.addEventListener('change', function() {
+        console.log('Course changed to:', this.value);
+        if (academicYearSelect.value) {
+            generateStudentId();
+        } else {
+            if (studentIdInput) {
+                studentIdInput.value = '';
+            }
+        }
+    });
+    
+    // Academic Year change: Generate student ID (if course is also selected)
+    academicYearSelect.addEventListener('change', function() {
+        console.log('Academic Year changed to:', this.value);
+        if (courseSelect.value) {
+            generateStudentId();
+        } else {
+            if (studentIdInput) {
+                studentIdInput.value = '';
+            }
+        }
+    });
+    
+    // Course Mode change: Regenerate student ID (if course and academic year are selected)
+    if (courseModeSelect) {
+        courseModeSelect.addEventListener('change', function() {
+            console.log('Course Mode changed to:', this.value);
+            if (courseSelect.value && academicYearSelect.value) {
+                generateStudentId();
+            }
         });
     }
     
-    if (courseSelect && academicYearSelect && studentIdInput) {
-        courseSelect.addEventListener('change', generateRegistrationNumber);
-        academicYearSelect.addEventListener('change', generateRegistrationNumber);
+    // Also use form-level event delegation as backup
+    if (createForm) {
+        createForm.addEventListener('change', function(e) {
+            if (e.target.id === 'department_id') {
+                loadCoursesForDepartment();
+            } else if (e.target.id === 'course_id' || e.target.id === 'academic_year' || e.target.id === 'course_mode') {
+                if (courseSelect.value && academicYearSelect.value) {
+                    generateStudentId();
+                }
+            }
+        });
     }
     
-    // Excel Import Form - Department and Course filtering
+    // If department is pre-selected on page load, load courses
+    if (departmentSelect.value) {
+        console.log('Department pre-selected:', departmentSelect.value);
+        loadCoursesForDepartment();
+    }
+    
+    console.log('=== Form initialization complete ===');
+});
+
+// Excel Import Form - Department and Course filtering (separate from create form)
+document.addEventListener('DOMContentLoaded', function() {
     const importDepartmentSelect = document.getElementById('import_department_id');
     const importCourseSelect = document.getElementById('import_course_id');
     const allImportCourseOptions = [];
@@ -606,32 +600,36 @@ document.addEventListener('DOMContentLoaded', function() {
         importDepartmentSelect.addEventListener('change', filterImportCoursesByDepartment);
     }
     
-    // Form validation: Ensure Full Name and NIC are required when enrollment is being created
+    // Form validation: Ensure Student ID, Full Name, and NIC are required
     const createForm = document.getElementById('createStudentForm');
+    const studentIdInput = document.getElementById('student_id');
     const fullNameInput = document.getElementById('student_fullname');
     const nicInput = document.getElementById('student_nic');
     
-    if (createForm && departmentSelect && courseSelect && academicYearSelect && fullNameInput && nicInput) {
+    if (createForm && studentIdInput && fullNameInput && nicInput) {
         createForm.addEventListener('submit', function(e) {
-            const hasDepartment = departmentSelect.value !== '';
-            const hasCourse = courseSelect.value !== '';
-            const hasAcademicYear = academicYearSelect.value !== '';
+            // Validate Student ID
+            if (!studentIdInput.value.trim()) {
+                e.preventDefault();
+                alert('Student ID is required.');
+                studentIdInput.focus();
+                return false;
+            }
             
-            // If enrollment fields are filled, Full Name and NIC must be filled
-            if (hasDepartment && hasCourse && hasAcademicYear) {
-                if (!fullNameInput.value.trim()) {
-                    e.preventDefault();
-                    alert('Full Name is required when creating enrollment.');
-                    fullNameInput.focus();
-                    return false;
-                }
-                
-                if (!nicInput.value.trim()) {
-                    e.preventDefault();
-                    alert('NIC is required when creating enrollment.');
-                    nicInput.focus();
-                    return false;
-                }
+            // Validate Full Name
+            if (!fullNameInput.value.trim()) {
+                e.preventDefault();
+                alert('Full Name is required.');
+                fullNameInput.focus();
+                return false;
+            }
+            
+            // Validate NIC
+            if (!nicInput.value.trim()) {
+                e.preventDefault();
+                alert('NIC is required.');
+                nicInput.focus();
+                return false;
             }
         });
     }

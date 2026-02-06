@@ -466,10 +466,14 @@
                                     
                                     <div class="col-12 col-md-4 mb-3">
                                         <label for="student_religion" class="form-label fw-semibold">Religion <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="student_religion" name="student_religion" 
-                                               value="<?php echo htmlspecialchars($student['student_religion'] ?? ''); ?>" 
-                                               maxlength="20" required>
-                                        <div class="invalid-feedback">Please enter religion.</div>
+                                        <select class="form-select" id="student_religion" name="student_religion" required>
+                                            <option value="">Select Religion</option>
+                                            <option value="Buddhism" <?php echo (isset($student['student_religion']) && $student['student_religion'] === 'Buddhism') ? 'selected' : ''; ?>>Buddhism</option>
+                                            <option value="Hinduism" <?php echo (isset($student['student_religion']) && $student['student_religion'] === 'Hinduism') ? 'selected' : ''; ?>>Hinduism</option>
+                                            <option value="Christianity" <?php echo (isset($student['student_religion']) && $student['student_religion'] === 'Christianity') ? 'selected' : ''; ?>>Christianity</option>
+                                            <option value="Islam" <?php echo (isset($student['student_religion']) && $student['student_religion'] === 'Islam') ? 'selected' : ''; ?>>Islam</option>
+                                        </select>
+                                        <div class="invalid-feedback">Please select religion.</div>
                                     </div>
                                 </div>
                                 
