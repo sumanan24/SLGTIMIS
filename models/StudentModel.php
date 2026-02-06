@@ -1092,8 +1092,12 @@ class StudentModel extends Model {
     
     /**
      * Get students count by Religion (only active students with status 'Following')
+     * Only returns the 4 main religions: Buddhism, Hinduism, Islam, Christianity
      */
     public function getStudentsByReligion($academicYear = null) {
+        // Define the 4 main religions (case-insensitive matching)
+        $mainReligions = ['Buddhism', 'Hinduism', 'Islam', 'Christianity'];
+        
         $sql = "SELECT s.student_religion, COUNT(DISTINCT s.student_id) as count 
                 FROM `{$this->table}` s
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id";
@@ -1105,6 +1109,18 @@ class StudentModel extends Model {
         ];
         $params = [];
         $types = '';
+        
+        // Filter to only include the 4 main religions (case-insensitive)
+        $religionConditions = [];
+        foreach ($mainReligions as $religion) {
+            $religionConditions[] = "LOWER(TRIM(s.student_religion)) = LOWER(TRIM(?))";
+            $params[] = $religion;
+            $types .= 's';
+        }
+        
+        if (!empty($religionConditions)) {
+            $conditions[] = "(" . implode(' OR ', $religionConditions) . ")";
+        }
         
         if (!empty($academicYear)) {
             $conditions[] = "se.academic_year = ?";
@@ -1128,11 +1144,67 @@ class StudentModel extends Model {
         
         if ($result && $result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
-                $data[$row['student_religion']] = (int)$row['count'];
+                $religion = trim($row['student_religion']);
+                // Normalize religion name to match one of the 4 main religions
+                $normalizedReligion = $this->normalizeReligionName($religion);
+                if ($normalizedReligion) {
+                    // If this religion already exists in data, add to it (in case of case variations)
+                    if (isset($data[$normalizedReligion])) {
+                        $data[$normalizedReligion] += (int)$row['count'];
+                    } else {
+                        $data[$normalizedReligion] = (int)$row['count'];
+                    }
+                }
             }
         }
         
-        return $data;
+        // Ensure all 4 main religions are in the result (with 0 count if no students)
+        $finalData = [];
+        foreach ($mainReligions as $religion) {
+            $finalData[$religion] = $data[$religion] ?? 0;
+        }
+        
+        // Sort by count descending
+        arsort($finalData);
+        
+        return $finalData;
+    }
+    
+    /**
+     * Normalize religion name to one of the 4 main religions
+     */
+    private function normalizeReligionName($religion) {
+        $religion = trim($religion);
+        $religionLower = strtolower($religion);
+        
+        // Map variations to main religions
+        $religionMap = [
+            'buddhism' => 'Buddhism',
+            'buddhist' => 'Buddhism',
+            'hinduism' => 'Hinduism',
+            'hindu' => 'Hinduism',
+            'islam' => 'Islam',
+            'muslim' => 'Islam',
+            'islamic' => 'Islam',
+            'christianity' => 'Christianity',
+            'christian' => 'Christianity',
+            'catholic' => 'Christianity',
+            'protestant' => 'Christianity'
+        ];
+        
+        if (isset($religionMap[$religionLower])) {
+            return $religionMap[$religionLower];
+        }
+        
+        // If exact match with main religions
+        $mainReligions = ['Buddhism', 'Hinduism', 'Islam', 'Christianity'];
+        foreach ($mainReligions as $mainReligion) {
+            if (strtolower($mainReligion) === $religionLower) {
+                return $mainReligion;
+            }
+        }
+        
+        return null;
     }
     
     /**
