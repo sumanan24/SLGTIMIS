@@ -12,8 +12,9 @@ class RoomAllocationController extends Controller {
             return;
         }
         
-        // Only SAO and ADM can access room allocations
-        if (!$this->checkRoomAllocationAccess()) {
+        // Allow SAO, ADM, and FIN to view room allocations
+        // FIN users have read-only access
+        if (!$this->checkRoomAllocationViewAccess()) {
             return;
         }
         
@@ -42,6 +43,11 @@ class RoomAllocationController extends Controller {
         
         $hostels = $hostelModel->getAll();
         $roomModel = $this->model('RoomModel');
+        
+        // Check if user can manage (create/edit/delete) room allocations
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $canManage = $userModel->canManageRoomAllocations($_SESSION['user_id']);
         
         // If hostel is selected and no room filter, show room-wise card view
         $roomWiseView = !empty($hostelId) && empty($roomId) && empty($search);
@@ -81,6 +87,7 @@ class RoomAllocationController extends Controller {
                 'status' => $status,
                 'hostels' => $hostels,
                 'rooms' => $rooms,
+                'canManage' => $canManage,
                 'message' => $_SESSION['message'] ?? null,
                 'error' => $_SESSION['error'] ?? null
             ];
@@ -110,6 +117,7 @@ class RoomAllocationController extends Controller {
                 'status' => $status,
                 'hostels' => $hostels,
                 'rooms' => $rooms,
+                'canManage' => $canManage,
                 'message' => $_SESSION['message'] ?? null,
                 'error' => $_SESSION['error'] ?? null
             ];

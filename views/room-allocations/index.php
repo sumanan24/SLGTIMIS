@@ -3,9 +3,11 @@
         <div class="card-header bg-primary text-white">
             <div class="d-flex align-items-center justify-content-between flex-wrap">
                 <h5 class="mb-0 fw-bold"><i class="fas fa-user-check me-2"></i>Room Allocations</h5>
+                <?php if (isset($canManage) && $canManage): ?>
                 <a href="<?php echo APP_URL; ?>/room-allocations/create" class="btn btn-light btn-sm mt-2 mt-md-0">
                     <i class="fas fa-plus me-1"></i>Allocate Room
                 </a>
+                <?php endif; ?>
             </div>
         </div>
         <div class="card-body">
@@ -364,6 +366,7 @@
                                         </span>
                                     </td>
                                     <td class="text-end">
+                                        <?php if (isset($canManage) && $canManage): ?>
                                         <div class="btn-group" role="group">
                                             <a href="<?php echo APP_URL; ?>/room-allocations/edit?id=<?php echo urlencode($allocation['id'] ?? ''); ?>" 
                                                class="btn btn-sm btn-outline-primary" title="Edit">
@@ -381,6 +384,9 @@
                                                 <i class="fas fa-trash"></i>
                                             </a>
                                         </div>
+                                        <?php else: ?>
+                                        <span class="text-muted small">View Only</span>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -416,9 +422,11 @@
                     <div class="text-center py-5">
                         <i class="fas fa-user-check fa-3x text-muted mb-3"></i>
                         <p class="text-muted">No room allocations found.</p>
+                        <?php if (isset($canManage) && $canManage): ?>
                         <a href="<?php echo APP_URL; ?>/room-allocations/create" class="btn btn-primary">
                             <i class="fas fa-plus me-1"></i>Create First Allocation
                         </a>
+                        <?php endif; ?>
                     </div>
                 <?php endif; ?>
             <?php endif; ?>

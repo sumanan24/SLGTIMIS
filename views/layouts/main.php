@@ -186,10 +186,20 @@
                                 $canViewHostelInfo = in_array($userRole, $allowedHostelViewRoles) || $isAdmin;
                             }
                             
+                            // Check if user can view room allocations (SAO, ADM, FIN, Admin)
+                            $canViewRoomAllocations = false;
+                            if (isset($_SESSION['user_id'])) {
+                                $allowedRoomAllocRoles = ['SAO', 'ADM', 'FIN'];
+                                $canViewRoomAllocations = in_array($userRole, $allowedRoomAllocRoles) || $isAdmin;
+                            }
+                            
                             if ($isAdminOrADM && !$isHOD) {
                                 $studentAffairsPages = array_merge($studentAffairsPages, ['hostels', 'rooms']);
                             }
                             if ($canManageRoomAllocations && !$isHOD) {
+                                $studentAffairsPages[] = 'room-allocations';
+                            }
+                            if ($canViewRoomAllocations && !$isHOD) {
                                 $studentAffairsPages[] = 'room-allocations';
                             }
                             if ($canViewHostelInfo) {
@@ -236,7 +246,7 @@
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    <?php if ($canManageRoomAllocations && !$isHOD): ?>
+                                    <?php if ($canViewRoomAllocations && !$isHOD): ?>
                                     <li class="menu-divider-submenu"></li>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/room-allocations" class="<?php echo (isset($page) && $page === 'room-allocations') ? 'active' : ''; ?>">

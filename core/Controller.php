@@ -298,6 +298,33 @@ class Controller {
     }
     
     /**
+     * Check if user can view room allocations (SAO, ADM, or FIN)
+     * FIN users have read-only access
+     */
+    protected function checkRoomAllocationViewAccess() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $userRole = $userModel->getUserRole($_SESSION['user_id']);
+        
+        // Allow SAO, ADM, Admin, and FIN to view room allocations
+        $allowedRoles = ['SAO', 'ADM', 'FIN'];
+        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
+        
+        if (!in_array($userRole, $allowedRoles) && !$isAdmin) {
+            $_SESSION['error'] = 'Access denied. Room Allocations section is only available for authorized roles.';
+            $this->redirect('dashboard');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
      * Log activity - Helper method for all controllers
      * 
      * @param string $activityType CREATE, UPDATE, DELETE, APPROVE, REJECT, VIEW, etc.
