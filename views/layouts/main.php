@@ -178,11 +178,22 @@
                             <?php 
                             // Build student affairs pages array
                             $studentAffairsPages = ['students'];
+                            
+                            // Check if user can view hostel information (FIN, ACC, DIR, REG, HOD, IN1, IN2, IN3, SAO, ADM, Admin)
+                            $canViewHostelInfo = false;
+                            if (isset($_SESSION['user_id'])) {
+                                $allowedHostelViewRoles = ['FIN', 'ACC', 'DIR', 'REG', 'HOD', 'IN1', 'IN2', 'IN3', 'SAO', 'ADM'];
+                                $canViewHostelInfo = in_array($userRole, $allowedHostelViewRoles) || $isAdmin;
+                            }
+                            
                             if ($isAdminOrADM && !$isHOD) {
                                 $studentAffairsPages = array_merge($studentAffairsPages, ['hostels', 'rooms']);
                             }
                             if ($canManageRoomAllocations && !$isHOD) {
                                 $studentAffairsPages[] = 'room-allocations';
+                            }
+                            if ($canViewHostelInfo) {
+                                $studentAffairsPages[] = 'students'; // Ensure students page is in array
                             }
                             ?>
                             <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, $studentAffairsPages)) ? 'active' : ''; ?>">
@@ -198,6 +209,18 @@
                                             <span>Students</span>
                                         </a>
                                     </li>
+                                    
+                                    <!-- Hostel Information Section - Visible to FIN, ACC, DIR, REG, HOD, IN1, IN2, IN3, SAO, ADM -->
+                                    <?php if ($canViewHostelInfo): ?>
+                                    <li class="menu-divider-submenu"></li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/students" class="<?php echo (isset($page) && $page === 'students') ? 'active' : ''; ?>" title="View students and their hostel allocation information">
+                                            <i class="fas fa-bed"></i>
+                                            <span>Hostel Allocations</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
+                                    
                                     <?php if ($isAdminOrADM && !$isHOD): ?>
                                     <li class="menu-divider-submenu"></li>
                                     <li>

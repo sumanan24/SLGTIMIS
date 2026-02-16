@@ -631,59 +631,100 @@
 
         <!-- Additional Information Row -->
         <div class="row g-4">
-            <!-- Hostel Information -->
+            <!-- Hostel Information - Visible to FIN, ACC, HOD, IN1, IN2, IN3, SAO, ADM, DIR, REG -->
             <div class="col-lg-6">
                 <div class="cv-card">
                     <h3 class="cv-section-title">
                         <i class="fas fa-bed"></i>
-                        Hostel Information
+                        Hostel Allocation Information
                     </h3>
                     <?php if ($hasHostel && !empty($hostelAllocation)): ?>
-                        <div class="cv-info-grid">
-                            <div class="cv-info-item">
-                                <div class="cv-info-icon"><i class="fas fa-building"></i></div>
-                                <div class="cv-info-content">
-                                    <div class="cv-info-label">Hostel</div>
-                                    <div class="cv-info-value"><?php echo htmlspecialchars($hostelAllocation['hostel_name'] ?? 'N/A'); ?></div>
-                                </div>
-                            </div>
-                            <div class="cv-info-item">
-                                <div class="cv-info-icon"><i class="fas fa-layer-group"></i></div>
-                                <div class="cv-info-content">
-                                    <div class="cv-info-label">Block</div>
-                                    <div class="cv-info-value"><?php echo htmlspecialchars($hostelAllocation['block_name'] ?? 'N/A'); ?></div>
-                                </div>
-                            </div>
-                            <div class="cv-info-item">
-                                <div class="cv-info-icon"><i class="fas fa-door-open"></i></div>
-                                <div class="cv-info-content">
-                                    <div class="cv-info-label">Room Number</div>
-                                    <div class="cv-info-value">
-                                        <span class="cv-badge cv-badge-info">
-                                            <?php echo htmlspecialchars($hostelAllocation['room_no'] ?? 'N/A'); ?>
-                                        </span>
+                        <!-- Current Hostel Allocation -->
+                        <div class="mb-3">
+                            <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--primary-navy); margin-bottom: 1rem;">
+                                <i class="fas fa-check-circle text-success me-2"></i>Current Allocation
+                            </h4>
+                            <div class="cv-info-grid">
+                                <div class="cv-info-item">
+                                    <div class="cv-info-icon"><i class="fas fa-building"></i></div>
+                                    <div class="cv-info-content">
+                                        <div class="cv-info-label">Hostel</div>
+                                        <div class="cv-info-value"><?php echo htmlspecialchars($hostelAllocation['hostel_name'] ?? 'N/A'); ?></div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="cv-info-item">
-                                <div class="cv-info-icon"><i class="fas fa-calendar-check"></i></div>
-                                <div class="cv-info-content">
-                                    <div class="cv-info-label">Allocated Date</div>
-                                    <div class="cv-info-value"><?php echo htmlspecialchars($hostelAllocation['allocated_at'] ?? 'N/A'); ?></div>
+                                <div class="cv-info-item">
+                                    <div class="cv-info-icon"><i class="fas fa-layer-group"></i></div>
+                                    <div class="cv-info-content">
+                                        <div class="cv-info-label">Block</div>
+                                        <div class="cv-info-value"><?php echo htmlspecialchars($hostelAllocation['block_name'] ?? 'N/A'); ?></div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="cv-info-item">
-                                <div class="cv-info-icon"><i class="fas fa-check-circle"></i></div>
-                                <div class="cv-info-content">
-                                    <div class="cv-info-label">Status</div>
-                                    <div class="cv-info-value">
-                                        <span class="cv-badge cv-badge-success">
-                                            <?php echo ucfirst($hostelAllocation['status'] ?? 'Active'); ?>
-                                        </span>
+                                <div class="cv-info-item">
+                                    <div class="cv-info-icon"><i class="fas fa-door-open"></i></div>
+                                    <div class="cv-info-content">
+                                        <div class="cv-info-label">Room Number</div>
+                                        <div class="cv-info-value">
+                                            <span class="cv-badge cv-badge-info">
+                                                <?php echo htmlspecialchars($hostelAllocation['room_no'] ?? 'N/A'); ?>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cv-info-item">
+                                    <div class="cv-info-icon"><i class="fas fa-calendar-check"></i></div>
+                                    <div class="cv-info-content">
+                                        <div class="cv-info-label">Allocated Date</div>
+                                        <div class="cv-info-value"><?php echo htmlspecialchars($hostelAllocation['allocated_at'] ?? 'N/A'); ?></div>
+                                    </div>
+                                </div>
+                                <div class="cv-info-item">
+                                    <div class="cv-info-icon"><i class="fas fa-check-circle"></i></div>
+                                    <div class="cv-info-content">
+                                        <div class="cv-info-label">Status</div>
+                                        <div class="cv-info-value">
+                                            <span class="cv-badge cv-badge-success">
+                                                <?php echo ucfirst($hostelAllocation['status'] ?? 'Active'); ?>
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Hostel Allocation History -->
+                        <?php if (!empty($hostelHistory) && count($hostelHistory) > 1): ?>
+                        <div class="mt-4 pt-3 border-top">
+                            <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--primary-navy); margin-bottom: 1rem;">
+                                <i class="fas fa-history me-2"></i>Allocation History
+                            </h4>
+                            <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>Hostel</th>
+                                            <th>Room</th>
+                                            <th>Allocated</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach (array_slice($hostelHistory, 0, 5) as $history): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($history['hostel_name'] ?? 'N/A'); ?></td>
+                                            <td><?php echo htmlspecialchars($history['room_no'] ?? 'N/A'); ?></td>
+                                            <td><?php echo htmlspecialchars($history['allocated_at'] ?? 'N/A'); ?></td>
+                                            <td>
+                                                <span class="badge bg-<?php echo ($history['status'] ?? '') === 'active' ? 'success' : 'secondary'; ?>">
+                                                    <?php echo ucfirst($history['status'] ?? 'N/A'); ?>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div class="cv-empty-state">
                             <i class="fas fa-bed"></i>
@@ -737,6 +778,139 @@
                 </div>
             </div>
         </div>
+
+        <!-- Payment Information Section -->
+        <?php if (isset($payments) && !empty($payments)): ?>
+        <div class="cv-card mt-4">
+            <h3 class="cv-section-title">
+                <i class="fas fa-money-bill-wave"></i>
+                Payment Information
+            </h3>
+            
+            <!-- Payment Statistics -->
+            <?php if (isset($paymentStats)): ?>
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <div class="cv-info-item" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-left: none;">
+                        <div class="cv-info-icon" style="background: rgba(255, 255, 255, 0.2);">
+                            <i class="fas fa-receipt"></i>
+                        </div>
+                        <div class="cv-info-content">
+                            <div class="cv-info-label" style="color: rgba(255, 255, 255, 0.8);">Total Payments</div>
+                            <div class="cv-info-value" style="color: white; font-size: 1.25rem; font-weight: 700;">
+                                <?php echo number_format($paymentStats['total'] ?? 0); ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="cv-info-item" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border-left: none;">
+                        <div class="cv-info-icon" style="background: rgba(255, 255, 255, 0.2);">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="cv-info-content">
+                            <div class="cv-info-label" style="color: rgba(255, 255, 255, 0.8);">Approved Amount</div>
+                            <div class="cv-info-value" style="color: white; font-size: 1.25rem; font-weight: 700;">
+                                Rs. <?php echo number_format($paymentStats['approvedAmount'] ?? 0, 2); ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="cv-info-item" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); color: #212529; border-left: none;">
+                        <div class="cv-info-icon" style="background: rgba(0, 0, 0, 0.1);">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="cv-info-content">
+                            <div class="cv-info-label" style="color: rgba(0, 0, 0, 0.7);">Pending Amount</div>
+                            <div class="cv-info-value" style="color: #212529; font-size: 1.25rem; font-weight: 700;">
+                                Rs. <?php echo number_format($paymentStats['pendingAmount'] ?? 0, 2); ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="cv-info-item" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white; border-left: none;">
+                        <div class="cv-info-icon" style="background: rgba(255, 255, 255, 0.2);">
+                            <i class="fas fa-coins"></i>
+                        </div>
+                        <div class="cv-info-content">
+                            <div class="cv-info-label" style="color: rgba(255, 255, 255, 0.8);">Total Amount</div>
+                            <div class="cv-info-value" style="color: white; font-size: 1.25rem; font-weight: 700;">
+                                Rs. <?php echo number_format($paymentStats['totalAmount'] ?? 0, 2); ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            
+            <!-- Payment History Table -->
+            <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th style="font-weight: 600;">Payment ID</th>
+                            <th style="font-weight: 600;">Date</th>
+                            <th style="font-weight: 600;">Amount</th>
+                            <th style="font-weight: 600;">Type</th>
+                            <th style="font-weight: 600;">Reason</th>
+                            <th style="font-weight: 600;">Method</th>
+                            <th style="font-weight: 600;">Status</th>
+                            <th style="font-weight: 600;">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($payments as $payment): ?>
+                        <tr>
+                            <td>
+                                <span class="fw-semibold text-primary">#<?php echo htmlspecialchars($payment['pays_id'] ?? 'N/A'); ?></span>
+                            </td>
+                            <td>
+                                <?php echo !empty($payment['pays_date']) ? date('M d, Y', strtotime($payment['pays_date'])) : 'N/A'; ?>
+                            </td>
+                            <td>
+                                <span class="fw-bold text-success">Rs. <?php echo number_format($payment['pays_amount'] ?? 0, 2); ?></span>
+                            </td>
+                            <td><?php echo htmlspecialchars($payment['payment_type'] ?? 'N/A'); ?></td>
+                            <td><?php echo htmlspecialchars($payment['payment_reason'] ?? 'N/A'); ?></td>
+                            <td><?php echo htmlspecialchars($payment['payment_method'] ?? 'N/A'); ?></td>
+                            <td>
+                                <?php
+                                $statusClass = 'bg-warning text-dark';
+                                $statusText = 'Pending';
+                                if (!empty($payment['approved']) && $payment['approved'] == 1) {
+                                    $statusClass = 'bg-success';
+                                    $statusText = 'Approved';
+                                }
+                                ?>
+                                <span class="badge <?php echo $statusClass; ?>">
+                                    <?php echo $statusText; ?>
+                                </span>
+                            </td>
+                            <td>
+                                <small class="text-muted" style="max-width: 200px; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="<?php echo htmlspecialchars($payment['pays_note'] ?? ''); ?>">
+                                    <?php echo htmlspecialchars($payment['pays_note'] ?? '-'); ?>
+                                </small>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php elseif (isset($payments) && empty($payments)): ?>
+        <div class="cv-card mt-4">
+            <h3 class="cv-section-title">
+                <i class="fas fa-money-bill-wave"></i>
+                Payment Information
+            </h3>
+            <div class="cv-empty-state">
+                <i class="fas fa-money-bill-wave"></i>
+                <p>No payment records found for this student.</p>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- Actions Section -->
         <div class="cv-card mt-4">

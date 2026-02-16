@@ -7,6 +7,31 @@
         background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
         min-height: calc(100vh - 60px);
         padding: 2rem 1.5rem;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+    
+    .dashboard-container .row {
+        display: flex;
+        flex-wrap: wrap;
+        margin-left: 0;
+        margin-right: 0;
+    }
+    
+    .dashboard-container .row > [class*="col-"] {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .row.g-4 > [class*="col-md-4"] {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .row.g-4 > [class*="col-md-4"] > .card {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
     }
     
     .dashboard-welcome-card {
@@ -20,6 +45,8 @@
     .dashboard-welcome-card .card-body {
         color: #1e293b;
         padding: 2rem;
+        display: flex;
+        flex-direction: column;
     }
     
     .dashboard-welcome-card h1 {
@@ -73,6 +100,19 @@
         box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
         transition: all 0.3s ease;
         height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .dashboard-stats-card .card-body {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
+        min-height: 180px;
+    }
+    
+    .dashboard-stats-card .card-body > .d-flex {
+        height: 100%;
     }
     
     .dashboard-stats-card:hover {
@@ -103,7 +143,8 @@
         font-weight: 600;
         letter-spacing: 0.5px;
         text-transform: uppercase;
-        margin-bottom: 1rem;
+        margin-bottom: 0.75rem;
+        line-height: 1.2;
     }
     
     .stats-card-value {
@@ -120,6 +161,8 @@
     .stats-card-subtitle {
         color: #64748b;
         font-size: 0.85rem;
+        line-height: 1.4;
+        margin-top: 0.5rem;
     }
     
     .stats-card-icon {
@@ -133,6 +176,7 @@
         background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
         color: #ffffff;
         box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        flex-shrink: 0;
     }
     
     .dashboard-stats-card:nth-child(2) .stats-card-icon {
@@ -152,6 +196,8 @@
         box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
         transition: all 0.3s ease;
         height: 100%;
+        display: flex;
+        flex-direction: column;
     }
     
     .dashboard-chart-card:hover {
@@ -172,6 +218,16 @@
     .chart-card-body {
         padding: 1.5rem;
         color: #2c3e50;
+        flex-grow: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 280px;
+    }
+    
+    .chart-card-body canvas {
+        max-width: 100%;
+        height: auto !important;
     }
     
     .chart-stat-item {
@@ -273,6 +329,8 @@
         transition: all 0.3s ease;
         height: 100%;
         box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+        display: flex;
+        flex-direction: column;
     }
     
     .course-enrollment-card:hover {
@@ -299,6 +357,7 @@
         display: flex;
         gap: 0.5rem;
         flex-wrap: wrap;
+        align-items: center;
     }
     
     .badge-nvq {
@@ -324,6 +383,8 @@
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
+        flex-grow: 1;
+        justify-content: flex-end;
     }
     
     .dept-name {
@@ -337,14 +398,17 @@
         justify-content: space-between;
         align-items: center;
         gap: 0.5rem;
+        width: 100%;
     }
     
     .stat-item {
         display: flex;
         flex-direction: column;
         align-items: center;
+        justify-content: center;
         gap: 0.25rem;
         flex: 1;
+        min-width: 0;
     }
     
     .stat-item i {
@@ -383,6 +447,16 @@
         padding: 1.5rem;
         border: 1px solid #e2e8f0;
         box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+        width: 100%;
+    }
+    
+    .department-section .row {
+        margin-left: 0;
+        margin-right: 0;
+    }
+    
+    .department-section .row > [class*="col-"] {
+        display: flex;
     }
     
     .department-header h5 {
@@ -439,10 +513,22 @@
             width: 50px;
             height: 50px;
             font-size: 1.5rem;
+            margin-left: 0 !important;
+            margin-top: 0.5rem;
         }
         
         .dashboard-stats-card .card-body {
             padding: 1.5rem;
+            min-height: auto;
+        }
+        
+        .dashboard-stats-card .card-body > .d-flex {
+            flex-direction: column;
+            align-items: flex-start !important;
+        }
+        
+        .row.g-4 > .col-md-4 {
+            margin-bottom: 1rem;
         }
         
         .chart-card-body {
@@ -456,11 +542,14 @@
         .row.g-4 {
             margin-left: -0.75rem;
             margin-right: -0.75rem;
+            display: flex;
+            flex-wrap: wrap;
         }
         
         .row.g-4 > * {
             padding-left: 0.75rem;
             padding-right: 0.75rem;
+            display: flex;
         }
         
         .course-enrollment-card {
@@ -469,6 +558,7 @@
         
         .enrollment-stats {
             flex-wrap: wrap;
+            justify-content: center;
         }
         
         .stat-item {
@@ -505,14 +595,35 @@
             width: 45px;
             height: 45px;
             font-size: 1.25rem;
+            margin-left: 0 !important;
         }
         
         .dashboard-stats-card .card-body {
             padding: 1rem;
+            min-height: auto;
+        }
+        
+        .dashboard-stats-card .card-body > .d-flex {
+            flex-direction: column;
+            align-items: flex-start !important;
+        }
+        
+        .row.g-4 > .col-md-4 {
+            margin-bottom: 1rem;
         }
         
         .chart-card-body {
             padding: 0.75rem;
+        }
+        
+        .enrollment-stats {
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .stat-item {
+            width: 100%;
+            min-width: auto;
         }
     }
 </style>
@@ -521,14 +632,14 @@
     <!-- Welcome Card with Academic Year Filter -->
     <div class="card dashboard-welcome-card">
         <div class="card-body">
-            <div class="d-flex align-items-center justify-content-between flex-wrap">
+            <div class="d-flex align-items-start align-items-md-center justify-content-between flex-wrap gap-3">
                 <div class="flex-grow-1">
-                    <h1>Welcome, <?php echo htmlspecialchars($user_name ?? 'User'); ?>!</h1>
+                    <h1 class="mb-2">Welcome, <?php echo htmlspecialchars($user_name ?? 'User'); ?>!</h1>
                     <p class="mb-0">SLGTI Management Information System</p>
                 </div>
-                <div class="d-flex align-items-center gap-3 mt-3 mt-md-0">
-                    <div class="d-flex align-items-center gap-2">
-                        <label for="academicYearFilter" class="mb-0 fw-semibold" style="font-size: 0.9rem;">Academic Year:</label>
+                <div class="d-flex align-items-center gap-3 flex-shrink-0">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <label for="academicYearFilter" class="mb-0 fw-semibold" style="font-size: 0.9rem; white-space: nowrap;">Academic Year:</label>
                         <select id="academicYearFilter" class="form-select form-select-sm" style="min-width: 180px;">
                             <option value="">All Years</option>
                             <?php foreach ($academicYears as $year): ?>
@@ -538,7 +649,7 @@
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="d-none d-md-block">
+                    <div class="d-none d-md-block flex-shrink-0">
                         <i class="fas fa-chart-line fa-3x opacity-30"></i>
                     </div>
                 </div>
@@ -559,10 +670,10 @@
     
     <!-- Main Stats Cards -->
     <div class="row g-4 mb-4">
-        <div class="col-md-6">
+        <div class="col-md-4">
             <div class="card dashboard-stats-card" style="border-left-color: #001f3f;">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center justify-content-between">
+                <div class="card-body p-4 d-flex flex-column">
+                    <div class="d-flex align-items-start justify-content-between flex-grow-1">
                         <div class="flex-grow-1">
                             <div class="stats-card-label">Total Students</div>
                             <div class="stats-card-value"><?php echo number_format($totalStudents); ?></div>
@@ -582,7 +693,7 @@
                                 Active & Following Only
                             </div>
                         </div>
-                        <div class="stats-card-icon">
+                        <div class="stats-card-icon flex-shrink-0 ms-3">
                             <i class="fas fa-user-graduate"></i>
                         </div>
                     </div>
@@ -590,16 +701,33 @@
             </div>
         </div>
         
-        <div class="col-md-6">
+        <div class="col-md-4">
             <div class="card dashboard-stats-card" style="border-left-color: #1e3a5f;">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center justify-content-between">
+                <div class="card-body p-4 d-flex flex-column">
+                    <div class="d-flex align-items-start justify-content-between flex-grow-1">
+                        <div class="flex-grow-1">
+                            <div class="stats-card-label">Total Staff</div>
+                            <div class="stats-card-value" style="color: #003366;"><?php echo number_format($totalStaff ?? 0); ?></div>
+                            <div class="stats-card-subtitle">Department Staff Members</div>
+                        </div>
+                        <div class="stats-card-icon flex-shrink-0 ms-3" style="background: rgba(0, 51, 102, 0.1); color: #003366;">
+                            <i class="fas fa-chalkboard-teacher"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card dashboard-stats-card" style="border-left-color: #1e3a5f;">
+                <div class="card-body p-4 d-flex flex-column">
+                    <div class="d-flex align-items-start justify-content-between flex-grow-1">
                         <div class="flex-grow-1">
                             <div class="stats-card-label">Total Courses</div>
                             <div class="stats-card-value" style="color: #1e3a5f;"><?php echo number_format($totalCourses); ?></div>
                             <div class="stats-card-subtitle">Available Courses</div>
                         </div>
-                        <div class="stats-card-icon" style="background: rgba(30, 58, 95, 0.1); color: #1e3a5f;">
+                        <div class="stats-card-icon flex-shrink-0 ms-3" style="background: rgba(30, 58, 95, 0.1); color: #1e3a5f;">
                             <i class="fas fa-book"></i>
                         </div>
                     </div>
@@ -622,9 +750,9 @@
                             <!-- Department Section -->
                             <div class="department-section mb-4">
                                 <div class="department-header mb-3">
-                                    <h5 class="mb-0">
+                                    <h5 class="mb-0 d-flex align-items-center">
                                         <i class="fas fa-building me-2" style="color: #001f3f;"></i>
-                                        <?php echo htmlspecialchars($dept['department_name']); ?>
+                                        <span><?php echo htmlspecialchars($dept['department_name']); ?></span>
                                     </h5>
                                     <hr style="border-top: 2px solid #dc3545; margin: 0.5rem 0;">
                                 </div>
@@ -640,11 +768,11 @@
                                             $modeDisplay = ($courseMode === 'Full') ? 'FT' : (($courseMode === 'Part') ? 'PT' : $courseMode);
                                             $modeColor = ($courseMode === 'Full') ? '#28a745' : '#ffc107';
                                         ?>
-                                            <div class="col-md-6 col-lg-4">
-                                                <div class="course-enrollment-card">
+                                            <div class="col-md-6 col-lg-4 d-flex">
+                                                <div class="course-enrollment-card w-100">
                                                     <div class="course-enrollment-header">
                                                         <div class="course-name"><?php echo htmlspecialchars($course['course_name']); ?></div>
-                                                        <div class="course-badges">
+                                                        <div class="course-badges d-flex flex-wrap gap-2">
                                                             <span class="badge badge-nvq">NVQ <?php echo htmlspecialchars($nvqLevel); ?></span>
                                                             <span class="badge badge-mode" style="background-color: <?php echo $modeColor; ?>;"><?php echo $modeDisplay; ?></span>
                                                         </div>

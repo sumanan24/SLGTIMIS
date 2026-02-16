@@ -128,12 +128,35 @@ class StudentController extends Controller {
         $currentEnrollment = $enrollmentModel->getCurrentEnrollment($id);
         
         // Get hostel information
+        // Note: Hostel allocation information is visible to all authorized users including:
+        // FIN, ACC, HOD, IN1, IN2, IN3, SAO, ADM, DIR, REG, and Admin
         $roomAllocationModel = $this->model('RoomAllocationModel');
         $hostelAllocation = $roomAllocationModel->getActiveByStudentId($id);
         
         // Get all allocations (history) for this student
         $filters = ['student_id' => $id];
         $hostelHistory = $roomAllocationModel->getAllocations(1, 100, $filters);
+        
+        // Get payment information
+        // Note: Payment information is visible to all authorized users including:
+        // FIN, ACC, HOD, IN1, IN2, IN3, SAO, ADM, DIR, REG, and Admin
+        $paymentModel = $this->model('PaymentModel');
+        $payments = $paymentModel->getByStudentId($id);
+        
+        // Calculate payment statistics
+        $totalPayments = count($payments);
+        $totalAmount = 0;
+        $approvedAmount = 0;
+        $pendingAmount = 0;
+        foreach ($payments as $payment) {
+            $amount = floatval($payment['pays_amount'] ?? 0);
+            $totalAmount += $amount;
+            if (!empty($payment['approved']) && $payment['approved'] == 1) {
+                $approvedAmount += $amount;
+            } else {
+                $pendingAmount += $amount;
+            }
+        }
         
         // Check if user is SAO or ADM for edit/reset access
         require_once BASE_PATH . '/models/UserModel.php';
@@ -152,6 +175,13 @@ class StudentController extends Controller {
             'hostelAllocation' => $hostelAllocation,
             'hostelHistory' => $hostelHistory,
             'hasHostel' => !empty($hostelAllocation),
+            'payments' => $payments,
+            'paymentStats' => [
+                'total' => $totalPayments,
+                'totalAmount' => $totalAmount,
+                'approvedAmount' => $approvedAmount,
+                'pendingAmount' => $pendingAmount
+            ],
             'canEdit' => $canEdit
         ];
         
