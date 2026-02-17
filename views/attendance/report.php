@@ -121,6 +121,29 @@
                         </div>
                     </form>
                     
+                        <?php if (isset($error) && !empty($error)): ?>
+                            <div class="alert alert-danger d-flex align-items-center">
+                                <i class="fas fa-exclamation-circle me-2"></i>
+                                <div><?php echo htmlspecialchars($error); ?></div>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <?php if (isset($message) && !empty($message)): ?>
+                            <div class="alert alert-success d-flex align-items-center">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <div><?php echo htmlspecialchars($message); ?></div>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <?php if (isset($isFIN) && $isFIN && (!isset($isMonthLocked) || !$isMonthLocked) && !empty($selectedDepartment) && !empty($selectedMonth)): ?>
+                            <div class="alert alert-info d-flex align-items-center">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <div>
+                                    <strong>Access Restricted:</strong> Attendance reports can only be viewed after HOD approval and monthly lock. Please wait until the month is locked.
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                        
                         <?php if (isset($isMonthLocked) && $isMonthLocked && (!isset($isAdmin) || !$isAdmin)): ?>
                             <div class="alert alert-warning d-flex align-items-center">
                                 <i class="fas fa-lock me-2"></i>

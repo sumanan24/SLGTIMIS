@@ -220,16 +220,6 @@
                                         </a>
                                     </li>
                                     
-                                    <!-- Hostel Information Section - Visible to FIN, ACC, DIR, REG, HOD, IN1, IN2, IN3, SAO, ADM -->
-                                    <?php if ($canViewHostelInfo): ?>
-                                    <li class="menu-divider-submenu"></li>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/students" class="<?php echo (isset($page) && $page === 'students') ? 'active' : ''; ?>" title="View students and their hostel allocation information">
-                                            <i class="fas fa-bed"></i>
-                                            <span>Hostel Allocations</span>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
                                     
                                     <?php if ($isAdminOrADM && !$isHOD): ?>
                                     <li class="menu-divider-submenu"></li>

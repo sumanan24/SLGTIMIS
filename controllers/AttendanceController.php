@@ -359,12 +359,16 @@ class AttendanceController extends Controller {
         $isDepartmentRestricted = $this->isDepartmentRestricted();
         $isHOD = $this->isHOD();
         $isAdmin = false;
+        $isFIN = false;
+        $userRole = null;
         
-        // Check if user is admin
+        // Check if user is admin or FIN
         if (isset($_SESSION['user_id'])) {
             require_once BASE_PATH . '/models/UserModel.php';
             $userModel = new UserModel();
             $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
+            $userRole = $userModel->getUserRole($_SESSION['user_id']);
+            $isFIN = ($userRole === 'FIN');
         }
         
         // Get filter parameters - use user's department if department-restricted user
@@ -413,7 +417,9 @@ class AttendanceController extends Controller {
             'below_80' => 0
         ];
         
-        if (!empty($month)) {
+        // FIN users can only view locked (HOD approved) months
+        // Only get report data if not FIN or if month is locked (for FIN users)
+        if (!empty($month) && (!$isFIN || $isMonthLocked)) {
             $filters = [
                 'department_id' => $departmentId,
                 'course_id' => $courseId,
@@ -467,6 +473,7 @@ class AttendanceController extends Controller {
             'eligibleOnly' => $eligibleOnly,
             'isHOD' => $isHOD,
             'isAdmin' => $isAdmin,
+            'isFIN' => $isFIN,
             'isMonthLocked' => $isMonthLocked,
             'lockStatus' => $lockStatus,
             'error' => $_SESSION['error'] ?? null,
@@ -635,30 +642,45 @@ class AttendanceController extends Controller {
         $attendanceModel = $this->model('AttendanceModel');
         $lockModel = $this->model('AttendanceMonthLockModel');
         
+        // Get user role to check if FIN
+        $isFIN = false;
+        if (isset($_SESSION['user_id'])) {
+            require_once BASE_PATH . '/models/UserModel.php';
+            $userModel = new UserModel();
+            $userRole = $userModel->getUserRole($_SESSION['user_id']);
+            $isFIN = ($userRole === 'FIN');
+        }
+        
         // Get filter parameters
         $departmentId = $this->get('department_id', '');
         $courseId = $this->get('course_id', '');
         $academicYear = $this->get('academic_year', '');
         $month = $this->get('month', date('Y-m'));
         
-        // Check if month is locked - only allow download if month is locked
-        if (!empty($departmentId) && !empty($month)) {
-            $lockStatus = $lockModel->getLockStatus($departmentId, $month);
-            $isMonthLocked = ($lockStatus && $lockStatus['status'] === 'locked');
-            
-            if (!$isMonthLocked) {
-                $_SESSION['error'] = 'Access denied. Excel download is only available for locked months.';
-                $this->redirect('attendance/report?' . http_build_query([
-                    'department_id' => $departmentId,
-                    'course_id' => $courseId,
-                    'academic_year' => $academicYear,
-                    'month' => $month
-                ]));
-                return;
-            }
-        } else {
+        if (empty($departmentId) || empty($month)) {
             $_SESSION['error'] = 'Department and Month are required for Excel export.';
             $this->redirect('attendance/report');
+            return;
+        }
+        
+        // Check if month is locked (HOD approved) - only allow download if month is locked
+        // FIN users can ONLY download locked months. Other users with attendance report access
+        // can also download locked months.
+        $lockStatus = $lockModel->getLockStatus($departmentId, $month);
+        $isMonthLocked = ($lockStatus && $lockStatus['status'] === 'locked');
+        
+        if (!$isMonthLocked) {
+            if ($isFIN) {
+                $_SESSION['error'] = 'Access Restricted: Attendance reports can only be viewed after HOD approval and monthly lock. Please wait until the month is locked.';
+            } else {
+                $_SESSION['error'] = 'Access denied. Excel download is only available for locked (HOD approved) months.';
+            }
+            $this->redirect('attendance/report?' . http_build_query([
+                'department_id' => $departmentId,
+                'course_id' => $courseId,
+                'academic_year' => $academicYear,
+                'month' => $month
+            ]));
             return;
         }
         
