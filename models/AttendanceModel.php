@@ -122,8 +122,8 @@ class AttendanceModel extends Model {
                     $moduleName = $record['module_name'] ?? 'General';
                     $staffName = $record['staff_name'] ?? $_SESSION['user_name'] ?? 'System';
                     
-                    // Check if record exists
-                    $checkSql = "SELECT `attendance_id` FROM `{$this->table}` 
+                    // Check if record exists and get current status
+                    $checkSql = "SELECT `attendance_id`, `attendance_status` FROM `{$this->table}` 
                                  WHERE `student_id` = ? AND `date` = ? AND `module_name` = ?";
                     $checkStmt = $conn->prepare($checkSql);
                     if (!$checkStmt) {
@@ -133,11 +133,19 @@ class AttendanceModel extends Model {
                     if (!$checkStmt->execute()) {
                         throw new Exception('Failed to execute check: ' . $checkStmt->error);
                     }
-                    $exists = $checkStmt->get_result()->fetch_assoc();
+                    $existingRecord = $checkStmt->get_result()->fetch_assoc();
                     $checkStmt->close();
                     
-                    if ($exists) {
-                        // Update existing record
+                    // Skip updating if existing record is a holiday (-1) and new status is also -1
+                    // This prevents unnecessary updates to holidays that are already set
+                    if ($existingRecord && $existingRecord['attendance_status'] == -1 && $status == -1) {
+                        // Holiday already exists, skip update to prevent timestamp changes
+                        $successCount++;
+                        continue;
+                    }
+                    
+                    if ($existingRecord) {
+                        // Update existing record (but not if it's already a holiday being set as holiday)
                         $updateSql = "UPDATE `{$this->table}` 
                                       SET `attendance_status` = ?, `staff_name` = ?
                                       WHERE `student_id` = ? AND `date` = ? AND `module_name` = ?";

@@ -195,11 +195,16 @@
                                                     <div><?php echo htmlspecialchars($day['day']); ?></div>
                                                     <div class="small text-muted" style="font-size: 0.65rem;"><?php echo htmlspecialchars($day['day_name']); ?></div>
                                                     <div class="mt-0">
+                                                        <?php 
+                                                        $isDateHoliday = in_array($day['date'], $holidayDates ?? []);
+                                                        $isHolidayDisabled = $isDateHoliday || (isset($isMonthLocked) && $isMonthLocked && (!isset($isAdmin) || !$isAdmin));
+                                                        ?>
                                                         <label class="form-check-label d-block" style="cursor: pointer; font-size: 0.6rem;">
                                                             <input type="checkbox" class="form-check-input holiday-date-checkbox" data-date="<?php echo $day['date']; ?>"
                                                                    id="holiday_date_<?php echo str_replace(['-'], '_', $day['date']); ?>"
                                                                    onchange="toggleHolidayForDate('<?php echo $day['date']; ?>', this.checked)"
-                                                                   <?php echo (isset($isMonthLocked) && $isMonthLocked && (!isset($isAdmin) || !$isAdmin)) ? 'disabled' : ''; ?>
+                                                                   <?php echo $isDateHoliday ? 'checked' : ''; ?>
+                                                                   <?php echo $isHolidayDisabled ? 'disabled' : ''; ?>
                                                                    style="cursor: pointer; width: 0.9rem; height: 0.9rem;"> H
                                                         </label>
                                                     </div>
@@ -416,12 +421,17 @@ document.addEventListener('DOMContentLoaded', function() {
             // Collect attendance data from all checkboxes
             const attendanceData = [];
             const holidayDates = new Set();
+            const existingHolidayDates = new Set(); // Dates that already have holidays in database
             
-            // First, collect all holiday dates
+            // First, collect all holiday dates from checkboxes
             document.querySelectorAll('.holiday-date-checkbox:checked').forEach(function(holidayCheckbox) {
                 const date = holidayCheckbox.getAttribute('data-date');
                 if (date) {
                     holidayDates.add(date);
+                    // If checkbox is disabled, it means holiday already exists in database
+                    if (holidayCheckbox.disabled) {
+                        existingHolidayDates.add(date);
+                    }
                 }
             });
             
@@ -431,6 +441,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const date = checkbox.getAttribute('data-date');
                 
                 if (studentId && date) {
+                    // Skip if this date already has a holiday set in database (prevent unnecessary updates)
+                    if (existingHolidayDates.has(date)) {
+                        return; // Skip this record - holiday already exists, don't update
+                    }
+                    
                     let status;
                     
                     // If date is marked as holiday, status is -1
@@ -522,6 +537,14 @@ function toggleHolidayForDate(date, isHoliday) {
         if (holidayCheckbox) {
             holidayCheckbox.checked = !isHoliday;
         }
+        return;
+    }
+    
+    // Check if this date already has holidays marked (from database)
+    const holidayCheckbox = document.querySelector(`.holiday-date-checkbox[data-date="${date}"]`);
+    if (holidayCheckbox && holidayCheckbox.disabled && holidayCheckbox.checked) {
+        // Holiday already exists in database, prevent changes silently
+        holidayCheckbox.checked = true; // Ensure it stays checked
         return;
     }
     
