@@ -149,10 +149,6 @@
                                 <i class="fas fa-lock me-2"></i>
                                 <div>
                                     <strong>Month Locked:</strong> Attendance for this month has been locked.
-                                    <?php if (isset($lockStatus) && !empty($lockStatus['locked_by_name'])): ?>
-                                        <br><small>Locked by: <?php echo htmlspecialchars($lockStatus['locked_by_name']); ?> 
-                                        on <?php echo date('Y-m-d H:i:s', strtotime($lockStatus['locked_at'])); ?></small>
-                                    <?php endif; ?>
                                 </div>
                             </div>
                         <?php endif; ?>
