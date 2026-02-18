@@ -285,6 +285,9 @@ class AttendanceModel extends Model {
             $sql .= " AND s.allowance_eligible = 1";
         }
         
+        // Attendance report: load only full-time students (course_mode = 'Full')
+        $sql .= " AND se.course_mode = 'Full'";
+        
         $sql .= " ORDER BY s.student_fullname ASC";
         
         $stmt = $conn->prepare($sql);
