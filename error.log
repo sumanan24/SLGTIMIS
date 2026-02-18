@@ -682,3 +682,37 @@
 [17-Feb-2026 14:00:32 UTC] Database::connect - Connection successful to sisslgti
 [17-Feb-2026 14:00:36 UTC] Database::connect - Connection successful to sisslgti
 [17-Feb-2026 14:00:39 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:01:19 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:01:28 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:01:32 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:01:32 UTC] PHP Fatal error:  Access level to GroupController::getUserDepartment() must be protected (as in class Controller) or weaker in C:\wamp64\www\SLGTIMIS\controllers\GroupController.php on line 43
+[17-Feb-2026 14:01:32 UTC] PHP Stack trace:
+[17-Feb-2026 14:01:32 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[17-Feb-2026 14:01:32 UTC] PHP   2. Router->route($uri = 'groups') C:\wamp64\www\SLGTIMIS\index.php:144
+[17-Feb-2026 14:01:32 UTC] PHP   3. Router->dispatch($route = 'GroupController@index', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[17-Feb-2026 14:02:52 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:03:53 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:04:56 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:05:06 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 0, Content-Type: 
+[17-Feb-2026 14:05:06 UTC] Hikvision makeRequest - Raw response (first 1000 chars): 
+[17-Feb-2026 14:05:06 UTC] Hikvision CURL Error: Connection timed out after 10009 milliseconds
+[17-Feb-2026 14:05:16 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 0, Content-Type: 
+[17-Feb-2026 14:05:16 UTC] Hikvision makeRequest - Raw response (first 1000 chars): 
+[17-Feb-2026 14:05:16 UTC] Hikvision CURL Error: Connection timed out after 10001 milliseconds
+[17-Feb-2026 14:05:26 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/System/deviceInfo, Method: GET, HTTP Code: 0, Content-Type: 
+[17-Feb-2026 14:05:26 UTC] Hikvision makeRequest - Raw response (first 1000 chars): 
+[17-Feb-2026 14:05:26 UTC] Hikvision CURL Error: Connection timed out after 10013 milliseconds
+[17-Feb-2026 14:05:36 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/, Method: GET, HTTP Code: 0, Content-Type: 
+[17-Feb-2026 14:05:36 UTC] Hikvision makeRequest - Raw response (first 1000 chars): 
+[17-Feb-2026 14:05:36 UTC] Hikvision CURL Error: Connection timed out after 10010 milliseconds
+[17-Feb-2026 14:05:36 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:05:36 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:05:37 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:05:37 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:09:56 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:10:04 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:10:06 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:10:08 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:10:14 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:12:21 UTC] Database::connect - Connection successful to sisslgti
+[17-Feb-2026 14:34:49 UTC] Database::connect - Connection successful to sisslgti

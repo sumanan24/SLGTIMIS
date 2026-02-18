@@ -112,7 +112,7 @@
                             ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-graduation-cap"></i>
-                                    <span>Education</span>
+                                    <span>Management</span>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
                                 <ul class="submenu" style="<?php 
@@ -209,7 +209,7 @@
                             <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, $studentAffairsPages)) ? 'active' : ''; ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-user-graduate"></i>
-                                    <span>Student Affairs</span>
+                                    <span>Student Info</span>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
                                 <ul class="submenu" style="<?php echo (isset($page) && in_array($page, $studentAffairsPages)) ? 'display: block;' : ''; ?>">
@@ -323,104 +323,107 @@
                             </li>
                             <?php endif; ?>
                             
+                            <?php
+                            // Build Students Approval menu items based on user role
+                            $studentsApprovalPages = [];
+                            $hasStudentsApprovalAccess = false;
                             
-                            <?php if ($isHOD): ?>
-                            <!-- Student Approval - Only for HOD -->
-                            <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, ['on-peak-requests-hod', 'bus-season-requests-hod'])) ? 'active' : ''; ?>">
+                            if (isset($_SESSION['user_id'])) {
+                                require_once BASE_PATH . '/models/UserModel.php';
+                                $userModel = new UserModel();
+                                $userRole = $userModel->getUserRole($_SESSION['user_id']);
+                                $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
+                                
+                                // HOD can approve first level (on-peak and bus season)
+                                if ($isHOD) {
+                                    $studentsApprovalPages[] = 'on-peak-requests-hod';
+                                    $studentsApprovalPages[] = 'bus-season-requests-hod';
+                                    $hasStudentsApprovalAccess = true;
+                                }
+                                
+                                // DIR, DPA, DPI, REG can approve second level
+                                if (in_array($userRole, ['DIR', 'DPA', 'DPI', 'REG']) || $isAdmin) {
+                                    $studentsApprovalPages[] = 'on-peak-requests-final';
+                                    $studentsApprovalPages[] = 'bus-season-requests-second';
+                                    $hasStudentsApprovalAccess = true;
+                                }
+                                
+                                // ADM, HOD, WAR can approve second level (but not if already DIR/DPA/DPI/REG)
+                                if ((in_array($userRole, ['ADM', 'HOD', 'WAR']) || $isAdmin) && !in_array($userRole, ['DIR', 'DPA', 'DPI', 'REG'])) {
+                                    $studentsApprovalPages[] = 'on-peak-requests-final';
+                                    $hasStudentsApprovalAccess = true;
+                                }
+                            }
+                            ?>
+                            
+                            <?php if ($hasStudentsApprovalAccess): ?>
+                            <!-- Students Approval - Consolidated menu for all student approvals -->
+                            <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, $studentsApprovalPages)) ? 'active' : ''; ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-user-check"></i>
-                                    <span>Student Approval</span>
+                                    <span>Students Approval</span>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
-                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, ['on-peak-requests-hod', 'bus-season-requests-hod'])) ? 'display: block;' : ''; ?>">
+                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, $studentsApprovalPages)) ? 'display: block;' : ''; ?>">
+                                    <?php if ($isHOD): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/on-peak-requests/hod-approval" class="<?php echo (isset($page) && $page === 'on-peak-requests-hod') ? 'active' : ''; ?>">
                                             <i class="fas fa-calendar-check"></i>
-                                            <span>On-Peak Approval</span>
+                                            <span>On-Peak First Approval</span>
                                         </a>
                                     </li>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/bus-season-requests/hod-approval" class="<?php echo (isset($page) && $page === 'bus-season-requests-hod') ? 'active' : ''; ?>">
-                                            <i class="fas fa-bus"></i>
-                                            <span>Bus Season Approval</span>
-                                        </a>
-                                    </li>
-                                </ul>
-                            </li>
-                            <?php endif; ?>
-                            
-                            <?php
-                            // Check if user can approve final requests
-                            $canFinalApprove = false;
-                            if (isset($_SESSION['user_id'])) {
-                                require_once BASE_PATH . '/models/UserModel.php';
-                                $userModel = new UserModel();
-                                $userRole = $userModel->getUserRole($_SESSION['user_id']);
-                                $canFinalApprove = in_array($userRole, ['DPR', 'RSA', 'DPA', 'DPI', 'WAR', 'ADM']) || $userModel->isAdmin($_SESSION['user_id']);
-                            }
-                            ?>
-                            <?php
-                            // Check if user is DIR, DPA, DPI, or REG for approvals submenu
-                            $isDIRApprover = false;
-                            if (isset($_SESSION['user_id'])) {
-                                require_once BASE_PATH . '/models/UserModel.php';
-                                $userModel = new UserModel();
-                                $userRole = $userModel->getUserRole($_SESSION['user_id']);
-                                $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-                                $isDIRApprover = in_array($userRole, ['DIR', 'DPA', 'DPI', 'REG']) || $isAdmin;
-                            }
-                            ?>
-                            <?php if ($isDIRApprover): ?>
-                            <!-- Approvals - For DIR, DPA, DPI, REG -->
-                            <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, ['on-peak-requests-final', 'bus-season-requests-second', 'circuit-program-approval'])) ? 'active' : ''; ?>">
-                                <a href="#" class="menu-toggle">
-                                    <i class="fas fa-check-circle"></i>
-                                    <span>Approvals</span>
-                                    <i class="fas fa-chevron-down menu-arrow"></i>
-                                </a>
-                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, ['on-peak-requests-final', 'bus-season-requests-second', 'circuit-program-approval'])) ? 'display: block;' : ''; ?>">
+                                    <?php endif; ?>
+                                    
+                                    <?php 
+                                    // Show On-Peak Second Approval for DIR, DPA, DPI, REG, ADM, HOD, WAR, Admin
+                                    $canApproveOnPeakSecond = false;
+                                    if (isset($_SESSION['user_id'])) {
+                                        require_once BASE_PATH . '/models/UserModel.php';
+                                        $userModel = new UserModel();
+                                        $userRole = $userModel->getUserRole($_SESSION['user_id']);
+                                        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
+                                        $canApproveOnPeakSecond = in_array($userRole, ['DIR', 'DPA', 'DPI', 'REG', 'ADM', 'HOD', 'WAR']) || $isAdmin;
+                                    }
+                                    ?>
+                                    <?php if ($canApproveOnPeakSecond): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/on-peak-requests/final-approval" class="<?php echo (isset($page) && $page === 'on-peak-requests-final') ? 'active' : ''; ?>">
                                             <i class="fas fa-check-double"></i>
-                                            <span>On-Peak Approval</span>
+                                            <span>On-Peak Second Approval</span>
                                         </a>
                                     </li>
+                                    <?php endif; ?>
+                                    
+                                    <?php if ($isHOD): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/bus-season-requests/hod-approval" class="<?php echo (isset($page) && $page === 'bus-season-requests-hod') ? 'active' : ''; ?>">
+                                            <i class="fas fa-bus"></i>
+                                            <span>Bus Season First Approval</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
+                                    
+                                    <?php 
+                                    // Show Bus Season Second Approval for DIR, DPA, DPI, REG, Admin
+                                    $canApproveBusSeasonSecond = false;
+                                    if (isset($_SESSION['user_id'])) {
+                                        require_once BASE_PATH . '/models/UserModel.php';
+                                        $userModel = new UserModel();
+                                        $userRole = $userModel->getUserRole($_SESSION['user_id']);
+                                        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
+                                        $canApproveBusSeasonSecond = in_array($userRole, ['DIR', 'DPA', 'DPI', 'REG']) || $isAdmin;
+                                    }
+                                    ?>
+                                    <?php if ($canApproveBusSeasonSecond): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/bus-season-requests/second-approval" class="<?php echo (isset($page) && $page === 'bus-season-requests-second') ? 'active' : ''; ?>">
                                             <i class="fas fa-bus"></i>
-                                            <span>Bus Season Approval</span>
+                                            <span>Bus Season Second Approval</span>
                                         </a>
                                     </li>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/circuit-program/approval" class="<?php echo (isset($page) && $page === 'circuit-program-approval') ? 'active' : ''; ?>">
-                                            <i class="fas fa-route"></i>
-                                            <span>Circuit Program Approval</span>
-                                        </a>
-                                    </li>
+                                    <?php endif; ?>
                                 </ul>
                             </li>
-                            <?php else: ?>
-                            <?php
-                            // Check if user can approve second approval (ADM, HOD, WAR - but not DIR/DPA/DPI/REG)
-                            $canSecondApprove = false;
-                            if (isset($_SESSION['user_id'])) {
-                                require_once BASE_PATH . '/models/UserModel.php';
-                                $userModel = new UserModel();
-                                $userRole = $userModel->getUserRole($_SESSION['user_id']);
-                                $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-                                // Only show if not DIR/DPA/DPI/REG (those are handled above)
-                                $canSecondApprove = (in_array($userRole, ['ADM', 'HOD', 'WAR']) || $isAdmin) && !in_array($userRole, ['DIR', 'DPA', 'DPI', 'REG']);
-                            }
-                            ?>
-                            <?php if ($canSecondApprove): ?>
-                            <!-- Second Request Approvals - For ADM, HOD, WAR (hostel students) -->
-                            <li>
-                                <a href="<?php echo APP_URL; ?>/on-peak-requests/final-approval" class="<?php echo (isset($page) && $page === 'on-peak-requests-final') ? 'active' : ''; ?>">
-                                    <i class="fas fa-check-double"></i>
-                                    <span>Second Request Approvals</span>
-                                </a>
-                            </li>
-                            <?php endif; ?>
                             <?php endif; ?>
                             
                             <?php
@@ -436,15 +439,6 @@
                                 $canProcessBusSeason = $isSAO || $isADM || $isAdmin;
                             }
                             ?>
-                            <?php if ($isHOD): ?>
-                            <!-- Bus Season HOD Approval - For HOD -->
-                            <li>
-                                <a href="<?php echo APP_URL; ?>/bus-season-requests/hod-approval" class="<?php echo (isset($page) && $page === 'bus-season-requests-hod') ? 'active' : ''; ?>">
-                                    <i class="fas fa-bus"></i>
-                                    <span>Bus Season Requests</span>
-                                </a>
-                            </li>
-                            <?php endif; ?>
                             
                             <?php if ($canProcessBusSeason): ?>
                             <!-- Bus Season Processing - For SAO, ADM, Admin -->
