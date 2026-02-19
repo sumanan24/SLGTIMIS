@@ -548,9 +548,101 @@ class StudentModel extends Model {
     
     /**
      * Delete student
+     * Deletes related records first to avoid foreign key constraint errors
      */
     public function deleteStudent($id) {
-        return $this->delete($id);
+        $conn = $this->db->getConnection();
+        
+        // Start transaction
+        $conn->begin_transaction();
+        
+        try {
+            // List of tables that reference student_id (delete in order to respect FK constraints)
+            $tablesToDelete = [
+                'assessments_marks',
+                'feedback_done',
+                'student_qualification',
+                'attendance',
+                'group_students',
+                'onpeak_request',
+                'onpeak_delete_details',
+                'bus_season_request',
+                'manage_final_place',
+                'room_allocation',
+                'student_enroll' // Delete student_enroll last as it has FK constraint
+            ];
+            
+            // Delete from each table
+            foreach ($tablesToDelete as $table) {
+                $check = $conn->query("SHOW TABLES LIKE '{$table}'");
+                if ($check && $check->num_rows > 0) {
+                    // Check if table has student_id column
+                    $checkColumn = $conn->query("SHOW COLUMNS FROM `{$table}` LIKE 'student_id'");
+                    if ($checkColumn && $checkColumn->num_rows > 0) {
+                        $sql = "DELETE FROM `{$table}` WHERE `student_id` = ?";
+                        $stmt = $conn->prepare($sql);
+                        if ($stmt) {
+                            $stmt->bind_param("s", $id);
+                            $stmt->execute();
+                            $stmt->close();
+                        }
+                    }
+                }
+            }
+            
+            // Delete login attempts first (before user deletion)
+            $checkLoginAttempts = $conn->query("SHOW TABLES LIKE 'login_attempts'");
+            if ($checkLoginAttempts && $checkLoginAttempts->num_rows > 0) {
+                $sqlLa = "DELETE FROM `login_attempts` WHERE `username` = ?";
+                $stmtLa = $conn->prepare($sqlLa);
+                if ($stmtLa) {
+                    $stmtLa->bind_param("s", $id);
+                    if (!$stmtLa->execute()) {
+                        throw new Exception("Failed to delete login attempts: " . $stmtLa->error);
+                    }
+                    $stmtLa->close();
+                }
+            }
+            
+            // Delete user account (must be deleted before student record)
+            $checkUser = $conn->query("SHOW TABLES LIKE 'user'");
+            if ($checkUser && $checkUser->num_rows > 0) {
+                $sqlUser = "DELETE FROM `user` WHERE `user_table` = 'student' AND `user_name` = ?";
+                $stmtUser = $conn->prepare($sqlUser);
+                if (!$stmtUser) {
+                    throw new Exception("Failed to prepare user delete statement: " . $conn->error);
+                }
+                $stmtUser->bind_param("s", $id);
+                if (!$stmtUser->execute()) {
+                    throw new Exception("Failed to delete user account: " . $stmtUser->error);
+                }
+                $stmtUser->close();
+            }
+            
+            // Finally, delete the student record
+            $sql = "DELETE FROM `{$this->table}` WHERE `{$this->getPrimaryKey()}` = ?";
+            $stmt = $conn->prepare($sql);
+            if (!$stmt) {
+                throw new Exception("Failed to prepare delete statement: " . $conn->error);
+            }
+            $stmt->bind_param("s", $id);
+            $result = $stmt->execute();
+            $stmt->close();
+            
+            if (!$result) {
+                throw new Exception("Failed to delete student: " . $conn->error);
+            }
+            
+            // Commit transaction
+            $conn->commit();
+            return true;
+            
+        } catch (Exception $e) {
+            // Rollback on error
+            $conn->rollback();
+            error_log("Error deleting student {$id}: " . $e->getMessage());
+            return false;
+        }
     }
     
     /**
