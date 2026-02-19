@@ -1499,7 +1499,8 @@ class StudentController extends Controller {
             ];
             return $this->view('students/delete', $data);
         }
-
+    }
+    
     /**
      * View deleted students (ADM only)
      */
@@ -1537,7 +1538,6 @@ class StudentController extends Controller {
 
         unset($_SESSION['error'], $_SESSION['message']);
         return $this->view('admin/deleted-students', $data);
-    }
     }
     
     public function resetPassword() {
