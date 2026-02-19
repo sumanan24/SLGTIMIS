@@ -444,89 +444,86 @@
             <?php endif; ?>
         </div>
         
-        <!-- Payment Information Card -->
-        <?php if (isset($request['payment']) && !empty($request['payment'])): ?>
+        <!-- Payment History -->
+        <?php if (isset($allPayments) && !empty($allPayments)): ?>
         <div class="detail-card">
-            <h5 class="fw-bold mb-3">Payment Information</h5>
-            <div class="row g-3 row-gap">
-                <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                    <div class="info-section">
-                        <div class="info-label">Student Payment (30%)</div>
-                        <div class="info-value text-success fw-bold">Rs. <?php echo number_format($request['payment']['student_paid'] ?? 0, 2); ?></div>
-                    </div>
-                </div>
-                
-                <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                    <div class="info-section">
-                        <div class="info-label">SLGTI Payment (35%)</div>
-                        <div class="info-value">Rs. <?php echo number_format($request['payment']['slgti_paid'] ?? 0, 2); ?></div>
-                    </div>
-                </div>
-                
-                <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                    <div class="info-section">
-                        <div class="info-label">CTB Payment (35%)</div>
-                        <div class="info-value">Rs. <?php echo number_format($request['payment']['ctb_paid'] ?? 0, 2); ?></div>
-                    </div>
-                </div>
-                
-                <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                    <div class="info-section">
-                        <div class="info-label">Total Season Value</div>
-                        <div class="info-value text-primary fw-bold">Rs. <?php echo number_format($request['payment']['total_amount'] ?? 0, 2); ?></div>
-                    </div>
-                </div>
-                
-                <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                    <div class="info-section">
-                        <div class="info-label">Season Rate</div>
-                        <div class="info-value">Rs. <?php echo number_format($request['payment']['season_rate'] ?? 0, 2); ?></div>
-                    </div>
-                </div>
-                
-                <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                    <div class="info-section">
-                        <div class="info-label">Payment Method</div>
-                        <div class="info-value"><?php echo ucfirst(htmlspecialchars($request['payment']['payment_method'] ?? 'N/A')); ?></div>
-                    </div>
-                </div>
-                
-                <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                    <div class="info-section">
-                        <div class="info-label">Payment Date</div>
-                        <div class="info-value"><?php echo $request['payment']['payment_date'] ? date('M d, Y', strtotime($request['payment']['payment_date'])) : 'N/A'; ?></div>
-                    </div>
-                </div>
-                
-                <?php if (!empty($request['payment']['payment_reference'])): ?>
-                <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                    <div class="info-section">
-                        <div class="info-label">Payment Reference</div>
-                        <div class="info-value"><?php echo htmlspecialchars($request['payment']['payment_reference']); ?></div>
-                    </div>
-                </div>
-                <?php endif; ?>
-                
-                <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-                    <div class="info-section">
-                        <div class="info-label">Collected By</div>
-                        <div class="info-value"><?php echo htmlspecialchars($request['payment']['collected_by_name'] ?? 'N/A'); ?></div>
-                    </div>
-                </div>
+            <h5 class="fw-bold mb-3">
+                <i class="fas fa-history me-2"></i>Payment History
+            </h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Payment Date</th>
+                            <th>Paid Amount</th>
+                            <th>Payment Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($allPayments as $payment): ?>
+                        <tr>
+                            <td><?php echo $payment['payment_date'] ? date('M d, Y', strtotime($payment['payment_date'])) : 'N/A'; ?></td>
+                            <td class="fw-bold text-success">Rs. <?php echo number_format($payment['paid_amount'] ?? 0, 2); ?></td>
+                            <td><?php echo !empty($payment['notes']) ? nl2br(htmlspecialchars($payment['notes'])) : '-'; ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
-            
-            <?php if (!empty($request['payment']['notes'])): ?>
-                <div class="info-section mt-3">
-                    <div class="info-label">Payment Notes</div>
-                    <div class="info-value">
-                        <div class="p-2 p-md-3 bg-light border rounded">
-                            <?php echo nl2br(htmlspecialchars($request['payment']['notes'])); ?>
-                        </div>
-                    </div>
-                </div>
-            <?php endif; ?>
         </div>
-        <?php elseif ($status === 'approved' && ($isSAO || $isADM)): ?>
+        <?php elseif (isset($request['payment']) && !empty($request['payment'])): ?>
+        <!-- Single Payment Display -->
+        <div class="detail-card">
+            <h5 class="fw-bold mb-3">
+                <i class="fas fa-history me-2"></i>Payment History
+            </h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Payment Date</th>
+                            <th>Paid Amount</th>
+                            <th>Payment Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><?php echo $request['payment']['payment_date'] ? date('M d, Y', strtotime($request['payment']['payment_date'])) : 'N/A'; ?></td>
+                            <td class="fw-bold text-success">Rs. <?php echo number_format($request['payment']['paid_amount'] ?? 0, 2); ?></td>
+                            <td><?php echo !empty($request['payment']['notes']) ? nl2br(htmlspecialchars($request['payment']['notes'])) : '-'; ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php elseif (isset($request['payment']) && !empty($request['payment'])): ?>
+        <!-- Single Payment Display -->
+        <div class="detail-card">
+            <h5 class="fw-bold mb-3">
+                <i class="fas fa-history me-2"></i>Payment History
+            </h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Payment Date</th>
+                            <th>Paid Amount</th>
+                            <th>Payment Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><?php echo $request['payment']['payment_date'] ? date('M d, Y', strtotime($request['payment']['payment_date'])) : 'N/A'; ?></td>
+                            <td class="fw-bold text-success">Rs. <?php echo number_format($request['payment']['paid_amount'] ?? 0, 2); ?></td>
+                            <td><?php echo !empty($request['payment']['notes']) ? nl2br(htmlspecialchars($request['payment']['notes'])) : '-'; ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <?php if (empty($allPayments) && empty($request['payment']) && $status === 'approved' && ($isSAO || $isADM)): ?>
         <div class="alert alert-info">
             <i class="fas fa-info-circle me-2"></i>
             Payment has not been collected yet. <a href="<?php echo APP_URL; ?>/bus-season-requests/sao-process" class="alert-link">Go to payment collection</a>.

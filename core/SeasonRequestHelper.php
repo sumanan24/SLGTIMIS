@@ -297,11 +297,21 @@ class SeasonRequestHelper {
             require_once BASE_PATH . '/models/BusSeasonRequestModel.php';
             $requestModel = new BusSeasonRequestModel();
             
-            // Check if student already has a request for this season
+            // Check if student already has a request for current month
             if ($requestModel->hasExistingRequest($studentId, $seasonYear)) {
+                $currentMonth = date('F Y');
                 return [
                     'can_submit' => false,
-                    'reason' => 'You already have a bus season request for this season year. Only one request per year is allowed.'
+                    'reason' => "You already have a bus season request for {$currentMonth}. You can create a new request next month."
+                ];
+            }
+            
+            // Check if student has reached maximum requests per year (12 requests = one per month)
+            if ($requestModel->hasReachedMaxRequests($studentId, $seasonYear, 12)) {
+                $totalRequests = $requestModel->getTotalRequestsForYear($studentId, $seasonYear);
+                return [
+                    'can_submit' => false,
+                    'reason' => "You have reached the maximum limit of 12 requests per year for season {$seasonYear}. You already have {$totalRequests} request(s)."
                 ];
             }
             

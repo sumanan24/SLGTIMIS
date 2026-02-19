@@ -733,3 +733,407 @@
 [19-Feb-2026 14:33:11 UTC] Database::connect - Connection successful to sisslgti
 [19-Feb-2026 14:33:15 UTC] Database::connect - Connection successful to sisslgti
 [19-Feb-2026 14:33:15 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:33:36 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:33:39 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:33:40 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:33:40 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:54:35 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:54:35 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[19-Feb-2026 14:54:47 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:54:47 UTC] No last Student ID found for course: reg, year: 2025/2026, mode: Full Time
+[19-Feb-2026 14:54:47 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:54:47 UTC] No last Student ID found for course: reg, year: 2025/2026, mode: Full Time
+[19-Feb-2026 14:54:55 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:54:59 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:55:04 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:55:04 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[19-Feb-2026 14:55:21 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:55:21 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:55:26 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:55:30 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:55:34 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:55:34 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[19-Feb-2026 14:55:41 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:55:41 UTC] Last Student ID found: 2025/EET/B2/REN25 for course: reg, year: 2025/2026, mode: Full Time
+[19-Feb-2026 14:55:41 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 14:55:41 UTC] Last Student ID found: 2025/EET/B2/REN25 for course: reg, year: 2025/2026, mode: Full Time
+[19-Feb-2026 16:08:24 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:08:25 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:08:28 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:08:28 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:08:33 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:08:42 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:08:44 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:08:51 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:08:58 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:13:29 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:13:35 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:13:38 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:13:41 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:13:44 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:13:46 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:13:54 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:13:58 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:13:58 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[19-Feb-2026 16:15:13 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:15:17 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:15:18 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:15:27 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:15:31 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:15:38 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:15:45 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:15:46 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:15:52 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:15:54 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:16:02 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:16:02 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:16:34 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:16:34 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:16:42 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:18:50 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:18:51 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:18:52 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:18:52 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:18:52 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:18:53 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:22:03 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:22:23 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:24:55 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:24:57 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:25:19 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:25:21 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:25:22 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:25:22 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:27:09 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:27:11 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:27:12 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:27:12 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:27:12 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:27:13 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:28:33 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:28:33 UTC] BusSeasonRequestModel::create - SQL: INSERT INTO `season_requests` 
+                    (`student_id`, `department_id`, `season_year`, `season_name`, 
+                     `route_from`, `route_to`, `change_point`, `distance_km`, `status`, `notes`) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+[19-Feb-2026 16:28:33 UTC] BusSeasonRequestModel::create - Data: {"student_id":"2022\/ICT\/4TE03","department_id":"ICT","season_year":"2026","season_name":"","route_from":"Nelliyady","route_to":"SLGTI","change_point":"","distance_km":0,"notes":"Created by SAO"}
+[19-Feb-2026 16:28:33 UTC] BusSeasonRequestModel::create - Success. Insert ID: 8
+[19-Feb-2026 16:28:33 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:28:36 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:28:53 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:28:53 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:28:54 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:28:54 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:30:42 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:30:48 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:30:54 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:30:58 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:02 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:25 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:28 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:28 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:28 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:39 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:39 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:48 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:49 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:50 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:50 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:50 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:51 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:51 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:51 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:31:57 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:33:56 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:36:03 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:36:07 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:37:23 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:38:18 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:39:50 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:41:02 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:41:13 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:42:07 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:42:14 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:42:43 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:42:43 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:42:44 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:42:47 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:43:05 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:43:46 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:44:11 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:44:11 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:44:14 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:44:20 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:44:20 UTC] BusSeasonRequestController::create - Request started. Method: POST
+[19-Feb-2026 16:44:20 UTC] BusSeasonRequestController::create - Request data: {"student_id":"2025\/ICT\/5IT001","department_id":"ICT","season_year":"2026","season_name":"","route_from":"Nelliyady","route_to":"SLGTI","change_point":"","distance_km":0,"notes":""}
+[19-Feb-2026 16:44:20 UTC] BusSeasonRequestController::create - Fatal Error: mysqli_stmt::bind_param(): Argument #5 could not be passed by reference
+[19-Feb-2026 16:44:36 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:44:41 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:44:41 UTC] BusSeasonRequestController::create - Request started. Method: POST
+[19-Feb-2026 16:44:41 UTC] BusSeasonRequestController::create - Request data: {"student_id":"2025\/ICT\/5IT001","department_id":"ICT","season_year":"2026","season_name":"","route_from":"Nelliyady","route_to":"SLGTI","change_point":"","distance_km":0,"notes":""}
+[19-Feb-2026 16:44:41 UTC] BusSeasonRequestController::create - Fatal Error: mysqli_stmt::bind_param(): Argument #5 could not be passed by reference
+[19-Feb-2026 16:46:05 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:46:11 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:46:11 UTC] BusSeasonRequestController::create - Request started. Method: POST
+[19-Feb-2026 16:46:11 UTC] BusSeasonRequestController::create - Request data: {"student_id":"2025\/ICT\/5IT001","department_id":"ICT","season_year":"2026","season_name":"","route_from":"Nelliyady","route_to":"SLGTI","change_point":"","distance_km":0,"notes":""}
+[19-Feb-2026 16:46:11 UTC] BusSeasonRequestModel::create - Request created successfully. ID: 9
+[19-Feb-2026 16:46:11 UTC] BusSeasonRequestController::create - Request created successfully. ID: 9
+[19-Feb-2026 16:46:13 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:46:19 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:46:19 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:46:21 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:46:25 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:46:25 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:46:27 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:49:10 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:49:10 UTC] BusSeasonRequestModel::getRequestsForSAO - SQL: SELECT r.*, 
+                s.student_fullname, s.student_email, s.student_id, s.student_gender, s.student_nic,
+                d.department_name, d.department_id,
+                hod.user_name as hod_approver_name,
+                second.user_name as second_approver_name,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id) as has_payment,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)) as has_issued_payment,
+                (SELECT COUNT(*) FROM `season_requests` r2 WHERE r2.student_id = r.student_id AND r2.season_year = r.season_year) as total_requests_for_student
+                FROM `season_requests` r
+                INNER JOIN `student` s ON r.student_id = s.student_id
+                LEFT JOIN `department` d ON r.department_id = d.department_id
+                LEFT JOIN `user` hod ON r.hod_approver_id = hod.user_id
+                LEFT JOIN `user` second ON r.second_approver_id = second.user_id WHERE (LOWER(TRIM(r.status)) = 'hod_approved' 
+                         OR LOWER(TRIM(r.status)) = 'approved' 
+                         OR LOWER(TRIM(r.status)) = 'paid' 
+                         OR LOWER(TRIM(r.status)) = 'issued') AND NOT EXISTS (
+                SELECT 1 FROM `season_payments` p 
+                WHERE p.request_id = r.id 
+                AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)
+            ) ORDER BY r.created_at DESC
+[19-Feb-2026 16:49:15 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:49:16 UTC] BusSeasonRequestModel::getRequestsForSAO - SQL: SELECT r.*, 
+                s.student_fullname, s.student_email, s.student_id, s.student_gender, s.student_nic,
+                d.department_name, d.department_id,
+                hod.user_name as hod_approver_name,
+                second.user_name as second_approver_name,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id) as has_payment,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)) as has_issued_payment,
+                (SELECT COUNT(*) FROM `season_requests` r2 WHERE r2.student_id = r.student_id AND r2.season_year = r.season_year) as total_requests_for_student
+                FROM `season_requests` r
+                INNER JOIN `student` s ON r.student_id = s.student_id
+                LEFT JOIN `department` d ON r.department_id = d.department_id
+                LEFT JOIN `user` hod ON r.hod_approver_id = hod.user_id
+                LEFT JOIN `user` second ON r.second_approver_id = second.user_id WHERE (LOWER(TRIM(r.status)) = 'hod_approved' 
+                         OR LOWER(TRIM(r.status)) = 'approved' 
+                         OR LOWER(TRIM(r.status)) = 'paid' 
+                         OR LOWER(TRIM(r.status)) = 'issued') ORDER BY r.created_at DESC
+[19-Feb-2026 16:49:17 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:49:17 UTC] BusSeasonRequestModel::getRequestsForSAO - SQL: SELECT r.*, 
+                s.student_fullname, s.student_email, s.student_id, s.student_gender, s.student_nic,
+                d.department_name, d.department_id,
+                hod.user_name as hod_approver_name,
+                second.user_name as second_approver_name,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id) as has_payment,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)) as has_issued_payment,
+                (SELECT COUNT(*) FROM `season_requests` r2 WHERE r2.student_id = r.student_id AND r2.season_year = r.season_year) as total_requests_for_student
+                FROM `season_requests` r
+                INNER JOIN `student` s ON r.student_id = s.student_id
+                LEFT JOIN `department` d ON r.department_id = d.department_id
+                LEFT JOIN `user` hod ON r.hod_approver_id = hod.user_id
+                LEFT JOIN `user` second ON r.second_approver_id = second.user_id WHERE (LOWER(TRIM(r.status)) = 'hod_approved' 
+                         OR LOWER(TRIM(r.status)) = 'approved' 
+                         OR LOWER(TRIM(r.status)) = 'paid' 
+                         OR LOWER(TRIM(r.status)) = 'issued') ORDER BY r.created_at DESC
+[19-Feb-2026 16:49:17 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:49:17 UTC] BusSeasonRequestModel::getRequestsForSAO - SQL: SELECT r.*, 
+                s.student_fullname, s.student_email, s.student_id, s.student_gender, s.student_nic,
+                d.department_name, d.department_id,
+                hod.user_name as hod_approver_name,
+                second.user_name as second_approver_name,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id) as has_payment,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)) as has_issued_payment,
+                (SELECT COUNT(*) FROM `season_requests` r2 WHERE r2.student_id = r.student_id AND r2.season_year = r.season_year) as total_requests_for_student
+                FROM `season_requests` r
+                INNER JOIN `student` s ON r.student_id = s.student_id
+                LEFT JOIN `department` d ON r.department_id = d.department_id
+                LEFT JOIN `user` hod ON r.hod_approver_id = hod.user_id
+                LEFT JOIN `user` second ON r.second_approver_id = second.user_id WHERE (LOWER(TRIM(r.status)) = 'hod_approved' 
+                         OR LOWER(TRIM(r.status)) = 'approved' 
+                         OR LOWER(TRIM(r.status)) = 'paid' 
+                         OR LOWER(TRIM(r.status)) = 'issued') ORDER BY r.created_at DESC
+[19-Feb-2026 16:49:17 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:49:17 UTC] BusSeasonRequestModel::getRequestsForSAO - SQL: SELECT r.*, 
+                s.student_fullname, s.student_email, s.student_id, s.student_gender, s.student_nic,
+                d.department_name, d.department_id,
+                hod.user_name as hod_approver_name,
+                second.user_name as second_approver_name,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id) as has_payment,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)) as has_issued_payment,
+                (SELECT COUNT(*) FROM `season_requests` r2 WHERE r2.student_id = r.student_id AND r2.season_year = r.season_year) as total_requests_for_student
+                FROM `season_requests` r
+                INNER JOIN `student` s ON r.student_id = s.student_id
+                LEFT JOIN `department` d ON r.department_id = d.department_id
+                LEFT JOIN `user` hod ON r.hod_approver_id = hod.user_id
+                LEFT JOIN `user` second ON r.second_approver_id = second.user_id WHERE (LOWER(TRIM(r.status)) = 'hod_approved' 
+                         OR LOWER(TRIM(r.status)) = 'approved' 
+                         OR LOWER(TRIM(r.status)) = 'paid' 
+                         OR LOWER(TRIM(r.status)) = 'issued') ORDER BY r.created_at DESC
+[19-Feb-2026 16:49:17 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:49:18 UTC] BusSeasonRequestModel::getRequestsForSAO - SQL: SELECT r.*, 
+                s.student_fullname, s.student_email, s.student_id, s.student_gender, s.student_nic,
+                d.department_name, d.department_id,
+                hod.user_name as hod_approver_name,
+                second.user_name as second_approver_name,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id) as has_payment,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)) as has_issued_payment,
+                (SELECT COUNT(*) FROM `season_requests` r2 WHERE r2.student_id = r.student_id AND r2.season_year = r.season_year) as total_requests_for_student
+                FROM `season_requests` r
+                INNER JOIN `student` s ON r.student_id = s.student_id
+                LEFT JOIN `department` d ON r.department_id = d.department_id
+                LEFT JOIN `user` hod ON r.hod_approver_id = hod.user_id
+                LEFT JOIN `user` second ON r.second_approver_id = second.user_id WHERE (LOWER(TRIM(r.status)) = 'hod_approved' 
+                         OR LOWER(TRIM(r.status)) = 'approved' 
+                         OR LOWER(TRIM(r.status)) = 'paid' 
+                         OR LOWER(TRIM(r.status)) = 'issued') ORDER BY r.created_at DESC
+[19-Feb-2026 16:49:18 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:49:18 UTC] BusSeasonRequestModel::getRequestsForSAO - SQL: SELECT r.*, 
+                s.student_fullname, s.student_email, s.student_id, s.student_gender, s.student_nic,
+                d.department_name, d.department_id,
+                hod.user_name as hod_approver_name,
+                second.user_name as second_approver_name,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id) as has_payment,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)) as has_issued_payment,
+                (SELECT COUNT(*) FROM `season_requests` r2 WHERE r2.student_id = r.student_id AND r2.season_year = r.season_year) as total_requests_for_student
+                FROM `season_requests` r
+                INNER JOIN `student` s ON r.student_id = s.student_id
+                LEFT JOIN `department` d ON r.department_id = d.department_id
+                LEFT JOIN `user` hod ON r.hod_approver_id = hod.user_id
+                LEFT JOIN `user` second ON r.second_approver_id = second.user_id WHERE (LOWER(TRIM(r.status)) = 'hod_approved' 
+                         OR LOWER(TRIM(r.status)) = 'approved' 
+                         OR LOWER(TRIM(r.status)) = 'paid' 
+                         OR LOWER(TRIM(r.status)) = 'issued') ORDER BY r.created_at DESC
+[19-Feb-2026 16:49:18 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:49:18 UTC] BusSeasonRequestModel::getRequestsForSAO - SQL: SELECT r.*, 
+                s.student_fullname, s.student_email, s.student_id, s.student_gender, s.student_nic,
+                d.department_name, d.department_id,
+                hod.user_name as hod_approver_name,
+                second.user_name as second_approver_name,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id) as has_payment,
+                (SELECT COUNT(*) FROM `season_payments` p WHERE p.request_id = r.id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)) as has_issued_payment,
+                (SELECT COUNT(*) FROM `season_requests` r2 WHERE r2.student_id = r.student_id AND r2.season_year = r.season_year) as total_requests_for_student
+                FROM `season_requests` r
+                INNER JOIN `student` s ON r.student_id = s.student_id
+                LEFT JOIN `department` d ON r.department_id = d.department_id
+                LEFT JOIN `user` hod ON r.hod_approver_id = hod.user_id
+                LEFT JOIN `user` second ON r.second_approver_id = second.user_id WHERE (LOWER(TRIM(r.status)) = 'hod_approved' 
+                         OR LOWER(TRIM(r.status)) = 'approved' 
+                         OR LOWER(TRIM(r.status)) = 'paid' 
+                         OR LOWER(TRIM(r.status)) = 'issued') ORDER BY r.created_at DESC
+[19-Feb-2026 16:51:41 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:51:51 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:51:55 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:51:59 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:52:37 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:52:40 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:52:45 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:53:01 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:53:01 UTC] BusSeasonRequestModel::create - Request created successfully. ID: 10
+[19-Feb-2026 16:53:03 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:53:17 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:53:30 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:53:30 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:53:52 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:53:52 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:54:37 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:54:48 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:54:48 UTC] BusSeasonRequestModel::create - Request created successfully. ID: 11
+[19-Feb-2026 16:54:49 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:55:04 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:55:05 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:55:13 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:55:30 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:56:54 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:56:57 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:57:12 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:57:52 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:58:32 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:58:33 UTC] BusSeasonRequestModel::create - Request created successfully. ID: 12
+[19-Feb-2026 16:58:34 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:58:49 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:58:54 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:59:03 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:59:07 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 16:59:56 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:00:51 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:01:17 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:01:17 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:01:22 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:03:12 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:03:20 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:03:35 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:03:48 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:03:59 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:04:42 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:04:56 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:06:44 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:06:53 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:07:03 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:07:14 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:08:07 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:08:14 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:09:33 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:09:40 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:09:42 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:09:50 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:09:51 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:09:55 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:10:59 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:11:02 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:11:02 UTC] BusSeasonRequestController::deletePayment - Fatal Error: Cannot access protected property BusSeasonRequestModel::$db | Trace: #0 C:\wamp64\www\SLGTIMIS\core\Router.php(67): BusSeasonRequestController->deletePayment()
+#1 C:\wamp64\www\SLGTIMIS\core\Router.php(26): Router->dispatch('BusSeasonReques...')
+#2 C:\wamp64\www\SLGTIMIS\index.php(144): Router->route('bus-season-requ...')
+#3 {main}
+[19-Feb-2026 17:12:47 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:12:51 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:12:52 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:14:43 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:15:04 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:15:04 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:15:25 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:15:25 UTC] Database::connect - Connection successful to sisslgti
+[19-Feb-2026 17:15:29 UTC] Database::connect - Connection successful to sisslgti

@@ -195,7 +195,7 @@
                 <div class="text-muted small mb-2 mb-md-0">
                     <i class="fas fa-info-circle me-1"></i>
                     Showing <strong><?php echo count($students); ?></strong> of <strong><?php echo number_format($total); ?></strong> students
-                    <?php if (!empty($filters['search']) || !empty($filters['status']) || !empty($filters['district']) || !empty($filters['gender']) || !empty($filters['department_id']) || !empty($filters['course_id']) || !empty($filters['academic_year'])): ?>
+                    <?php if (!empty($filters['search']) || !empty($filters['status']) || !empty($filters['district']) || !empty($filters['gender']) || !empty($filters['department_id']) || !empty($filters['course_id']) || !empty($filters['academic_year']) || !empty($filters['course_mode']) || !empty($filters['group_id'])): ?>
                         <a href="<?php echo APP_URL; ?>/students" class="text-primary ms-2 text-decoration-none">
                             <i class="fas fa-times-circle me-1"></i>Clear filters
                         </a>
@@ -285,6 +285,23 @@
                 </div>
 
                 <?php if ($totalPages > 1): ?>
+                    <?php
+                    // Helper function to build query string with all filters
+                    function buildPaginationQuery($page, $filters) {
+                        $params = ['page' => $page];
+                        // Include all filter parameters
+                        if (!empty($filters['search'])) $params['search'] = $filters['search'];
+                        if (!empty($filters['status'])) $params['status'] = $filters['status'];
+                        if (!empty($filters['district'])) $params['district'] = $filters['district'];
+                        if (!empty($filters['gender'])) $params['gender'] = $filters['gender'];
+                        if (!empty($filters['department_id'])) $params['department_id'] = $filters['department_id'];
+                        if (!empty($filters['course_id'])) $params['course_id'] = $filters['course_id'];
+                        if (!empty($filters['academic_year'])) $params['academic_year'] = $filters['academic_year'];
+                        if (!empty($filters['course_mode'])) $params['course_mode'] = $filters['course_mode'];
+                        if (!empty($filters['group_id'])) $params['group_id'] = $filters['group_id'];
+                        return '?' . http_build_query($params);
+                    }
+                    ?>
                     <div class="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-3">
                         <div class="text-muted small">
                             Page <strong><?php echo $currentPage; ?></strong> of <strong><?php echo $totalPages; ?></strong>
@@ -293,15 +310,7 @@
                             <ul class="pagination pagination-sm mb-0">
                                 <?php if ($currentPage > 1): ?>
                                     <li class="page-item">
-                                        <a class="page-link" href="?page=<?php echo $currentPage - 1; ?><?php 
-                                            echo !empty($filters['search']) ? '&search=' . urlencode($filters['search']) : '';
-                                            echo !empty($filters['status']) ? '&status=' . urlencode($filters['status']) : '';
-                                            echo !empty($filters['district']) ? '&district=' . urlencode($filters['district']) : '';
-                                            echo !empty($filters['gender']) ? '&gender=' . urlencode($filters['gender']) : '';
-                                            echo !empty($filters['department_id']) ? '&department_id=' . urlencode($filters['department_id']) : '';
-                                            echo !empty($filters['course_id']) ? '&course_id=' . urlencode($filters['course_id']) : '';
-                                            echo !empty($filters['academic_year']) ? '&academic_year=' . urlencode($filters['academic_year']) : '';
-                                        ?>">
+                                        <a class="page-link" href="<?php echo buildPaginationQuery($currentPage - 1, $filters); ?>">
                                             <i class="fas fa-chevron-left"></i> Previous
                                         </a>
                                     </li>
@@ -314,12 +323,7 @@
                                 
                                 if ($startPage > 1): ?>
                                     <li class="page-item">
-                                        <a class="page-link" href="?page=1<?php 
-                                            echo !empty($filters['search']) ? '&search=' . urlencode($filters['search']) : '';
-                                            echo !empty($filters['status']) ? '&status=' . urlencode($filters['status']) : '';
-                                            echo !empty($filters['district']) ? '&district=' . urlencode($filters['district']) : '';
-                                            echo !empty($filters['gender']) ? '&gender=' . urlencode($filters['gender']) : '';
-                                        ?>">1</a>
+                                        <a class="page-link" href="<?php echo buildPaginationQuery(1, $filters); ?>">1</a>
                                     </li>
                                     <?php if ($startPage > 2): ?>
                                         <li class="page-item disabled"><span class="page-link">...</span></li>
@@ -328,15 +332,7 @@
                                 
                                 <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
                                     <li class="page-item <?php echo $i == $currentPage ? 'active' : ''; ?>">
-                                        <a class="page-link" href="?page=<?php echo $i; ?><?php 
-                                            echo !empty($filters['search']) ? '&search=' . urlencode($filters['search']) : '';
-                                            echo !empty($filters['status']) ? '&status=' . urlencode($filters['status']) : '';
-                                            echo !empty($filters['district']) ? '&district=' . urlencode($filters['district']) : '';
-                                            echo !empty($filters['gender']) ? '&gender=' . urlencode($filters['gender']) : '';
-                                            echo !empty($filters['department_id']) ? '&department_id=' . urlencode($filters['department_id']) : '';
-                                            echo !empty($filters['course_id']) ? '&course_id=' . urlencode($filters['course_id']) : '';
-                                            echo !empty($filters['academic_year']) ? '&academic_year=' . urlencode($filters['academic_year']) : '';
-                                        ?>">
+                                        <a class="page-link" href="<?php echo buildPaginationQuery($i, $filters); ?>">
                                             <?php echo $i; ?>
                                         </a>
                                     </li>
@@ -347,23 +343,13 @@
                                         <li class="page-item disabled"><span class="page-link">...</span></li>
                                     <?php endif; ?>
                                     <li class="page-item">
-                                        <a class="page-link" href="?page=<?php echo $totalPages; ?><?php 
-                                            echo !empty($filters['search']) ? '&search=' . urlencode($filters['search']) : '';
-                                            echo !empty($filters['status']) ? '&status=' . urlencode($filters['status']) : '';
-                                            echo !empty($filters['district']) ? '&district=' . urlencode($filters['district']) : '';
-                                            echo !empty($filters['gender']) ? '&gender=' . urlencode($filters['gender']) : '';
-                                        ?>"><?php echo $totalPages; ?></a>
+                                        <a class="page-link" href="<?php echo buildPaginationQuery($totalPages, $filters); ?>"><?php echo $totalPages; ?></a>
                                     </li>
                                 <?php endif; ?>
                                 
                                 <?php if ($currentPage < $totalPages): ?>
                                     <li class="page-item">
-                                        <a class="page-link" href="?page=<?php echo $currentPage + 1; ?><?php 
-                                            echo !empty($filters['search']) ? '&search=' . urlencode($filters['search']) : '';
-                                            echo !empty($filters['status']) ? '&status=' . urlencode($filters['status']) : '';
-                                            echo !empty($filters['district']) ? '&district=' . urlencode($filters['district']) : '';
-                                            echo !empty($filters['gender']) ? '&gender=' . urlencode($filters['gender']) : '';
-                                        ?>">
+                                        <a class="page-link" href="<?php echo buildPaginationQuery($currentPage + 1, $filters); ?>">
                                             Next <i class="fas fa-chevron-right"></i>
                                         </a>
                                     </li>

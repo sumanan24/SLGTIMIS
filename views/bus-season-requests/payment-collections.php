@@ -39,6 +39,100 @@
         border-bottom: 3px solid #198754;
         background: none;
     }
+    
+    /* Action Buttons Styling */
+    .action-buttons {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        justify-content: flex-end;
+    }
+    
+    .action-buttons .btn {
+        border: 1px solid;
+        background: transparent;
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+    }
+    
+    .action-buttons .btn:hover {
+        background: rgba(0, 0, 0, 0.05);
+        transform: translateY(-1px);
+    }
+    
+    .action-buttons .btn:active {
+        transform: translateY(0);
+    }
+    
+    .action-buttons .btn i {
+        margin-right: 0.375rem;
+        font-size: 0.875rem;
+    }
+    
+    .action-buttons .btn-outline-warning {
+        border-color: #ffc107;
+        color: #ffc107;
+    }
+    
+    .action-buttons .btn-outline-warning:hover {
+        background-color: #ffc107;
+        color: #000;
+        border-color: #ffc107;
+    }
+    
+    .action-buttons .btn-outline-primary {
+        border-color: #0d6efd;
+        color: #0d6efd;
+    }
+    
+    .action-buttons .btn-outline-primary:hover {
+        background-color: #0d6efd;
+        color: #fff;
+        border-color: #0d6efd;
+    }
+    
+    .action-buttons .btn-outline-danger {
+        border-color: #dc3545;
+        color: #dc3545;
+    }
+    
+    .action-buttons .btn-outline-danger:hover {
+        background-color: #dc3545;
+        color: #fff;
+        border-color: #dc3545;
+    }
+    
+    .action-buttons .btn-outline-success {
+        border-color: #198754;
+        color: #198754;
+    }
+    
+    .action-buttons .btn-outline-success:hover {
+        background-color: #198754;
+        color: #fff;
+        border-color: #198754;
+    }
+    
+    /* Bulk action button */
+    .btn-warning {
+        border: 1px solid #ffc107;
+        background: transparent;
+        color: #ffc107;
+    }
+    
+    .btn-warning:hover:not(:disabled) {
+        background-color: #ffc107;
+        color: #000;
+        border-color: #ffc107;
+    }
+    
+    .btn-warning:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
 </style>
 
 <div class="container-fluid px-3 px-md-4 py-4">
@@ -134,7 +228,7 @@
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="fw-bold mb-0">Paid Seasons</h5>
                     <button onclick="bulkUpdate('processing')" id="btnBulkProcess" class="btn btn-warning btn-sm" disabled>
-                        <i class="fas fa-spinner fa-spin me-1"></i> Mark Selected as Processing
+                        <i class="fas fa-cog"></i> Mark Selected as Processing
                     </button>
                 </div>
                 <div class="table-responsive">
@@ -169,9 +263,65 @@
                                     <td class="fw-bold text-success">Rs. <?php echo number_format($c['paid_amount'] ?? 0, 2); ?></td>
                                     <td><?php echo !empty($c['payment_date']) ? date('M d, Y', strtotime($c['payment_date'])) : 'N/A'; ?></td>
                                     <td class="text-end">
-                                        <button onclick="updateStatus(<?php echo $c['payment_id']; ?>, 'processing')" class="btn btn-sm btn-outline-warning">
-                                            Process
-                                        </button>
+                                        <div class="action-buttons">
+                                            <button onclick="updateStatus(<?php echo $c['payment_id']; ?>, 'processing')" class="btn btn-outline-warning" title="Move to Processing">
+                                                <i class="fas fa-cog"></i>Process
+                                            </button>
+                                            <button onclick="editPayment(<?php echo $c['payment_id']; ?>)" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editPaymentModal_<?php echo $c['payment_id']; ?>" title="Edit Payment">
+                                                <i class="fas fa-edit"></i>Edit
+                                            </button>
+                                            <button onclick="deletePayment(<?php echo $c['payment_id']; ?>)" class="btn btn-outline-danger" title="Delete Payment">
+                                                <i class="fas fa-trash"></i>Delete
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Edit Payment Modal -->
+                                        <div class="modal fade" id="editPaymentModal_<?php echo $c['payment_id']; ?>" tabindex="-1">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header bg-primary text-white">
+                                                        <h5 class="modal-title">
+                                                            <i class="fas fa-edit me-2"></i>Edit Payment
+                                                        </h5>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <form id="editPaymentForm_<?php echo $c['payment_id']; ?>">
+                                                            <input type="hidden" name="payment_id" value="<?php echo $c['payment_id']; ?>">
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-bold">Paid Amount</label>
+                                                                <input type="number" step="0.01" class="form-control" name="paid_amount" value="<?php echo $c['paid_amount'] ?? 0; ?>" required>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-bold">Payment Date</label>
+                                                                <input type="date" class="form-control" name="payment_date" value="<?php echo $c['payment_date'] ? date('Y-m-d', strtotime($c['payment_date'])) : date('Y-m-d'); ?>" required>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-bold">Payment Method</label>
+                                                                <select class="form-select" name="payment_method" required>
+                                                                    <option value="Cash" <?php echo ($c['payment_method'] ?? '') === 'Cash' ? 'selected' : ''; ?>>Cash</option>
+                                                                    <option value="Bank Transfer" <?php echo ($c['payment_method'] ?? '') === 'Bank Transfer' ? 'selected' : ''; ?>>Bank Transfer</option>
+                                                                </select>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-bold">Payment Reference</label>
+                                                                <input type="text" class="form-control" name="payment_reference" value="<?php echo htmlspecialchars($c['payment_reference'] ?? ''); ?>">
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-bold">Notes</label>
+                                                                <textarea class="form-control" name="notes" rows="3"><?php echo htmlspecialchars($c['payment_notes'] ?? $c['notes'] ?? ''); ?></textarea>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="button" class="btn btn-primary" onclick="savePaymentEdit(<?php echo $c['payment_id']; ?>)">
+                                                            <i class="fas fa-save me-1"></i>Save Changes
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; endif; ?>
@@ -215,9 +365,11 @@
                                     <td class="fw-bold text-success">Rs. <?php echo number_format($c['paid_amount'] ?? 0, 2); ?></td>
                                     <td><?php echo !empty($c['updated_at']) ? date('M d, Y', strtotime($c['updated_at'])) : 'N/A'; ?></td>
                                     <td class="text-end">
-                                        <button onclick="updateStatus(<?php echo $c['payment_id']; ?>, 'issued')" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#issueModal_<?php echo $c['payment_id']; ?>">
-                                            Issue Season
-                                        </button>
+                                        <div class="action-buttons">
+                                            <button onclick="updateStatus(<?php echo $c['payment_id']; ?>, 'issued')" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#issueModal_<?php echo $c['payment_id']; ?>" title="Issue Season Ticket">
+                                                <i class="fas fa-check-circle"></i>Issue Season
+                                            </button>
+                                        </div>
 
                                         <!-- Issue Modal -->
                                         <div class="modal fade" id="issueModal_<?php echo $c['payment_id']; ?>" tabindex="-1">
@@ -336,8 +488,11 @@
                                     <td><?php echo !empty($c['issued_at']) ? date('M d, Y', strtotime($c['issued_at'])) : 'N/A'; ?></td>
                                     <td class="text-end">
                                         <a href="<?php echo APP_URL; ?>/bus-season-requests/view?id=<?php echo $c['request_id']; ?>" class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-eye"></i>
+                                            <i class="fas fa-eye me-1"></i>View
                                         </a>
+                                        <span class="text-muted ms-2" title="Issued payments cannot be edited or deleted">
+                                            <i class="fas fa-lock"></i>
+                                        </span>
                                     </td>
                                 </tr>
                             <?php endforeach; endif; ?>
@@ -433,6 +588,127 @@ function submitIssue(paymentId) {
     .catch(error => {
         console.error('Error:', error);
         alert('An error occurred');
+    });
+}
+
+function editPayment(paymentId) {
+    // Modal will be shown via data-bs-toggle
+    // Form is already populated in the modal
+}
+
+function savePaymentEdit(paymentId) {
+    const form = document.getElementById('editPaymentForm_' + paymentId);
+    if (!form) {
+        alert('Error: Form not found');
+        return;
+    }
+    
+    const formData = new FormData(form);
+    const saveBtn = form.closest('.modal').querySelector('button[onclick*="savePaymentEdit"]');
+    
+    // Disable button and show loading
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        const originalText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+        
+        fetch('<?php echo APP_URL; ?>/bus-season-requests/edit-payment', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            // Try to parse JSON even if status is not ok
+            return response.text().then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    return { ok: response.ok, data: data, status: response.status };
+                } catch (e) {
+                    // If not JSON, return error message
+                    return { 
+                        ok: false, 
+                        data: { success: false, message: text || 'Server returned an error (Status: ' + response.status + ')' },
+                        status: response.status 
+                    };
+                }
+            });
+        })
+        .then(result => {
+            if (result.ok && result.data.success) {
+                // Close modal
+                const modalElement = document.getElementById('editPaymentModal_' + paymentId);
+                if (modalElement) {
+                    const modal = bootstrap.Modal.getInstance(modalElement);
+                    if (modal) {
+                        modal.hide();
+                    }
+                }
+                // Show success message
+                alert('Payment updated successfully!');
+                location.reload();
+            } else {
+                // Show error message
+                const errorMsg = result.data.message || result.data.error || 'Failed to update payment. Please try again.';
+                alert('Error: ' + errorMsg);
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while updating payment. Please check your connection and try again.\n\nError: ' + error.message);
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalText;
+        });
+    }
+}
+
+function deletePayment(paymentId) {
+    if (!confirm('Are you sure you want to delete this payment? This action cannot be undone.')) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('payment_id', paymentId);
+    
+    fetch('<?php echo APP_URL; ?>/bus-season-requests/delete-payment', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        // Try to parse JSON even if status is not ok
+        return response.text().then(text => {
+            try {
+                const data = JSON.parse(text);
+                return { ok: response.ok, data: data, status: response.status };
+            } catch (e) {
+                // If not JSON, return error message
+                return { 
+                    ok: false, 
+                    data: { success: false, message: text || 'Server returned an error (Status: ' + response.status + ')' },
+                    status: response.status 
+                };
+            }
+        });
+    })
+    .then(result => {
+        if (result.ok && result.data.success) {
+            alert('Payment deleted successfully!');
+            location.reload();
+        } else {
+            // Show error message
+            const errorMsg = result.data.message || result.data.error || 'Failed to delete payment. Please try again.';
+            alert('Error: ' + errorMsg);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while deleting payment. Please check your connection and try again.\n\nError: ' + error.message);
     });
 }
 

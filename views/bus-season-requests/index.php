@@ -98,10 +98,29 @@
     <?php endif; ?>
     
     <?php if (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student'): ?>
+        <!-- Request Count Info -->
+        <?php if (isset($totalRequests) && $totalRequests > 0): ?>
+            <div class="alert alert-<?php echo isset($hasReachedMax) && $hasReachedMax ? 'warning' : 'info'; ?>">
+                <i class="fas fa-<?php echo isset($hasReachedMax) && $hasReachedMax ? 'exclamation-triangle' : 'info-circle'; ?> me-2"></i>
+                <strong>Request Status:</strong> You have <strong><?php echo $totalRequests; ?></strong> request(s) for season <?php echo $seasonYear ?? '2026'; ?> 
+                (Maximum: <?php echo $maxRequests ?? 12; ?> requests per year).
+                <?php if (isset($hasReachedMax) && $hasReachedMax): ?>
+                    <span class="text-danger fw-bold">You have reached the maximum limit.</span>
+                <?php elseif (isset($totalRequests) && $totalRequests >= ($maxRequests ?? 12) - 2): ?>
+                    <span class="text-warning">You are approaching the limit.</span>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+        
         <?php if ($hasExistingRequest): ?>
             <div class="alert alert-info">
                 <i class="fas fa-info-circle me-2"></i>
-                You already have a bus season request for the season year <strong>2026</strong>. Only one request per year is allowed.
+                You already have a bus season request for <strong><?php echo date('F Y'); ?></strong>. You can create a new request next month.
+            </div>
+        <?php elseif (isset($hasReachedMax) && $hasReachedMax): ?>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                You have reached the maximum limit of <strong><?php echo $maxRequests ?? 12; ?> requests per year</strong> for season <?php echo $seasonYear ?? '2026'; ?>.
             </div>
         <?php else: ?>
             <!-- Request Form for Students -->

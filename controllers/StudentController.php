@@ -1652,13 +1652,23 @@ class StudentController extends Controller {
                     'lastRegNumber' => $nextAvailableId // Actually returns next available ID
                 ]);
             } else {
-                // If no previous ID found, return null so frontend can handle it
-                echo json_encode([
-                    'success' => false,
-                    'error' => 'No previous registration number found. Please enter student ID manually.'
-                ]);
+                // Try to generate a new ID using generateNextRegistrationNumber as fallback
+                $generatedId = $studentModel->generateNextRegistrationNumber($courseId, $academicYear, $courseMode);
+                if ($generatedId) {
+                    echo json_encode([
+                        'success' => true,
+                        'lastRegNumber' => $generatedId
+                    ]);
+                } else {
+                    // If still no ID found, return error
+                    echo json_encode([
+                        'success' => false,
+                        'error' => 'Unable to generate student ID. Please enter student ID manually.'
+                    ]);
+                }
             }
         } catch (Exception $e) {
+            error_log("Error in getLastRegNumber: " . $e->getMessage());
             echo json_encode([
                 'success' => false,
                 'error' => 'Error fetching next available student ID: ' . $e->getMessage()

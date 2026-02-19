@@ -56,7 +56,19 @@ class BusSeasonRequestController extends Controller {
         unset($request);
         
         // Check if student already has request for 2026
-        $hasExistingRequest = $requestModel->hasExistingRequest($studentId, '2026');
+        $hasExistingRequest = false;
+        $totalRequests = 0;
+        $maxRequests = 12;
+        $hasReachedMax = false;
+        
+        try {
+            $hasExistingRequest = $requestModel->hasExistingRequest($studentId, '2026');
+            $totalRequests = $requestModel->getTotalRequestsForYear($studentId, '2026');
+            $hasReachedMax = $requestModel->hasReachedMaxRequests($studentId, '2026', $maxRequests);
+        } catch (Exception $e) {
+            error_log("BusSeasonRequestController::studentIndex - Error checking requests: " . $e->getMessage());
+            // Continue with default values if there's an error
+        }
         
         $data = [
             'title' => 'Bus Season Request - 2026',
@@ -66,6 +78,9 @@ class BusSeasonRequestController extends Controller {
             'departmentId' => $departmentId,
             'requests' => $requests,
             'hasExistingRequest' => $hasExistingRequest,
+            'totalRequests' => $totalRequests,
+            'maxRequests' => $maxRequests,
+            'hasReachedMax' => $hasReachedMax,
             'message' => $this->getFlashMessage(),
             'error' => $this->getFlashError()
         ];
@@ -154,11 +169,30 @@ class BusSeasonRequestController extends Controller {
             $requestModel = $this->model('BusSeasonRequestModel');
             $requestModel->ensureTableStructure();
             
-            // Check if student already has request for 2026
-            if ($requestModel->hasExistingRequest($studentId, '2026')) {
-                $errorMsg = 'You already have a bus season request for 2026. Only one request per year is allowed.';
-                $this->handleResponse($isAjax, false, $errorMsg);
-                return;
+            // Check if student already has request for current month
+            try {
+                if ($requestModel->hasExistingRequest($studentId, '2026')) {
+                    $currentMonth = date('F Y');
+                    $errorMsg = "You already have a bus season request for {$currentMonth}. You can create a new request next month.";
+                    $this->handleResponse($isAjax, false, $errorMsg);
+                    return;
+                }
+            } catch (Exception $e) {
+                error_log("BusSeasonRequestController::create - Error checking existing request: " . $e->getMessage());
+                // Continue if check fails
+            }
+            
+            // Check if student has reached maximum requests per year (12 requests = one per month)
+            try {
+                if ($requestModel->hasReachedMaxRequests($studentId, '2026', 12)) {
+                    $totalRequests = $requestModel->getTotalRequestsForYear($studentId, '2026');
+                    $errorMsg = "You have reached the maximum limit of 12 requests per year for season 2026. You already have {$totalRequests} request(s).";
+                    $this->handleResponse($isAjax, false, $errorMsg);
+                    return;
+                }
+            } catch (Exception $e) {
+                error_log("BusSeasonRequestController::create - Error checking max requests: " . $e->getMessage());
+                // Continue if check fails
             }
             
             // Get department ID (optional)
@@ -394,7 +428,8 @@ class BusSeasonRequestController extends Controller {
         $requestModel->ensureTableStructure();
         
         $filters = [
-            'payment_filter' => $this->get('payment_filter', 'needs_payment'),
+            'payment_filter' => $this->get('payment_filter', 'all'), // Default to 'all' to show all requests
+            'search' => trim($this->get('search', '')), // Search by name, NIC, or student ID
             'student_id' => trim($this->get('student_id', '')),
             'request_id' => trim($this->get('request_id', ''))
         ];
@@ -466,11 +501,30 @@ class BusSeasonRequestController extends Controller {
             $requestModel = $this->model('BusSeasonRequestModel');
             $requestModel->ensureTableStructure();
             
-            // Check if student already has request for 2026
-            if ($requestModel->hasExistingRequest($studentId, '2026')) {
-                $errorMsg = 'This student already has a bus season request for 2026.';
-                $this->handleResponse($isAjax, false, $errorMsg);
-                return;
+            // Check if student already has request for current month
+            try {
+                if ($requestModel->hasExistingRequest($studentId, '2026')) {
+                    $currentMonth = date('F Y');
+                    $errorMsg = "This student already has a bus season request for {$currentMonth}. They can create a new request next month.";
+                    $this->handleResponse($isAjax, false, $errorMsg);
+                    return;
+                }
+            } catch (Exception $e) {
+                error_log("BusSeasonRequestController::saoCreateRequest - Error checking existing request: " . $e->getMessage());
+                // Continue if check fails
+            }
+            
+            // Check if student has reached maximum requests per year (12 requests = one per month)
+            try {
+                if ($requestModel->hasReachedMaxRequests($studentId, '2026', 12)) {
+                    $totalRequests = $requestModel->getTotalRequestsForYear($studentId, '2026');
+                    $errorMsg = "This student has reached the maximum limit of 12 requests per year for season 2026. They already have {$totalRequests} request(s).";
+                    $this->handleResponse($isAjax, false, $errorMsg);
+                    return;
+                }
+            } catch (Exception $e) {
+                error_log("BusSeasonRequestController::saoCreateRequest - Error checking max requests: " . $e->getMessage());
+                // Continue if check fails
             }
             
             // Get department ID
@@ -633,6 +687,112 @@ class BusSeasonRequestController extends Controller {
         ];
         
         return $this->view('bus-season-requests/payment-collections', $data);
+    }
+    
+    /**
+     * Edit Payment (AJAX)
+     */
+    public function editPayment() {
+        $this->requireAuth();
+        $this->requireSAOAccess();
+        $this->requirePost();
+        
+        $paymentId = (int)$this->post('payment_id', 0);
+        $paidAmount = floatval($this->post('paid_amount', 0));
+        $paymentDate = trim($this->post('payment_date', ''));
+        $paymentMethod = trim($this->post('payment_method', 'Cash'));
+        $paymentReference = trim($this->post('payment_reference', ''));
+        $notes = trim($this->post('notes', ''));
+        
+        if (empty($paymentId) || $paidAmount <= 0) {
+            $this->json(['success' => false, 'message' => 'Payment ID and valid paid amount are required.'], 400);
+            return;
+        }
+        
+        $requestModel = $this->model('BusSeasonRequestModel');
+        $payment = $requestModel->getPaymentCollectionById($paymentId);
+        
+        if (!$payment) {
+            $this->json(['success' => false, 'message' => 'Payment record not found.'], 404);
+            return;
+        }
+        
+        // Check if payment is issued - cannot edit issued payments
+        if (strtolower(trim($payment['status'] ?? '')) === 'issued') {
+            $this->json(['success' => false, 'message' => 'Issued payments cannot be edited.'], 403);
+            return;
+        }
+        
+        // Update payment details
+        $updateData = [
+            'paid_amount' => $paidAmount,
+            'payment_date' => $paymentDate ?: date('Y-m-d'),
+            'payment_method' => $paymentMethod,
+            'payment_reference' => $paymentReference,
+            'notes' => $notes
+        ];
+        
+        try {
+            if ($requestModel->updatePaymentStatus($paymentId, $payment['status'], $updateData)) {
+                $this->json(['success' => true, 'message' => 'Payment updated successfully.']);
+            } else {
+                $error = $requestModel->db->getConnection()->error ?? 'Unknown database error';
+                error_log("BusSeasonRequestController::editPayment - Update failed for payment ID: {$paymentId}. Error: {$error}");
+                $this->json(['success' => false, 'message' => 'Failed to update payment. Database error occurred.']);
+            }
+        } catch (Exception $e) {
+            error_log("BusSeasonRequestController::editPayment - Exception: " . $e->getMessage() . " | Trace: " . $e->getTraceAsString());
+            $this->json(['success' => false, 'message' => 'An error occurred while updating payment: ' . $e->getMessage()]);
+        } catch (Error $e) {
+            error_log("BusSeasonRequestController::editPayment - Fatal Error: " . $e->getMessage() . " | Trace: " . $e->getTraceAsString());
+            $this->json(['success' => false, 'message' => 'A system error occurred. Please contact the administrator.']);
+        }
+    }
+    
+    /**
+     * Delete Payment (AJAX)
+     */
+    public function deletePayment() {
+        $this->requireAuth();
+        $this->requireSAOAccess();
+        $this->requirePost();
+        
+        $paymentId = (int)$this->post('payment_id', 0);
+        
+        if (empty($paymentId)) {
+            $this->json(['success' => false, 'message' => 'Payment ID is required.'], 400);
+            return;
+        }
+        
+        $requestModel = $this->model('BusSeasonRequestModel');
+        $payment = $requestModel->getPaymentCollectionById($paymentId);
+        
+        if (!$payment) {
+            $this->json(['success' => false, 'message' => 'Payment record not found.'], 404);
+            return;
+        }
+        
+        // Check if payment is issued - cannot delete issued payments
+        if (strtolower(trim($payment['status'] ?? '')) === 'issued') {
+            $this->json(['success' => false, 'message' => 'Issued payments cannot be deleted.'], 403);
+            return;
+        }
+        
+        // Delete payment record using model method
+        try {
+            if ($requestModel->deletePaymentCollection($paymentId)) {
+                $this->json(['success' => true, 'message' => 'Payment deleted successfully.']);
+            } else {
+                error_log("BusSeasonRequestController::deletePayment - Delete failed for payment ID: {$paymentId}");
+                $this->json(['success' => false, 'message' => 'Failed to delete payment. Please check the error logs.']);
+            }
+        } catch (Exception $e) {
+            error_log("BusSeasonRequestController::deletePayment - Exception: " . $e->getMessage() . " | Trace: " . $e->getTraceAsString());
+            $this->json(['success' => false, 'message' => 'An error occurred while deleting payment: ' . $e->getMessage()]);
+        } catch (Error $e) {
+            error_log("BusSeasonRequestController::deletePayment - Fatal Error: " . $e->getMessage() . " | Trace: " . $e->getTraceAsString());
+            $this->json(['success' => false, 'message' => 'A system error occurred. Please contact the administrator.']);
+        }
     }
     
     /**
@@ -825,10 +985,20 @@ class BusSeasonRequestController extends Controller {
             return;
         }
         
+        // Get latest payment (for backward compatibility)
+        $latestPayment = $requestModel->getPaymentCollectionByRequestId($requestId);
+        if ($latestPayment) {
+            $request['payment'] = $latestPayment;
+        }
+        
+        // Get all payment collections for this request
+        $allPayments = $requestModel->getAllPaymentsByRequestId($requestId);
+        
         $data = [
             'title' => 'Bus Season Request Details',
             'page' => 'bus-season-requests',
             'request' => $request,
+            'allPayments' => $allPayments,
             'isStudent' => $this->isStudent(),
             'isHOD' => $this->isHOD(),
             'isSAO' => $this->isSAO(),

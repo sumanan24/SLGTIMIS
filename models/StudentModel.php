@@ -712,48 +712,60 @@ class StudentModel extends Model {
      * This method finds the last ID, increments it, and keeps checking until it finds an available ID
      */
     public function getNextAvailableRegistrationNumber($courseId, $academicYear, $courseMode = null) {
-        $lastRegNumber = $this->getLastRegistrationNumber($courseId, $academicYear, $courseMode);
+        // Normalize course mode
+        $normalizedCourseMode = $courseMode ?: 'Full Time';
         
-        // If no last registration number found, return null (will need to generate from scratch)
+        // First, try to get the last registration number
+        $lastRegNumber = $this->getLastRegistrationNumber($courseId, $academicYear, $normalizedCourseMode);
+        
+        // If no last registration number found, use generateNextRegistrationNumber to create first one
         if (!$lastRegNumber) {
+            $generatedId = $this->generateNextRegistrationNumber($courseId, $academicYear, $normalizedCourseMode);
+            if ($generatedId && !$this->exists($generatedId)) {
+                error_log("Generated first Student ID: " . $generatedId . " for course: " . $courseId . ", year: " . $academicYear . ", mode: " . $normalizedCourseMode);
+                return $generatedId;
+            }
+            return $generatedId;
+        }
+        
+        // Use generateNextRegistrationNumber to properly parse and increment the ID
+        // This handles all format variations correctly
+        $nextId = $this->generateNextRegistrationNumber($courseId, $academicYear, $normalizedCourseMode);
+        
+        if (!$nextId) {
+            error_log("Failed to generate next Student ID for course: " . $courseId . ", year: " . $academicYear . ", mode: " . $normalizedCourseMode);
             return null;
         }
         
-        // Extract last 3 digits from the student ID
-        $match = preg_match('/(\d{3})$/', $lastRegNumber, $matches);
-        if (!$match) {
-            // If no 3 digits found, return the last ID as is (let frontend handle it)
-            return $lastRegNumber;
-        }
-        
-        $lastNumber = intval($matches[1]);
-        $baseId = preg_replace('/\d{3}$/', '', $lastRegNumber);
-        
-        // Try up to 1000 iterations to find an available ID
+        // Check if the generated ID already exists, and if so, keep incrementing
         $maxAttempts = 1000;
         $attempt = 0;
+        $currentId = $nextId;
         
-        while ($attempt < $maxAttempts) {
-            $nextNumber = $lastNumber + 1 + $attempt;
-            $nextNumberStr = str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
-            $nextId = $baseId . $nextNumberStr;
-            
-            // Check if this ID already exists
-            if (!$this->exists($nextId)) {
-                error_log("Next available Student ID: " . $nextId . " for course: " . $courseId . ", year: " . $academicYear . ", mode: " . $courseMode);
-                return $nextId;
+        while ($attempt < $maxAttempts && $this->exists($currentId)) {
+            // Extract the number part and increment
+            // Try to find the last sequence of digits (could be 3, 4, or more digits)
+            if (preg_match('/(\d+)$/', $currentId, $matches)) {
+                $lastNumber = intval($matches[1]);
+                $baseId = preg_replace('/\d+$/', '', $currentId);
+                $digits = strlen($matches[1]); // Preserve the number of digits
+                $nextNumber = $lastNumber + 1;
+                $nextNumberStr = str_pad($nextNumber, $digits, '0', STR_PAD_LEFT);
+                $currentId = $baseId . $nextNumberStr;
+            } else {
+                // Fallback: just append a number
+                $currentId = $nextId . '_' . ($attempt + 1);
             }
-            
             $attempt++;
         }
         
-        // If we couldn't find an available ID after many attempts, return the incremented last ID
-        // (This shouldn't happen in normal circumstances)
-        $nextNumber = $lastNumber + 1;
-        $nextNumberStr = str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
-        $nextId = $baseId . $nextNumberStr;
-        error_log("Warning: Could not find available ID after " . $maxAttempts . " attempts. Returning: " . $nextId);
-        return $nextId;
+        if ($attempt >= $maxAttempts) {
+            error_log("Warning: Could not find available ID after " . $maxAttempts . " attempts. Returning: " . $currentId);
+        } else {
+            error_log("Next available Student ID: " . $currentId . " for course: " . $courseId . ", year: " . $academicYear . ", mode: " . $normalizedCourseMode);
+        }
+        
+        return $currentId;
     }
     
     /**
@@ -830,7 +842,8 @@ class StudentModel extends Model {
             if (!empty($ptMatches)) {
                 // Format: YYYY/DEPARTMENT_CODE/COURSE_CODE/PT_NNN
                 $number = intval($ptMatches[1]);
-                $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
+                $digits = strlen($ptMatches[1]); // Preserve original number of digits
+                $nextNumber = str_pad($number + 1, $digits, '0', STR_PAD_LEFT);
                 
                 if ($isPartTime) {
                     // Generating Part Time, increment PT number
@@ -856,7 +869,8 @@ class StudentModel extends Model {
                 // Format: YYYY/DEPARTMENT_CODE/COURSE_CODE_NNN
                 $lastCourseCode = $matches[1];
                 $number = intval($matches[2]);
-                $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
+                $digits = strlen($matches[2]); // Preserve original number of digits
+                $nextNumber = str_pad($number + 1, $digits, '0', STR_PAD_LEFT);
                 
                 if (!$isPartTime) {
                     // Generating Full Time, increment number
@@ -876,13 +890,15 @@ class StudentModel extends Model {
             $number = intval($parts[3]);
             
             // Convert old format to new format
+            // Preserve original number of digits from the last part
+            $digits = strlen($parts[3]);
             if ($isPartTime && ($oldMode === 'PT' || $oldMode === 'PART')) {
                 // Part Time: convert to YYYY/DEPARTMENT_CODE/COURSE_CODE/PT_NNN
-                $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
+                $nextNumber = str_pad($number + 1, $digits, '0', STR_PAD_LEFT);
                 return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . '/PT' . $nextNumber;
             } elseif (!$isPartTime && ($oldMode === 'FT' || $oldMode === 'FULL' || empty($oldMode))) {
                 // Full Time: convert to YYYY/DEPARTMENT_CODE/COURSE_CODE_NNN
-                $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
+                $nextNumber = str_pad($number + 1, $digits, '0', STR_PAD_LEFT);
                 return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . $nextNumber;
             } else {
                 // Different mode, start from 001
@@ -903,7 +919,8 @@ class StudentModel extends Model {
             // Check if last part is just a number
             if (is_numeric($lastPart)) {
                 $number = intval($lastPart);
-                $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
+                $digits = strlen($lastPart); // Preserve original number of digits
+                $nextNumber = str_pad($number + 1, $digits, '0', STR_PAD_LEFT);
                 
                 if ($isPartTime) {
                     return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . '/PT' . $nextNumber;
@@ -916,7 +933,8 @@ class StudentModel extends Model {
             preg_match('/^([A-Za-z]+)(\d+)$/', $lastPart, $matches);
             if (!empty($matches)) {
                 $number = intval($matches[2]);
-                $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
+                $digits = strlen($matches[2]); // Preserve original number of digits
+                $nextNumber = str_pad($number + 1, $digits, '0', STR_PAD_LEFT);
                 
                 if ($isPartTime) {
                     return $year . '/' . strtoupper($departmentCode) . '/' . strtoupper($courseCode) . '/PT' . $nextNumber;
@@ -930,7 +948,8 @@ class StudentModel extends Model {
         preg_match('/(\d+)$/', $lastRegNumber, $matches);
         if (!empty($matches[1])) {
             $number = intval($matches[1]);
-            $nextNumber = str_pad($number + 1, 3, '0', STR_PAD_LEFT);
+            $digits = strlen($matches[1]); // Preserve original number of digits
+            $nextNumber = str_pad($number + 1, $digits, '0', STR_PAD_LEFT);
             // Extract prefix and normalize
             $prefix = substr($lastRegNumber, 0, -strlen($matches[1]));
             // Normalize separator to slash (handle both _ and /)
