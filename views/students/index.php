@@ -257,7 +257,22 @@
                                             <a href="<?php echo APP_URL; ?>/students/edit?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-primary" title="Edit">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            <a href="<?php echo APP_URL; ?>/students/delete?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-danger" onclick="return confirm('Are you sure you want to delete this student?');" title="Delete">
+                                            <?php 
+                                            // Build delete URL with current filters
+                                            $deleteUrl = APP_URL . '/students/delete?id=' . urlencode($student['student_id']);
+                                            if (!empty($filters)) {
+                                                $filterParams = [];
+                                                foreach ($filters as $key => $value) {
+                                                    if (!empty($value) && $key !== 'page') {
+                                                        $filterParams[$key] = $value;
+                                                    }
+                                                }
+                                                if (!empty($filterParams)) {
+                                                    $deleteUrl .= '&' . http_build_query($filterParams);
+                                                }
+                                            }
+                                            ?>
+                                            <a href="<?php echo $deleteUrl; ?>" class="btn btn-outline-danger" onclick="return confirm('Are you sure you want to delete this student?');" title="Delete">
                                                 <i class="fas fa-trash"></i>
                                             </a>
                                             <?php endif; ?>

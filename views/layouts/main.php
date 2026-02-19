@@ -485,6 +485,7 @@
                                     $adminPages = [];
                                     if ($isADM) {
                                         $adminPages[] = 'admin-import-images';
+                                        $adminPages[] = 'admin-deleted-students';
                                     }
                                     if ($isAdminUser) {
                                         $adminPages = array_merge($adminPages, ['admin-users', 'admin-locked-accounts', 'admin-activity-logs', 'admin-backup-db']);
@@ -504,6 +505,12 @@
                                         <a href="<?php echo APP_URL; ?>/students/upload-images" class="<?php echo (isset($page) && $page === 'admin-import-images') ? 'active' : ''; ?>">
                                             <i class="fas fa-images"></i>
                                             <span>Upload Student Images</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/admin/deleted-students" class="<?php echo (isset($page) && $page === 'admin-deleted-students') ? 'active' : ''; ?>">
+                                            <i class="fas fa-user-slash"></i>
+                                            <span>Deleted Students</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>

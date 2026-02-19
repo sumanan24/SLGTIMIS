@@ -1427,6 +1427,30 @@ class StudentController extends Controller {
         // Store old values for logging
         $oldValues = $student;
         
+        // Get current filters from query parameters or referrer
+        $currentFilters = [];
+        $filterKeys = ['department_id', 'course_id', 'academic_year', 'status', 'search', 'district', 'gender', 'course_mode', 'group_id', 'page'];
+        
+        foreach ($filterKeys as $key) {
+            $value = $this->get($key, '');
+            if (!empty($value)) {
+                $currentFilters[$key] = $value;
+            }
+        }
+        
+        // If no filters in URL, try to get from referrer
+        if (empty($currentFilters) && !empty($_SERVER['HTTP_REFERER'])) {
+            $referer = parse_url($_SERVER['HTTP_REFERER']);
+            if (!empty($referer['query'])) {
+                parse_str($referer['query'], $queryParams);
+                foreach ($filterKeys as $key) {
+                    if (!empty($queryParams[$key])) {
+                        $currentFilters[$key] = $queryParams[$key];
+                    }
+                }
+            }
+        }
+        
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Delete student
             $result = $studentModel->deleteStudent($id);
@@ -1447,15 +1471,73 @@ class StudentController extends Controller {
                 $_SESSION['error'] = 'Failed to delete student.';
             }
             
-            $this->redirect('students');
+            // Preserve filters from POST or current filters
+            $redirectFilters = [];
+            foreach ($filterKeys as $key) {
+                $value = $this->post($key, '');
+                if (empty($value) && isset($currentFilters[$key])) {
+                    $value = $currentFilters[$key];
+                }
+                if (!empty($value)) {
+                    $redirectFilters[$key] = $value;
+                }
+            }
+            
+            // Build redirect URL with filters
+            $redirectUrl = 'students';
+            if (!empty($redirectFilters)) {
+                $redirectUrl .= '?' . http_build_query($redirectFilters);
+            }
+            
+            $this->redirect($redirectUrl);
         } else {
             $data = [
                 'title' => 'Delete Student',
                 'page' => 'students',
-                'student' => $student
+                'student' => $student,
+                'filters' => $currentFilters
             ];
             return $this->view('students/delete', $data);
         }
+
+    /**
+     * View deleted students (ADM only)
+     */
+    public function deletedStudents() {
+        // Check authentication
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $userRole = $userModel->getUserRole($_SESSION['user_id']);
+        $isADM = ($userRole === 'ADM');
+        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
+
+        // Only ADM (and system admin) can access
+        if (!$isADM && !$isAdmin) {
+            $_SESSION['error'] = 'Access denied. Only ADM users can view deleted students.';
+            $this->redirect('students');
+            return;
+        }
+
+        require_once BASE_PATH . '/models/DeletedStudentModel.php';
+        $deletedModel = new DeletedStudentModel();
+        $deletedStudents = $deletedModel->all('deleted_at DESC');
+
+        $data = [
+            'title' => 'Deleted Students',
+            'page' => 'admin-deleted-students',
+            'deletedStudents' => $deletedStudents,
+            'error' => $_SESSION['error'] ?? null,
+            'message' => $_SESSION['message'] ?? null
+        ];
+
+        unset($_SESSION['error'], $_SESSION['message']);
+        return $this->view('admin/deleted-students', $data);
+    }
     }
     
     public function resetPassword() {

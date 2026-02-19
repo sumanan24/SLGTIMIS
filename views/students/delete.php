@@ -45,11 +45,24 @@
                     </div>
                     
                     <form method="POST" action="<?php echo APP_URL; ?>/students/delete?id=<?php echo urlencode($student['student_id']); ?>">
+                        <?php if (!empty($filters)): ?>
+                            <?php foreach ($filters as $key => $value): ?>
+                                <?php if (!empty($value)): ?>
+                                    <input type="hidden" name="<?php echo htmlspecialchars($key); ?>" value="<?php echo htmlspecialchars($value); ?>">
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-danger">
                                 <i class="fas fa-trash me-1"></i>Yes, Delete Student
                             </button>
-                            <a href="<?php echo APP_URL; ?>/students" class="btn btn-outline-secondary">
+                            <?php 
+                            $cancelUrl = APP_URL . '/students';
+                            if (!empty($filters)) {
+                                $cancelUrl .= '?' . http_build_query($filters);
+                            }
+                            ?>
+                            <a href="<?php echo $cancelUrl; ?>" class="btn btn-outline-secondary">
                                 <i class="fas fa-times me-1"></i>Cancel
                             </a>
                         </div>

@@ -112,6 +112,9 @@ return [
     'bus-season-requests/bulk-update-status' => 'BusSeasonRequestController@bulkUpdateStatus',
     'bus-season-requests/export-payments' => 'BusSeasonRequestController@exportPaymentsExcel',
     'bus-season-requests/payment-collections' => 'BusSeasonRequestController@paymentCollections',
+
+    // Deleted students (ADM-only view handled in StudentController)
+    'admin/deleted-students' => 'StudentController@deletedStudents',
     // Circuit Program
     'circuit-program' => 'CircuitProgramController@index',
     'circuit-program/create' => 'CircuitProgramController@create',
