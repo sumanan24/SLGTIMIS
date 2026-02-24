@@ -485,25 +485,17 @@ class BusSeasonRequestModel extends Model {
         
         $paymentFilter = $filters['payment_filter'] ?? 'needs_payment';
         
-        // Join season_requests and season_payments on student_id; count payment times per student.
-        // All payment counts/checks use student_id only (no request_id).
+        // Use request_id to connect season_requests and season_payments.
+        // All payment counts/checks are per request (not just per student).
         $sql = "SELECT r.*, 
                 s.student_fullname, s.student_email, s.student_id, s.student_gender, s.student_nic,
                 d.department_name, d.department_id,
-                COALESCE(pay.payment_times, 0) as payment_times,
-                COALESCE(pay.payment_times, 0) as has_payment,
-                COALESCE(pay.issued_times, 0) as has_issued_payment,
+                (SELECT COUNT(*) FROM `{$this->paymentTable}` p WHERE p.request_id = r.id) as has_payment,
+                (SELECT COUNT(*) FROM `{$this->paymentTable}` p WHERE p.request_id = r.id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)) as has_issued_payment,
                 (SELECT COUNT(*) FROM `{$this->table}` r2 WHERE r2.student_id = r.student_id AND r2.season_year = r.season_year) as total_requests_for_student
                 FROM `{$this->table}` r
                 INNER JOIN `student` s ON r.student_id = s.student_id
-                LEFT JOIN `department` d ON r.department_id = d.department_id
-                LEFT JOIN (
-                    SELECT p.student_id,
-                           COUNT(*) as payment_times,
-                           SUM(CASE WHEN LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL THEN 1 ELSE 0 END) as issued_times
-                    FROM `{$this->paymentTable}` p
-                    GROUP BY p.student_id
-                ) pay ON pay.student_id = r.student_id";
+                LEFT JOIN `department` d ON r.department_id = d.department_id";
         
         $conditions = [];
         $params = [];
@@ -520,26 +512,25 @@ class BusSeasonRequestModel extends Model {
         }
         
         if ($paymentFilter === 'needs_payment') {
-            // Show requests that need initial payment: exclude students who already have an issued payment
+            // Show requests that need initial payment: exclude requests that already have an issued payment
             // This is for collecting the FIRST payment only, not monthly payments
             $conditions[] = "NOT EXISTS (
                 SELECT 1 FROM `{$this->paymentTable}` p 
-                WHERE p.student_id = r.student_id 
+                WHERE p.request_id = r.id 
                 AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)
             )";
         } elseif ($paymentFilter === 'issued') {
-            // Show only requests belonging to students who have at least one issued payment
+            // Show only requests that have at least one issued payment
             $conditions[] = "EXISTS (
                 SELECT 1 FROM `{$this->paymentTable}` p 
-                WHERE p.student_id = r.student_id 
+                WHERE p.request_id = r.id 
                 AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)
             )";
         } elseif ($paymentFilter === 'monthly_payment') {
             // Show only issued requests (for collecting monthly payments)
-            // Same as 'issued' but more explicit for monthly payment collection
             $conditions[] = "EXISTS (
                 SELECT 1 FROM `{$this->paymentTable}` p 
-                WHERE p.student_id = r.student_id 
+                WHERE p.request_id = r.id 
                 AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)
             )";
         }
