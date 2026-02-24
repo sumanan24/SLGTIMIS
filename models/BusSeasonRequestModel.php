@@ -486,11 +486,12 @@ class BusSeasonRequestModel extends Model {
         $paymentFilter = $filters['payment_filter'] ?? 'needs_payment';
         
         // Simplified query - focus on payment collection, remove approval-related joins
+        // IMPORTANT: Link payments by student_id (not request_id) so checks are student-based.
         $sql = "SELECT r.*, 
                 s.student_fullname, s.student_email, s.student_id, s.student_gender, s.student_nic,
                 d.department_name, d.department_id,
-                (SELECT COUNT(*) FROM `{$this->paymentTable}` p WHERE p.request_id = r.id) as has_payment,
-                (SELECT COUNT(*) FROM `{$this->paymentTable}` p WHERE p.request_id = r.id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)) as has_issued_payment,
+                (SELECT COUNT(*) FROM `{$this->paymentTable}` p WHERE p.student_id = r.student_id) as has_payment,
+                (SELECT COUNT(*) FROM `{$this->paymentTable}` p WHERE p.student_id = r.student_id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)) as has_issued_payment,
                 (SELECT COUNT(*) FROM `{$this->table}` r2 WHERE r2.student_id = r.student_id AND r2.season_year = r.season_year) as total_requests_for_student
                 FROM `{$this->table}` r
                 INNER JOIN `student` s ON r.student_id = s.student_id
@@ -511,20 +512,28 @@ class BusSeasonRequestModel extends Model {
         }
         
         if ($paymentFilter === 'needs_payment') {
-            // Show requests that need initial payment: exclude requests that have already been issued
+            // Show requests that need initial payment: exclude students who already have an issued payment
             // This is for collecting the FIRST payment only, not monthly payments
             $conditions[] = "NOT EXISTS (
                 SELECT 1 FROM `{$this->paymentTable}` p 
-                WHERE p.request_id = r.id 
+                WHERE p.student_id = r.student_id 
                 AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)
             )";
         } elseif ($paymentFilter === 'issued') {
-            // Show only issued requests
-            $conditions[] = "EXISTS (SELECT 1 FROM `{$this->paymentTable}` p WHERE p.request_id = r.id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL))";
+            // Show only requests belonging to students who have at least one issued payment
+            $conditions[] = "EXISTS (
+                SELECT 1 FROM `{$this->paymentTable}` p 
+                WHERE p.student_id = r.student_id 
+                AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)
+            )";
         } elseif ($paymentFilter === 'monthly_payment') {
             // Show only issued requests (for collecting monthly payments)
             // Same as 'issued' but more explicit for monthly payment collection
-            $conditions[] = "EXISTS (SELECT 1 FROM `{$this->paymentTable}` p WHERE p.request_id = r.id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL))";
+            $conditions[] = "EXISTS (
+                SELECT 1 FROM `{$this->paymentTable}` p 
+                WHERE p.student_id = r.student_id 
+                AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)
+            )";
         }
         /* 'all' = no payment filter - shows all approved requests */
         
