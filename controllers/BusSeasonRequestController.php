@@ -437,8 +437,20 @@ class BusSeasonRequestController extends Controller {
         $studentModel = $this->model('StudentModel');
         $academicYears = $studentModel->getAcademicYears();
         
-        // Get all active students for the dropdown
-        $allStudents = $studentModel->getStudents(1, 1000, ['status' => 'Active']); // Get up to 1000 active students
+        // Get all active students for the Create Request dropdown
+        $allStudents = $studentModel->getStudents(1, 1000, ['status' => 'Active']);
+        // Exclude students who already have a request for the current month (season year 2026)
+        $seasonYear = '2026';
+        $alreadyRequestedIds = $requestModel->getStudentIdsWithRequestForCurrentMonth($seasonYear);
+        $students = [];
+        foreach ($allStudents as $stu) {
+            if (empty($stu['student_id'])) {
+                continue;
+            }
+            if (!in_array($stu['student_id'], $alreadyRequestedIds, true)) {
+                $students[] = $stu;
+            }
+        }
         
         $data = [
             'title' => 'Bus Season Requests - Payment Collection',
@@ -446,7 +458,7 @@ class BusSeasonRequestController extends Controller {
             'requests' => $requests,
             'filters' => $filters,
             'academicYears' => $academicYears,
-            'students' => $allStudents,
+            'students' => $students,
             'message' => $this->getFlashMessage(),
             'error' => $this->getFlashError()
         ];

@@ -323,6 +323,30 @@ class BusSeasonRequestModel extends Model {
     }
     
     /**
+     * Get student IDs that already have a request for the current month in the given season year.
+     * Used to exclude them from the "Create Request" dropdown so they don't appear.
+     */
+    public function getStudentIdsWithRequestForCurrentMonth($seasonYear) {
+        $this->ensureTableStructure();
+        $currentMonth = date('Y-m');
+        $sql = "SELECT DISTINCT `student_id` FROM `{$this->table}` 
+                WHERE `season_year` = ? 
+                AND DATE_FORMAT(`created_at`, '%Y-%m') = ?";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param("ss", $seasonYear, $currentMonth);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $ids = [];
+        while ($result && $row = $result->fetch_assoc()) {
+            $ids[] = $row['student_id'];
+        }
+        return $ids;
+    }
+    
+    /**
      * Check if student has existing request for a specific month
      */
     public function hasExistingRequestForMonth($studentId, $seasonYear, $month = null) {

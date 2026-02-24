@@ -191,26 +191,36 @@ class RoomAllocationController extends Controller {
             }
             
             // Enforce gender-based hostel allocation (Female -> female hostel, Male -> male hostel)
-            $studentGender = strtolower(trim($student['student_gender'] ?? ''));
+            $rawStudentGender = strtolower(trim($student['student_gender'] ?? ''));
+            $studentGender = null;
+            if ($rawStudentGender !== '') {
+                $ch = $rawStudentGender[0];
+                if (strpos($rawStudentGender, 'female') !== false || strpos($rawStudentGender, 'girl') !== false || strpos($rawStudentGender, 'lad') !== false || $ch === 'f') {
+                    $studentGender = 'female';
+                } elseif (strpos($rawStudentGender, 'male') !== false || strpos($rawStudentGender, 'boy') !== false || strpos($rawStudentGender, 'gent') !== false || $ch === 'm') {
+                    $studentGender = 'male';
+                }
+            }
             $hostel = null;
             if (!empty($room['hostel_id'] ?? null)) {
                 $hostel = $hostelModel->getById($room['hostel_id']);
             }
             
-            if ($hostel && !empty($hostel['gender'])) {
-                $hostelGender = strtolower(trim($hostel['gender']));
-                
-                $isFemaleHostel = strpos($hostelGender, 'female') !== false;
-                $isMaleHostel = strpos($hostelGender, 'male') !== false;
-                
-                if ($isFemaleHostel && $studentGender === 'male') {
-                    $_SESSION['error'] = 'Selected hostel is for female students only. Please select a female student or choose an appropriate hostel.';
-                    $this->redirect('room-allocations/create');
-                    return;
+            if ($hostel && !empty($hostel['gender']) && $studentGender !== null) {
+                $rawHostelGender = strtolower(trim($hostel['gender']));
+                $hostelGender = null;
+                $ch = $rawHostelGender !== '' ? $rawHostelGender[0] : '';
+                if (strpos($rawHostelGender, 'female') !== false || strpos($rawHostelGender, 'girl') !== false || strpos($rawHostelGender, 'lad') !== false || $ch === 'f') {
+                    $hostelGender = 'female';
+                } elseif (strpos($rawHostelGender, 'male') !== false || strpos($rawHostelGender, 'boy') !== false || strpos($rawHostelGender, 'gent') !== false || $ch === 'm') {
+                    $hostelGender = 'male';
                 }
                 
-                if ($isMaleHostel && $studentGender === 'female') {
-                    $_SESSION['error'] = 'Selected hostel is for male students only. Please select a male student or choose an appropriate hostel.';
+                if ($hostelGender !== null && $hostelGender !== $studentGender) {
+                    $msg = $hostelGender === 'female'
+                        ? 'Selected hostel is for female students only. Please select a female student or choose an appropriate hostel.'
+                        : 'Selected hostel is for male students only. Please select a male student or choose an appropriate hostel.';
+                    $_SESSION['error'] = $msg;
                     $this->redirect('room-allocations/create');
                     return;
                 }

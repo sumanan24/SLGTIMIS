@@ -187,7 +187,17 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const studentId = this.dataset.studentId || '';
             const studentName = this.dataset.studentName || '';
-            const studentGender = (this.dataset.studentGender || '').toLowerCase();
+            // Normalize student gender to 'female' | 'male' | null
+            const rawStudentGender = (this.dataset.studentGender || '').toLowerCase().trim();
+            let studentGender = null;
+            if (rawStudentGender) {
+                const ch = rawStudentGender.charAt(0);
+                if (rawStudentGender.includes('female') || rawStudentGender.includes('girl') || rawStudentGender.includes('ladies') || ch === 'f') {
+                    studentGender = 'female';
+                } else if (rawStudentGender.includes('male') || rawStudentGender.includes('boy') || rawStudentGender.includes('gents') || ch === 'm') {
+                    studentGender = 'male';
+                }
+            }
             
             studentIdInput.value = studentId;
             studentSearchInput.value = studentName && studentId
@@ -219,25 +229,25 @@ document.addEventListener('DOMContentLoaded', function() {
                         return;
                     }
                     
-                    const hostelGender = (opt.getAttribute('data-gender') || '').toLowerCase();
+                    const rawHostelGender = (opt.getAttribute('data-gender') || '').toLowerCase().trim();
+                    let hostelGender = null;
+                    if (rawHostelGender) {
+                        const ch = rawHostelGender.charAt(0);
+                        if (rawHostelGender.includes('female') || rawHostelGender.includes('girl') || rawHostelGender.includes('ladies') || ch === 'f') {
+                            hostelGender = 'female';
+                        } else if (rawHostelGender.includes('male') || rawHostelGender.includes('boy') || rawHostelGender.includes('gents') || ch === 'm') {
+                            hostelGender = 'male';
+                        }
+                    }
                     
-                    // If hostel has no gender set, keep it visible for any student
-                    if (!hostelGender) {
-                        opt.hidden = false;
-                        hasMatch = true;
+                    // If we couldn't determine either gender, don't count as a match now
+                    // (will be handled by fallback if no strict matches)
+                    if (!studentGender || !hostelGender) {
+                        opt.hidden = true;
                         return;
                     }
                     
-                    const isFemaleHostel = hostelGender.indexOf('female') !== -1;
-                    const isMaleHostel = hostelGender.indexOf('male') !== -1;
-                    
-                    let show = true;
-                    if (isFemaleHostel && studentGender === 'male') {
-                        show = false;
-                    } else if (isMaleHostel && studentGender === 'female') {
-                        show = false;
-                    }
-                    
+                    const show = hostelGender === studentGender;
                     opt.hidden = !show;
                     if (show) {
                         hasMatch = true;
@@ -247,8 +257,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Reset selection after filtering
                 hostelSelect.value = '';
                 
+                // If no strict gender matches, fall back to showing all hostels
+                // so the user can still proceed and fix configuration later.
                 if (!hasMatch) {
-                    alert('No hostels are available for the selected student gender. Please check hostel configuration.');
+                    options.forEach(opt => {
+                        if (opt.value) {
+                            opt.hidden = false;
+                        }
+                    });
                 }
             }
         });
