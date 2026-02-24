@@ -673,7 +673,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 window.location.reload();
                             }, 1500);
                         } else {
-                            createRequestErrorText.textContent = data.error || 'Failed to create request.';
+                            // Prefer backend message; fall back to generic error
+                            createRequestErrorText.textContent = data.message || data.error || 'Failed to create request.';
                             createRequestError.classList.remove('d-none');
                             createRequestBtn.disabled = false;
                             createRequestBtn.innerHTML = '<i class="fas fa-save me-2"></i>Create Request';
