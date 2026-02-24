@@ -772,7 +772,7 @@ class AttendanceController extends Controller {
                 } elseif ($status == 'A') {
                     $statusValue = '0'; // Absent = 0
                 } elseif ($status == 'H') {
-                    $statusValue = ''; // Holiday = empty (no -1 value)
+                    $statusValue = '-1'; // Holiday = -1 (as per requirement)
                 } else {
                     $statusValue = ''; // Not marked = empty
                 }

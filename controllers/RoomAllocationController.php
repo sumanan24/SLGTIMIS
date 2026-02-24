@@ -148,7 +148,7 @@ class RoomAllocationController extends Controller {
             $data = [
                 'student_id' => trim($this->post('student_id', '')),
                 'room_id' => trim($this->post('room_id', '')),
-                'allocated_at' => time(),
+                // Let RoomAllocationModel::createAllocation() set allocated_at to current date (Y-m-d)
                 'status' => 'active'
             ];
             
@@ -160,7 +160,8 @@ class RoomAllocationController extends Controller {
             }
             
             // Check if student exists
-            $student = $studentModel->getById($data['student_id']);
+            // StudentModel uses primary key student_id, so use find()
+            $student = $studentModel->find($data['student_id']);
             if (!$student) {
                 $_SESSION['error'] = 'Student not found.';
                 $this->redirect('room-allocations/create');
@@ -174,11 +175,45 @@ class RoomAllocationController extends Controller {
                 return;
             }
             
+            // Load room and related hostel to validate gender and availability
+            $room = $roomModel->getById($data['room_id']);
+            if (!$room) {
+                $_SESSION['error'] = 'Selected room not found.';
+                $this->redirect('room-allocations/create');
+                return;
+            }
+            
             // Check if room has available beds
             if (!$allocationModel->hasAvailableBeds($data['room_id'])) {
                 $_SESSION['error'] = 'Selected room is full.';
                 $this->redirect('room-allocations/create');
                 return;
+            }
+            
+            // Enforce gender-based hostel allocation (Female -> female hostel, Male -> male hostel)
+            $studentGender = strtolower(trim($student['student_gender'] ?? ''));
+            $hostel = null;
+            if (!empty($room['hostel_id'] ?? null)) {
+                $hostel = $hostelModel->getById($room['hostel_id']);
+            }
+            
+            if ($hostel && !empty($hostel['gender'])) {
+                $hostelGender = strtolower(trim($hostel['gender']));
+                
+                $isFemaleHostel = strpos($hostelGender, 'female') !== false;
+                $isMaleHostel = strpos($hostelGender, 'male') !== false;
+                
+                if ($isFemaleHostel && $studentGender === 'male') {
+                    $_SESSION['error'] = 'Selected hostel is for female students only. Please select a female student or choose an appropriate hostel.';
+                    $this->redirect('room-allocations/create');
+                    return;
+                }
+                
+                if ($isMaleHostel && $studentGender === 'female') {
+                    $_SESSION['error'] = 'Selected hostel is for male students only. Please select a male student or choose an appropriate hostel.';
+                    $this->redirect('room-allocations/create');
+                    return;
+                }
             }
             
             // Create allocation
@@ -210,12 +245,26 @@ class RoomAllocationController extends Controller {
                 $rooms = $roomModel->getAvailableRooms($hostelId);
             }
             
+            // Preload active students for type-ahead search (similar to Bus Season Requests SAO screen)
+            // Exclude students who already have an active room allocation
+            $allActiveStudents = $studentModel->getStudents(1, 1000, ['status' => 'Active']);
+            $students = [];
+            foreach ($allActiveStudents as $stu) {
+                if (empty($stu['student_id'])) {
+                    continue;
+                }
+                if (!$allocationModel->hasActiveAllocation($stu['student_id'])) {
+                    $students[] = $stu;
+                }
+            }
+            
             $data = [
                 'title' => 'Allocate Room',
                 'page' => 'room-allocations',
                 'hostels' => $hostels,
                 'rooms' => $rooms,
                 'hostel_id' => $hostelId,
+                'students' => $students,
                 'error' => $_SESSION['error'] ?? null
             ];
             unset($_SESSION['error']);
@@ -459,12 +508,14 @@ class RoomAllocationController extends Controller {
         
         $hostelId = $this->get('hostel_id', '');
         $roomModel = $this->model('RoomModel');
-        // For filter, get all rooms, not just available ones
+        
+        // Return only rooms with available beds for the selected hostel
         if (!empty($hostelId)) {
-            $rooms = $roomModel->getByHostelId($hostelId);
+            $rooms = $roomModel->getAvailableRooms($hostelId);
         } else {
             $rooms = [];
         }
+        
         $this->json($rooms);
     }
 }

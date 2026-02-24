@@ -203,7 +203,7 @@
                                                         $statusValue = '0'; // Absent = 0
                                                     } elseif ($status == 'H') {
                                                         $class = 'bg-warning text-dark';
-                                                        $statusValue = ''; // Holiday - no text, only color
+                                                        $statusValue = '-1'; // Holiday = -1 (as per requirement)
                                                     } else {
                                                         $statusValue = ''; // Not marked = empty
                                                     }
@@ -250,7 +250,7 @@
                                         <strong>Legend:</strong> 
                                         <span class="badge bg-success text-white">1</span> = Present, 
                                         <span class="badge bg-danger text-white">0</span> = Absent, 
-                                        <span class="badge bg-warning text-dark" style="min-width: 20px;">&nbsp;</span> = Holiday,
+                                        <span class="badge bg-warning text-dark">-1</span> = Holiday,
                                         <span class="badge bg-light text-dark">Empty</span> = Not Marked
                                     </small>
                                 </div>
