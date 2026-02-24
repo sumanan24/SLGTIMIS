@@ -485,17 +485,25 @@ class BusSeasonRequestModel extends Model {
         
         $paymentFilter = $filters['payment_filter'] ?? 'needs_payment';
         
-        // Simplified query - focus on payment collection, remove approval-related joins
-        // IMPORTANT: Link payments by student_id (not request_id) so checks are student-based.
+        // Join season_requests and season_payments on student_id; count payment times per student.
+        // All payment counts/checks use student_id only (no request_id).
         $sql = "SELECT r.*, 
                 s.student_fullname, s.student_email, s.student_id, s.student_gender, s.student_nic,
                 d.department_name, d.department_id,
-                (SELECT COUNT(*) FROM `{$this->paymentTable}` p WHERE p.student_id = r.student_id) as has_payment,
-                (SELECT COUNT(*) FROM `{$this->paymentTable}` p WHERE p.student_id = r.student_id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)) as has_issued_payment,
+                COALESCE(pay.payment_times, 0) as payment_times,
+                COALESCE(pay.payment_times, 0) as has_payment,
+                COALESCE(pay.issued_times, 0) as has_issued_payment,
                 (SELECT COUNT(*) FROM `{$this->table}` r2 WHERE r2.student_id = r.student_id AND r2.season_year = r.season_year) as total_requests_for_student
                 FROM `{$this->table}` r
                 INNER JOIN `student` s ON r.student_id = s.student_id
-                LEFT JOIN `department` d ON r.department_id = d.department_id";
+                LEFT JOIN `department` d ON r.department_id = d.department_id
+                LEFT JOIN (
+                    SELECT p.student_id,
+                           COUNT(*) as payment_times,
+                           SUM(CASE WHEN LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL THEN 1 ELSE 0 END) as issued_times
+                    FROM `{$this->paymentTable}` p
+                    GROUP BY p.student_id
+                ) pay ON pay.student_id = r.student_id";
         
         $conditions = [];
         $params = [];
