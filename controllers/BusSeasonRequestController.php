@@ -997,14 +997,16 @@ class BusSeasonRequestController extends Controller {
             return;
         }
         
-        // Get latest payment (for backward compatibility)
-        $latestPayment = $requestModel->getPaymentCollectionByRequestId($requestId);
-        if ($latestPayment) {
-            $request['payment'] = $latestPayment;
+        // Get all payment collections for this student (by student_id only)
+        $allPayments = [];
+        if (!empty($request['student_id'])) {
+            $allPayments = $requestModel->getAllPaymentsByStudentId($request['student_id']);
         }
-        
-        // Get all payment collections for this request
-        $allPayments = $requestModel->getAllPaymentsByRequestId($requestId);
+
+        // Latest payment (first in list) for backward compatibility in views
+        if (!empty($allPayments)) {
+            $request['payment'] = $allPayments[0];
+        }
         
         $data = [
             'title' => 'Bus Season Request Details',

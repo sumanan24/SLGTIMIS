@@ -485,13 +485,13 @@ class BusSeasonRequestModel extends Model {
         
         $paymentFilter = $filters['payment_filter'] ?? 'needs_payment';
         
-        // Use request_id to connect season_requests and season_payments.
-        // All payment counts/checks are per request (not just per student).
+        // Connect season_requests and season_payments by student_id only (no request_id).
+        // Same as: SELECT * FROM season_payments, season_requests WHERE season_requests.student_id = season_payments.student_id
         $sql = "SELECT r.*, 
                 s.student_fullname, s.student_email, s.student_id, s.student_gender, s.student_nic,
                 d.department_name, d.department_id,
-                (SELECT COUNT(*) FROM `{$this->paymentTable}` p WHERE p.request_id = r.id) as has_payment,
-                (SELECT COUNT(*) FROM `{$this->paymentTable}` p WHERE p.request_id = r.id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)) as has_issued_payment,
+                (SELECT COUNT(*) FROM `{$this->paymentTable}` p WHERE p.student_id = r.student_id) as has_payment,
+                (SELECT COUNT(*) FROM `{$this->paymentTable}` p WHERE p.student_id = r.student_id AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)) as has_issued_payment,
                 (SELECT COUNT(*) FROM `{$this->table}` r2 WHERE r2.student_id = r.student_id AND r2.season_year = r.season_year) as total_requests_for_student
                 FROM `{$this->table}` r
                 INNER JOIN `student` s ON r.student_id = s.student_id
@@ -511,26 +511,23 @@ class BusSeasonRequestModel extends Model {
                              OR LOWER(TRIM(r.status)) = 'issued')";
         }
         
+        // All payment filters use student_id only (no request_id)
         if ($paymentFilter === 'needs_payment') {
-            // Show requests that need initial payment: exclude requests that already have an issued payment
-            // This is for collecting the FIRST payment only, not monthly payments
             $conditions[] = "NOT EXISTS (
                 SELECT 1 FROM `{$this->paymentTable}` p 
-                WHERE p.request_id = r.id 
+                WHERE p.student_id = r.student_id 
                 AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)
             )";
         } elseif ($paymentFilter === 'issued') {
-            // Show only requests that have at least one issued payment
             $conditions[] = "EXISTS (
                 SELECT 1 FROM `{$this->paymentTable}` p 
-                WHERE p.request_id = r.id 
+                WHERE p.student_id = r.student_id 
                 AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)
             )";
         } elseif ($paymentFilter === 'monthly_payment') {
-            // Show only issued requests (for collecting monthly payments)
             $conditions[] = "EXISTS (
                 SELECT 1 FROM `{$this->paymentTable}` p 
-                WHERE p.request_id = r.id 
+                WHERE p.student_id = r.student_id 
                 AND (LOWER(TRIM(p.status)) = 'issued' OR p.issued_at IS NOT NULL)
             )";
         }
@@ -744,6 +741,33 @@ class BusSeasonRequestModel extends Model {
             }
         }
         
+        return $payments;
+    }
+
+    /**
+     * Get all payment collections for a student (by student_id)
+     * This links payments to requests using only student_id, not request_id.
+     */
+    public function getAllPaymentsByStudentId($studentId) {
+        $sql = "SELECT p.*, 
+                u.user_name as collected_by_name
+                FROM `{$this->paymentTable}` p
+                LEFT JOIN `user` u ON p.collected_by = u.user_id
+                WHERE p.student_id = ?
+                ORDER BY p.created_at DESC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param("s", $studentId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        $payments = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $payments[] = $row;
+            }
+        }
+
         return $payments;
     }
     
