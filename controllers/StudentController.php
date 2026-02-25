@@ -29,17 +29,32 @@ class StudentController extends Controller {
         $userDepartmentId = $this->getUserDepartment();
         $isDepartmentRestricted = $this->isDepartmentRestricted();
         
-        $filters = [
-            'search' => $this->get('search', ''),
-            'status' => $isDepartmentRestricted ? 'Active' : $this->get('status', ''), // Force Active status for department-restricted users
-            'district' => $this->get('district', ''),
-            'gender' => $this->get('gender', ''),
-            'department_id' => $userDepartmentId ? $userDepartmentId : $this->get('department_id', ''),
-            'course_id' => $this->get('course_id', ''),
-            'academic_year' => $this->get('academic_year', ''),
-            'course_mode' => $this->get('course_mode', ''),
-            'group_id' => $this->get('group_id', '')
-        ];
+        // HOD, IN1, IN2, IN3: load full students with student_status = Active only; no other filters (district, gender, course, etc.)
+        if ($isDepartmentRestricted) {
+            $filters = [
+                'search' => $this->get('search', ''),
+                'status' => 'Active',
+                'department_id' => $userDepartmentId ?: '',
+                'district' => '',
+                'gender' => '',
+                'course_id' => '',
+                'academic_year' => '',
+                'course_mode' => '',
+                'group_id' => ''
+            ];
+        } else {
+            $filters = [
+                'search' => $this->get('search', ''),
+                'status' => $this->get('status', ''),
+                'district' => $this->get('district', ''),
+                'gender' => $this->get('gender', ''),
+                'department_id' => $userDepartmentId ? $userDepartmentId : $this->get('department_id', ''),
+                'course_id' => $this->get('course_id', ''),
+                'academic_year' => $this->get('academic_year', ''),
+                'course_mode' => $this->get('course_mode', ''),
+                'group_id' => $this->get('group_id', '')
+            ];
+        }
         
         $students = $studentModel->getStudents($page, 20, $filters);
         $total = $studentModel->getTotalStudents($filters);
