@@ -135,11 +135,10 @@ return [
     'groups/remove-student' => 'GroupController@removeStudent',
     'groups/get-courses-by-department' => 'GroupController@getCoursesByDepartment',
     'groups/get-available-students' => 'GroupController@getAvailableStudents',
-    // Group Timetable
+    // Group Timetable (CRUD)
     'group-timetable/index' => 'GroupTimetableController@index',
     'group-timetable/create' => 'GroupTimetableController@create',
     'group-timetable/edit' => 'GroupTimetableController@edit',
     'group-timetable/delete' => 'GroupTimetableController@delete',
-    'group-timetable/student-view' => 'GroupTimetableController@studentView',
 ];
 

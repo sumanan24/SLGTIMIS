@@ -1,123 +1,89 @@
+<?php
+$group_id = $group_id ?? '';
+$group = $group ?? null;
+$entry = $entry ?? [];
+$days = $days ?? ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+$sessionTypes = $sessionTypes ?? ['Theory' => 'Theory', 'Practical' => 'Practical'];
+$timeSlots = $timeSlots ?? [];
+$modules = $modules ?? [];
+$staff = $staff ?? [];
+// Normalize so dropdown selection matches (DB may store different format)
+$entryDay = isset($entry['day']) ? ucfirst(strtolower(trim($entry['day']))) : '';
+$entryTimeSlot = isset($entry['time_slot']) ? preg_replace('/\s*-\s*/', '-', trim($entry['time_slot'])) : '';
+?>
 <div class="container-fluid px-4 py-4">
-    <div class="row justify-content-center">
-        <div class="col-lg-10 col-xl-8">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0 fw-bold"><i class="fas fa-edit me-2"></i>Edit Timetable Entry</h5>
-                </div>
-                <div class="card-body">
-                    <?php if (isset($error)): ?>
-                        <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center" role="alert">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            <div><?php echo htmlspecialchars($error); ?></div>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <form method="POST" action="<?php echo APP_URL; ?>/group-timetable/edit?id=<?php echo urlencode($timetable['timetable_id']); ?>">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="weekday" class="form-label fw-semibold">
-                                    Weekday <span class="text-danger">*</span>
-                                </label>
-                                <select class="form-select" id="weekday" name="weekday" required>
-                                    <option value="">Select Weekday</option>
-                                    <?php foreach ($weekdays as $key => $label): ?>
-                                        <option value="<?php echo htmlspecialchars($key); ?>" 
-                                                <?php echo ($timetable['weekday'] === $key) ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($label); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="period" class="form-label fw-semibold">
-                                    Period <span class="text-danger">*</span>
-                                </label>
-                                <select class="form-select" id="period" name="period" required>
-                                    <option value="">Select Period</option>
-                                    <?php foreach ($periods as $key => $label): ?>
-                                        <option value="<?php echo htmlspecialchars($key); ?>" 
-                                                <?php echo ($timetable['period'] === $key) ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($label); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="module_id" class="form-label fw-semibold">Module ID</label>
-                                <select class="form-select" id="module_id" name="module_id">
-                                    <option value="">Select Module</option>
-                                    <?php if (!empty($modules)): ?>
-                                        <?php foreach ($modules as $moduleId): ?>
-                                            <option value="<?php echo htmlspecialchars($moduleId); ?>" 
-                                                    <?php echo (isset($timetable['module_id']) && $timetable['module_id'] === $moduleId) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($moduleId); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </select>
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="staff_id" class="form-label fw-semibold">Staff</label>
-                                <select class="form-select" id="staff_id" name="staff_id">
-                                    <option value="">Select Staff</option>
-                                    <?php foreach ($staff as $staffMember): ?>
-                                        <option value="<?php echo htmlspecialchars($staffMember['staff_id']); ?>" 
-                                                <?php echo ($timetable['staff_id'] === $staffMember['staff_id']) ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($staffMember['staff_name']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="classroom" class="form-label fw-semibold">Classroom</label>
-                            <input type="text" class="form-control" id="classroom" name="classroom" 
-                                   value="<?php echo htmlspecialchars($timetable['classroom'] ?? ''); ?>"
-                                   placeholder="Enter classroom">
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="start_date" class="form-label fw-semibold">Start Date</label>
-                                <input type="date" class="form-control" id="start_date" name="start_date" 
-                                       value="<?php echo htmlspecialchars($timetable['start_date'] ?? ''); ?>">
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="end_date" class="form-label fw-semibold">End Date</label>
-                                <input type="date" class="form-control" id="end_date" name="end_date" 
-                                       value="<?php echo htmlspecialchars($timetable['end_date'] ?? ''); ?>">
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="active" class="form-label fw-semibold">Status</label>
-                            <select class="form-select" id="active" name="active">
-                                <option value="1" <?php echo ($timetable['active'] == 1) ? 'selected' : ''; ?>>Active</option>
-                                <option value="0" <?php echo ($timetable['active'] == 0) ? 'selected' : ''; ?>>Inactive</option>
-                            </select>
-                        </div>
-                        
-                        <div class="d-flex gap-2 mt-4">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-1"></i>Update Entry
-                            </button>
-                            <a href="<?php echo APP_URL; ?>/group-timetable/index?group_id=<?php echo urlencode($timetable['group_id']); ?>" class="btn btn-outline-secondary">
-                                <i class="fas fa-times me-1"></i>Cancel
-                            </a>
-                        </div>
-                    </form>
-                </div>
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white">
+            <div class="d-flex align-items-center justify-content-between">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-edit me-2"></i>Edit Timetable Entry</h5>
+                <a href="<?php echo APP_URL; ?>/group-timetable/index?group_id=<?php echo urlencode($group_id); ?>" class="btn btn-light btn-sm">Back to Timetable</a>
             </div>
+        </div>
+        <div class="card-body">
+            <?php if (isset($error)): ?>
+                <div class="alert alert-danger alert-dismissible fade show"><?php echo htmlspecialchars($error); ?> <button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+            <?php endif; ?>
+
+            <form method="post" action="<?php echo APP_URL; ?>/group-timetable/edit?id=<?php echo urlencode($entry['id'] ?? ''); ?>">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Day</label>
+                        <select class="form-select" name="day" required>
+                            <option value="">Select day</option>
+                            <?php foreach ($days as $d): ?>
+                                <option value="<?php echo htmlspecialchars($d); ?>" <?php echo ($entryDay === $d) ? 'selected' : ''; ?>><?php echo htmlspecialchars($d); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Time Slot</label>
+                        <select class="form-select" name="time_slot" required>
+                            <option value="">Select time slot</option>
+                            <?php foreach ($timeSlots as $value => $label): ?>
+                                <option value="<?php echo htmlspecialchars($value); ?>" <?php echo ($entryTimeSlot === $value) ? 'selected' : ''; ?>><?php echo htmlspecialchars($label); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Module</label>
+                        <select class="form-select" name="module_id">
+                            <option value="">Select Module</option>
+                            <?php foreach ($modules as $m): ?>
+                                <option value="<?php echo htmlspecialchars((string)($m['module_id'] ?? '')); ?>" <?php echo (isset($entry['module_id']) && (string)$entry['module_id'] === (string)($m['module_id'] ?? '')) ? 'selected' : ''; ?>><?php echo htmlspecialchars($m['module_name'] ?? $m['module_id'] ?? '—'); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Lecturer (Staff)</label>
+                        <select class="form-select" name="staff_id">
+                            <option value="">Select Lecturer</option>
+                            <?php foreach ($staff as $s): ?>
+                                <option value="<?php echo htmlspecialchars((string)($s['staff_id'] ?? '')); ?>" <?php echo (isset($entry['staff_id']) && (string)$entry['staff_id'] === (string)($s['staff_id'] ?? '')) ? 'selected' : ''; ?>><?php echo htmlspecialchars($s['staff_name'] ?? $s['staff_id'] ?? '—'); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Subject (optional)</label>
+                        <input type="text" class="form-control" name="subject" value="<?php echo htmlspecialchars($entry['subject'] ?? ''); ?>" placeholder="Subject name">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Session Type</label>
+                        <select class="form-select" name="session_type">
+                            <?php foreach ($sessionTypes as $k => $v): ?>
+                                <option value="<?php echo htmlspecialchars($k); ?>" <?php echo (isset($entry['session_type']) && $entry['session_type'] === $k) ? 'selected' : ''; ?>><?php echo htmlspecialchars($v); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Room</label>
+                        <input type="text" class="form-control" name="room" value="<?php echo htmlspecialchars($entry['room'] ?? ''); ?>" placeholder="Room / Lab">
+                    </div>
+                </div>
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Update</button>
+                    <a href="<?php echo APP_URL; ?>/group-timetable/index?group_id=<?php echo urlencode($group_id); ?>" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
         </div>
     </div>
 </div>
-

@@ -40,7 +40,7 @@ class GroupController extends Controller {
      * For IN1/IN2/IN3: get from staff table
      * For ADM/Admin: return null (can access all)
      */
-    private function getUserDepartment() {
+    protected function getUserDepartment() {
         if (!isset($_SESSION['user_id'])) {
             return null;
         }

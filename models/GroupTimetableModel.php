@@ -1,190 +1,176 @@
 <?php
 /**
- * Group Timetable Model
+ * Group Timetable Model (CRUD)
+ * group_id from URL; time_slot = 08:30-10:00 | 10:30-12:00 | 13:00-14:30 | 14:45-16:15
+ * module_id from module table; staff_id from staff (department)
  */
 
 class GroupTimetableModel extends Model {
     protected $table = 'group_timetable';
-    
+
     protected function getPrimaryKey() {
-        return 'timetable_id';
+        return 'id';
     }
-    
+
+    /** Fixed time slots for timetable */
+    public static function getTimeSlots() {
+        return [
+            '08:30-10:00' => '08:30 - 10:00',
+            '10:30-12:00' => '10:30 - 12:00',
+            '13:00-14:30' => '13:00 - 14:30',
+            '14:45-16:15' => '14:45 - 16:15'
+        ];
+    }
+
     /**
-     * Get all timetables for a group
+     * Get all timetable entries by group_id (from URL)
      */
-    public function getByGroupId($groupId, $activeOnly = false) {
-        $sql = "SELECT tt.*, g.name as group_name, s.staff_name,
-                c.course_name, d.department_name
-                FROM `{$this->table}` tt
-                LEFT JOIN `groups` g ON tt.group_id = g.id
-                LEFT JOIN `course` c ON g.course_id = c.course_id
-                LEFT JOIN `department` d ON c.department_id = d.department_id
-                LEFT JOIN `staff` s ON tt.staff_id = s.staff_id
-                WHERE tt.group_id = ?";
-        
-        $params = [$groupId];
-        $types = 'i';
-        
-        if ($activeOnly) {
-            $sql .= " AND tt.active = 1";
+    public function getByGroupId($groupId) {
+        if ($groupId === null || $groupId === '') return [];
+        $sql = "SELECT tt.*, m.module_name, s.staff_name 
+                FROM `{$this->table}` tt 
+                LEFT JOIN `module` m ON m.module_id = tt.module_id 
+                LEFT JOIN `staff` s ON s.staff_id = tt.staff_id 
+                WHERE tt.group_id = ? 
+                ORDER BY FIELD(tt.day, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'), tt.time_slot";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param("i", $groupId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $data = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $data[] = $row;
+            }
         }
-        
-        $sql .= " ORDER BY tt.weekday, tt.period";
-        
+        return $data;
+    }
+
+    /**
+     * Get all entries (optional filter by group_id)
+     */
+    public function getAll($groupId = null) {
+        $sql = "SELECT tt.*, m.module_name, s.staff_name 
+                FROM `{$this->table}` tt 
+                LEFT JOIN `module` m ON m.module_id = tt.module_id 
+                LEFT JOIN `staff` s ON s.staff_id = tt.staff_id 
+                WHERE 1=1";
+        $params = [];
+        $types = '';
+        if ($groupId !== null && $groupId !== '') {
+            $sql .= " AND tt.group_id = ?";
+            $params[] = $groupId;
+            $types .= 'i';
+        }
+        $sql .= " ORDER BY tt.group_id, FIELD(tt.day, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'), tt.time_slot";
+        if (!empty($params)) {
+            $stmt = $this->db->prepare($sql);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+        } else {
+            $result = $this->db->query($sql);
+        }
+        $data = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $data[] = $row;
+            }
+        }
+        return $data;
+    }
+
+    /**
+     * Normalize day (e.g. "monday" -> "Monday") and time_slot (e.g. "08:30 - 10:00" -> "08:30-10:00")
+     * so unique check and DB constraint match.
+     */
+    public static function normalizeDay($day) {
+        $day = trim((string) $day);
+        return $day !== '' ? ucfirst(strtolower($day)) : '';
+    }
+
+    public static function normalizeTimeSlot($timeSlot) {
+        $slot = trim((string) $timeSlot);
+        return $slot !== '' ? preg_replace('/\s*-\s*/', '-', $slot) : '';
+    }
+
+    /**
+     * Check if (group_id, day, time_slot) already exists. For edit, pass $excludeId to allow same row.
+     */
+    public function existsSlot($groupId, $day, $timeSlot, $excludeId = null) {
+        $day = self::normalizeDay($day);
+        $timeSlot = self::normalizeTimeSlot($timeSlot);
+        if ($groupId === null || $groupId === '' || $day === '' || $timeSlot === '') {
+            return false;
+        }
+        $sql = "SELECT 1 FROM `{$this->table}` WHERE group_id = ? AND day = ? AND time_slot = ?";
+        $params = [$groupId, $day, $timeSlot];
+        $types = 'iss';
+        if ($excludeId !== null && $excludeId !== '') {
+            $sql .= " AND id != ?";
+            $params[] = $excludeId;
+            $types .= 'i';
+        }
+        $sql .= " LIMIT 1";
         $stmt = $this->db->prepare($sql);
         $stmt->bind_param($types, ...$params);
         $stmt->execute();
         $result = $stmt->get_result();
-        
-        $data = [];
-        if ($result && $result->num_rows > 0) {
-            while ($row = $result->fetch_assoc()) {
-                $data[] = $row;
-            }
-        }
-        
-        return $data;
+        return $result && $result->num_rows > 0;
     }
-    
+
     /**
-     * Get timetable by ID with details
+     * Get single record by id (with module name)
      */
-    public function getByIdWithDetails($id) {
-        $sql = "SELECT tt.*, g.name as group_name, g.course_id, c.course_name, c.department_id, d.department_name
-                FROM `{$this->table}` tt
-                LEFT JOIN `groups` g ON tt.group_id = g.id
-                LEFT JOIN `course` c ON g.course_id = c.course_id
-                LEFT JOIN `department` d ON c.department_id = d.department_id
-                WHERE tt.timetable_id = ?";
-        
+    public function getById($id) {
+        $sql = "SELECT tt.*, m.module_name, s.staff_name 
+                FROM `{$this->table}` tt 
+                LEFT JOIN `module` m ON m.module_id = tt.module_id 
+                LEFT JOIN `staff` s ON s.staff_id = tt.staff_id 
+                WHERE tt.id = ?";
         $stmt = $this->db->prepare($sql);
         $stmt->bind_param("i", $id);
         $stmt->execute();
         $result = $stmt->get_result();
-        
-        return $result->fetch_assoc();
+        return $result ? $result->fetch_assoc() : null;
     }
-    
+
     /**
-     * Get timetables by group IDs (for students viewing their groups)
+     * Modules for dropdown - from module table by course_id
      */
-    public function getByGroupIds($groupIds) {
-        if (empty($groupIds)) {
-            return [];
-        }
-        
-        $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
-        $sql = "SELECT tt.*, g.name as group_name, g.course_id, c.course_name, d.department_name,
-                s.staff_name
-                FROM `{$this->table}` tt
-                LEFT JOIN `groups` g ON tt.group_id = g.id
-                LEFT JOIN `course` c ON g.course_id = c.course_id
-                LEFT JOIN `department` d ON c.department_id = d.department_id
-                LEFT JOIN `staff` s ON tt.staff_id = s.staff_id
-                WHERE tt.group_id IN ($placeholders) AND tt.active = 1
-                ORDER BY g.name, tt.weekday, tt.period";
-        
+    public function getModulesByCourseId($courseId) {
+        if ($courseId === null || $courseId === '') return [];
+        $sql = "SELECT module_id, module_name FROM `module` WHERE course_id = ? ORDER BY module_name, module_id";
         $stmt = $this->db->prepare($sql);
-        $types = str_repeat('i', count($groupIds));
-        $stmt->bind_param($types, ...$groupIds);
+        $stmt->bind_param("s", $courseId);
         $stmt->execute();
         $result = $stmt->get_result();
-        
         $data = [];
         if ($result && $result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
                 $data[] = $row;
             }
         }
-        
         return $data;
     }
-    
-    /**
-     * Create a new timetable entry
-     */
+
     public function createTimetable($data) {
         return $this->create($data);
     }
-    
-    /**
-     * Update timetable entry
-     */
+
     public function updateTimetable($id, $data) {
         return $this->update($id, $data);
     }
-    
-    /**
-     * Delete timetable entry
-     */
+
     public function deleteTimetable($id) {
         return $this->delete($id);
     }
-    
-    /**
-     * Get weekdays list
-     */
-    public function getWeekdays() {
-        return [
-            'Monday' => 'Monday',
-            'Tuesday' => 'Tuesday',
-            'Wednesday' => 'Wednesday',
-            'Thursday' => 'Thursday',
-            'Friday' => 'Friday',
-            'Saturday' => 'Saturday',
-            'Sunday' => 'Sunday'
-        ];
+
+    public static function getDays() {
+        return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     }
-    
-    /**
-     * Get periods list (fixed time slots)
-     */
-    public function getPeriods() {
-        return [
-            '08:30-10:00' => '08:30 - 10:00',
-            '10:30-12:00' => '10:30 - 12:00',
-            '13:00-14:30' => '13:00 - 14:30',
-            '14:45-16:15' => '14:45 - 16:15'
-        ];
-    }
-    
-    /**
-     * Get time slots array (for easy iteration)
-     */
-    public function getTimeSlots() {
-        return [
-            '08:30-10:00' => '08:30 - 10:00',
-            '10:30-12:00' => '10:30 - 12:00',
-            '13:00-14:30' => '13:00 - 14:30',
-            '14:45-16:15' => '14:45 - 16:15'
-        ];
-    }
-    
-    /**
-     * Ensure time_slot column exists and populate it from period if needed
-     */
-    public function ensureTimeSlotColumn() {
-        try {
-            // Check if time_slot column exists
-            $checkColumn = "SHOW COLUMNS FROM `{$this->table}` LIKE 'time_slot'";
-            $result = $this->db->query($checkColumn);
-            
-            if (!$result || $result->num_rows == 0) {
-                // Add time_slot column after period column
-                $sql = "ALTER TABLE `{$this->table}` ADD COLUMN `time_slot` VARCHAR(20) DEFAULT NULL COMMENT 'Time slot (e.g., 08:30-10:00)' AFTER `period`";
-                $this->db->query($sql);
-                
-                // Populate time_slot from period for existing records
-                $updateSql = "UPDATE `{$this->table}` SET `time_slot` = `period` WHERE `time_slot` IS NULL OR `time_slot` = ''";
-                $this->db->query($updateSql);
-            }
-            
-            return true;
-        } catch (Exception $e) {
-            error_log("Error ensuring time_slot column: " . $e->getMessage());
-            return false;
-        }
+
+    public static function getSessionTypes() {
+        return ['Theory' => 'Theory', 'Practical' => 'Practical'];
     }
 }
-

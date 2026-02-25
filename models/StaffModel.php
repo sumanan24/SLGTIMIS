@@ -46,7 +46,7 @@ class StaffModel extends Model {
             $sql .= " WHERE " . implode(" AND ", $conditions);
         }
         
-        $sql .= " ORDER BY s.staff_id DESC LIMIT $perPage OFFSET $offset";
+        $sql .= " ORDER BY s.staff_name, s.staff_id LIMIT $perPage OFFSET $offset";
         
         if (!empty($params)) {
             $stmt = $this->db->prepare($sql);

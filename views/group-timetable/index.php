@@ -1,143 +1,124 @@
+<?php
+$group_id = $group_id ?? '';
+$group = $group ?? null;
+$entries = $entries ?? [];
+$grid = $grid ?? [];
+$weekdaysToShow = $weekdaysToShow ?? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+$timeSlots = $timeSlots ?? [];
+$modules = $modules ?? [];
+$staff = $staff ?? [];
+?>
 <div class="container-fluid px-4 py-4">
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-primary text-white">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-calendar-alt me-2"></i>Timetable: <?php echo htmlspecialchars($group['name']); ?></h5>
-                <div class="d-flex gap-2">
-                    <a href="<?php echo APP_URL; ?>/group-timetable/create?group_id=<?php echo urlencode($group['id']); ?>" class="btn btn-light btn-sm">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-calendar-alt me-2"></i><?php echo $group ? htmlspecialchars('Timetable: ' . $group['name']) : 'Group Timetable'; ?></h5>
+                <?php if ($group_id !== ''): ?>
+                    <a href="<?php echo APP_URL; ?>/group-timetable/create?group_id=<?php echo urlencode($group_id); ?>" class="btn btn-light btn-sm">
                         <i class="fas fa-plus me-1"></i>Add Entry
                     </a>
-                    <a href="<?php echo APP_URL; ?>/groups/show?id=<?php echo urlencode($group['id']); ?>" class="btn btn-light btn-sm">
-                        <i class="fas fa-arrow-left me-1"></i>Back to Group
-                    </a>
-                </div>
+                <?php endif; ?>
             </div>
         </div>
         <div class="card-body">
             <?php if (isset($message)): ?>
-                <div class="alert alert-success alert-dismissible fade show d-flex align-items-center" role="alert">
-                    <i class="fas fa-check-circle me-2"></i>
-                    <div><?php echo htmlspecialchars($message); ?></div>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
+                <div class="alert alert-success alert-dismissible fade show"><?php echo htmlspecialchars($message); ?> <button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
             <?php endif; ?>
-            
             <?php if (isset($error)): ?>
-                <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center" role="alert">
-                    <i class="fas fa-exclamation-circle me-2"></i>
-                    <div><?php echo htmlspecialchars($error); ?></div>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
+                <div class="alert alert-danger alert-dismissible fade show"><?php echo htmlspecialchars($error); ?> <button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
             <?php endif; ?>
-            
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <p class="mb-1"><strong>Course:</strong> <?php echo htmlspecialchars($group['course_name'] ?? 'N/A'); ?></p>
-                    <p class="mb-0"><strong>Department:</strong> <?php echo htmlspecialchars($group['department_name'] ?? 'N/A'); ?></p>
+
+            <?php if ($group_id === ''): ?>
+                <p class="text-muted">Use URL with <strong>group_id</strong> to view timetable, e.g. <code>group-timetable/index?group_id=8</code></p>
+                <p class="mb-0"><a href="<?php echo APP_URL; ?>/groups">Go to Groups</a> and open a group, then use the timetable link for that group.</p>
+            <?php elseif (!$group): ?>
+                <p class="text-danger">Group not found.</p>
+            <?php else: ?>
+                <div class="mb-3">
+                    <p class="mb-1"><strong>Course:</strong> <?php echo htmlspecialchars($group['course_name'] ?? '—'); ?></p>
+                    <p class="mb-0"><strong>Department:</strong> <?php echo htmlspecialchars($group['department_name'] ?? '—'); ?></p>
                 </div>
-                <div class="col-md-6">
-                    <p class="mb-1"><strong>Academic Year:</strong> <?php echo htmlspecialchars($group['academic_year'] ?? 'N/A'); ?></p>
-                </div>
-            </div>
-            
-            <?php if (!empty($timetables)): ?>
-                <div class="table-responsive mt-3">
-                    <table class="table table-hover align-middle mb-0 table-bordered">
+                <!-- Timetable list: one row per day, second column lists all time slots with module & staff -->
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle mb-0 timetable-list">
                         <thead class="table-light">
                             <tr>
-                                <th class="fw-bold text-nowrap">Weekday</th>
-                                <th class="fw-bold text-nowrap">Time Slot</th>
-                                <th class="fw-bold text-nowrap">Module ID</th>
-                                <th class="fw-bold text-nowrap">Staff</th>
-                                <th class="fw-bold text-nowrap">Classroom</th>
-                                <th class="fw-bold text-nowrap">Start Date</th>
-                                <th class="fw-bold text-nowrap">End Date</th>
-                                <th class="fw-bold text-nowrap text-center">Status</th>
-                                <th class="fw-bold text-nowrap text-end">Actions</th>
+                                <th class="fw-bold text-center" style="width: 140px;">Day</th>
+                                <th class="fw-bold">Time Slots / Modules / Staff</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php 
-                            // Weekday to number mapping (0 = Monday, 1 = Tuesday, etc.)
-                            $weekdayMap = [
-                                'Monday' => 0,
-                                'Tuesday' => 1,
-                                'Wednesday' => 2,
-                                'Thursday' => 3,
-                                'Friday' => 4,
-                                'Saturday' => 5,
-                                'Sunday' => 6
-                            ];
-                            
-                            foreach ($timetables as $timetable): 
-                                $weekdayName = $timetable['weekday'] ?? '';
-                                $weekdayNumber = isset($weekdayMap[$weekdayName]) ? $weekdayMap[$weekdayName] : $weekdayName;
-                                
-                                // Get time slot from time_slot column first, fallback to period
-                                $timeSlot = $timetable['time_slot'] ?? $timetable['period'] ?? '';
-                            ?>
+                            <?php foreach ($weekdaysToShow as $day): ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars($weekdayNumber); ?></td>
-                                    <td>
-                                        <?php 
-                                        if (!empty($timeSlot)) {
-                                            // Format time slot display - if it's already formatted, use it; otherwise format it
-                                            if (strpos($timeSlot, '-') !== false && strpos($timeSlot, ':') !== false) {
-                                                // Format like "08:30-10:00" to "08:30 - 10:00"
-                                                $periodParts = explode('-', $timeSlot);
-                                                if (count($periodParts) == 2) {
-                                                    echo htmlspecialchars(trim($periodParts[0]) . ' - ' . trim($periodParts[1]));
-                                                } else {
-                                                    echo htmlspecialchars($timeSlot);
-                                                }
-                                            } else {
-                                                echo htmlspecialchars($timeSlot);
-                                            }
-                                        } else {
-                                            echo 'N/A';
-                                        }
-                                        ?>
-                                    </td>
-                                    <td><?php echo htmlspecialchars($timetable['module_id'] ?? 'N/A'); ?></td>
-                                    <td><?php echo htmlspecialchars($timetable['staff_name'] ?? 'N/A'); ?></td>
-                                    <td><?php echo htmlspecialchars($timetable['classroom'] ?? 'N/A'); ?></td>
-                                    <td><?php echo htmlspecialchars($timetable['start_date'] ?? 'N/A'); ?></td>
-                                    <td><?php echo htmlspecialchars($timetable['end_date'] ?? 'N/A'); ?></td>
-                                    <td class="text-center">
-                                        <span class="badge bg-<?php echo ($timetable['active'] == 1) ? 'success' : 'secondary'; ?> rounded-pill px-3">
-                                            <?php echo ($timetable['active'] == 1) ? 'Active' : 'Inactive'; ?>
-                                        </span>
-                                    </td>
-                                    <td class="text-end">
-                                        <div class="btn-group btn-group-sm" role="group">
-                                            <a href="<?php echo APP_URL; ?>/group-timetable/edit?id=<?php echo urlencode($timetable['timetable_id']); ?>" 
-                                               class="btn btn-outline-primary btn-sm" 
-                                               title="Edit">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            <a href="<?php echo APP_URL; ?>/group-timetable/delete?id=<?php echo urlencode($timetable['timetable_id']); ?>" 
-                                               class="btn btn-outline-danger btn-sm" 
-                                               onclick="return confirm('Are you sure you want to delete this timetable entry?');"
-                                               title="Delete">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
-                                        </div>
+                                    <td class="fw-bold bg-light align-top text-center"><?php echo htmlspecialchars($day); ?></td>
+                                    <td class="p-2">
+                                        <?php if (!empty($timeSlots)): ?>
+                                            <?php foreach ($timeSlots as $slotKey => $slotLabel):
+                                                $entry = isset($grid[$day][$slotKey]) ? $grid[$day][$slotKey] : null;
+                                                $isAllocated = is_array($entry) && isset($entry['id']) && $entry['id'] !== '' && $entry['id'] !== null;
+                                            ?>
+                                                <div class="d-flex justify-content-between align-items-start mb-2 slot-row">
+                                                    <div class="small text-muted fw-semibold" style="min-width: 140px;">
+                                                        <?php echo htmlspecialchars($slotLabel); ?>
+                                                    </div>
+                                                    <div class="flex-grow-1 ms-2">
+                                                        <?php if ($isAllocated): ?>
+                                                            <?php /* Allocated slot: show details only; no Add button; show Delete + Edit */ ?>
+                                                            <div class="slot-filled">
+                                                                <div class="small fw-bold text-primary">
+                                                                    <span class="text-muted">Module:</span>
+                                                                    <?php echo htmlspecialchars($entry['module_id'] ?? $entry['subject'] ?? '—'); ?>
+                                                                    <?php if (!empty($entry['module_name'])): ?>
+                                                                        <span class="fw-normal text-muted">(<?php echo htmlspecialchars($entry['module_name']); ?>)</span>
+                                                                    <?php endif; ?>
+                                                                </div>
+                                                                <div class="small text-muted">
+                                                                    <span class="text-muted">Staff ID:</span>
+                                                                    <?php echo htmlspecialchars($entry['staff_id'] ?? '—'); ?>
+                                                                    <?php if (!empty($entry['staff_name'])): ?>
+                                                                        <span class="fw-normal">(<?php echo htmlspecialchars($entry['staff_name']); ?>)</span>
+                                                                    <?php endif; ?>
+                                                                </div>
+                                                                <?php if (!empty($entry['room'])): ?>
+                                                                    <div class="small"><?php echo htmlspecialchars($entry['room']); ?></div>
+                                                                <?php endif; ?>
+                                                                <div class="btn-group btn-group-sm mt-1">
+                                                                    <a href="<?php echo APP_URL; ?>/group-timetable/delete?id=<?php echo urlencode($entry['id']); ?>" class="btn btn-danger btn-sm" onclick="return confirm('Delete this slot?');" title="Delete">
+                                                                        <i class="fas fa-trash-alt me-1"></i>Delete
+                                                                    </a>
+                                                                    <a href="<?php echo APP_URL; ?>/group-timetable/edit?id=<?php echo urlencode($entry['id']); ?>" class="btn btn-outline-primary btn-sm" title="Edit">
+                                                                        <i class="fas fa-edit"></i>
+                                                                    </a>
+                                                                </div>
+                                                            </div>
+                                                        <?php else: ?>
+                                                            <?php /* Empty slot: Add button only; no Delete */ ?>
+                                                            <div class="slot-empty d-flex align-items-center">
+                                                                <span class="small text-muted me-2">Empty</span>
+                                                                <a href="<?php echo APP_URL; ?>/group-timetable/create?group_id=<?php echo urlencode($group_id); ?>&day=<?php echo urlencode($day); ?>&time_slot=<?php echo urlencode($slotKey); ?>" class="btn btn-outline-success btn-sm">
+                                                                    <i class="fas fa-plus me-1"></i>Add
+                                                                </a>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <div class="text-muted small">No time slots configured.</div>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-            <?php else: ?>
-                <div class="text-center py-5">
-                    <i class="fas fa-calendar-alt fa-3x text-muted mb-3"></i>
-                    <p class="text-muted mb-3">No timetable entries found for this group.</p>
-                    <a href="<?php echo APP_URL; ?>/group-timetable/create?group_id=<?php echo urlencode($group['id']); ?>" class="btn btn-primary">
-                        <i class="fas fa-plus me-1"></i>Add First Entry
-                    </a>
-                </div>
             <?php endif; ?>
         </div>
     </div>
 </div>
 
+<style>
+.timetable-list .slot-row:last-child { margin-bottom: 0; }
+.slot-filled { font-size: 0.875rem; }
+.slot-empty { font-size: 0.875rem; }
+</style>
