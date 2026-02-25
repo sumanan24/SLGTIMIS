@@ -6,8 +6,18 @@
 class StudentEnrollmentModel extends Model {
     protected $table = 'student_enroll';
     
+    /** Last SQL error when an update fails (for display to user) */
+    protected $lastSqlError = '';
+    
     protected function getPrimaryKey() {
         return 'student_id';
+    }
+    
+    /**
+     * Get last SQL error from update operations.
+     */
+    public function getLastSqlError() {
+        return $this->lastSqlError;
     }
     
     /**
@@ -100,9 +110,10 @@ class StudentEnrollmentModel extends Model {
     }
     
     /**
-     * Update enrollment for a student (active Following only)
+     * Update enrollment for a student (active Following only). On failure use getLastSqlError().
      */
     public function updateEnrollment($studentId, $data) {
+        $this->lastSqlError = '';
         $sql = "UPDATE `{$this->table}` SET 
                 `course_id` = ?, 
                 `academic_year` = ?, 
@@ -113,6 +124,10 @@ class StudentEnrollmentModel extends Model {
                 LIMIT 1";
         
         $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            $this->lastSqlError = $this->db->getConnection()->error ?? 'Prepare failed (student_enroll)';
+            return false;
+        }
         $stmt->bind_param("sssss", 
             $data['course_id'],
             $data['academic_year'],
@@ -121,13 +136,18 @@ class StudentEnrollmentModel extends Model {
             $studentId
         );
         
-        return $stmt->execute();
+        if (!$stmt->execute()) {
+            $this->lastSqlError = $stmt->error ?? 'Execute failed (student_enroll)';
+            return false;
+        }
+        return true;
     }
     
     /**
-     * Update enrollment by record (student_id, course_id, academic_year) - for Dropout re-registration
+     * Update enrollment by record (student_id, course_id, academic_year) - for Dropout re-registration. On failure use getLastSqlError().
      */
     public function updateEnrollmentByRecord($studentId, $courseId, $academicYear, $data) {
+        $this->lastSqlError = '';
         $sql = "UPDATE `{$this->table}` SET 
                 `course_id` = ?, 
                 `academic_year` = ?, 
@@ -136,6 +156,10 @@ class StudentEnrollmentModel extends Model {
                 WHERE `student_id` = ? AND `course_id` = ? AND `academic_year` = ?";
         
         $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            $this->lastSqlError = $this->db->getConnection()->error ?? 'Prepare failed (student_enroll)';
+            return false;
+        }
         $stmt->bind_param("sssssss", 
             $data['course_id'],
             $data['academic_year'],
@@ -146,7 +170,11 @@ class StudentEnrollmentModel extends Model {
             $academicYear
         );
         
-        return $stmt->execute();
+        if (!$stmt->execute()) {
+            $this->lastSqlError = $stmt->error ?? 'Execute failed (student_enroll)';
+            return false;
+        }
+        return true;
     }
 }
 

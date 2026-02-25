@@ -91,8 +91,12 @@ class Model {
     
     /**
      * Update record
+     * @param mixed $id Primary key value
+     * @param array $data Column => value to set
+     * @param string|null $sqlError Set to MySQL error message on failure (prepare or execute)
+     * @return bool
      */
-    public function update($id, $data) {
+    public function update($id, $data, &$sqlError = null) {
         $set = [];
         $types = '';
         $values = [];
@@ -116,6 +120,11 @@ class Model {
         $sql = "UPDATE `{$this->table}` SET $set WHERE `{$this->getPrimaryKey()}` = ?";
         $stmt = $this->db->prepare($sql);
         
+        if (!$stmt) {
+            $sqlError = $this->db->getConnection()->error ?? 'Prepare failed';
+            return false;
+        }
+        
         // Add ID parameter
         $types .= 's';
         $values[] = $id;
@@ -128,7 +137,11 @@ class Model {
         
         call_user_func_array([$stmt, 'bind_param'], array_merge([$types], $refs));
         
-        return $stmt->execute();
+        if (!$stmt->execute()) {
+            $sqlError = $stmt->error ?? 'Execute failed';
+            return false;
+        }
+        return true;
     }
     
     /**

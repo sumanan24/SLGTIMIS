@@ -6,8 +6,18 @@
 class StudentModel extends Model {
     protected $table = 'student';
     
+    /** Last SQL error message when an update fails (for display to user) */
+    protected $lastSqlError = '';
+    
     protected function getPrimaryKey() {
         return 'student_id';
+    }
+    
+    /**
+     * Get last SQL error from update operations (student table, updateStudentId, updateStudentImage).
+     */
+    public function getLastSqlError() {
+        return $this->lastSqlError;
     }
     
     /**
@@ -434,10 +444,16 @@ class StudentModel extends Model {
     }
     
     /**
-     * Update student
+     * Update student. On failure, use getLastSqlError() for the MySQL error message.
      */
     public function updateStudent($id, $data) {
-        return $this->update($id, $data);
+        $this->lastSqlError = '';
+        $err = null;
+        $result = $this->update($id, $data, $err);
+        if (!$result && $err !== null) {
+            $this->lastSqlError = $err;
+        }
+        return $result;
     }
     
     /**
@@ -445,6 +461,7 @@ class StudentModel extends Model {
      * This requires updating the student_id in multiple tables
      */
     public function updateStudentId($oldId, $newId) {
+        $this->lastSqlError = '';
         // Start transaction
         $this->db->begin_transaction();
         
@@ -452,21 +469,35 @@ class StudentModel extends Model {
             // Update student table
             $sql1 = "UPDATE `{$this->table}` SET `student_id` = ? WHERE `student_id` = ?";
             $stmt1 = $this->db->prepare($sql1);
+            if (!$stmt1) {
+                $this->lastSqlError = $this->db->getConnection()->error ?? 'Prepare failed (student table)';
+                $this->db->rollback();
+                return false;
+            }
             $stmt1->bind_param("ss", $newId, $oldId);
             $result1 = $stmt1->execute();
             
             if (!$result1) {
-                throw new Exception("Failed to update student_id in student table");
+                $this->lastSqlError = 'student table: ' . ($stmt1->error ?? 'Execute failed');
+                $this->db->rollback();
+                return false;
             }
             
             // Update student_enroll table
             $sql2 = "UPDATE `student_enroll` SET `student_id` = ? WHERE `student_id` = ?";
             $stmt2 = $this->db->prepare($sql2);
+            if (!$stmt2) {
+                $this->lastSqlError = $this->db->getConnection()->error ?? 'Prepare failed (student_enroll table)';
+                $this->db->rollback();
+                return false;
+            }
             $stmt2->bind_param("ss", $newId, $oldId);
             $result2 = $stmt2->execute();
             
             if (!$result2) {
-                throw new Exception("Failed to update student_id in student_enroll table");
+                $this->lastSqlError = 'student_enroll table: ' . ($stmt2->error ?? 'Execute failed');
+                $this->db->rollback();
+                return false;
             }
             
             // Update attendance and group_students tables (no FK, must update explicitly)
@@ -513,7 +544,7 @@ class StudentModel extends Model {
             return true;
             
         } catch (Exception $e) {
-            // Rollback on error
+            $this->lastSqlError = $e->getMessage();
             $this->db->rollback();
             return false;
         }
@@ -1519,11 +1550,15 @@ class StudentModel extends Model {
         $stmt = $this->db->prepare($sql);
         
         if (!$stmt) {
+            $this->lastSqlError = $this->db->getConnection()->error ?? 'Prepare failed (profile image)';
             return false;
         }
         
         $stmt->bind_param("ss", $imagePath, $studentId);
         $result = $stmt->execute();
+        if (!$result) {
+            $this->lastSqlError = $stmt->error ?? 'Execute failed (profile image)';
+        }
         $stmt->close();
         
         return $result;

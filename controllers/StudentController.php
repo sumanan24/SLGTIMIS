@@ -1187,7 +1187,8 @@ class StudentController extends Controller {
                             $id = $newStudentId; // Update current ID for enrollment update
                             $_SESSION['message'] = 'Registration number updated successfully.';
                         } else {
-                            $_SESSION['error'] = 'Failed to update registration number.';
+                            $sqlErr = $studentModel->getLastSqlError();
+                            $_SESSION['error'] = 'Failed to update registration number.' . ($sqlErr ? ' SQL error: ' . $sqlErr : '');
                         }
                     }
                 }
@@ -1218,7 +1219,8 @@ class StudentController extends Controller {
                         $_SESSION['message'] = ($_SESSION['message'] ?? '') . ' Enrollment updated successfully.' . 
                             ($enrollStatus === 'Following' && $editableEnrollment['student_enroll_status'] !== 'Following' ? ' Student re-registered.' : '');
                     } else {
-                        $_SESSION['error'] = ($_SESSION['error'] ?? '') . ' Failed to update enrollment.';
+                        $sqlErr = $enrollmentModel->getLastSqlError();
+                        $_SESSION['error'] = ($_SESSION['error'] ?? '') . ' Failed to update enrollment.' . ($sqlErr ? ' SQL error: ' . $sqlErr : '');
                     }
                 } elseif (empty($_SESSION['error']) && empty($editableEnrollment)) {
                     $_SESSION['error'] = 'No enrollment found to update.';
@@ -1294,7 +1296,9 @@ class StudentController extends Controller {
                         // Store active tab for redirect
                         $_SESSION['active_tab'] = $updateSection;
                     } else {
-                        $_SESSION['error'] = 'Failed to update student. Please check the database connection and try again.';
+                        $sectionLabel = $updateSection === 'personal' ? 'Personal information' : ($updateSection === 'bank' ? 'Bank details' : ($updateSection === 'eligibility' ? 'Eligibility' : $updateSection));
+                        $sqlErr = $studentModel->getLastSqlError();
+                        $_SESSION['error'] = 'Failed to update ' . $sectionLabel . '.' . ($sqlErr ? ' SQL error: ' . $sqlErr : '');
                     }
                 }
             } else {
@@ -1337,7 +1341,9 @@ class StudentController extends Controller {
                         // Store active tab for redirect
                         $_SESSION['active_tab'] = $updateSection;
                     } else {
-                        $_SESSION['error'] = 'Failed to update student. Please check the database connection and try again.';
+                        $sectionLabel = $updateSection === 'personal' ? 'Personal information' : ($updateSection === 'bank' ? 'Bank details' : ($updateSection === 'eligibility' ? 'Eligibility' : $updateSection));
+                        $sqlErr = $studentModel->getLastSqlError();
+                        $_SESSION['error'] = 'Failed to update ' . $sectionLabel . '.' . ($sqlErr ? ' SQL error: ' . $sqlErr : '');
                     }
                 }
             }
