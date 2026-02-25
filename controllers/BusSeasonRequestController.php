@@ -668,6 +668,73 @@ class BusSeasonRequestController extends Controller {
     }
     
     /**
+     * SAO Update Route Information for a Request
+     */
+    public function updateRoute() {
+        $this->requireAuth();
+        $this->requireSAOAccess();
+        $this->requirePost();
+        
+        require_once BASE_PATH . '/core/SeasonRequestHelper.php';
+        
+        $csrfToken = $this->post('csrf_token', '');
+        if (!SeasonRequestHelper::verifyCSRFToken($csrfToken)) {
+            $this->setError('Invalid session token. Please try again.');
+            $this->redirect('bus-season-requests/sao-process');
+            return;
+        }
+        
+        $requestId = (int)$this->post('request_id', 0);
+        $routeFrom = trim($this->post('route_from', ''));
+        $routeTo = trim($this->post('route_to', ''));
+        
+        if (empty($requestId)) {
+            $this->setError('Request ID is required.');
+            $this->redirect('bus-season-requests/sao-process');
+            return;
+        }
+        
+        // Simple validation for route fields only
+        if (empty($routeFrom) || strlen($routeFrom) > 255) {
+            $this->setError('Route From is required and must be less than 255 characters.');
+            $this->redirect('bus-season-requests/sao-process');
+            return;
+        }
+        if (empty($routeTo) || strlen($routeTo) > 255) {
+            $this->setError('Route To is required and must be less than 255 characters.');
+            $this->redirect('bus-season-requests/sao-process');
+            return;
+        }
+        
+        $requestModel = $this->model('BusSeasonRequestModel');
+        $requestModel->ensureTableStructure();
+        
+        $updated = $requestModel->updateRoute($requestId, $routeFrom, $routeTo);
+        
+        if ($updated) {
+            try {
+                SeasonRequestHelper::logActivity(
+                    'UPDATE',
+                    $requestId,
+                    "SAO updated route information for bus season request #{$requestId}",
+                    [
+                        'route_from' => $routeFrom,
+                        'route_to' => $routeTo
+                    ]
+                );
+            } catch (Exception $e) {
+                // Logging error is non-fatal
+            }
+            
+            $this->setMessage('Route information updated successfully.');
+        } else {
+            $this->setError('Failed to update route information. Please try again.');
+        }
+        
+        $this->redirect('bus-season-requests/sao-process');
+    }
+    
+    /**
      * Payment Collections View
      */
     public function paymentCollections() {

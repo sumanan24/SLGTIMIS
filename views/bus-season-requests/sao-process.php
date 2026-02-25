@@ -321,6 +321,14 @@
                                 </td>
                                 <td class="text-end">
                                     <div class="action-buttons">
+                                        <!-- Edit Route Button -->
+                                        <button type="button"
+                                                class="btn btn-outline-secondary btn-sm mb-1"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#editRouteModal_<?php echo $request['id']; ?>">
+                                            <i class="fas fa-route me-1"></i>Edit Route
+                                        </button>
+                                        
                                         <?php if ($status !== 'rejected'): ?>
                                             <button type="button" 
                                                     class="btn btn-success btn-sm" 
@@ -343,6 +351,59 @@
                                            title="View Details">
                                             <i class="fas fa-eye"></i>
                                         </a>
+                                    </div>
+                                    
+                                    <!-- Edit Route Modal -->
+                                    <div class="modal fade" id="editRouteModal_<?php echo $request['id']; ?>" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">
+                                                        <i class="fas fa-route me-2"></i>Edit Route Information
+                                                    </h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <?php 
+                                                    require_once BASE_PATH . '/core/SeasonRequestHelper.php';
+                                                    $csrfTokenRoute = SeasonRequestHelper::generateCSRFToken();
+                                                    ?>
+                                                    <form action="<?php echo APP_URL; ?>/bus-season-requests/update-route" method="POST">
+                                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfTokenRoute); ?>">
+                                                        <input type="hidden" name="request_id" value="<?php echo (int)$request['id']; ?>">
+                                                        
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-bold">
+                                                                <i class="fas fa-map-marker-alt text-danger me-2"></i>Route From <span class="text-danger">*</span>
+                                                            </label>
+                                                            <input type="text"
+                                                                   class="form-control"
+                                                                   name="route_from"
+                                                                   value="<?php echo htmlspecialchars($request['route_from']); ?>"
+                                                                   required>
+                                                        </div>
+                                                        
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-bold">
+                                                                <i class="fas fa-map-marker-alt text-success me-2"></i>Route To <span class="text-danger">*</span>
+                                                            </label>
+                                                            <input type="text"
+                                                                   class="form-control"
+                                                                   name="route_to"
+                                                                   value="<?php echo htmlspecialchars($request['route_to']); ?>"
+                                                                   required>
+                                                        </div>
+                                                        
+                                                        <div class="d-flex justify-content-end gap-2">
+                                                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-primary">
+                                                                <i class="fas fa-save me-2"></i>Save Changes
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     
                                     <!-- Payment Modal -->

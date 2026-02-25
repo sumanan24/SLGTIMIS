@@ -648,6 +648,36 @@ class BusSeasonRequestModel extends Model {
     }
     
     /**
+     * Update route information for a request (Route From / Route To only)
+     */
+    public function updateRoute($requestId, $routeFrom, $routeTo) {
+        $this->ensureTableStructure();
+        
+        $sql = "UPDATE `{$this->table}` 
+                SET `route_from` = ?, 
+                    `route_to` = ?
+                WHERE `id` = ?";
+        
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            $conn = $this->db->getConnection();
+            error_log("BusSeasonRequestModel::updateRoute - Prepare failed: " . ($conn ? $conn->error : 'Unknown error'));
+            return false;
+        }
+        
+        $stmt->bind_param("ssi", $routeFrom, $routeTo, $requestId);
+        
+        if (!$stmt->execute()) {
+            error_log("BusSeasonRequestModel::updateRoute - Execute failed: " . $stmt->error);
+            $stmt->close();
+            return false;
+        }
+        
+        $stmt->close();
+        return true;
+    }
+    
+    /**
      * Create payment collection
      */
     public function createPaymentCollection($requestId, $studentId, $paidAmount, $seasonRate, $collectedBy, $paymentMethod = 'cash', $paymentReference = null, $notes = null) {
