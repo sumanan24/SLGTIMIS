@@ -27,8 +27,8 @@ class DepartmentModel extends Model {
     /**
      * Create new department
      */
-    public function createDepartment($data) {
-        return $this->create($data);
+    public function createDepartment($data, &$sqlError = null) {
+        return $this->create($data, $sqlError);
     }
     
     /**

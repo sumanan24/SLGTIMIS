@@ -87,49 +87,68 @@ class StaffController extends Controller {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $staffModel = $this->model('StaffModel');
             
-            $data = [
-                'staff_id' => trim($this->post('staff_id', '')),
-                'department_id' => trim($this->post('department_id', '')),
-                'staff_name' => trim($this->post('staff_name', '')),
-                'staff_address' => trim($this->post('staff_address', '')),
-                'staff_dob' => $this->post('staff_dob', ''),
-                'staff_nic' => trim($this->post('staff_nic', '')),
-                'staff_email' => trim($this->post('staff_email', '')),
-                'staff_pno' => (int)$this->post('staff_pno', 0),
-                'staff_date_of_join' => $this->post('staff_date_of_join', ''),
-                'staff_gender' => $this->post('staff_gender', ''),
-                'staff_epf' => trim($this->post('staff_epf', '')),
-                'staff_position' => trim($this->post('staff_position', '')),
-                'staff_type' => $this->post('staff_type', ''),
-                'staff_status' => $this->post('staff_status', 'Working')
-            ];
-            
-            // Validation
-            if (empty($data['staff_id']) || empty($data['staff_name']) || empty($data['staff_email']) || 
-                empty($data['staff_nic']) || empty($data['department_id'])) {
-                $_SESSION['error'] = 'Staff ID, Name, Email, NIC, and Department are required.';
+            // Read only the fields user should fill
+            $staffId       = trim($this->post('staff_id', ''));
+            $departmentId  = trim($this->post('department_id', ''));
+            $staffName     = trim($this->post('staff_name', ''));
+            $staffNic      = trim($this->post('staff_nic', ''));
+            $staffPosition = trim($this->post('staff_position', ''));
+            $staffType     = $this->post('staff_type', '');
+            $staffStatus   = $this->post('staff_status', 'Working');
+
+            // Validation for required fields (only what the form shows)
+            if (empty($staffId) || empty($departmentId) || empty($staffName) ||
+                empty($staffNic) || empty($staffPosition) || empty($staffType) || empty($staffStatus)) {
+                $_SESSION['error'] = 'Staff ID, Department, Name, NIC, Position, Staff Type, and Status are required.';
                 $this->redirect('staff/create');
                 return;
             }
             
             // Check if staff ID already exists
-            if ($staffModel->exists($data['staff_id'])) {
+            if ($staffModel->exists($staffId)) {
                 $_SESSION['error'] = 'Staff ID already exists.';
                 $this->redirect('staff/create');
                 return;
             }
             
             // Check if department exists
-            if (!$departmentModel->exists($data['department_id'])) {
+            if (!$departmentModel->exists($departmentId)) {
                 $_SESSION['error'] = 'Selected department does not exist.';
                 $this->redirect('staff/create');
                 return;
             }
             
-            // Create staff
-            $result = $staffModel->createStaff($data);
+            // Build full data record, auto-filling DB-required fields that are not on the form
+            $today = date('Y-m-d');
+            $autoEmail = strtolower($staffId) . '@slgti.local';
+            $autoEpf   = 'AUTO-' . $staffId;
+
+            $data = [
+                'staff_id'          => $staffId,
+                'department_id'     => $departmentId,
+                'staff_name'        => $staffName,
+                'staff_address'     => '-',           // not collected on form
+                'staff_dob'         => $today,        // default placeholder date
+                'staff_nic'         => $staffNic,
+                'staff_email'       => $autoEmail,    // auto-generated unique email
+                'staff_pno'         => 0,             // not collected on form
+                'staff_date_of_join'=> $today,        // default join date
+                'staff_gender'      => 'Male',        // default gender
+                'staff_epf'         => $autoEpf,      // auto-generated unique EPF
+                'staff_position'    => $staffPosition,
+                'staff_type'        => $staffType,
+                'staff_status'      => $staffStatus
+            ];
             
-            if ($result) {
+            // Create staff
+            $sqlError = null;
+            $result = $staffModel->createStaff($data, $sqlError);
+            
+            // For manual primary keys, treat only FALSE as failure
+            if ($result !== false) {
+                // Build department label for message
+                $dept = $departmentModel->getById($data['department_id']);
+                $deptLabel = $dept ? "{$dept['department_name']} ({$data['department_id']})" : $data['department_id'];
                 // Log activity
                 $this->logActivity(
                     'CREATE',
@@ -140,10 +159,15 @@ class StaffController extends Controller {
                     $data
                 );
                 
-                $_SESSION['message'] = 'Staff created successfully.';
+                $_SESSION['message'] = 'Staff created successfully. ID: ' . $data['staff_id'] . ', Department: ' . $deptLabel . '.';
                 $this->redirect('staff');
             } else {
-                $_SESSION['error'] = 'Failed to create staff.';
+                if ($sqlError) {
+                    error_log("StaffController::create - SQL error while creating staff {$data['staff_id']}: " . $sqlError);
+                    $_SESSION['error'] = 'Failed to create staff. Database error: ' . $sqlError;
+                } else {
+                    $_SESSION['error'] = 'Failed to create staff.';
+                }
                 $this->redirect('staff/create');
             }
         } else {

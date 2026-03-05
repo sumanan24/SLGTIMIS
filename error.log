@@ -1747,3 +1747,289 @@
 [25-Feb-2026 17:57:03 UTC] Database::connect - Connection successful to sisslgti
 [25-Feb-2026 17:57:07 UTC] Database::connect - Connection successful to sisslgti
 [25-Feb-2026 17:58:44 UTC] Database::connect - Connection successful to sisslgti
+[26-Feb-2026 03:23:44 UTC] Database::connect - Connection successful to sisslgti
+[26-Feb-2026 03:23:46 UTC] Database::connect - Connection successful to sisslgti
+[26-Feb-2026 03:23:59 UTC] Database::connect - Connection successful to sisslgti
+[26-Feb-2026 03:23:59 UTC] Database::connect - Connection successful to sisslgti
+[26-Feb-2026 03:24:04 UTC] Database::connect - Connection successful to sisslgti
+[26-Feb-2026 03:24:04 UTC] Database::connect - Connection successful to sisslgti
+[26-Feb-2026 03:24:06 UTC] Database::connect - Connection successful to sisslgti
+[26-Feb-2026 03:24:08 UTC] Database::connect - Connection successful to sisslgti
+[26-Feb-2026 03:24:08 UTC] First course structure: Array
+(
+    [0] => course_id
+    [1] => course_name
+    [2] => course_nvq_level
+    [3] => course_ojt_duration
+    [4] => course_institute_training
+    [5] => department_id
+    [6] => department_name
+)
+
+[26-Feb-2026 04:14:55 UTC] Database::connect - Connection successful to sisslgti
+[26-Feb-2026 04:14:55 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:12:13 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:12:15 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:12:21 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:12:21 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:12:24 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:12:28 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:12:34 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:12:34 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:12:36 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:12:40 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:12:54 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:14:10 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:14:10 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:14:22 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:14:33 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:14:47 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:14:47 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 05:14:51 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 07:08:40 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:49:54 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:50:31 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:50:31 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:50:39 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:50:41 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:53:33 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:53:37 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:53:40 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:54:46 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:54:47 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:54:53 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:54:53 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:56:29 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:56:35 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:56:35 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:56:42 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:56:45 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:56:45 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:56:49 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:56:50 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:56:50 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:56:54 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:56:55 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:56:55 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:57:01 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:57:02 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:57:02 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:57:11 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:57:19 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:57:23 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:57:27 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:57:34 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:57:42 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:57:49 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:57:51 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:58:58 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 08:58:58 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:05:57 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:11:23 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:11:26 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:24:39 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:25:40 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:25:40 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:26:15 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:27:36 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:27:36 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:27:44 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:27:46 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:28:05 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:28:07 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:28:23 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:28:38 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:29:24 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:29:32 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:29:34 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:29:34 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:29:43 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:29:50 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:29:52 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:29:52 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:29:59 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:30:25 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:30:25 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:30:29 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:31:04 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:31:05 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:31:09 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:31:09 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:31:11 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:31:23 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:31:23 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:31:28 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:31:33 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:31:35 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:31:38 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:31:40 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:31:42 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:31:45 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:34:07 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:39:04 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:43:26 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:43:40 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:43:40 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:43:51 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:43:51 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:43:57 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:43:57 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:43:59 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:44:13 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:44:14 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:44:19 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:44:25 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:44:35 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 0, Content-Type: 
+[02-Mar-2026 09:44:35 UTC] Hikvision makeRequest - Raw response (first 1000 chars): 
+[02-Mar-2026 09:44:35 UTC] Hikvision CURL Error: Connection timed out after 10014 milliseconds
+[02-Mar-2026 09:44:45 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 0, Content-Type: 
+[02-Mar-2026 09:44:45 UTC] Hikvision makeRequest - Raw response (first 1000 chars): 
+[02-Mar-2026 09:44:45 UTC] Hikvision CURL Error: Connection timed out after 10006 milliseconds
+[02-Mar-2026 09:44:55 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/System/deviceInfo, Method: GET, HTTP Code: 0, Content-Type: 
+[02-Mar-2026 09:44:55 UTC] Hikvision makeRequest - Raw response (first 1000 chars): 
+[02-Mar-2026 09:44:55 UTC] Hikvision CURL Error: Connection timed out after 10002 milliseconds
+[02-Mar-2026 09:45:05 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/, Method: GET, HTTP Code: 0, Content-Type: 
+[02-Mar-2026 09:45:05 UTC] Hikvision makeRequest - Raw response (first 1000 chars): 
+[02-Mar-2026 09:45:05 UTC] Hikvision CURL Error: Connection timed out after 10013 milliseconds
+[02-Mar-2026 09:45:05 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:47:19 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:47:19 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:50:27 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:50:40 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:50:41 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:50:45 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:50:49 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:50:53 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:50:56 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:54:52 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:54:54 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:55:04 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:55:15 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:55:20 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:55:38 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:55:40 UTC] Database::connect - Connection successful to sisslgti
+[02-Mar-2026 09:55:45 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:47:12 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:47:15 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:47:25 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:47:25 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:47:28 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:47:33 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:47:33 UTC] PHP Fatal error:  Declaration of BusSeasonRequestModel::create($data) must be compatible with Model::create($data, &$sqlError = null) in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 135
+[05-Mar-2026 13:47:33 UTC] PHP Stack trace:
+[05-Mar-2026 13:47:33 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Mar-2026 13:47:33 UTC] PHP   2. Router->route($uri = 'bus-season-requests/sao-process') C:\wamp64\www\SLGTIMIS\index.php:144
+[05-Mar-2026 13:47:33 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@saoProcess', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[05-Mar-2026 13:47:33 UTC] PHP   4. BusSeasonRequestController->saoProcess() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[05-Mar-2026 13:47:33 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:427
+[05-Mar-2026 13:47:40 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:47:40 UTC] PHP Fatal error:  Declaration of BusSeasonRequestModel::create($data) must be compatible with Model::create($data, &$sqlError = null) in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 135
+[05-Mar-2026 13:47:40 UTC] PHP Stack trace:
+[05-Mar-2026 13:47:40 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Mar-2026 13:47:40 UTC] PHP   2. Router->route($uri = 'bus-season-requests/sao-process') C:\wamp64\www\SLGTIMIS\index.php:144
+[05-Mar-2026 13:47:40 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@saoProcess', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[05-Mar-2026 13:47:40 UTC] PHP   4. BusSeasonRequestController->saoProcess() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[05-Mar-2026 13:47:40 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:427
+[05-Mar-2026 13:47:43 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:47:43 UTC] PHP Fatal error:  Declaration of BusSeasonRequestModel::create($data) must be compatible with Model::create($data, &$sqlError = null) in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 135
+[05-Mar-2026 13:47:43 UTC] PHP Stack trace:
+[05-Mar-2026 13:47:43 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Mar-2026 13:47:43 UTC] PHP   2. Router->route($uri = 'bus-season-requests/payment-collections') C:\wamp64\www\SLGTIMIS\index.php:144
+[05-Mar-2026 13:47:43 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@paymentCollections', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[05-Mar-2026 13:47:43 UTC] PHP   4. BusSeasonRequestController->paymentCollections() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[05-Mar-2026 13:47:43 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:744
+[05-Mar-2026 13:48:06 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:48:06 UTC] PHP Fatal error:  Declaration of BusSeasonRequestModel::create($data) must be compatible with Model::create($data, &$sqlError = null) in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 135
+[05-Mar-2026 13:48:06 UTC] PHP Stack trace:
+[05-Mar-2026 13:48:06 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Mar-2026 13:48:06 UTC] PHP   2. Router->route($uri = 'bus-season-requests/sao-process') C:\wamp64\www\SLGTIMIS\index.php:144
+[05-Mar-2026 13:48:06 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@saoProcess', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[05-Mar-2026 13:48:06 UTC] PHP   4. BusSeasonRequestController->saoProcess() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[05-Mar-2026 13:48:06 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:427
+[05-Mar-2026 13:51:07 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:51:07 UTC] PHP Fatal error:  Declaration of BusSeasonRequestModel::create($data) must be compatible with Model::create($data, &$sqlError = null) in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 135
+[05-Mar-2026 13:51:07 UTC] PHP Stack trace:
+[05-Mar-2026 13:51:07 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Mar-2026 13:51:07 UTC] PHP   2. Router->route($uri = 'bus-season-requests/sao-process') C:\wamp64\www\SLGTIMIS\index.php:144
+[05-Mar-2026 13:51:07 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@saoProcess', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[05-Mar-2026 13:51:07 UTC] PHP   4. BusSeasonRequestController->saoProcess() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[05-Mar-2026 13:51:07 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:427
+[05-Mar-2026 13:52:34 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:52:34 UTC] PHP Fatal error:  Declaration of BusSeasonRequestModel::create($data) must be compatible with Model::create($data, &$sqlError = null) in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 135
+[05-Mar-2026 13:52:34 UTC] PHP Stack trace:
+[05-Mar-2026 13:52:34 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Mar-2026 13:52:34 UTC] PHP   2. Router->route($uri = 'bus-season-requests/sao-process') C:\wamp64\www\SLGTIMIS\index.php:144
+[05-Mar-2026 13:52:34 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@saoProcess', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[05-Mar-2026 13:52:34 UTC] PHP   4. BusSeasonRequestController->saoProcess() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[05-Mar-2026 13:52:34 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:427
+[05-Mar-2026 13:52:36 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:52:36 UTC] PHP Fatal error:  Declaration of BusSeasonRequestModel::create($data) must be compatible with Model::create($data, &$sqlError = null) in C:\wamp64\www\SLGTIMIS\models\BusSeasonRequestModel.php on line 135
+[05-Mar-2026 13:52:36 UTC] PHP Stack trace:
+[05-Mar-2026 13:52:36 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Mar-2026 13:52:36 UTC] PHP   2. Router->route($uri = 'bus-season-requests/payment-collections') C:\wamp64\www\SLGTIMIS\index.php:144
+[05-Mar-2026 13:52:36 UTC] PHP   3. Router->dispatch($route = 'BusSeasonRequestController@paymentCollections', $params = *uninitialized*) C:\wamp64\www\SLGTIMIS\core\Router.php:26
+[05-Mar-2026 13:52:36 UTC] PHP   4. BusSeasonRequestController->paymentCollections() C:\wamp64\www\SLGTIMIS\core\Router.php:67
+[05-Mar-2026 13:52:36 UTC] PHP   5. Controller->model($model = 'BusSeasonRequestModel') C:\wamp64\www\SLGTIMIS\controllers\BusSeasonRequestController.php:744
+[05-Mar-2026 13:53:13 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:53:38 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 13:53:41 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:06:53 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:06:53 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:06:55 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:06:58 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:06:58 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:08:20 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:08:24 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:09:43 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:10:20 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:11:23 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:11:25 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:11:55 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:12:33 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:12:37 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:12:56 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:19:02 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:22:58 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:08 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:21 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:21 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:25 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:25 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:28 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:28 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:32 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:32 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:36 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:36 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:42 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:42 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:49 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:50 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:55 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:23:56 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:24:02 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:24:02 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:24:08 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:24:08 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:24:14 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:24:14 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:24:17 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:24:17 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:24:21 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:24:21 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:24:24 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:24:25 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:24:30 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:25:00 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:25:05 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:26:00 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:26:32 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:31:19 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:31:20 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:31:20 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:31:22 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:31:30 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:31:30 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:31:34 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:31:39 UTC] Database::connect - Connection successful to sisslgti
+[05-Mar-2026 14:31:41 UTC] Database::connect - Connection successful to sisslgti

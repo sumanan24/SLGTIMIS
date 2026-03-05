@@ -88,9 +88,12 @@ class DepartmentController extends Controller {
                 'department_name' => $department_name
             ];
             
-            $result = $departmentModel->createDepartment($deptData);
+            $sqlError = null;
+            $result = $departmentModel->createDepartment($deptData, $sqlError);
             
-            if ($result) {
+            // For tables with manual primary keys (like department_id),
+            // insert_id can be 0 even on success, so we only treat FALSE as failure.
+            if ($result !== false) {
                 // Log activity
                 $this->logActivity(
                     'CREATE',
@@ -104,7 +107,12 @@ class DepartmentController extends Controller {
                 $_SESSION['message'] = 'Department created successfully.';
                 $this->redirect('departments');
             } else {
-                $_SESSION['error'] = 'Failed to create department.';
+                if ($sqlError) {
+                    error_log("DepartmentController::create - SQL error while creating department {$department_id}: " . $sqlError);
+                    $_SESSION['error'] = 'Failed to create department. Database error: ' . $sqlError;
+                } else {
+                    $_SESSION['error'] = 'Failed to create department.';
+                }
                 $this->redirect('departments/create');
             }
         } else {

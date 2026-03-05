@@ -47,66 +47,14 @@
                                 <input type="text" class="form-control" id="staff_name" name="staff_name" 
                                        maxlength="50" required>
                             </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="staff_email" class="form-label fw-semibold">
-                                    Email <span class="text-danger">*</span>
-                                </label>
-                                <input type="email" class="form-control" id="staff_email" name="staff_email" 
-                                       maxlength="254" required>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
+                    
+                      
                             <div class="col-md-6 mb-3">
                                 <label for="staff_nic" class="form-label fw-semibold">
                                     NIC <span class="text-danger">*</span>
                                 </label>
                                 <input type="text" class="form-control" id="staff_nic" name="staff_nic" 
                                        maxlength="15" required>
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="staff_epf" class="form-label fw-semibold">
-                                    EPF Number <span class="text-danger">*</span>
-                                </label>
-                                <input type="text" class="form-control" id="staff_epf" name="staff_epf" 
-                                       maxlength="20" required>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label for="staff_dob" class="form-label fw-semibold">Date of Birth</label>
-                                <input type="date" class="form-control" id="staff_dob" name="staff_dob" required>
-                            </div>
-                            
-                            <div class="col-md-4 mb-3">
-                                <label for="staff_date_of_join" class="form-label fw-semibold">Date of Join</label>
-                                <input type="date" class="form-control" id="staff_date_of_join" name="staff_date_of_join" required>
-                            </div>
-                            
-                            <div class="col-md-4 mb-3">
-                                <label for="staff_gender" class="form-label fw-semibold">Gender</label>
-                                <select class="form-select" id="staff_gender" name="staff_gender" required>
-                                    <option value="">Select</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                    <option value="Transgender">Transgender</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="staff_address" class="form-label fw-semibold">Address</label>
-                                <textarea class="form-control" id="staff_address" name="staff_address" rows="2" maxlength="50"></textarea>
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="staff_pno" class="form-label fw-semibold">Phone Number</label>
-                                <input type="tel" class="form-control" id="staff_pno" name="staff_pno" 
-                                       pattern="[0-9]{9,10}">
                             </div>
                         </div>
                         

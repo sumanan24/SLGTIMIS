@@ -172,32 +172,7 @@
         </div>
     <?php endif; ?>
     
-    <div class="filter-card">
-        <form method="GET" action="<?php echo APP_URL; ?>/bus-season-requests/payment-collections" class="row g-3">
-            <div class="col-md-3">
-                <label class="form-label fw-bold">Season Year</label>
-                <select class="form-select" name="season_year">
-                    <option value="">All Years</option>
-                    <?php foreach ($academicYears as $year): ?>
-                        <option value="<?php echo $year; ?>" <?php echo ($filters['season_year'] == $year) ? 'selected' : ''; ?>><?php echo $year; ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-bold">Month</label>
-                <input type="month" class="form-control" name="month" value="<?php echo htmlspecialchars($filters['month'] ?? ''); ?>">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-bold">Student ID</label>
-                <input type="text" class="form-control" name="student_id" value="<?php echo htmlspecialchars($filters['student_id']); ?>" placeholder="Enter ID">
-            </div>
-            <div class="col-md-3 d-flex align-items-end">
-                <button type="submit" class="btn btn-primary w-100">
-                    <i class="fas fa-search me-2"></i>Search & Filter
-                </button>
-            </div>
-        </form>
-    </div>
+    <!-- No academic year, date range, or per-student filters needed on this screen -->
 
     <!-- Tabs for different statuses -->
     <ul class="nav nav-tabs mb-4" id="paymentTabs" role="tablist">

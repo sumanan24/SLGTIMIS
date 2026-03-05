@@ -744,22 +744,17 @@ class BusSeasonRequestController extends Controller {
         $requestModel = $this->model('BusSeasonRequestModel');
         $requestModel->ensureTableStructure();
         
+        // Only status-based filtering is needed here; no academic year, date range, or per-student filters
         $filters = [
-            'season_year' => $this->get('season_year', ''),
-            'student_id' => $this->get('student_id', ''),
-            'month' => $this->get('month', ''),
             'status' => $this->get('status', '')
         ];
         
         $collections = $requestModel->getAllPaymentCollections($filters);
-        $studentModel = $this->model('StudentModel');
-        $academicYears = $studentModel->getAcademicYears();
         
         $data = [
             'title' => 'Bus Season Payment Collections',
             'page' => 'bus-season-payments',
             'collections' => $collections,
-            'academicYears' => $academicYears,
             'filters' => $filters,
             'message' => $this->getFlashMessage(),
             'error' => $this->getFlashError()
@@ -968,16 +963,14 @@ class BusSeasonRequestController extends Controller {
         
         $requestModel = $this->model('BusSeasonRequestModel');
         $status = $this->get('status', 'paid');
+        // Only status filter is used for exports
         $filters = [
-            'season_year' => $this->get('season_year', ''),
-            'student_id' => $this->get('student_id', ''),
-            'month' => $this->get('month', ''),
             'status' => $status
         ];
         
         $collections = $requestModel->getAllPaymentCollections($filters);
         
-        $filename = 'bus_season_' . $status . '_' . ($filters['month'] ?: date('Y-m')) . '.csv';
+        $filename = 'bus_season_' . $status . '_' . date('Y-m') . '.csv';
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('Cache-Control: must-revalidate, post-check=0, pre-check=0');

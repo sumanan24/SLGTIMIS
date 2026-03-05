@@ -25,11 +25,30 @@ class ProfileController extends Controller {
                 $this->redirect('dashboard');
                 return;
             }
+
+            // Load staff details for staff users (link via user_name = staff_id)
+            $staff = null;
+            $staffDepartment = null;
+            if (isset($user['user_table']) && $user['user_table'] === 'staff') {
+                try {
+                    $staffModel = $this->model('StaffModel');
+                    $staff = $staffModel->getById($user['user_name']);
+                    
+                    if ($staff && !empty($staff['department_id'])) {
+                        $departmentModel = $this->model('DepartmentModel');
+                        $staffDepartment = $departmentModel->getById($staff['department_id']);
+                    }
+                } catch (Exception $e) {
+                    error_log("ProfileController::index - Failed to load staff details: " . $e->getMessage());
+                }
+            }
             
             $data = [
                 'title' => 'Profile',
                 'page' => 'profile',
                 'user' => $user,
+                'staff' => $staff,
+                'staffDepartment' => $staffDepartment,
                 'message' => $_SESSION['message'] ?? null,
                 'error' => $_SESSION['error'] ?? null
             ];
@@ -74,20 +93,14 @@ class ProfileController extends Controller {
                 return;
             }
             
-            // Get form data
-            $userName = trim($this->post('user_name', ''));
+            // Get form data (username is not editable here; keep existing)
+            $userName = $currentUser['user_name'];
             $userEmail = trim($this->post('user_email', ''));
             $currentPassword = $this->post('current_password', '');
             $newPassword = $this->post('new_password', '');
             $confirmPassword = $this->post('confirm_password', '');
             
             // Validation
-            if (empty($userName)) {
-                $_SESSION['error'] = 'Username is required.';
-                $this->redirect('profile');
-                return;
-            }
-            
             if (empty($userEmail)) {
                 $_SESSION['error'] = 'Email is required.';
                 $this->redirect('profile');
@@ -96,17 +109,6 @@ class ProfileController extends Controller {
             
             if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
                 $_SESSION['error'] = 'Invalid email format.';
-                $this->redirect('profile');
-                return;
-            }
-            
-            // Check if username already exists (excluding current user)
-            $checkStmt = $db->prepare("SELECT user_id FROM `user` WHERE `user_name` = ? AND `user_id` != ?");
-            $checkStmt->bind_param("si", $userName, $_SESSION['user_id']);
-            $checkStmt->execute();
-            $checkResult = $checkStmt->get_result();
-            if ($checkResult->num_rows > 0) {
-                $_SESSION['error'] = 'Username already exists.';
                 $this->redirect('profile');
                 return;
             }
@@ -120,6 +122,61 @@ class ProfileController extends Controller {
                 $_SESSION['error'] = 'Email already exists.';
                 $this->redirect('profile');
                 return;
+            }
+
+            // If this is a staff user, optionally update staff details too
+            $isStaffUser = isset($currentUser['user_table']) && $currentUser['user_table'] === 'staff';
+            $staffUpdated = false;
+            if ($isStaffUser) {
+                $staffId = $currentUser['user_name']; // staff_id is same as user_name for staff accounts
+
+                // Read staff fields from form (staff_id itself is NOT editable)
+                $staffName = trim($this->post('staff_name', ''));
+                $staffNic = trim($this->post('staff_nic', ''));
+                $staffDob = $this->post('staff_dob', '');
+                $staffDateOfJoin = $this->post('staff_date_of_join', '');
+                $staffGender = $this->post('staff_gender', '');
+                $staffAddress = trim($this->post('staff_address', ''));
+                $staffPhone = trim($this->post('staff_pno', ''));
+
+                // Basic validation for key staff fields
+                if (empty($staffName) || empty($staffNic)) {
+                    $_SESSION['error'] = 'Staff Name and NIC are required.';
+                    $this->redirect('profile');
+                    return;
+                }
+
+                $staffData = [
+                    'staff_name' => $staffName,
+                    'staff_nic' => $staffNic,
+                    // Keep staff email in sync with login email
+                    'staff_email' => $userEmail,
+                ];
+
+                if (!empty($staffDob)) {
+                    $staffData['staff_dob'] = $staffDob;
+                }
+                if (!empty($staffDateOfJoin)) {
+                    $staffData['staff_date_of_join'] = $staffDateOfJoin;
+                }
+                if (!empty($staffGender)) {
+                    $staffData['staff_gender'] = $staffGender;
+                }
+                if (!empty($staffAddress)) {
+                    $staffData['staff_address'] = $staffAddress;
+                }
+                if ($staffPhone !== '') {
+                    $staffData['staff_pno'] = (int)$staffPhone;
+                }
+
+                $staffModel = $this->model('StaffModel');
+                $staffUpdated = $staffModel->updateStaff($staffId, $staffData);
+
+                if (!$staffUpdated) {
+                    $_SESSION['error'] = 'Failed to update staff details. Please try again.';
+                    $this->redirect('profile');
+                    return;
+                }
             }
             
             // Update password if provided
@@ -180,7 +237,10 @@ class ProfileController extends Controller {
             $_SESSION['user_name'] = $userName;
             $_SESSION['user_email'] = $userEmail;
             
-            $_SESSION['message'] = 'Profile updated successfully' . ($passwordUpdated ? ' (including password)' : '') . '.';
+            $_SESSION['message'] = 'Profile updated successfully'
+                . ($passwordUpdated ? ' (including password)' : '')
+                . ($isStaffUser && $staffUpdated ? ' (including staff details)' : '')
+                . '.';
             $this->redirect('profile');
         } catch (Exception $e) {
             $_SESSION['error'] = 'Error updating profile: ' . $e->getMessage();

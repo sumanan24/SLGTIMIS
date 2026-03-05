@@ -131,9 +131,12 @@ class StaffModel extends Model {
     
     /**
      * Create new staff
+     * @param array $data
+     * @param string|null $sqlError Set to MySQL error on failure
+     * @return int|false
      */
-    public function createStaff($data) {
-        return $this->create($data);
+    public function createStaff($data, &$sqlError = null) {
+        return $this->create($data, $sqlError);
     }
     
     /**

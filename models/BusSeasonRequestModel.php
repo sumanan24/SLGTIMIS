@@ -131,8 +131,9 @@ class BusSeasonRequestModel extends Model {
     
     /**
      * Create new request
+     * Signature must match Model::create($data, &$sqlError = null)
      */
-    public function create($data) {
+    public function create($data, &$sqlError = null) {
         $this->ensureTableStructure();
         
         try {
@@ -163,6 +164,7 @@ class BusSeasonRequestModel extends Model {
                     } catch (Exception $e) {
                         $error = 'Database connection error: ' . $e->getMessage();
                     }
+                    $sqlError = $error;
                     error_log("BusSeasonRequestModel::create - Prepare failed: " . $error . " | SQL: " . $sql);
                     return false;
                 }
@@ -192,6 +194,7 @@ class BusSeasonRequestModel extends Model {
                     } catch (Exception $e) {
                         $error = 'Database connection error: ' . $e->getMessage();
                     }
+                    $sqlError = $error;
                     error_log("BusSeasonRequestModel::create - Prepare failed: " . $error . " | SQL: " . $sql);
                     return false;
                 }
@@ -212,19 +215,23 @@ class BusSeasonRequestModel extends Model {
             
             if ($stmt->execute()) {
                 $insertId = $this->db->lastInsertId();
+                $sqlError = null;
                 error_log("BusSeasonRequestModel::create - Request created successfully. ID: " . $insertId);
                 $stmt->close();
                 return $insertId;
             } else {
                 $error = $stmt->error ?? 'Unknown error';
+                $sqlError = $error;
                 error_log("BusSeasonRequestModel::create - Execute failed: " . $error . " | SQL: " . $sql);
                 $stmt->close();
                 return false;
             }
         } catch (Exception $e) {
+            $sqlError = $e->getMessage();
             error_log("BusSeasonRequestModel::create - Exception: " . $e->getMessage() . " | Trace: " . $e->getTraceAsString());
             return false;
         } catch (Error $e) {
+            $sqlError = $e->getMessage();
             error_log("BusSeasonRequestModel::create - Fatal Error: " . $e->getMessage() . " | Trace: " . $e->getTraceAsString());
             return false;
         }
@@ -940,7 +947,7 @@ class BusSeasonRequestModel extends Model {
     }
     
     /**
-     * Get all payment collections with filters
+     * Get all payment collections with optional status filter only
      */
     public function getAllPaymentCollections($filters = []) {
         $this->ensureTableStructure();
@@ -967,24 +974,6 @@ class BusSeasonRequestModel extends Model {
         
         $params = [];
         $types = '';
-        
-        if (!empty($filters['season_year'])) {
-            $sql .= " AND r.season_year = ?";
-            $params[] = $filters['season_year'];
-            $types .= 's';
-        }
-        
-        if (!empty($filters['student_id'])) {
-            $sql .= " AND p.student_id = ?";
-            $params[] = $filters['student_id'];
-            $types .= 's';
-        }
-        
-        if (!empty($filters['month'])) {
-            $sql .= " AND MONTH(p.payment_date) = ?";
-            $params[] = $filters['month'];
-            $types .= 'i';
-        }
         
         if (!empty($filters['status'])) {
             $sql .= " AND LOWER(TRIM(p.status)) = LOWER(TRIM(?))";

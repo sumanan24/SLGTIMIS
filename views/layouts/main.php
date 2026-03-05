@@ -98,17 +98,21 @@
                             <?php if (!$isSAO): ?>
                             <!-- Deputy Principal Education Branch - Hidden for SAO -->
                             <li class="menu-item-has-children <?php 
-                                $educationPages = ['departments', 'courses', 'staff'];
-                                if ($hasGroupAccess) {
-                                    $educationPages[] = 'groups';
-                                }
-                                if ($hasTimetableAccess) {
-                                    $educationPages[] = 'group-timetable';
-                                }
-                                if ($isAdminOrADM) {
-                                    $educationPages[] = 'staff-roles';
-                                }
-                                echo (isset($page) && in_array($page, $educationPages)) ? 'active' : ''; 
+                            $educationPages = ['departments', 'courses', 'staff', 'inventory'];
+                            if ($hasGroupAccess) {
+                                $educationPages[] = 'groups';
+                            }
+                            if ($hasTimetableAccess) {
+                                $educationPages[] = 'group-timetable';
+                            }
+                            if ($isAdminOrADM) {
+                                $educationPages[] = 'staff-roles';
+                            }
+                            // HOD staff module enrollment page
+                            if ($isHOD) {
+                                $educationPages[] = 'hod-staff-module-enroll';
+                            }
+                            echo (isset($page) && in_array($page, $educationPages)) ? 'active' : ''; 
                             ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-graduation-cap"></i>
@@ -116,7 +120,7 @@
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
                                 <ul class="submenu" style="<?php 
-                                    $educationPages = ['departments', 'courses', 'staff'];
+                                    $educationPages = ['departments', 'courses', 'staff', 'inventory'];
                                     if ($hasGroupAccess) {
                                         $educationPages[] = 'groups';
                                     }
@@ -125,6 +129,9 @@
                                     }
                                     if ($isAdminOrADM) {
                                         $educationPages[] = 'staff-roles';
+                                    }
+                                    if ($isHOD) {
+                                        $educationPages[] = 'hod-staff-module-enroll';
                                     }
                                     echo (isset($page) && in_array($page, $educationPages)) ? 'display: block;' : ''; 
                                 ?>">
@@ -168,6 +175,20 @@
                                         <a href="<?php echo APP_URL; ?>/staff" class="<?php echo (isset($page) && $page === 'staff') ? 'active' : ''; ?>">
                                             <i class="fas fa-chalkboard-teacher"></i>
                                             <span>Staff</span>
+                                        </a>
+                                    </li>
+                                    <?php if ($isHOD): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/hod/staff-module-enroll" class="<?php echo (isset($page) && $page === 'hod-staff-module-enroll') ? 'active' : ''; ?>">
+                                            <i class="fas fa-user-cog"></i>
+                                            <span>Staff Module Enrollment</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/inventory" class="<?php echo (isset($page) && $page === 'inventory') ? 'active' : ''; ?>">
+                                            <i class="fas fa-boxes"></i>
+                                            <span>Inventory</span>
                                         </a>
                                     </li>
                                 </ul>

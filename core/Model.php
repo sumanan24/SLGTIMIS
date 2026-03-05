@@ -70,13 +70,21 @@ class Model {
     
     /**
      * Insert new record
+     * @param array $data Column => value to insert
+     * @param string|null $sqlError Set to MySQL error message on failure (prepare or execute)
+     * @return int|false Last insert ID on success, false on failure
      */
-    public function create($data) {
+    public function create($data, &$sqlError = null) {
         $columns = implode('`, `', array_keys($data));
         $placeholders = implode(', ', array_fill(0, count($data), '?'));
         
         $sql = "INSERT INTO `{$this->table}` (`$columns`) VALUES ($placeholders)";
         $stmt = $this->db->prepare($sql);
+        
+        if (!$stmt) {
+            $sqlError = $this->db->getConnection()->error ?? 'Prepare failed';
+            return false;
+        }
         
         $types = str_repeat('s', count($data));
         $values = array_values($data);
@@ -86,6 +94,7 @@ class Model {
             return $this->db->lastInsertId();
         }
         
+        $sqlError = $stmt->error ?? 'Execute failed';
         return false;
     }
     

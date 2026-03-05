@@ -140,5 +140,12 @@ return [
     'group-timetable/create' => 'GroupTimetableController@create',
     'group-timetable/edit' => 'GroupTimetableController@edit',
     'group-timetable/delete' => 'GroupTimetableController@delete',
+    // Staff module enrollment (HOD)
+    'hod/staff-module-enroll' => 'StaffModuleEnrollmentController@create',
+    'hod/get-modules-by-course' => 'StaffModuleEnrollmentController@getModulesByCourse',
+    // Inventory
+    'inventory' => 'InventoryController@index',
+    'inventory/create' => 'InventoryController@create',
+    'inventory/delete' => 'InventoryController@delete',
 ];
 
