@@ -37,8 +37,13 @@ class GroupTimetableController extends Controller {
         $entries = [];
         $modules = [];
         $staff = [];
+        $groupsList = [];
         $weekdaysToShow = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
         $grid = [];
+        // Load groups user can access (for group selector)
+        $departmentId = $this->getUserDepartment();
+        $groupsList = $groupModel->getAllWithDetails($departmentId);
+        
         if ($groupId !== '') {
             $group = $groupModel->getByIdWithDetails($groupId);
             if ($group) {
@@ -72,6 +77,7 @@ class GroupTimetableController extends Controller {
             'title' => $group ? ('Timetable: ' . $group['name']) : 'Group Timetable',
             'page' => 'group-timetable',
             'group_id' => $groupId,
+            'groupsList' => $groupsList,
             'group' => $group,
             'entries' => $entries,
             'grid' => $grid,

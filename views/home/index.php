@@ -103,9 +103,6 @@ Welcome to the SLGTI Management Information System. This system helps manage stu
                         <a href="<?php echo APP_URL; ?>/login" class="btn px-4 py-2 shadow" style="background: #001f3f; border: none; color: #ffffff; font-size: 0.9rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0, 31, 63, 0.3); transition: all 0.3s ease;">
                             <i class="fas fa-sign-in-alt me-2"></i>Login to System
                         </a>
-                        <a href="<?php echo APP_URL; ?>/students" class="btn px-4 py-2 shadow" style="background: #001f3f; border: none; color: #ffffff; font-size: 0.9rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0, 31, 63, 0.3); transition: all 0.3s ease;">
-                            <i class="fas fa-search me-2"></i>Search Student
-                        </a>
                     </div>
                 <?php endif; ?>
             </div>

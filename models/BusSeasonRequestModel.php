@@ -947,7 +947,10 @@ class BusSeasonRequestModel extends Model {
     }
     
     /**
-     * Get all payment collections with optional status filter only
+     * Get all payment collections with optional filters
+     * Supported filters:
+     *  - status: payment status (paid, processing, issued, etc.)
+     *  - from_date / to_date: filter by payment_date (Y-m-d)
      */
     public function getAllPaymentCollections($filters = []) {
         $this->ensureTableStructure();
@@ -981,15 +984,38 @@ class BusSeasonRequestModel extends Model {
             $types .= 's';
         }
         
+        // Optional date range filters (by payment_date)
+        if (!empty($filters['from_date'])) {
+            $sql .= " AND DATE(p.payment_date) >= ?";
+            $params[] = $filters['from_date'];
+            $types .= 's';
+        }
+        
+        if (!empty($filters['to_date'])) {
+            $sql .= " AND DATE(p.payment_date) <= ?";
+            $params[] = $filters['to_date'];
+            $types .= 's';
+        }
+        
         $sql .= " ORDER BY p.payment_date DESC, p.created_at DESC";
         
         if (!empty($params)) {
             $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                $conn = $this->db->getConnection();
+                error_log("BusSeasonRequestModel::getAllPaymentCollections - Prepare failed: " . ($conn ? $conn->error : 'Unknown error'));
+                return [];
+            }
             $stmt->bind_param($types, ...$params);
             $stmt->execute();
             $result = $stmt->get_result();
         } else {
             $result = $this->db->query($sql);
+            if (!$result) {
+                $conn = $this->db->getConnection();
+                error_log("BusSeasonRequestModel::getAllPaymentCollections - Query failed: " . ($conn ? $conn->error : 'Unknown error'));
+                return [];
+            }
         }
         
         $data = [];

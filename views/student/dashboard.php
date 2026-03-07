@@ -1,3 +1,8 @@
+<?php
+$recentPayments = $recentPayments ?? [];
+$busSeasonPayments = $busSeasonPayments ?? [];
+?>
+
 <style>
     .student-dashboard-card {
         background: white;
@@ -371,6 +376,21 @@
                             </div>
                         </a>
                     </div>
+                    <div class="col-6 col-md-4 col-lg-3">
+                        <a href="<?php echo APP_URL; ?>/student/payments" class="text-decoration-none">
+                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-warning border-opacity-50 hover-lift quick-link-card">
+                                <div class="flex-shrink-0">
+                                    <div class="bg-warning bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
+                                        <i class="fas fa-money-bill-wave text-warning"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="fw-bold text-dark quick-link-text">Payments</div>
+                                    <div class="small text-muted quick-link-subtext">View All</div>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -466,6 +486,91 @@
                     </div>
                 <?php else: ?>
                     <p class="text-muted mb-0 small">No hostel allocation</p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Payments View -->
+    <div class="student-dashboard-card p-3 p-md-4 mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2">
+            <h5 class="fw-bold mb-0">
+                <i class="fas fa-money-bill-wave me-2" style="color: var(--student-primary);"></i>Payments
+            </h5>
+        </div>
+        
+        <div class="row g-3">
+            <div class="col-12 col-lg-6">
+                <h6 class="fw-bold mb-2">
+                    <i class="fas fa-bus me-1 text-success"></i>Bus Season Payments
+                </h6>
+                <?php if (!empty($busSeasonPayments)): ?>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach (array_slice($busSeasonPayments, 0, 5) as $p): ?>
+                                    <tr>
+                                        <td class="small">
+                                            <?php echo htmlspecialchars(!empty($p['payment_date']) ? date('Y-m-d', strtotime($p['payment_date'])) : 'N/A'); ?>
+                                        </td>
+                                        <td class="small text-success">
+                                            Rs. <?php echo number_format($p['paid_amount'] ?? 0, 2); ?>
+                                        </td>
+                                        <td class="small">
+                                            <span class="badge bg-<?php echo strtolower($p['status'] ?? '') === 'issued' ? 'success' : 'secondary'; ?>">
+                                                <?php echo htmlspecialchars(ucfirst($p['status'] ?? 'N/A')); ?>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <p class="text-muted small mb-0">No bus season payments recorded.</p>
+                <?php endif; ?>
+            </div>
+            
+            <div class="col-12 col-lg-6">
+                <h6 class="fw-bold mb-2">
+                    <i class="fas fa-receipt me-1 text-primary"></i>Other / Hostel Payments
+                </h6>
+                <?php if (!empty($recentPayments)): ?>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Reason</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($recentPayments as $p): ?>
+                                    <tr>
+                                        <td class="small">
+                                            <?php echo htmlspecialchars(!empty($p['pays_date']) ? date('Y-m-d', strtotime($p['pays_date'])) : 'N/A'); ?>
+                                        </td>
+                                        <td class="small text-truncate" style="max-width: 150px;" title="<?php echo htmlspecialchars($p['payment_reason'] ?? ''); ?>">
+                                            <?php echo htmlspecialchars($p['payment_reason'] ?? ''); ?>
+                                        </td>
+                                        <td class="small text-success">
+                                            Rs. <?php echo number_format($p['pays_amount'] ?? 0, 2); ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <p class="text-muted small mb-0">No payments recorded.</p>
                 <?php endif; ?>
             </div>
         </div>

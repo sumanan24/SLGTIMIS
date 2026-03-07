@@ -744,9 +744,10 @@ class BusSeasonRequestController extends Controller {
         $requestModel = $this->model('BusSeasonRequestModel');
         $requestModel->ensureTableStructure();
         
-        // Only status-based filtering is needed here; no academic year, date range, or per-student filters
         $filters = [
-            'status' => $this->get('status', '')
+            'status' => $this->get('status', ''),
+            'from_date' => $this->get('from_date', ''),
+            'to_date' => $this->get('to_date', '')
         ];
         
         $collections = $requestModel->getAllPaymentCollections($filters);
@@ -963,9 +964,12 @@ class BusSeasonRequestController extends Controller {
         
         $requestModel = $this->model('BusSeasonRequestModel');
         $status = $this->get('status', 'paid');
-        // Only status filter is used for exports
+        
+        // Status filter is required; optional date range filters match the collections view
         $filters = [
-            'status' => $status
+            'status' => $status,
+            'from_date' => $this->get('from_date', ''),
+            'to_date' => $this->get('to_date', '')
         ];
         
         $collections = $requestModel->getAllPaymentCollections($filters);
@@ -982,8 +986,15 @@ class BusSeasonRequestController extends Controller {
         // CSV Headers
         if ($status === 'issued') {
             fputcsv($output, [
-                'Name', 'NIC Number', 'Route', 'Total Price', 'Student Portion (30%)',
-                'SLGTI Portion (35%)', 'CTB Portion (35%)', 'Issued Date', 'Reference Number'
+                'Name',
+                'NIC Number',
+                'Route',
+                'Total Price',
+                'Student Portion (30%)',
+                'SLGTI Portion (35%)',
+                'CTB Portion (35%)',
+                'Issued Date',
+                'Reference Number'
             ]);
         } else {
             fputcsv($output, [

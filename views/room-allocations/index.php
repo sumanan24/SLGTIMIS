@@ -1,13 +1,25 @@
 <div class="container-fluid px-4 py-3">
     <div class="card shadow-sm border-0">
         <div class="card-header bg-primary text-white">
-            <div class="d-flex align-items-center justify-content-between flex-wrap">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <h5 class="mb-0 fw-bold"><i class="fas fa-user-check me-2"></i>Room Allocations</h5>
-                <?php if (isset($canManage) && $canManage): ?>
-                <a href="<?php echo APP_URL; ?>/room-allocations/create" class="btn btn-light btn-sm mt-2 mt-md-0">
-                    <i class="fas fa-plus me-1"></i>Allocate Room
-                </a>
-                <?php endif; ?>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <a href="<?php echo APP_URL; ?>/room-allocations/export-excel?<?php 
+                        echo http_build_query([
+                            'hostel_id' => $hostel_id ?? '',
+                            'room_id' => $room_id ?? '',
+                            'status' => $status ?? '',
+                            'search' => $search ?? ''
+                        ]); 
+                    ?>" class="btn btn-outline-light btn-sm mt-2 mt-md-0">
+                        <i class="fas fa-file-excel me-1"></i>Export Excel
+                    </a>
+                    <?php if (isset($canManage) && $canManage): ?>
+                    <a href="<?php echo APP_URL; ?>/room-allocations/create" class="btn btn-light btn-sm mt-2 mt-md-0">
+                        <i class="fas fa-plus me-1"></i>Allocate Room
+                    </a>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
         <div class="card-body">

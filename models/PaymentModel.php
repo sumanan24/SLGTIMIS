@@ -229,7 +229,7 @@ class PaymentModel extends Model {
     public function getByStudentId($studentId) {
         $sql = "SELECT * FROM `{$this->table}` 
                 WHERE student_id = ? 
-                ORDER BY pays_date DESC";
+                ORDER BY pays_date DESC, pays_id DESC";
         
         $stmt = $this->db->prepare($sql);
         $stmt->bind_param("s", $studentId);
@@ -244,6 +244,17 @@ class PaymentModel extends Model {
         }
         
         return $data;
+    }
+    
+    /**
+     * Get paginated payments for a student (for dashboards, etc.)
+     */
+    public function getPaymentsByStudent($studentId, $page = 1, $perPage = 5) {
+        $all = $this->getByStudentId($studentId);
+        $page = max(1, (int)$page);
+        $perPage = max(1, (int)$perPage);
+        $offset = ($page - 1) * $perPage;
+        return array_slice($all, $offset, $perPage);
     }
     
     /**

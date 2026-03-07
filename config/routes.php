@@ -23,6 +23,7 @@ return [
     'hod/dashboard' => 'HODDashboardController@index',
     // Student Portal Routes
     'student/dashboard' => 'StudentDashboardController@index',
+    'student/payments' => 'StudentDashboardController@payments',
     'student/profile' => 'StudentController@showStudentProfile',
     'student/profile/edit' => 'StudentController@editStudentProfile',
     'student/accept-conduct' => 'StudentController@acceptConduct',
@@ -88,6 +89,7 @@ return [
     'room-allocations/delete' => 'RoomAllocationController@delete',
     'room-allocations/deallocate' => 'RoomAllocationController@deallocate',
     'room-allocations/get-available-rooms' => 'RoomAllocationController@getAvailableRooms',
+    'room-allocations/export-excel' => 'RoomAllocationController@exportExcel',
     // On-Peak/Off-Peak Requests
     'on-peak-requests' => 'OnPeakRequestController@index',
     'on-peak-requests/create' => 'OnPeakRequestController@create',
@@ -143,6 +145,11 @@ return [
     // Staff module enrollment (HOD)
     'hod/staff-module-enroll' => 'StaffModuleEnrollmentController@create',
     'hod/get-modules-by-course' => 'StaffModuleEnrollmentController@getModulesByCourse',
+    // Instructor diary (IN1/IN2/IN3/LE1/LE2/SLE/HOD)
+    'instructor-diary' => 'InstructorDiaryController@index',
+    'instructor-diary/create' => 'InstructorDiaryController@create',
+    'hod/instructor-diary' => 'InstructorDiaryController@hodReport',
+    'hod/instructor-diary/export' => 'InstructorDiaryController@hodReportExport',
     // Inventory
     'inventory' => 'InventoryController@index',
     'inventory/create' => 'InventoryController@create',

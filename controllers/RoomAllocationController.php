@@ -501,6 +501,92 @@ class RoomAllocationController extends Controller {
     }
     
     /**
+     * Export room allocations (students hostel details) to Excel/CSV
+     */
+    public function exportExcel() {
+        // Ensure user can view room allocations (SAO, ADM, FIN, Admin)
+        if (!$this->checkRoomAllocationViewAccess()) {
+            return;
+        }
+        
+        $allocationModel = $this->model('RoomAllocationModel');
+        
+        // Reuse same filters as index
+        $filters = [];
+        $search = $this->get('search', '');
+        $hostelId = $this->get('hostel_id', '');
+        $roomId = $this->get('room_id', '');
+        $status = $this->get('status', '');
+        
+        if (!empty($search)) {
+            $filters['search'] = $search;
+        }
+        if (!empty($hostelId)) {
+            $filters['hostel_id'] = $hostelId;
+        }
+        if (!empty($roomId)) {
+            $filters['room_id'] = $roomId;
+        }
+        if (!empty($status)) {
+            $filters['status'] = $status;
+        }
+        
+        $allocations = $allocationModel->getAllocationsForExport($filters);
+        
+        // Prepare CSV headers
+        $filename = 'room_allocations_' . date('Y-m-d_His') . '.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+        header('Pragma: public');
+        
+        // BOM for UTF-8
+        echo "\xEF\xBB\xBF";
+        
+        $output = fopen('php://output', 'w');
+        
+        // Header row
+        fputcsv($output, [
+            'Student ID',
+            'Student Name',
+            'NIC',
+            'Hostel',
+            'Block',
+            'Room',
+            'Allocated Date',
+            'Status'
+        ]);
+        
+        // Data rows
+        foreach ($allocations as $a) {
+            // Format allocated date (timestamp or date string)
+            $allocatedAt = '';
+            if (!empty($a['allocated_at'])) {
+                if (is_numeric($a['allocated_at'])) {
+                    $allocatedAt = date('Y-m-d', (int)$a['allocated_at']);
+                } else {
+                    $ts = strtotime($a['allocated_at']);
+                    $allocatedAt = $ts ? date('Y-m-d', $ts) : $a['allocated_at'];
+                }
+            }
+            
+            fputcsv($output, [
+                $a['student_id'] ?? '',
+                $a['student_fullname'] ?? '',
+                $a['student_nic'] ?? '',
+                $a['hostel_name'] ?? '',
+                $a['block_name'] ?? '',
+                $a['room_no'] ?? '',
+                $allocatedAt,
+                ucfirst($a['status'] ?? '')
+            ]);
+        }
+        
+        fclose($output);
+        exit;
+    }
+    
+    /**
      * AJAX endpoint to get available rooms by hostel
      */
     public function getAvailableRooms() {

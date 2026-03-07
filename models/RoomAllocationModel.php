@@ -89,6 +89,79 @@ class RoomAllocationModel extends Model {
     }
     
     /**
+     * Get all allocations for export (no pagination)
+     */
+    public function getAllocationsForExport($filters = []) {
+        $sql = "SELECT ha.*, 
+                s.student_id, s.student_fullname, s.student_email, s.student_nic,
+                r.room_no, r.capacity,
+                b.name as block_name,
+                h.name as hostel_name, h.gender as hostel_gender
+                FROM `{$this->table}` ha
+                LEFT JOIN `student` s ON ha.student_id = s.student_id
+                LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
+                LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
+                LEFT JOIN `hostels` h ON b.hostel_id = h.id
+                WHERE 1=1";
+        
+        $params = [];
+        $types = '';
+        
+        if (!empty($filters['hostel_id'])) {
+            $sql .= " AND b.hostel_id = ?";
+            $params[] = $filters['hostel_id'];
+            $types .= 's';
+        }
+        
+        if (!empty($filters['room_id'])) {
+            $sql .= " AND ha.room_id = ?";
+            $params[] = $filters['room_id'];
+            $types .= 's';
+        }
+        
+        if (!empty($filters['student_id'])) {
+            $sql .= " AND ha.student_id = ?";
+            $params[] = $filters['student_id'];
+            $types .= 's';
+        }
+        
+        if (!empty($filters['status'])) {
+            $sql .= " AND ha.status = ?";
+            $params[] = $filters['status'];
+            $types .= 's';
+        }
+        
+        if (!empty($filters['search'])) {
+            $searchTerm = '%' . $filters['search'] . '%';
+            $sql .= " AND (s.student_fullname LIKE ? OR s.student_id LIKE ? OR r.room_no LIKE ?)";
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $types .= 'sss';
+        }
+        
+        $sql .= " ORDER BY ha.allocated_at DESC";
+        
+        if (!empty($params)) {
+            $stmt = $this->db->prepare($sql);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+        } else {
+            $result = $this->db->query($sql);
+        }
+        
+        $data = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $data[] = $row;
+            }
+        }
+        
+        return $data;
+    }
+    
+    /**
      * Get total count of allocations
      */
     public function getTotalAllocations($filters = []) {

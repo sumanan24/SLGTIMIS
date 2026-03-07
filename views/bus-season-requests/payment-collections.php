@@ -172,7 +172,48 @@
         </div>
     <?php endif; ?>
     
-    <!-- No academic year, date range, or per-student filters needed on this screen -->
+    <!-- Status and optional date range filters -->
+    <div class="filter-card">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label for="from_date" class="form-label fw-bold">From Date</label>
+                <input
+                    type="date"
+                    id="from_date"
+                    name="from_date"
+                    class="form-control"
+                    value="<?php echo htmlspecialchars($filters['from_date'] ?? ''); ?>"
+                >
+            </div>
+            <div class="col-md-3">
+                <label for="to_date" class="form-label fw-bold">To Date</label>
+                <input
+                    type="date"
+                    id="to_date"
+                    name="to_date"
+                    class="form-control"
+                    value="<?php echo htmlspecialchars($filters['to_date'] ?? ''); ?>"
+                >
+            </div>
+            <div class="col-md-3">
+                <label for="status" class="form-label fw-bold">Status</label>
+                <select id="status" name="status" class="form-select">
+                    <option value="">All</option>
+                    <option value="paid" <?php echo (isset($filters['status']) && $filters['status'] === 'paid') ? 'selected' : ''; ?>>Paid</option>
+                    <option value="processing" <?php echo (isset($filters['status']) && $filters['status'] === 'processing') ? 'selected' : ''; ?>>Processing</option>
+                    <option value="issued" <?php echo (isset($filters['status']) && $filters['status'] === 'issued') ? 'selected' : ''; ?>>Issued</option>
+                </select>
+            </div>
+            <div class="col-md-3 text-md-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="fas fa-filter me-1"></i>Apply Filters
+                </button>
+                <a href="<?php echo APP_URL; ?>/bus-season-requests/payment-collections" class="btn btn-outline-secondary">
+                    <i class="fas fa-undo me-1"></i>Reset
+                </a>
+            </div>
+        </form>
+    </div>
 
     <!-- Tabs for different statuses -->
     <ul class="nav nav-tabs mb-4" id="paymentTabs" role="tablist">
@@ -395,15 +436,6 @@
                                                                 <span class="fw-bold">Balance to Pay:</span>
                                                                 <span class="fw-bold text-danger" id="calc_balance_<?php echo $c['payment_id']; ?>">Rs. 0.00</span>
                                                             </div>
-                                                            <hr class="my-2">
-                                                            <div class="d-flex justify-content-between small mb-1">
-                                                                <span>SLGTI Contribution (35%):</span>
-                                                                <span id="calc_slgti_<?php echo $c['payment_id']; ?>">Rs. 0.00</span>
-                                                            </div>
-                                                            <div class="d-flex justify-content-between small">
-                                                                <span>CTB Contribution (35%):</span>
-                                                                <span id="calc_ctb_<?php echo $c['payment_id']; ?>">Rs. 0.00</span>
-                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div class="modal-footer">
@@ -435,8 +467,6 @@
                                 <th>Route</th>
                                 <th>Student Paid (30%)</th>
                                 <th>Total Value</th>
-                                <th>SLGTI (35%)</th>
-                                <th>CTB (35%)</th>
                                 <th>Issued Date</th>
                                 <th class="text-end">Actions</th>
                             </tr>
@@ -458,16 +488,11 @@
                                     </td>
                                     <td class="fw-bold text-success">Rs. <?php echo number_format($c['student_paid'] ?? 0, 2); ?></td>
                                     <td class="fw-bold text-primary">Rs. <?php echo number_format($c['total_amount'] ?? 0, 2); ?></td>
-                                    <td class="small">Rs. <?php echo number_format($c['slgti_paid'] ?? 0, 2); ?></td>
-                                    <td class="small">Rs. <?php echo number_format($c['ctb_paid'] ?? 0, 2); ?></td>
                                     <td><?php echo !empty($c['issued_at']) ? date('M d, Y', strtotime($c['issued_at'])) : 'N/A'; ?></td>
                                     <td class="text-end">
                                         <a href="<?php echo APP_URL; ?>/bus-season-requests/view?id=<?php echo $c['request_id']; ?>" class="btn btn-sm btn-outline-primary">
                                             <i class="fas fa-eye me-1"></i>View
                                         </a>
-                                        <span class="text-muted ms-2" title="Issued payments cannot be edited or deleted">
-                                            <i class="fas fa-lock"></i>
-                                        </span>
                                     </td>
                                 </tr>
                             <?php endforeach; endif; ?>
@@ -715,12 +740,7 @@ document.addEventListener('input', function(e) {
 });
 
 function updateCalculations(paymentId, total, studentPortion, initialPaid) {
-    const slgti = total * 0.35;
-    const ctb = total * 0.35;
     const balance = studentPortion - initialPaid;
-    
-    document.getElementById('calc_slgti_' + paymentId).textContent = 'Rs. ' + slgti.toLocaleString(undefined, {minimumFractionDigits: 2});
-    document.getElementById('calc_ctb_' + paymentId).textContent = 'Rs. ' + ctb.toLocaleString(undefined, {minimumFractionDigits: 2});
     
     const balanceEl = document.getElementById('calc_balance_' + paymentId);
     balanceEl.textContent = 'Rs. ' + balance.toLocaleString(undefined, {minimumFractionDigits: 2});

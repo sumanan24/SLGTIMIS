@@ -86,15 +86,24 @@ class StudentDashboardController extends Controller {
         // Get recent attendance (last 10 days)
         $recentAttendance = array_slice($attendanceRecords, -10, 10, true);
         
-        // Get payment info if available (optional)
+        // Get payment info
         $recentPayments = [];
+        $busSeasonPayments = [];
         try {
+            // Generic/hostel/other payments from finance system
             $paymentModel = $this->model('PaymentModel');
-            if (method_exists($paymentModel, 'getPaymentsByStudent')) {
-                $recentPayments = $paymentModel->getPaymentsByStudent($studentId, 1, 5);
-            }
+            $recentPayments = $paymentModel->getPaymentsByStudent($studentId, 1, 5);
         } catch (Exception $e) {
-            // Payment model might not exist or have this method
+            // Ignore and leave empty
+        }
+        
+        try {
+            // Bus season payments (season ticket collections)
+            $busSeasonModel = $this->model('BusSeasonRequestModel');
+            $busSeasonModel->ensureTableStructure();
+            $busSeasonPayments = $busSeasonModel->getAllPaymentsByStudentId($studentId);
+        } catch (Exception $e) {
+            // Ignore and leave empty
         }
         
         // Check if student has accepted code of conduct
@@ -115,10 +124,69 @@ class StudentDashboardController extends Controller {
             'currentMonth' => $currentMonth,
             'recentAttendance' => $recentAttendance,
             'recentPayments' => $recentPayments,
+            'busSeasonPayments' => $busSeasonPayments,
             'hasAcceptedConduct' => $hasAcceptedConduct
         ];
         
         return $this->view('student/dashboard', $data);
+    }
+    
+    /**
+     * Detailed payments page for students
+     */
+    public function payments() {
+        // Same auth + role checks as index
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        
+        if (!isset($_SESSION['user_table']) || $_SESSION['user_table'] !== 'student') {
+            $_SESSION['error'] = 'Access denied. This section is only available for students.';
+            require_once BASE_PATH . '/models/UserModel.php';
+            $userModel = new UserModel();
+            if ($userModel->isHOD($_SESSION['user_id'])) {
+                $this->redirect('hod/dashboard');
+            } else {
+                $this->redirect('dashboard');
+            }
+            return;
+        }
+        
+        $studentId = $_SESSION['user_name'];
+        $studentModel = $this->model('StudentModel');
+        $student = $studentModel->find($studentId);
+        if (!$student) {
+            $_SESSION['error'] = 'Student record not found.';
+            $this->redirect('logout');
+            return;
+        }
+        
+        // Load all payments
+        $hostelAndOther = [];
+        $busSeasonPayments = [];
+        try {
+            $paymentModel = $this->model('PaymentModel');
+            $hostelAndOther = $paymentModel->getByStudentId($studentId);
+        } catch (Exception $e) {
+        }
+        
+        try {
+            $busSeasonModel = $this->model('BusSeasonRequestModel');
+            $busSeasonModel->ensureTableStructure();
+            $busSeasonPayments = $busSeasonModel->getAllPaymentsByStudentId($studentId);
+        } catch (Exception $e) {
+        }
+        
+        $data = [
+            'title' => 'My Payments',
+            'page' => 'student-dashboard',
+            'student' => $student,
+            'hostelPayments' => $hostelAndOther,
+            'busSeasonPayments' => $busSeasonPayments,
+        ];
+        
+        return $this->view('student/payments', $data);
     }
 }
 

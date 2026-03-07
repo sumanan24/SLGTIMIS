@@ -85,6 +85,10 @@
                                 $hasGroupAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'ADM']) || $isAdmin;
                                 // Timetable access: HOD, ADM, and Admin (for managing timetables)
                                 $hasTimetableAccess = in_array($userRole, ['HOD', 'ADM']) || $isAdmin;
+                                // Instructor diary access: teaching staff, HOD, DIR/DPA/DPI/REG, ADM, and Admin
+                                $hasInstructorDiaryAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'LE1', 'LE2', 'SLE', 'DIR', 'DPA', 'DPI', 'REG', 'ADM']) || $isAdmin;
+                                // Instructor diary report (HOD + management roles + Admin)
+                                $hasInstructorDiaryReportAccess = in_array($userRole, ['HOD', 'DIR', 'DPA', 'DPI', 'REG', 'ADM']) || $isAdmin;
                             }
                             ?>
                             
@@ -112,6 +116,9 @@
                             if ($isHOD) {
                                 $educationPages[] = 'hod-staff-module-enroll';
                             }
+                            if (isset($hasInstructorDiaryReportAccess) && $hasInstructorDiaryReportAccess) {
+                                $educationPages[] = 'hod-instructor-diary';
+                            }
                             echo (isset($page) && in_array($page, $educationPages)) ? 'active' : ''; 
                             ?>">
                                 <a href="#" class="menu-toggle">
@@ -132,6 +139,9 @@
                                     }
                                     if ($isHOD) {
                                         $educationPages[] = 'hod-staff-module-enroll';
+                                    }
+                                    if (isset($hasInstructorDiaryReportAccess) && $hasInstructorDiaryReportAccess) {
+                                        $educationPages[] = 'hod-instructor-diary';
                                     }
                                     echo (isset($page) && in_array($page, $educationPages)) ? 'display: block;' : ''; 
                                 ?>">
@@ -182,6 +192,14 @@
                                         <a href="<?php echo APP_URL; ?>/hod/staff-module-enroll" class="<?php echo (isset($page) && $page === 'hod-staff-module-enroll') ? 'active' : ''; ?>">
                                             <i class="fas fa-user-cog"></i>
                                             <span>Staff Module Enrollment</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
+                                    <?php if (isset($hasInstructorDiaryReportAccess) && $hasInstructorDiaryReportAccess): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/hod/instructor-diary" class="<?php echo (isset($page) && $page === 'hod-instructor-diary') ? 'active' : ''; ?>">
+                                            <i class="fas fa-book-open"></i>
+                                            <span>Instructor Diary Report</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
@@ -484,6 +502,16 @@
                                 <a href="<?php echo APP_URL; ?>/circuit-program" class="<?php echo (isset($page) && in_array($page, ['circuit-program', 'circuit-program-create', 'circuit-program-view'])) ? 'active' : ''; ?>">
                                     <i class="fas fa-route"></i>
                                     <span>Circuit Program</span>
+                                </a>
+                            </li>
+                            <?php endif; ?>
+                            
+                            <?php if (isset($hasInstructorDiaryAccess) && $hasInstructorDiaryAccess): ?>
+                            <!-- Instructor Diary (Teaching Staff + HOD) -->
+                            <li>
+                                <a href="<?php echo APP_URL; ?>/instructor-diary" class="<?php echo (isset($page) && $page === 'instructor-diary') ? 'active' : ''; ?>">
+                                    <i class="fas fa-book-open"></i>
+                                    <span>Instructor Diary</span>
                                 </a>
                             </li>
                             <?php endif; ?>

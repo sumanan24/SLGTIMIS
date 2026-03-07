@@ -7,6 +7,7 @@ $weekdaysToShow = $weekdaysToShow ?? ['Monday', 'Tuesday', 'Wednesday', 'Thursda
 $timeSlots = $timeSlots ?? [];
 $modules = $modules ?? [];
 $staff = $staff ?? [];
+$groupsList = $groupsList ?? [];
 ?>
 <div class="container-fluid px-4 py-4">
     <div class="card shadow-sm border-0 mb-4">
@@ -28,9 +29,27 @@ $staff = $staff ?? [];
                 <div class="alert alert-danger alert-dismissible fade show"><?php echo htmlspecialchars($error); ?> <button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
             <?php endif; ?>
 
+            <!-- Group selector -->
+            <?php if (!empty($groupsList)): ?>
+                <form class="row g-2 align-items-end mb-3" method="get" action="<?php echo APP_URL; ?>/group-timetable/index">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Select Group</label>
+                        <select name="group_id" class="form-select" onchange="this.form.submit()">
+                            <option value="">-- Choose a group --</option>
+                            <?php foreach ($groupsList as $g): ?>
+                                <option value="<?php echo htmlspecialchars($g['id']); ?>" <?php echo (string)$group_id === (string)$g['id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars(($g['name'] ?? '') . ' (' . ($g['course_name'] ?? '') . ')'); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </form>
+            <?php endif; ?>
+
             <?php if ($group_id === ''): ?>
-                <p class="text-muted">Use URL with <strong>group_id</strong> to view timetable, e.g. <code>group-timetable/index?group_id=8</code></p>
-                <p class="mb-0"><a href="<?php echo APP_URL; ?>/groups">Go to Groups</a> and open a group, then use the timetable link for that group.</p>
+                <p class="text-muted mb-0">
+                    Select a group above to view its timetable.
+                </p>
             <?php elseif (!$group): ?>
                 <p class="text-danger">Group not found.</p>
             <?php else: ?>

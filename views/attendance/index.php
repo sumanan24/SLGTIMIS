@@ -479,8 +479,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const departmentId = document.querySelector('select[name="department_id"]')?.value || '';
             const month = document.querySelector('input[name="month"]')?.value || '';
             
-            // Submit via AJAX
-            fetch('<?php echo APP_URL; ?>/attendance/bulk-update', {
+            // Submit via same-origin path so save never "Failed to fetch" when APP_URL differs from site (e.g. production)
+            const bulkUpdatePath = (window.location.pathname.replace(/\/$/, '') || '/attendance') + '/bulk-update';
+            fetch(bulkUpdatePath, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

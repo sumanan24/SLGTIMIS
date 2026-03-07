@@ -1,3 +1,11 @@
+<?php
+$editingEnrollment = $editingEnrollment ?? null;
+$isEditMode = !empty($editingEnrollment);
+$currentEnrollDate = $isEditMode
+    ? substr($editingEnrollment['staff_module_enrollment_date'] ?? date('Y-m-d'), 0, 10)
+    : date('Y-m-d');
+?>
+
 <div class="container mt-4">
     <h3>Staff Module Enrollment (HOD)</h3>
 
@@ -16,13 +24,22 @@
     <div class="row">
         <div class="col-md-6">
             <form action="<?php echo APP_URL; ?>/hod/staff-module-enroll" method="post" class="card p-3 mb-4">
+                <h5 class="mb-3">
+                    <?php echo $isEditMode ? 'Edit Staff Module Enrollment' : 'New Staff Module Enrollment'; ?>
+                </h5>
+
+                <input type="hidden" name="action" value="<?php echo $isEditMode ? 'update' : 'create'; ?>">
+                <?php if ($isEditMode): ?>
+                    <input type="hidden" name="enrollment_id" value="<?php echo htmlspecialchars($editingEnrollment['staff_module_enrollment_id']); ?>">
+                <?php endif; ?>
                 <div class="mb-3">
                     <label for="staff_id" class="form-label">Staff</label>
                     <select name="staff_id" id="staff_id" class="form-select" required>
                         <option value="">-- Select Staff --</option>
                         <?php if (!empty($staffList)): ?>
                             <?php foreach ($staffList as $staff): ?>
-                                <option value="<?php echo htmlspecialchars($staff['staff_id']); ?>">
+                                <option value="<?php echo htmlspecialchars($staff['staff_id']); ?>"
+                                    <?php echo ($isEditMode && ($editingEnrollment['staff_id'] ?? '') === $staff['staff_id']) ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars(($staff['staff_name'] ?? '') . ' (' . $staff['staff_id'] . ')'); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -36,7 +53,8 @@
                         <option value="">-- Select Course --</option>
                         <?php if (!empty($courses)): ?>
                             <?php foreach ($courses as $course): ?>
-                                <option value="<?php echo htmlspecialchars($course['course_id']); ?>">
+                                <option value="<?php echo htmlspecialchars($course['course_id']); ?>"
+                                    <?php echo ($isEditMode && ($editingEnrollment['course_id'] ?? '') === $course['course_id']) ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars(($course['course_name'] ?? '') . ' (' . $course['course_id'] . ')'); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -46,7 +64,13 @@
 
                 <div class="mb-3">
                     <label for="module_id" class="form-label">Module</label>
-                    <select name="module_id" id="module_id" class="form-select" required>
+                    <select
+                        name="module_id"
+                        id="module_id"
+                        class="form-select"
+                        data-current-module-id="<?php echo $isEditMode ? htmlspecialchars($editingEnrollment['module_id']) : ''; ?>"
+                        required
+                    >
                         <option value="">-- Select Module --</option>
                         <!-- Optionally populated via JS based on course -->
                     </select>
@@ -67,7 +91,24 @@
                     </select>
                 </div>
 
-                <button type="submit" class="btn btn-primary">Enroll Staff to Module</button>
+                <div class="mb-3">
+                    <label for="enrollment_date" class="form-label">Enrollment Date</label>
+                    <input
+                        type="date"
+                        name="enrollment_date"
+                        id="enrollment_date"
+                        class="form-control"
+                        value="<?php echo htmlspecialchars($currentEnrollDate); ?>"
+                    >
+                    <small class="text-muted">If left empty, today&apos;s date will be used.</small>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <?php echo $isEditMode ? 'Update Enrollment' : 'Enroll Staff to Module'; ?>
+                </button>
+                <?php if ($isEditMode): ?>
+                    <a href="<?php echo APP_URL; ?>/hod/staff-module-enroll" class="btn btn-outline-secondary ms-2">Cancel</a>
+                <?php endif; ?>
             </form>
         </div>
 
@@ -86,6 +127,7 @@
                                     <th>Module</th>
                                     <th>Academic Year</th>
                                     <th>Date</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -97,6 +139,18 @@
                                             <td><?php echo htmlspecialchars(($enroll['module_name'] ?? '') . ' (' . $enroll['module_id'] . ')'); ?></td>
                                             <td><?php echo htmlspecialchars($enroll['academic_year']); ?></td>
                                             <td><?php echo htmlspecialchars($enroll['staff_module_enrollment_date']); ?></td>
+                                            <td>
+                                                <a href="<?php echo APP_URL; ?>/hod/staff-module-enroll?edit_id=<?php echo htmlspecialchars($enroll['staff_module_enrollment_id']); ?>" class="btn btn-sm btn-outline-primary mb-1">
+                                                    <i class="fas fa-edit me-1"></i>Edit
+                                                </a>
+                                                <form method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this enrollment?');">
+                                                    <input type="hidden" name="action" value="delete">
+                                                    <input type="hidden" name="enrollment_id" value="<?php echo htmlspecialchars($enroll['staff_module_enrollment_id']); ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 <?php else: ?>
@@ -135,11 +189,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!data.success || !Array.isArray(data.modules)) {
                     return;
                 }
+                const currentModuleId = moduleSelect.getAttribute('data-current-module-id') || '';
                 data.modules.forEach(m => {
                     if (!m.module_id) return;
                     const opt = document.createElement('option');
                     opt.value = m.module_id;
                     opt.textContent = (m.module_name || '') + ' (' + m.module_id + ')';
+                    if (currentModuleId && currentModuleId === m.module_id) {
+                        opt.selected = true;
+                    }
                     moduleSelect.appendChild(opt);
                 });
             })
@@ -147,5 +205,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Silently fail; user can retry by re-selecting the course
             });
     });
+
+    // If editing, trigger initial load of modules for selected course
+    <?php if ($isEditMode && !empty($editingEnrollment['course_id'])): ?>
+    if (courseSelect) {
+        courseSelect.dispatchEvent(new Event('change'));
+    }
+    <?php endif; ?>
 });
 </script>
