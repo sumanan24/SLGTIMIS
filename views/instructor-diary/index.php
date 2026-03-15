@@ -5,6 +5,7 @@ $entries = $entries ?? [];
 $filters = $filters ?? ['from_date' => '', 'to_date' => '', 'module_id' => ''];
 $editingEntry = $editingEntry ?? null;
 $isEditMode = !empty($editingEntry);
+$dbError = $dbError ?? '';
 ?>
 
 <div class="container-fluid px-4 py-3">
@@ -18,6 +19,13 @@ $isEditMode = !empty($editingEntry);
             </div>
         </div>
         <div class="card-body">
+            <?php if (!empty($dbError)): ?>
+                <div class="alert alert-warning alert-dismissible fade show">
+                    <strong>Database Debug:</strong>
+                    <span class="small"><?php echo htmlspecialchars($dbError); ?></span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
             <?php if (!empty($message)): ?>
                 <div class="alert alert-success alert-dismissible fade show">
                     <?php echo htmlspecialchars($message); ?>
@@ -32,71 +40,9 @@ $isEditMode = !empty($editingEntry);
             <?php endif; ?>
             
             <div class="row g-3">
-                <div class="col-12 col-lg-5">
-                    <div class="border rounded p-3 h-100">
-                        <h6 class="fw-bold mb-3 d-flex justify-content-between align-items-center">
-                            <span>
-                                <i class="fas fa-pen me-1 text-primary"></i>
-                                <?php echo $isEditMode ? 'Edit Diary Entry' : 'New Diary Entry'; ?>
-                            </span>
-                            <?php if ($isEditMode): ?>
-                                <a href="<?php echo APP_URL; ?>/instructor-diary" class="btn btn-sm btn-outline-secondary">
-                                    Cancel
-                                </a>
-                            <?php endif; ?>
-                        </h6>
-                        <form action="<?php echo APP_URL; ?>/instructor-diary/create" method="post" class="row g-2">
-                            <input type="hidden" name="action" value="<?php echo $isEditMode ? 'update' : 'create'; ?>">
-                            <?php if ($isEditMode): ?>
-                                <input type="hidden" name="diary_id" value="<?php echo htmlspecialchars($editingEntry['instructor_diary_id']); ?>">
-                            <?php endif; ?>
-                            <div class="col-12">
-                                <label class="form-label">Module</label>
-                                <select name="staff_module_enrollment_id" class="form-select" required>
-                                    <option value="">-- Select Module --</option>
-                                    <?php foreach ($enrollments as $e): ?>
-                                        <option value="<?php echo htmlspecialchars($e['staff_module_enrollment_id']); ?>"
-                                            <?php
-                                                if ($isEditMode && (int)$editingEntry['staff_module_enrollment_id'] === (int)$e['staff_module_enrollment_id']) {
-                                                    echo 'selected';
-                                                }
-                                            ?>>
-                                            <?php echo htmlspecialchars(($e['module_name'] ?? '') . ' (' . ($e['course_name'] ?? '') . ', ' . ($e['academic_year'] ?? '') . ')'); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label">Date</label>
-                                <input type="date" name="diary_date" class="form-control"
-                                       value="<?php echo htmlspecialchars($isEditMode ? $editingEntry['diary_date'] : date('Y-m-d')); ?>" required>
-                            </div>
-                            <div class="col-3">
-                                <label class="form-label">From</label>
-                                <input type="time" name="start_time" class="form-control"
-                                       value="<?php echo htmlspecialchars($isEditMode ? substr($editingEntry['start_time'], 0, 5) : ''); ?>" required>
-                            </div>
-                            <div class="col-3">
-                                <label class="form-label">To</label>
-                                <input type="time" name="end_time" class="form-control"
-                                       value="<?php echo htmlspecialchars($isEditMode ? substr($editingEntry['end_time'], 0, 5) : ''); ?>" required>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label">Topic Covered</label>
-                                <textarea name="topic_covered" rows="3" class="form-control" required><?php echo htmlspecialchars($isEditMode ? $editingEntry['topic_covered'] : ''); ?></textarea>
-                            </div>
-                            <div class="col-12 text-end">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save me-1"></i>
-                                    <?php echo $isEditMode ? 'Update Entry' : 'Save Entry'; ?>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-                
-                <div class="col-12 col-lg-7">
-                    <div class="border rounded p-3 h-100">
+                <!-- Recent Entries table at top -->
+                <div class="col-12">
+                    <div class="border rounded p-3">
                         <h6 class="fw-bold mb-3">
                             <i class="fas fa-list me-1 text-primary"></i>Recent Entries
                         </h6>
@@ -182,6 +128,70 @@ $isEditMode = !empty($editingEntry);
                         <?php else: ?>
                             <p class="text-muted small mb-0">No diary entries found for the selected filters.</p>
                         <?php endif; ?>
+                    </div>
+                </div>
+                
+                <!-- New/Edit Diary Entry form below -->
+                <div class="col-12 col-lg-5">
+                    <div class="border rounded p-3 h-100">
+                        <h6 class="fw-bold mb-3 d-flex justify-content-between align-items-center">
+                            <span>
+                                <i class="fas fa-pen me-1 text-primary"></i>
+                                <?php echo $isEditMode ? 'Edit Diary Entry' : 'New Diary Entry'; ?>
+                            </span>
+                            <?php if ($isEditMode): ?>
+                                <a href="<?php echo APP_URL; ?>/instructor-diary" class="btn btn-sm btn-outline-secondary">
+                                    Cancel
+                                </a>
+                            <?php endif; ?>
+                        </h6>
+                        <form action="<?php echo APP_URL; ?>/instructor-diary/create" method="post" class="row g-2">
+                            <input type="hidden" name="action" value="<?php echo $isEditMode ? 'update' : 'create'; ?>">
+                            <?php if ($isEditMode): ?>
+                                <input type="hidden" name="diary_id" value="<?php echo htmlspecialchars($editingEntry['instructor_diary_id']); ?>">
+                            <?php endif; ?>
+                            <div class="col-12">
+                                <label class="form-label">Module</label>
+                                <select name="staff_module_enrollment_id" class="form-select" required>
+                                    <option value="">-- Select Module --</option>
+                                    <?php foreach ($enrollments as $e): ?>
+                                        <option value="<?php echo htmlspecialchars($e['staff_module_enrollment_id']); ?>"
+                                            <?php
+                                                if ($isEditMode && (int)$editingEntry['staff_module_enrollment_id'] === (int)$e['staff_module_enrollment_id']) {
+                                                    echo 'selected';
+                                                }
+                                            ?>>
+                                            <?php echo htmlspecialchars(($e['module_name'] ?? '') . ' (' . ($e['course_name'] ?? '') . ', ' . ($e['academic_year'] ?? '') . ')'); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Date</label>
+                                <input type="date" name="diary_date" class="form-control"
+                                       value="<?php echo htmlspecialchars($isEditMode ? $editingEntry['diary_date'] : date('Y-m-d')); ?>" required>
+                            </div>
+                            <div class="col-3">
+                                <label class="form-label">From</label>
+                                <input type="time" name="start_time" class="form-control"
+                                       value="<?php echo htmlspecialchars($isEditMode ? substr($editingEntry['start_time'], 0, 5) : ''); ?>" required>
+                            </div>
+                            <div class="col-3">
+                                <label class="form-label">To</label>
+                                <input type="time" name="end_time" class="form-control"
+                                       value="<?php echo htmlspecialchars($isEditMode ? substr($editingEntry['end_time'], 0, 5) : ''); ?>" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Topic Covered</label>
+                                <textarea name="topic_covered" rows="3" class="form-control" required><?php echo htmlspecialchars($isEditMode ? $editingEntry['topic_covered'] : ''); ?></textarea>
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-1"></i>
+                                    <?php echo $isEditMode ? 'Update Entry' : 'Save Entry'; ?>
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>

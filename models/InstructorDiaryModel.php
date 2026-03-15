@@ -4,6 +4,7 @@
  */
 class InstructorDiaryModel extends Model {
     protected $table = 'instructor_diary';
+    protected $lastError = '';
     
     protected function getPrimaryKey() {
         return 'instructor_diary_id';
@@ -33,7 +34,8 @@ class InstructorDiaryModel extends Model {
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
             
             if (!$this->db->query($sql)) {
-                error_log('InstructorDiaryModel::ensureTableStructure create failed: ' . $this->db->getConnection()->error);
+                $this->lastError = $this->db->getConnection()->error;
+                error_log('InstructorDiaryModel::ensureTableStructure create failed: ' . $this->lastError);
             }
         }
         
@@ -64,6 +66,8 @@ class InstructorDiaryModel extends Model {
         
         $stmt = $this->db->prepare($sql);
         if (!$stmt) {
+            $this->lastError = $this->db->getConnection()->error;
+            error_log('InstructorDiaryModel::existsEntry prepare failed: ' . $this->lastError);
             return false;
         }
         
@@ -130,7 +134,8 @@ class InstructorDiaryModel extends Model {
         
         $stmt = $this->db->prepare($sql);
         if (!$stmt) {
-            error_log('InstructorDiaryModel::getByStaff prepare failed: ' . $this->db->getConnection()->error);
+            $this->lastError = $this->db->getConnection()->error;
+            error_log('InstructorDiaryModel::getByStaff prepare failed: ' . $this->lastError);
             return [];
         }
         
@@ -193,7 +198,8 @@ class InstructorDiaryModel extends Model {
         
         $stmt = $this->db->prepare($sql);
         if (!$stmt) {
-            error_log('InstructorDiaryModel::getByCourseAndYear prepare failed: ' . $this->db->getConnection()->error);
+            $this->lastError = $this->db->getConnection()->error;
+            error_log('InstructorDiaryModel::getByCourseAndYear prepare failed: ' . $this->lastError);
             return [];
         }
         
@@ -279,7 +285,8 @@ class InstructorDiaryModel extends Model {
         
         $stmt = $this->db->prepare($sql);
         if (!$stmt) {
-            error_log('InstructorDiaryModel::getForReport prepare failed: ' . $this->db->getConnection()->error);
+            $this->lastError = $this->db->getConnection()->error;
+            error_log('InstructorDiaryModel::getForReport prepare failed: ' . $this->lastError);
             return [];
         }
         
@@ -298,6 +305,13 @@ class InstructorDiaryModel extends Model {
         }
         
         return $data;
+    }
+
+    /**
+     * Get last database error message for debugging (read-only).
+     */
+    public function getLastError() {
+        return $this->lastError;
     }
 }
 

@@ -88,6 +88,7 @@ class InstructorDiaryController extends Controller {
             'to_date' => $toDate,
             'module_id' => $moduleId,
         ]);
+        $dbError = method_exists($diaryModel, 'getLastError') ? $diaryModel->getLastError() : '';
         
         // Optional: load entry being edited
         $editId = (int)$this->get('edit_id', 0);
@@ -108,6 +109,7 @@ class InstructorDiaryController extends Controller {
             'enrollments' => $enrollments,
             'entries' => $entries,
             'editingEntry' => $editingEntry,
+            'dbError' => $dbError,
             'filters' => [
                 'from_date' => $fromDate,
                 'to_date' => $toDate,
