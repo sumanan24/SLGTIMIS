@@ -33,7 +33,7 @@ class InstructorDiaryModel extends Model {
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
             
             if (!$this->db->query($sql)) {
-                error_log('InstructorDiaryModel::ensureTableStructure create failed: ' . $this->db->error);
+                error_log('InstructorDiaryModel::ensureTableStructure create failed: ' . $this->db->getConnection()->error);
             }
         }
         
@@ -130,7 +130,7 @@ class InstructorDiaryModel extends Model {
         
         $stmt = $this->db->prepare($sql);
         if (!$stmt) {
-            error_log('InstructorDiaryModel::getByStaff prepare failed: ' . $this->db->error);
+            error_log('InstructorDiaryModel::getByStaff prepare failed: ' . $this->db->getConnection()->error);
             return [];
         }
         
@@ -193,7 +193,7 @@ class InstructorDiaryModel extends Model {
         
         $stmt = $this->db->prepare($sql);
         if (!$stmt) {
-            error_log('InstructorDiaryModel::getByCourseAndYear prepare failed: ' . $this->db->error);
+            error_log('InstructorDiaryModel::getByCourseAndYear prepare failed: ' . $this->db->getConnection()->error);
             return [];
         }
         
@@ -279,7 +279,7 @@ class InstructorDiaryModel extends Model {
         
         $stmt = $this->db->prepare($sql);
         if (!$stmt) {
-            error_log('InstructorDiaryModel::getForReport prepare failed: ' . $this->db->error);
+            error_log('InstructorDiaryModel::getForReport prepare failed: ' . $this->db->getConnection()->error);
             return [];
         }
         
