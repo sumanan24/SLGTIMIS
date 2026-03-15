@@ -85,10 +85,10 @@ class InstructorDiaryModel extends Model {
         $this->ensureTableStructure();
         
         $sql = "SELECT d.*, 
-                       sme.course_id,
-                       sme.academic_year,
-                       m.module_name,
-                       s.staff_name
+                       ANY_VALUE(sme.course_id) AS course_id,
+                       ANY_VALUE(sme.academic_year) AS academic_year,
+                       ANY_VALUE(m.module_name) AS module_name,
+                       ANY_VALUE(s.staff_name) AS staff_name
                 FROM `{$this->table}` d
                 LEFT JOIN `staff_module_enrollment` sme 
                     ON d.staff_module_enrollment_id = sme.staff_module_enrollment_id
@@ -161,10 +161,10 @@ class InstructorDiaryModel extends Model {
         $this->ensureTableStructure();
         
         $sql = "SELECT d.*, 
-                       sme.course_id,
-                       sme.academic_year,
-                       m.module_name,
-                       s.staff_name
+                       ANY_VALUE(sme.course_id) AS course_id,
+                       ANY_VALUE(sme.academic_year) AS academic_year,
+                       ANY_VALUE(m.module_name) AS module_name,
+                       ANY_VALUE(s.staff_name) AS staff_name
                 FROM `{$this->table}` d
                 LEFT JOIN `staff_module_enrollment` sme 
                     ON d.staff_module_enrollment_id = sme.staff_module_enrollment_id
@@ -227,11 +227,11 @@ class InstructorDiaryModel extends Model {
         $this->ensureTableStructure();
         
         $sql = "SELECT d.*, 
-                       sme.course_id,
-                       sme.academic_year,
-                       m.module_name,
-                       s.staff_name,
-                       c.course_name
+                       ANY_VALUE(sme.course_id) AS course_id,
+                       ANY_VALUE(sme.academic_year) AS academic_year,
+                       ANY_VALUE(m.module_name) AS module_name,
+                       ANY_VALUE(s.staff_name) AS staff_name,
+                       ANY_VALUE(c.course_name) AS course_name
                 FROM `{$this->table}` d
                 LEFT JOIN `staff_module_enrollment` sme 
                     ON d.staff_module_enrollment_id = sme.staff_module_enrollment_id
