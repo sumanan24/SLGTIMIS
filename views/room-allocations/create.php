@@ -78,16 +78,20 @@
                             </label>
                             <select class="form-select" id="room_id" name="room_id" required>
                                 <option value="">Select Room</option>
-                                <?php foreach ($rooms as $room): ?>
+                                <?php foreach ($rooms as $room): 
+                                    $capacity  = (int)($room['capacity'] ?? 0);
+                                    $available = (int)($room['available_beds'] ?? 0);
+                                    $occupied  = $capacity > 0 ? ($capacity - $available) : 0;
+                                ?>
                                     <option value="<?php echo htmlspecialchars($room['id']); ?>" 
-                                            data-available="<?php echo $room['available_beds'] ?? 0; ?>">
+                                            data-available="<?php echo $available; ?>">
                                         <?php echo htmlspecialchars($room['room_no'] ?? 'N/A'); ?> - 
                                         <?php echo htmlspecialchars($room['block_name'] ?? 'N/A'); ?> 
-                                        (Available: <?php echo $room['available_beds'] ?? 0; ?> beds)
+                                        (<?php echo $occupied; ?>/<?php echo $capacity; ?> students)
                                     </option>
                                 <?php endforeach; ?>
                             </select>
-                            <div class="form-text">Only rooms with available beds are shown</div>
+                            <div class="form-text">Showing rooms with available beds. Brackets show allocated / capacity.</div>
                         </div>
                         
                         <div class="d-flex justify-content-end gap-2 mt-4">
@@ -115,7 +119,8 @@ function loadAvailableRooms(hostelId) {
         return;
     }
     
-    fetch('<?php echo APP_URL; ?>/room-allocations/get-available-rooms?hostel_id=' + encodeURIComponent(hostelId))
+    // context=create => only rooms with available beds, plus capacity info
+    fetch('<?php echo APP_URL; ?>/room-allocations/get-available-rooms?context=create&hostel_id=' + encodeURIComponent(hostelId))
         .then(response => response.json())
         .then(data => {
             roomSelect.innerHTML = '<option value="">Select Room</option>';
@@ -127,11 +132,15 @@ function loadAvailableRooms(hostelId) {
                 return;
             }
             data.forEach(room => {
+                const capacity  = parseInt(room.capacity || 0, 10);
+                const available = parseInt(room.available_beds || 0, 10);
+                const occupied  = capacity > 0 ? (capacity - available) : 0;
                 const option = document.createElement('option');
                 option.value = room.id;
-                option.textContent = (room.room_no || 'N/A') + ' - ' + (room.block_name || 'N/A') + 
-                                   ' (Available: ' + (room.available_beds || 0) + ' beds)';
-                option.setAttribute('data-available', room.available_beds || 0);
+                option.textContent =
+                    (room.room_no || 'N/A') + ' - ' + (room.block_name || 'N/A') +
+                    ' (' + occupied + '/' + capacity + ' students)';
+                option.setAttribute('data-available', available);
                 roomSelect.appendChild(option);
             });
         })

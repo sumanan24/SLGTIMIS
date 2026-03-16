@@ -587,9 +587,13 @@ class RoomAllocationController extends Controller {
     }
     
     /**
-     * AJAX endpoint to get rooms by hostel for filters.
-     * When selecting a hostel in the filter, load ALL rooms in that hostel (not only available ones).
-     * Access level: same as viewing room allocations (SAO, ADM, FIN).
+     * AJAX endpoint to get rooms by hostel.
+     *
+     * Used in two contexts:
+     * - Filters (room-allocations index): load ALL rooms in a hostel (even full ones)
+     * - Create allocation form: load only rooms with available beds, including capacity/occupied info
+     *
+     * Context is selected via optional `context` GET parameter: `create` | default (filters).
      */
     public function getAvailableRooms() {
         // Check authentication
@@ -605,13 +609,20 @@ class RoomAllocationController extends Controller {
         }
 
         $hostelId = $this->get('hostel_id', '');
+        $context  = $this->get('context', 'filter');
         $roomModel = $this->model('RoomModel');
 
-        // For filters we want ALL rooms for the hostel (even full ones)
-        if (!empty($hostelId)) {
-            $rooms = $roomModel->getByHostelId($hostelId);
+        if (empty($hostelId)) {
+            $this->json([]);
+            return;
+        }
+
+        if ($context === 'create') {
+            // For create form: only rooms with available beds, with capacity/occupied info
+            $rooms = $roomModel->getAvailableRooms($hostelId);
         } else {
-            $rooms = [];
+            // For filters: ALL rooms for the hostel, even if full
+            $rooms = $roomModel->getByHostelId($hostelId);
         }
 
         $this->json($rooms);
