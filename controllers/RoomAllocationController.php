@@ -587,7 +587,9 @@ class RoomAllocationController extends Controller {
     }
     
     /**
-     * AJAX endpoint to get available rooms by hostel
+     * AJAX endpoint to get rooms by hostel for filters.
+     * When selecting a hostel in the filter, load ALL rooms in that hostel (not only available ones).
+     * Access level: same as viewing room allocations (SAO, ADM, FIN).
      */
     public function getAvailableRooms() {
         // Check authentication
@@ -595,23 +597,23 @@ class RoomAllocationController extends Controller {
             $this->json(['success' => false, 'error' => 'Unauthorized'], 401);
             return;
         }
-        
-        // Only SAO and ADM can access room allocations
-        if (!$this->canManageRoomAllocations()) {
-            $this->json(['success' => false, 'error' => 'Access denied. Room Allocations section is only available for Student Affairs Office or Administrator.'], 403);
+
+        // Reuse view-access check so FIN (read-only) can also load rooms in filters
+        if (!$this->checkRoomAllocationViewAccess()) {
+            $this->json(['success' => false, 'error' => 'Access denied.'], 403);
             return;
         }
-        
+
         $hostelId = $this->get('hostel_id', '');
         $roomModel = $this->model('RoomModel');
-        
-        // Return only rooms with available beds for the selected hostel
+
+        // For filters we want ALL rooms for the hostel (even full ones)
         if (!empty($hostelId)) {
-            $rooms = $roomModel->getAvailableRooms($hostelId);
+            $rooms = $roomModel->getByHostelId($hostelId);
         } else {
             $rooms = [];
         }
-        
+
         $this->json($rooms);
     }
 }
