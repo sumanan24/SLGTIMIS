@@ -19,6 +19,20 @@ class StudentEnrollmentModel extends Model {
     public function getLastSqlError() {
         return $this->lastSqlError;
     }
+
+    /**
+     * Ensure course_version column exists on student_enroll table.
+     * Stores the version number of the course when the student enrolled.
+     */
+    protected function ensureCourseVersionColumn() {
+        $sql = "SHOW COLUMNS FROM `{$this->table}` LIKE 'course_version'";
+        $result = $this->db->query($sql);
+        if ($result && $result->num_rows === 0) {
+            $alter = "ALTER TABLE `{$this->table}` 
+                      ADD COLUMN `course_version` INT(11) NULL DEFAULT NULL AFTER `course_id`";
+            $this->db->query($alter);
+        }
+    }
     
     /**
      * Get enrollments for a student
@@ -91,14 +105,25 @@ class StudentEnrollmentModel extends Model {
      * Create new enrollment
      */
     public function createEnrollment($data) {
+        $this->ensureCourseVersionColumn();
+
+        // Determine course version: use provided value or latest version for the course
+        $courseVersion = isset($data['course_version']) ? (int)$data['course_version'] : null;
+        if ($courseVersion === null && !empty($data['course_id'])) {
+            require_once BASE_PATH . '/models/CourseModel.php';
+            $courseModel = new CourseModel();
+            $courseVersion = $courseModel->getLatestVersionForCourse($data['course_id']);
+        }
+
         $sql = "INSERT INTO `{$this->table}` 
-                (`student_id`, `course_id`, `academic_year`, `course_mode`, `student_enroll_status`, `student_enroll_date`, `student_enroll_exit_date`) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)";
+                (`student_id`, `course_id`, `course_version`, `academic_year`, `course_mode`, `student_enroll_status`, `student_enroll_date`, `student_enroll_exit_date`) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         
         $stmt = $this->db->prepare($sql);
-        $stmt->bind_param("sssssss",
+        $stmt->bind_param("ssisssss",
             $data['student_id'],
             $data['course_id'],
+            $courseVersion,
             $data['academic_year'],
             $data['course_mode'],
             $data['student_enroll_status'],
@@ -114,8 +139,19 @@ class StudentEnrollmentModel extends Model {
      */
     public function updateEnrollment($studentId, $data) {
         $this->lastSqlError = '';
+        $this->ensureCourseVersionColumn();
+
+        // Update course_version to latest if course_id changes or explicit version provided
+        $courseVersion = isset($data['course_version']) ? (int)$data['course_version'] : null;
+        if ($courseVersion === null && !empty($data['course_id'])) {
+            require_once BASE_PATH . '/models/CourseModel.php';
+            $courseModel = new CourseModel();
+            $courseVersion = $courseModel->getLatestVersionForCourse($data['course_id']);
+        }
+
         $sql = "UPDATE `{$this->table}` SET 
                 `course_id` = ?, 
+                `course_version` = ?, 
                 `academic_year` = ?, 
                 `course_mode` = ?, 
                 `student_enroll_status` = ?
@@ -128,8 +164,9 @@ class StudentEnrollmentModel extends Model {
             $this->lastSqlError = $this->db->getConnection()->error ?? 'Prepare failed (student_enroll)';
             return false;
         }
-        $stmt->bind_param("sssss", 
+        $stmt->bind_param("isssss", 
             $data['course_id'],
+            $courseVersion,
             $data['academic_year'],
             $data['course_mode'],
             $data['student_enroll_status'],
@@ -148,8 +185,18 @@ class StudentEnrollmentModel extends Model {
      */
     public function updateEnrollmentByRecord($studentId, $courseId, $academicYear, $data) {
         $this->lastSqlError = '';
+        $this->ensureCourseVersionColumn();
+
+        $courseVersion = isset($data['course_version']) ? (int)$data['course_version'] : null;
+        if ($courseVersion === null && !empty($data['course_id'])) {
+            require_once BASE_PATH . '/models/CourseModel.php';
+            $courseModel = new CourseModel();
+            $courseVersion = $courseModel->getLatestVersionForCourse($data['course_id']);
+        }
+
         $sql = "UPDATE `{$this->table}` SET 
                 `course_id` = ?, 
+                `course_version` = ?, 
                 `academic_year` = ?, 
                 `course_mode` = ?, 
                 `student_enroll_status` = ?
@@ -160,8 +207,9 @@ class StudentEnrollmentModel extends Model {
             $this->lastSqlError = $this->db->getConnection()->error ?? 'Prepare failed (student_enroll)';
             return false;
         }
-        $stmt->bind_param("sssssss", 
+        $stmt->bind_param("isssssss", 
             $data['course_id'],
+            $courseVersion,
             $data['academic_year'],
             $data['course_mode'],
             $data['student_enroll_status'],

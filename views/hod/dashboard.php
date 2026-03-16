@@ -346,129 +346,400 @@
     }
     
     /* ============================================
-       MOBILE RESPONSIVE STYLES
+       MOBILE RESPONSIVE - Text & card proper sizing
        ============================================ */
     @media (max-width: 992px) {
         .dashboard-container {
+            padding: 1.25rem 1rem;
+            font-size: 1rem;
+        }
+        .dashboard-welcome-card .card-body {
             padding: 1.5rem 1rem;
+        }
+        .chart-card-header {
+            padding: 0.875rem 1rem;
+            font-size: clamp(0.9rem, 2.2vw, 0.95rem);
         }
     }
     
     @media (max-width: 768px) {
         .dashboard-container {
-            padding: 1rem;
+            padding: 0; /* no side space on mobile */
+            min-height: calc(100vh - 56px);
+            font-size: 1rem;
+        }
+        
+        .dashboard-container .row {
+            margin-left: 0;
+            margin-right: 0;
+        }
+        
+        .dashboard-container .row > [class*="col-"] {
+            padding-left: 0;
+            padding-right: 0;
+            margin-bottom: 0.5rem;
+        }
+        
+        .dashboard-welcome-card {
+            margin-bottom: 0.75rem;
+            border-radius: 12px;
         }
         
         .dashboard-welcome-card .card-body {
-            padding: 1.5rem 1rem;
+            padding: 0.875rem 0.625rem;
+            font-size: 1rem;
         }
         
         .dashboard-welcome-card h1 {
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
+            font-size: clamp(1.2rem, 4.5vw, 1.35rem);
+            margin-bottom: 0.75rem;
+            line-height: 1.3;
         }
         
-        .dashboard-welcome-card .d-flex {
-            flex-direction: column;
-            align-items: flex-start !important;
+        .dashboard-welcome-card p {
+            font-size: 0.9375rem; /* 15px - readable */
         }
         
-        .dashboard-welcome-card .d-flex > div {
+        .dashboard-welcome-card small {
+            font-size: 0.875rem;
+        }
+        
+        .dashboard-welcome-card .d-flex.align-items-start.justify-content-between,
+        .dashboard-welcome-card .d-flex.align-items-md-center {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 1rem !important;
+        }
+        
+        .dashboard-welcome-card .d-flex > div.flex-grow-1 {
             width: 100%;
         }
         
-        .dashboard-welcome-card .d-flex > div:first-child {
-            margin-bottom: 1rem;
-        }
-        
-        .dashboard-welcome-card select {
+        .dashboard-welcome-card .d-flex.align-items-center.gap-3 {
             width: 100%;
-            min-width: 100%;
+            flex-direction: column !important;
+            align-items: stretch !important;
         }
         
-        .stats-card-value {
-            font-size: 2rem;
+        .dashboard-welcome-card .d-flex.align-items-center.gap-2 {
+            width: 100%;
+            flex-direction: column !important;
+            align-items: stretch !important;
         }
         
-        .stats-card-icon {
-            width: 50px;
-            height: 50px;
-            font-size: 1.5rem;
-            margin-left: 0 !important;
-            margin-top: 0.5rem;
+        .dashboard-welcome-card label[for="academicYearFilter"] {
+            margin-bottom: 0.25rem;
+            font-size: 0.9375rem;
+        }
+        
+        .dashboard-welcome-card select#academicYearFilter {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100%;
+            font-size: 1rem; /* 16px avoids iOS zoom on focus */
+            min-height: 44px;
+        }
+        
+        .department-badge {
+            font-size: 0.875rem;
+            padding: 0.5rem 0.875rem;
+        }
+        
+        .department-info-box {
+            padding: 0.875rem;
+            margin-top: 0.75rem;
+            font-size: 0.875rem;
+        }
+        
+        .dashboard-welcome-card .border-top {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+        }
+        
+        /* Stats cards - stack and align, proper text size */
+        .row.g-4 > .col-md-4 {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+        
+        .dashboard-stats-card {
+            margin-bottom: 0;
+            border-radius: 12px;
         }
         
         .dashboard-stats-card .card-body {
-            padding: 1.5rem;
+            padding: 0.75rem 0.625rem;
             min-height: auto;
+            font-size: 1rem;
         }
         
         .dashboard-stats-card .card-body > .d-flex {
-            flex-direction: column;
-            align-items: flex-start !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+        
+        .stats-card-label {
+            font-size: 0.75rem;
+        }
+        
+        .stats-card-value {
+            font-size: clamp(1.65rem, 6vw, 1.85rem);
+            line-height: 1.2;
+        }
+        
+        .stats-card-subtitle {
+            font-size: 0.8125rem; /* 13px - readable */
+            line-height: 1.35;
+        }
+        
+        .stats-card-icon {
+            width: 48px;
+            height: 48px;
+            font-size: 1.35rem;
+            margin-left: 0 !important;
+            flex-shrink: 0;
         }
         
         .chart-card-body {
-            padding: 1rem;
-            min-height: 250px;
+            padding: 0.625rem 0.5rem;
+            min-height: 240px;
+        }
+        
+        .chart-card-body canvas {
+            max-height: 240px;
         }
         
         .dashboard-chart-card {
-            margin-bottom: 1.5rem;
+            margin-bottom: 0.5rem;
+            border-radius: 12px;
         }
         
-        .row.g-4 {
+        .dashboard-chart-card .card-body {
+            padding: 0.625rem 0.5rem;
+        }
+        
+        .chart-card-header {
+            padding: 0.625rem 0.5rem;
+        }
+        
+        .dashboard-chart-card .card-body {
+            font-size: 1rem;
+        }
+        
+        .dashboard-chart-card .card-body h5 {
+            font-size: 0.9375rem;
+        }
+        
+        /* Course enrollment - stack on mobile, tight to border */
+        .course-enrollment-item .card-body {
+            padding: 0.625rem 0.5rem !important;
+            font-size: 1rem;
+        }
+        
+        .course-enrollment-item .card-body .d-flex {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 0.5rem;
+        }
+        
+        .course-enrollment-item .text-end {
+            text-align: left !important;
+        }
+        
+        .course-enrollment-item h6 {
+            font-size: 0.9375rem;
+            line-height: 1.4;
+        }
+        
+        .course-enrollment-item small {
+            font-size: 0.8125rem;
+        }
+        
+        .course-enrollment-item .h4 {
+            font-size: 1.25rem;
+        }
+        
+        /* Tables - horizontal scroll, tight to card edge */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
             margin-left: -0.5rem;
             margin-right: -0.5rem;
-        }
-        
-        .row.g-4 > * {
             padding-left: 0.5rem;
             padding-right: 0.5rem;
         }
         
-        .row.g-4 > .col-md-4 {
-            margin-bottom: 1rem;
+        .table-responsive .table {
+            margin-bottom: 0;
+            font-size: 0.9375rem;
+        }
+        
+        .table-responsive .table th,
+        .table-responsive .table td {
+            white-space: nowrap;
+            padding: 0.5rem 0.4rem;
+            min-width: 44px;
+        }
+        
+        /* Hostel summary - 2x2 grid, tight padding */
+        .row.g-3.mb-4 .col-6 .card-body {
+            padding: 0.5rem 0.375rem !important;
+            font-size: 1rem;
+        }
+        
+        .row.g-3.mb-4 {
+            margin-left: -0.25rem;
+            margin-right: -0.25rem;
+        }
+        
+        .row.g-3.mb-4 > [class*="col-"] {
+            padding-left: 0.25rem;
+            padding-right: 0.25rem;
+        }
+        
+        .row.g-3.mb-4 .col-6 .h4 {
+            font-size: clamp(1.15rem, 5vw, 1.25rem);
+        }
+        
+        .row.g-3.mb-4 .col-6 .small {
+            font-size: 0.8125rem;
+        }
+        
+        .alert {
+            font-size: 0.9375rem;
+            padding: 0.5rem 0.625rem;
+        }
+        
+        .row.g-4 {
+            margin-left: -0.25rem;
+            margin-right: -0.25rem;
+        }
+        
+        .row.g-4 > [class*="col-"] {
+            padding-left: 0.25rem;
+            padding-right: 0.25rem;
         }
     }
     
-    @media (max-width: 480px) {
+    @media (max-width: 576px) {
         .dashboard-container {
-            padding: 0.75rem;
+            padding: 0;
+            font-size: 1rem;
+        }
+        
+        .dashboard-container .row > [class*="col-"] {
+            padding-left: 0;
+            padding-right: 0;
+            margin-bottom: 0.375rem;
+        }
+        
+        .dashboard-welcome-card {
+            margin-bottom: 0.5rem;
         }
         
         .dashboard-welcome-card .card-body {
-            padding: 1rem;
+            padding: 0.75rem 0.5rem;
         }
         
         .dashboard-welcome-card h1 {
-            font-size: 1.25rem;
+            font-size: clamp(1.1rem, 5vw, 1.25rem);
         }
         
         .stats-card-value {
-            font-size: 1.75rem;
+            font-size: clamp(1.5rem, 7vw, 1.65rem);
+        }
+        
+        .stats-card-subtitle {
+            font-size: 0.8125rem;
         }
         
         .stats-card-icon {
-            width: 45px;
-            height: 45px;
-            font-size: 1.25rem;
-            margin-left: 0 !important;
+            width: 44px;
+            height: 44px;
+            font-size: 1.2rem;
         }
         
         .dashboard-stats-card .card-body {
-            padding: 1rem;
-            min-height: auto;
+            padding: 0.625rem 0.5rem;
         }
         
-        .dashboard-stats-card .card-body > .d-flex {
-            flex-direction: column;
-            align-items: flex-start !important;
+        .chart-card-header {
+            padding: 0.5rem 0.5rem;
+            font-size: clamp(0.875rem, 2.5vw, 0.9375rem);
         }
         
         .chart-card-body {
-            padding: 0.75rem;
+            padding: 0.5rem 0.375rem;
             min-height: 200px;
+        }
+        
+        .chart-card-body canvas {
+            max-height: 200px;
+        }
+        
+        .dashboard-chart-card .card-body {
+            padding: 0.5rem 0.375rem;
+        }
+        
+        /* Hostel summary - single column on very small */
+        .row.g-3.mb-4 .col-6 {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+        
+        .course-enrollment-item .card-body {
+            padding: 0.5rem 0.375rem !important;
+        }
+        
+        .course-enrollment-item h6 {
+            font-size: 0.9375rem;
+        }
+        
+        .table-responsive .table {
+            font-size: 0.875rem;
+        }
+        
+        .table-responsive .table th,
+        .table-responsive .table td {
+            padding: 0.5rem 0.4rem;
+        }
+    }
+    
+    @media (max-width: 380px) {
+        .dashboard-container {
+            padding: 0;
+        }
+
+        .dashboard-welcome-card h1 {
+            font-size: 1.1rem;
+        }
+        
+        .dashboard-welcome-card .card-body {
+            padding: 0.625rem 0.375rem;
+        }
+        
+        .stats-card-value {
+            font-size: 1.4rem;
+        }
+        
+        .stats-card-subtitle {
+            font-size: 0.75rem;
+        }
+        
+        .department-badge {
+            font-size: 0.8125rem;
+            padding: 0.4rem 0.625rem;
+        }
+        
+        .dashboard-stats-card .card-body {
+            padding: 0.5rem 0.375rem;
+        }
+        
+        .chart-card-header,
+        .chart-card-body {
+            padding: 0.5rem 0.375rem;
         }
     }
 </style>
@@ -811,7 +1082,7 @@
                 <div class="card-body">
                     <!-- Hostel Summary Statistics -->
                     <div class="row g-3 mb-4">
-                        <div class="col-md-3">
+                        <div class="col-6 col-md-3">
                             <div class="card" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-left: 4px solid #0ea5e9;">
                                 <div class="card-body text-center p-3">
                                     <div class="h4 mb-1" style="color: #0ea5e9; font-weight: 700;"><?php echo number_format($hostelStats['total_hostels'] ?? 0); ?></div>
@@ -819,7 +1090,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-md-3">
                             <div class="card" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-left: 4px solid #22c55e;">
                                 <div class="card-body text-center p-3">
                                     <div class="h4 mb-1" style="color: #22c55e; font-weight: 700;"><?php echo number_format($hostelStats['total_rooms'] ?? 0); ?></div>
@@ -827,7 +1098,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-md-3">
                             <div class="card" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 4px solid #f59e0b;">
                                 <div class="card-body text-center p-3">
                                     <div class="h4 mb-1" style="color: #f59e0b; font-weight: 700;"><?php echo number_format($hostelStats['total_capacity'] ?? 0); ?></div>
@@ -835,7 +1106,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-6 col-md-3">
                             <div class="card" style="background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%); border-left: 4px solid #ec4899;">
                                 <div class="card-body text-center p-3">
                                     <div class="h4 mb-1" style="color: #ec4899; font-weight: 700;"><?php echo number_format($hostelStats['total_occupied'] ?? 0); ?></div>

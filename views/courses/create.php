@@ -1,4 +1,55 @@
-<div class="container-fluid px-4 py-3">
+<style>
+/* Mobile: no side space, proper align */
+@media (max-width: 768px) {
+    .course-create-wrap.container-fluid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+    .course-create-wrap .row {
+        margin-left: 0;
+        margin-right: 0;
+    }
+    .course-create-wrap .row > [class*="col-"] {
+        padding-left: 0;
+        padding-right: 0;
+    }
+    .course-create-wrap .col-lg-8 {
+        max-width: 100%;
+        flex: 0 0 100%;
+    }
+    .course-create-wrap .card {
+        border-radius: 0;
+    }
+    .course-create-wrap .card-header {
+        padding: 0.75rem 0.5rem;
+    }
+    .course-create-wrap .card-header h5 {
+        font-size: 1rem;
+    }
+    .course-create-wrap .card-body {
+        padding: 0.75rem 0.5rem !important;
+    }
+    .course-create-wrap .d-flex.gap-2 {
+        flex-direction: column;
+    }
+    .course-create-wrap .d-flex.gap-2 .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+@media (max-width: 576px) {
+    .course-create-wrap .card-body {
+        padding: 0.5rem 0.375rem !important;
+    }
+    .course-create-wrap .card-header {
+        padding: 0.625rem 0.375rem;
+    }
+}
+</style>
+
+<div class="container-fluid px-4 py-3 course-create-wrap">
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card shadow-sm border-0">

@@ -91,9 +91,68 @@
     align-items: center;
     justify-content: center;
 }
+
+/* Mobile: no side space, cards align to screen */
+@media (max-width: 768px) {
+    .courses-page-wrap.container-fluid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+    .courses-page-wrap > .card {
+        border-radius: 0;
+    }
+    .courses-page-wrap .card-body {
+        padding: 0.75rem 0.5rem !important;
+    }
+    .courses-page-wrap .card.border.mb-4 .card-body {
+        padding: 0.625rem 0.5rem !important;
+    }
+    .courses-page-wrap .row.g-3 {
+        margin-left: 0;
+        margin-right: 0;
+    }
+    .courses-page-wrap .row.g-3 > [class*="col-"] {
+        padding-left: 0;
+        padding-right: 0;
+        margin-bottom: 0.5rem;
+    }
+    .courses-page-wrap .table-responsive {
+        margin-left: -0.5rem;
+        margin-right: -0.5rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .courses-page-wrap .card-header {
+        padding: 0.75rem 0.5rem;
+    }
+    .courses-page-wrap .card-header .d-flex {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 0.5rem;
+    }
+    .courses-page-wrap .courses-header-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+@media (max-width: 576px) {
+    .courses-page-wrap .card-body {
+        padding: 0.5rem 0.375rem !important;
+    }
+    .courses-page-wrap .card.border.mb-4 .card-body {
+        padding: 0.5rem 0.375rem !important;
+    }
+    .courses-page-wrap .card-header {
+        padding: 0.625rem 0.375rem;
+    }
+}
 </style>
 
-<div class="container-fluid px-4 py-3">
+<div class="container-fluid px-4 py-3 courses-page-wrap">
     <div class="card shadow-sm border-0">
         <div class="card-header bg-primary text-white">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">

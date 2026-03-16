@@ -337,15 +337,116 @@ class CourseController extends Controller {
                 $this->redirect('courses/edit?id=' . urlencode($id));
             }
         } else {
+            $courseModel = $this->model('CourseModel');
+            $versions = $courseModel->getVersionsForCourse($id);
+            $latestVersion = $courseModel->getLatestVersionForCourse($id);
             $data = [
                 'title' => 'Edit Course',
                 'page' => 'courses',
                 'course' => $course,
                 'departments' => $departments,
+                'versions' => $versions,
+                'latestVersion' => $latestVersion,
+                'message' => $_SESSION['message'] ?? null,
                 'error' => $_SESSION['error'] ?? null
             ];
-            unset($_SESSION['error']);
+            unset($_SESSION['message'], $_SESSION['error']);
             return $this->view('courses/edit', $data);
+        }
+    }
+
+    /**
+     * Create a new version for a course (same course code, incremented version number).
+     * New student enrollments will use this latest version.
+     */
+    public function newVersion() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $isHOD = $this->isHOD();
+        $userRole = $userModel->getUserRole($_SESSION['user_id']);
+        $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
+        if (!$isHOD && !$isADM) {
+            $_SESSION['error'] = 'Access denied. Only HOD and ADM can create course versions.';
+            $this->redirect('courses');
+            return;
+        }
+        $id = trim($this->get('id', ''));
+        if (empty($id)) {
+            $_SESSION['error'] = 'Course ID is required.';
+            $this->redirect('courses');
+            return;
+        }
+        $courseModel = $this->model('CourseModel');
+        $course = $courseModel->getById($id);
+        if (!$course) {
+            $_SESSION['error'] = 'Course not found.';
+            $this->redirect('courses');
+            return;
+        }
+        $hodDepartmentId = $this->getHODDepartment();
+        if ($hodDepartmentId && isset($course['department_id']) && $course['department_id'] !== $hodDepartmentId) {
+            $_SESSION['error'] = 'Access denied. You can only manage versions for courses in your department.';
+            $this->redirect('courses');
+            return;
+        }
+        $newVersionNo = $courseModel->createNewVersion($id);
+        if ($newVersionNo > 0) {
+            $_SESSION['message'] = "Course version added: {$newVersionNo}. New enrollments will use this version.";
+            $this->redirect('courses/edit?id=' . urlencode($id));
+        } else {
+            $_SESSION['error'] = 'Failed to add course version.';
+            $this->redirect('courses/edit?id=' . urlencode($id));
+        }
+    }
+
+    /**
+     * Remove a course version (same access as newVersion).
+     */
+    public function removeVersion() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $isHOD = $this->isHOD();
+        $userRole = $userModel->getUserRole($_SESSION['user_id']);
+        $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
+        if (!$isHOD && !$isADM) {
+            $_SESSION['error'] = 'Access denied. Only HOD and ADM can remove course versions.';
+            $this->redirect('courses');
+            return;
+        }
+        $id = trim($this->get('id', ''));
+        $versionNo = (int)$this->get('version_no', 0);
+        if (empty($id) || $versionNo < 1) {
+            $_SESSION['error'] = 'Course ID and version number are required.';
+            $this->redirect('courses');
+            return;
+        }
+        $courseModel = $this->model('CourseModel');
+        $course = $courseModel->getById($id);
+        if (!$course) {
+            $_SESSION['error'] = 'Course not found.';
+            $this->redirect('courses');
+            return;
+        }
+        $hodDepartmentId = $this->getHODDepartment();
+        if ($hodDepartmentId && isset($course['department_id']) && $course['department_id'] !== $hodDepartmentId) {
+            $_SESSION['error'] = 'Access denied. You can only manage versions for courses in your department.';
+            $this->redirect('courses');
+            return;
+        }
+        if ($courseModel->deleteVersion($id, $versionNo)) {
+            $_SESSION['message'] = "Course version {$versionNo} removed.";
+            $this->redirect('courses/edit?id=' . urlencode($id));
+        } else {
+            $_SESSION['error'] = 'Failed to remove version or version not found.';
+            $this->redirect('courses/edit?id=' . urlencode($id));
         }
     }
     

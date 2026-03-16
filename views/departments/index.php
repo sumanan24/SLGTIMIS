@@ -1,4 +1,65 @@
-<div class="container-fluid px-4 py-3">
+<style>
+/* Departments index - mobile full-width, no side space */
+@media (max-width: 768px) {
+    .departments-page-wrap.container-fluid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+    .departments-page-wrap .card {
+        border-radius: 0;
+    }
+    .departments-page-wrap .card-header {
+        padding: 0.75rem 0.5rem;
+    }
+    .departments-page-wrap .card-header .d-flex {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 0.5rem;
+    }
+    .departments-page-wrap .card-header h5 {
+        font-size: 1rem;
+    }
+    .departments-page-wrap .card-body {
+        padding: 0.75rem 0.5rem !important;
+    }
+    .departments-page-wrap .btn.btn-light.btn-sm {
+        width: 100%;
+        justify-content: center;
+    }
+    .departments-page-wrap .table-responsive {
+        margin-left: -0.5rem;
+        margin-right: -0.5rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .departments-page-wrap .table {
+        font-size: 0.9375rem;
+    }
+    .departments-page-wrap .table th,
+    .departments-page-wrap .table td {
+        white-space: nowrap;
+        padding: 0.5rem 0.4rem;
+    }
+}
+@media (max-width: 576px) {
+    .departments-page-wrap.container-fluid {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+    .departments-page-wrap .card-body {
+        padding: 0.5rem 0.375rem !important;
+    }
+    .departments-page-wrap .card-header {
+        padding: 0.625rem 0.375rem;
+    }
+}
+</style>
+
+<div class="container-fluid px-4 py-3 departments-page-wrap">
     <div class="card shadow-sm border-0">
         <div class="card-header bg-primary text-white">
             <div class="d-flex align-items-center justify-content-between flex-wrap">

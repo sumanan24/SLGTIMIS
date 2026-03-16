@@ -1,4 +1,70 @@
-<div class="container-fluid px-4 py-3">
+<style>
+/* Departments delete - mobile full-width, no side space */
+@media (max-width: 768px) {
+    .dept-delete-wrap.container-fluid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+    .dept-delete-wrap .row {
+        margin-left: 0;
+        margin-right: 0;
+    }
+    .dept-delete-wrap .row > [class*="col-"] {
+        padding-left: 0;
+        padding-right: 0;
+    }
+    .dept-delete-wrap .col-lg-6 {
+        max-width: 100%;
+        flex: 0 0 100%;
+    }
+    .dept-delete-wrap .card {
+        border-radius: 0;
+    }
+    .dept-delete-wrap .card-header {
+        padding: 0.75rem 0.5rem;
+    }
+    .dept-delete-wrap .card-header h5 {
+        font-size: 1rem;
+    }
+    .dept-delete-wrap .card-body {
+        padding: 0.75rem 0.5rem !important;
+    }
+    .dept-delete-wrap .table-responsive {
+        margin-left: -0.5rem;
+        margin-right: -0.5rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+        -webkit-overflow-scrolling: touch;
+    }
+    .dept-delete-wrap .table {
+        font-size: 0.9375rem;
+    }
+    .dept-delete-wrap .table th,
+    .dept-delete-wrap .table td {
+        padding: 0.5rem 0.4rem;
+        white-space: nowrap;
+    }
+    .dept-delete-wrap .d-flex.gap-2 {
+        flex-direction: column;
+    }
+    .dept-delete-wrap .d-flex.gap-2 .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+@media (max-width: 576px) {
+    .dept-delete-wrap .card-body {
+        padding: 0.5rem 0.375rem !important;
+    }
+    .dept-delete-wrap .card-header {
+        padding: 0.625rem 0.375rem;
+    }
+}
+</style>
+
+<div class="container-fluid px-4 py-3 dept-delete-wrap">
     <div class="row justify-content-center">
         <div class="col-lg-6">
             <div class="card shadow-sm border-0">

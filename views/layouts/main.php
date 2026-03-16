@@ -102,13 +102,13 @@
                             <?php if (!$isSAO): ?>
                             <!-- Deputy Principal Education Branch - Hidden for SAO -->
                             <li class="menu-item-has-children <?php 
-                            $educationPages = ['departments', 'courses', 'staff', 'inventory'];
-                            if ($hasGroupAccess) {
-                                $educationPages[] = 'groups';
-                            }
-                            if ($hasTimetableAccess) {
-                                $educationPages[] = 'group-timetable';
-                            }
+$educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
+                                    if ($hasGroupAccess) {
+                                        $educationPages[] = 'groups';
+                                    }
+                                    if ($hasTimetableAccess) {
+                                        $educationPages[] = 'group-timetable';
+                                    }
                             if ($isAdminOrADM) {
                                 $educationPages[] = 'staff-roles';
                             }
@@ -127,7 +127,7 @@
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
                                 <ul class="submenu" style="<?php 
-                                    $educationPages = ['departments', 'courses', 'staff', 'inventory'];
+                                    $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                     if ($hasGroupAccess) {
                                         $educationPages[] = 'groups';
                                     }
@@ -155,6 +155,12 @@
                                         <a href="<?php echo APP_URL; ?>/courses" class="<?php echo (isset($page) && $page === 'courses') ? 'active' : ''; ?>">
                                             <i class="fas fa-book"></i>
                                             <span>Courses</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/modules" class="<?php echo (isset($page) && $page === 'modules') ? 'active' : ''; ?>">
+                                            <i class="fas fa-cubes"></i>
+                                            <span>Modules</span>
                                         </a>
                                     </li>
                                     <?php if ($hasGroupAccess): ?>

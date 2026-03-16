@@ -6,6 +6,13 @@
                     <h5 class="mb-0 fw-bold"><i class="fas fa-edit me-2"></i>Edit Course</h5>
                 </div>
                 <div class="card-body">
+                    <?php if (isset($message)): ?>
+                        <div class="alert alert-success alert-dismissible fade show d-flex align-items-center" role="alert">
+                            <i class="fas fa-check-circle me-2"></i>
+                            <div><?php echo htmlspecialchars($message); ?></div>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <?php endif; ?>
                     <?php if (isset($error)): ?>
                         <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center" role="alert">
                             <i class="fas fa-exclamation-circle me-2"></i>
@@ -13,6 +20,40 @@
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     <?php endif; ?>
+
+                    <?php
+                    $versions = $versions ?? [];
+                    $latestVersion = $latestVersion ?? 0;
+                    ?>
+                    <div class="card border mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title mb-2 fw-bold text-muted small">Course versions</h6>
+                            <p class="text-muted small mb-2">Latest version for new enrollments: <strong><?php echo (int)$latestVersion; ?></strong> (0 = default)</p>
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                <form method="POST" action="<?php echo APP_URL; ?>/courses/new-version?id=<?php echo urlencode($course['course_id']); ?>" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-plus me-1"></i>Add version
+                                    </button>
+                                </form>
+                            </div>
+                            <?php if (!empty($versions)): ?>
+                                <ul class="list-group list-group-flush">
+                                    <?php foreach ($versions as $v): ?>
+                                        <li class="list-group-item d-flex align-items-center justify-content-between py-1 px-0">
+                                            <span>Version <?php echo (int)$v['version_no']; ?></span>
+                                            <form method="POST" action="<?php echo APP_URL; ?>/courses/remove-version?id=<?php echo urlencode($course['course_id']); ?>&version_no=<?php echo (int)$v['version_no']; ?>" class="d-inline" onsubmit="return confirm('Remove version <?php echo (int)$v['version_no']; ?>?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <i class="fas fa-trash-alt"></i> Remove
+                                                </button>
+                                            </form>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php else: ?>
+                                <p class="text-muted small mb-0">No versions yet. Click &quot;Add version&quot; to create one.</p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                     
                     <form method="POST" action="<?php echo APP_URL; ?>/courses/edit?id=<?php echo urlencode($course['course_id']); ?>">
                         <div class="row">
