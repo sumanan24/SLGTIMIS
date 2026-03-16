@@ -196,38 +196,31 @@ class GroupModel extends Model {
     }
     
     /**
-     * Get available students for a course (not already in the group)
+     * Get available students for a course (only students NOT assigned to any active group).
      */
     public function getAvailableStudents($courseId, $academicYear, $groupId = null) {
         $sql = "SELECT DISTINCT s.student_id, s.student_fullname, s.student_email
                 FROM `student` s
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
-                WHERE se.course_id = ? AND se.academic_year = ? AND se.student_enroll_status = 'Following'";
-        
-        if ($groupId) {
-            $sql .= " AND s.student_id NOT IN (
-                        SELECT student_id FROM `group_students` WHERE group_id = ? AND status = 'active'
-                    )";
-        }
-        
-        $sql .= " ORDER BY s.student_fullname ASC";
-        
+                WHERE se.course_id = ? 
+                  AND se.academic_year = ?
+                  AND s.student_id NOT IN (
+                        SELECT student_id FROM `group_students` WHERE status = 'active'
+                  )
+                ORDER BY s.student_fullname ASC";
+
         $stmt = $this->db->prepare($sql);
-        if ($groupId) {
-            $stmt->bind_param("ssi", $courseId, $academicYear, $groupId);
-        } else {
-            $stmt->bind_param("ss", $courseId, $academicYear);
-        }
+        $stmt->bind_param("ss", $courseId, $academicYear);
         $stmt->execute();
         $result = $stmt->get_result();
-        
+
         $data = [];
         if ($result && $result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
                 $data[] = $row;
             }
         }
-        
+
         return $data;
     }
     
