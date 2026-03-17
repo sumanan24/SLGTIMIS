@@ -376,7 +376,8 @@ class AttendanceController extends Controller {
         $courseId = $this->get('course_id', '');
         $academicYear = $this->get('academic_year', '');
         $month = $this->get('month', date('Y-m'));
-        $eligibleOnly = $this->get('eligible_only', '0') === '1';
+        // FIN users see only eligible (allowance-eligible) students; others can toggle via filter
+        $eligibleOnly = $isFIN ? true : ($this->get('eligible_only', '0') === '1');
         
         // Get filter options - only show user's department if department-restricted
         if ($userDepartmentId) {
@@ -689,6 +690,10 @@ class AttendanceController extends Controller {
             'course_id' => $courseId,
             'academic_year' => $academicYear
         ];
+        // FIN users export only eligible (allowance-eligible) students
+        if ($isFIN) {
+            $filters['eligible_only'] = true;
+        }
         
         // Get report data (same method as report view)
         $reportData = $attendanceModel->getAttendanceReport($month, $filters);

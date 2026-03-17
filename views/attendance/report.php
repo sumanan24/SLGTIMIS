@@ -99,13 +99,21 @@
                             <div class="col-md-2">
                                 <label class="form-label fw-semibold">&nbsp;</label>
                                 <div class="form-check mt-2">
+                                    <?php if (isset($isFIN) && $isFIN): ?>
+                                    <input class="form-check-input" type="checkbox" id="eligible_only" name="eligible_only" value="1" checked disabled>
+                                    <label class="form-check-label" for="eligible_only">
+                                        Eligible Students Only
+                                    </label>
+                                    <div class="form-text small">FIN view: only allowance eligible students</div>
+                                    <?php else: ?>
                                     <input class="form-check-input" type="checkbox" id="eligible_only" name="eligible_only" value="1"
                                            <?php echo (isset($eligibleOnly) && $eligibleOnly) ? 'checked' : ''; ?>>
                                     <label class="form-check-label" for="eligible_only">
                                         Eligible Students Only
                                     </label>
+                                    <div class="form-text small">Show only allowance eligible students</div>
+                                    <?php endif; ?>
                                 </div>
-                                <div class="form-text small">Show only allowance eligible students</div>
                             </div>
                         </div>
                         
