@@ -454,6 +454,19 @@ class UserModel extends Model {
         
         // Order by
         $orderBy = $filters['order_by'] ?? 'user_name';
+        $allowedOrderBy = [
+            'user_id',
+            'user_name',
+            'user_email',
+            'user_active',
+            'account_locked',
+            'lock_reason',
+            'locked_at',
+            'user_last_login_timestamp'
+        ];
+        if (!in_array($orderBy, $allowedOrderBy, true)) {
+            $orderBy = 'user_name';
+        }
         $orderDir = isset($filters['order_dir']) && strtoupper($filters['order_dir']) === 'DESC' ? 'DESC' : 'ASC';
         $sql .= " ORDER BY `{$orderBy}` {$orderDir}";
         

@@ -274,11 +274,38 @@ class AdminController extends Controller {
             unset($_SESSION['message'], $_SESSION['error']);
             return $this->view('admin/locked-accounts', $data);
         } catch (Exception $e) {
+            // Keep page usable even if query fails
+            $search = $this->get('search', '');
+            $status = $this->get('status', '');
+            $hasLogin = $this->get('has_login', '');
+            $orderBy = $this->get('order_by', 'locked_at');
+            $orderDir = $this->get('order_dir', 'DESC');
+            
+            $filters = [
+                'lock_status' => 'locked',
+                'order_by' => $orderBy,
+                'order_dir' => $orderDir
+            ];
+            if (!empty($search)) {
+                $filters['search'] = $search;
+            }
+            if ($status !== '') {
+                $filters['status'] = $status;
+            }
+            if (!empty($hasLogin)) {
+                $filters['has_login'] = $hasLogin;
+            }
+            
             $data = [
                 'title' => 'Locked Accounts',
                 'page' => 'admin-locked-accounts',
+                'users' => [],
+                'lockedCount' => 0,
+                'filters' => $filters,
+                'message' => $_SESSION['message'] ?? null,
                 'error' => 'Error loading locked accounts: ' . $e->getMessage()
             ];
+            unset($_SESSION['message'], $_SESSION['error']);
             return $this->view('admin/locked-accounts', $data);
         }
     }
