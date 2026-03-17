@@ -265,6 +265,11 @@
             </div>
         </main>
     <?php endif; ?>
+    
+    <footer class="py-3 text-center text-muted small">
+        <div>&copy; <?php echo date('Y'); ?> Sri Lanka German Training Institute</div>
+        <div>Developed by SICODE</div>
+    </footer>
 
     <?php if (!empty($_SESSION['error']) || !empty($_SESSION['message'])): ?>
         <?php
