@@ -289,7 +289,6 @@
                                             <option value="">Select</option>
                                             <option value="Mr." <?php echo ($student['student_title'] ?? '') === 'Mr.' ? 'selected' : ''; ?>>Mr.</option>
                                             <option value="Mrs." <?php echo ($student['student_title'] ?? '') === 'Mrs.' ? 'selected' : ''; ?>>Mrs.</option>
-                                            <option value="Miss" <?php echo ($student['student_title'] ?? '') === 'Miss' ? 'selected' : ''; ?>>Miss</option>
                                             <option value="Ms." <?php echo ($student['student_title'] ?? '') === 'Ms.' ? 'selected' : ''; ?>>Ms.</option>
                                         </select>
                                         <div class="invalid-feedback">Please select a title.</div>
