@@ -273,7 +273,7 @@ class RoomAllocationModel extends Model {
      */
     public function getByRoomId($roomId, $status = null) {
         $sql = "SELECT ha.*, 
-                s.student_id, s.student_fullname, s.student_email, s.student_nic, s.student_gender,
+                s.student_id, s.student_fullname, s.student_phone, s.student_nic, s.student_gender,
                 r.room_no, r.capacity,
                 b.name as block_name,
                 h.name as hostel_name

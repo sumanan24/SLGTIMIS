@@ -4,6 +4,127 @@
  */
 
 class StudentController extends Controller {
+    private function containsNonEnglishChars($value) {
+        if ($value === null) return false;
+        $value = (string)$value;
+        // Reject non-ASCII characters (Sinhala/Tamil etc.). Allow standard English ASCII.
+        return (bool)preg_match('/[^\x00-\x7F]/', $value);
+    }
+    
+    private function enforceEnglishOnly($data, $fieldNames, $tab = 'personal') {
+        foreach ($fieldNames as $field) {
+            if (array_key_exists($field, $data) && $this->containsNonEnglishChars($data[$field])) {
+                $_SESSION['error'] = 'Please fill all details in English only.';
+                $_SESSION['active_tab'] = $tab;
+                $this->redirect('student/profile/edit');
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    private function normalizeSriLankaNic($nic) {
+        $nic = strtoupper(trim((string)$nic));
+        // Remove common separators/spaces
+        $nic = preg_replace('/\s+|-|_/', '', $nic);
+        return $nic;
+    }
+    
+    private function isValidSriLankaNic($nic) {
+        $nic = $this->normalizeSriLankaNic($nic);
+        // Old NIC: 9 digits + V/X, New NIC: 12 digits
+        return (bool)preg_match('/^(\d{9}[VX]|\d{12})$/', $nic);
+    }
+
+    private function isValidStrongPassword($password) {
+        $password = (string)$password;
+        if (strlen($password) < 8) return false;
+        // At least 1 uppercase, 1 lowercase, 1 digit
+        return (bool)preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/', $password);
+    }
+
+    /**
+     * Student change password (from student dashboard)
+     */
+    public function changeStudentPassword() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        if (!isset($_SESSION['user_table']) || $_SESSION['user_table'] !== 'student') {
+            $_SESSION['error'] = 'Access denied.';
+            $this->redirect('dashboard');
+            return;
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->redirect('student/dashboard');
+            return;
+        }
+
+        $oldPassword = (string)$this->post('old_password', '');
+        $newPassword = (string)$this->post('new_password', '');
+        $confirmPassword = (string)$this->post('confirm_password', '');
+
+        if (trim($oldPassword) === '' || trim($newPassword) === '' || trim($confirmPassword) === '') {
+            $_SESSION['error'] = 'Old password, new password, and confirm password are required.';
+            $this->redirect('student/dashboard');
+            return;
+        }
+        if ($newPassword !== $confirmPassword) {
+            $_SESSION['error'] = 'New password and confirm password do not match.';
+            $this->redirect('student/dashboard');
+            return;
+        }
+        if (!$this->isValidStrongPassword($newPassword)) {
+            $_SESSION['error'] = 'Password must be at least 8 characters and include 1 capital letter, 1 small letter, and 1 number.';
+            $this->redirect('student/dashboard');
+            return;
+        }
+
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare("SELECT `user_password_hash` FROM `user` WHERE `user_id` = ? AND `user_active` = 1");
+            $stmt->bind_param('i', $_SESSION['user_id']);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            $user = $res ? $res->fetch_assoc() : null;
+            if (!$user || empty($user['user_password_hash'])) {
+                $_SESSION['error'] = 'User account not properly configured. Please contact administrator.';
+                $this->redirect('student/dashboard');
+                return;
+            }
+
+            $currentHash = (string)$user['user_password_hash'];
+            $isSha256 = (strlen($currentHash) === 64 && ctype_xdigit($currentHash));
+            $passwordVerified = false;
+            if ($isSha256) {
+                $hashedInput = hash('sha256', $oldPassword);
+                $passwordVerified = hash_equals($currentHash, $hashedInput);
+            } else {
+                $passwordVerified = password_verify($oldPassword, $currentHash);
+            }
+
+            if (!$passwordVerified) {
+                $_SESSION['error'] = 'Old password is incorrect.';
+                $this->redirect('student/dashboard');
+                return;
+            }
+
+            // Save new password using password_hash (AuthController supports password_verify for non-SHA256 hashes)
+            $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
+            $update = $db->prepare("UPDATE `user` SET `user_password_hash` = ? WHERE `user_id` = ?");
+            $update->bind_param('si', $newHash, $_SESSION['user_id']);
+            $update->execute();
+
+            $_SESSION['message'] = 'Password changed successfully.';
+            $this->redirect('student/dashboard');
+            return;
+        } catch (Exception $e) {
+            $_SESSION['error'] = 'Error changing password. Please try again.';
+            $this->redirect('student/dashboard');
+            return;
+        }
+    }
     
     public function index() {
         // Check authentication
@@ -325,174 +446,6 @@ class StudentController extends Controller {
                     'bank_branch' => trim($this->post('bank_branch', ''))
                 ];
                 $successMessage = 'Bank details updated successfully.';
-            } elseif ($updateSection === 'documents') {
-                // Handle PDF document upload
-                $successMessage = 'Documents uploaded successfully.';
-                $data = [];
-                
-                // Ensure student_documents_pdf column exists
-                $studentModel->addStudentDocumentsPdfColumnIfNotExists();
-                
-                // Check if file was uploaded
-                if (!isset($_FILES['student_documents_pdf'])) {
-                    $_SESSION['error'] = 'No file was uploaded. Please check Nginx configuration (client_max_body_size) and PHP settings (upload_max_filesize, post_max_size).';
-                    $_SESSION['active_tab'] = 'documents';
-                    $this->redirect('student/profile/edit');
-                    return;
-                }
-                
-                $file = $_FILES['student_documents_pdf'];
-                
-                // Check for upload errors
-                if ($file['error'] !== UPLOAD_ERR_OK) {
-                    $errorMessages = [
-                        UPLOAD_ERR_INI_SIZE => 'File exceeds PHP upload_max_filesize limit. Please increase upload_max_filesize in php.ini.',
-                        UPLOAD_ERR_FORM_SIZE => 'File exceeds form MAX_FILE_SIZE limit.',
-                        UPLOAD_ERR_PARTIAL => 'File was only partially uploaded. Please check Nginx client_max_body_size setting.',
-                        UPLOAD_ERR_NO_FILE => 'No file was uploaded.',
-                        UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder. Please check PHP temp directory.',
-                        UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk. Please check directory permissions.',
-                        UPLOAD_ERR_EXTENSION => 'File upload stopped by PHP extension.',
-                    ];
-                    
-                    $errorMsg = $errorMessages[$file['error']] ?? 'Unknown upload error (Code: ' . $file['error'] . ').';
-                    
-                    // Additional Nginx-specific check
-                    if ($file['error'] === UPLOAD_ERR_INI_SIZE || $file['error'] === UPLOAD_ERR_FORM_SIZE) {
-                        $errorMsg .= ' Also check Nginx client_max_body_size setting (should be at least 10M).';
-                    }
-                    
-                    $_SESSION['error'] = $errorMsg;
-                    $_SESSION['active_tab'] = 'documents';
-                    $this->redirect('student/profile/edit');
-                    return;
-                }
-                
-                $file = $_FILES['student_documents_pdf'];
-                
-                // Validate file type
-                $allowedMimeTypes = ['application/pdf'];
-                $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-                
-                if ($fileExtension !== 'pdf' || !in_array($file['type'], $allowedMimeTypes)) {
-                    $_SESSION['error'] = 'Only PDF files are allowed.';
-                    $_SESSION['active_tab'] = 'documents';
-                    $this->redirect('student/profile/edit');
-                    return;
-                }
-                
-                // Check file size (max 10MB before compression)
-                $maxSize = 10 * 1024 * 1024; // 10MB
-                if ($file['size'] > $maxSize) {
-                    $_SESSION['error'] = 'File size exceeds 10MB limit. Please compress the PDF before uploading.';
-                    $_SESSION['active_tab'] = 'documents';
-                    $this->redirect('student/profile/edit');
-                    return;
-                }
-                
-                // Ensure assets directory exists and is writable
-                $assetsDirectory = BASE_PATH . '/assets';
-                $assetsCheck = $this->ensureDirectoryWritable($assetsDirectory, 'assets');
-                if (!$assetsCheck['success']) {
-                    $_SESSION['error'] = $assetsCheck['message'];
-                    $_SESSION['active_tab'] = 'documents';
-                    $this->redirect('student/profile/edit');
-                    return;
-                }
-                
-                // Create studentdoc directory if it doesn't exist and ensure it's writable
-                $docDirectory = BASE_PATH . '/assets/studentdoc';
-                $docCheck = $this->ensureDirectoryWritable($docDirectory, 'assets/studentdoc');
-                if (!$docCheck['success']) {
-                    $_SESSION['error'] = $docCheck['message'];
-                    $_SESSION['active_tab'] = 'documents';
-                    $this->redirect('student/profile/edit');
-                    return;
-                }
-                
-                // Generate filename: student_id.pdf
-                $safeStudentId = preg_replace('/[^a-zA-Z0-9._-]/', '_', $studentId);
-                $newFilename = $safeStudentId . '.pdf';
-                $targetPath = $docDirectory . '/' . $newFilename;
-                
-                // Delete old file if exists
-                if (file_exists($targetPath)) {
-                    @unlink($targetPath);
-                }
-                
-                // Move uploaded file temporarily
-                $tempPath = $docDirectory . '/temp_' . $newFilename;
-                
-                // Check if we can write to the directory
-                if (!is_writable($docDirectory)) {
-                    $_SESSION['error'] = 'Cannot write to documents directory. Please contact administrator to set proper permissions.';
-                    $_SESSION['active_tab'] = 'documents';
-                    $this->redirect('student/profile/edit');
-                    return;
-                }
-                
-                // Try to move the uploaded file
-                if (!move_uploaded_file($file['tmp_name'], $tempPath)) {
-                    $errorMsg = 'Failed to upload file. ';
-                    switch ($file['error']) {
-                        case UPLOAD_ERR_INI_SIZE:
-                        case UPLOAD_ERR_FORM_SIZE:
-                            $errorMsg .= 'File size exceeds limit.';
-                            break;
-                        case UPLOAD_ERR_PARTIAL:
-                            $errorMsg .= 'File was only partially uploaded.';
-                            break;
-                        case UPLOAD_ERR_NO_FILE:
-                            $errorMsg .= 'No file was uploaded.';
-                            break;
-                        case UPLOAD_ERR_NO_TMP_DIR:
-                            $errorMsg .= 'Missing temporary folder.';
-                            break;
-                        case UPLOAD_ERR_CANT_WRITE:
-                            $errorMsg .= 'Failed to write file to disk. Please check directory permissions.';
-                            break;
-                        case UPLOAD_ERR_EXTENSION:
-                            $errorMsg .= 'File upload stopped by extension.';
-                            break;
-                        default:
-                            $errorMsg .= 'Please check directory permissions (755 or 775 required).';
-                    }
-                    $_SESSION['error'] = $errorMsg;
-                    $_SESSION['active_tab'] = 'documents';
-                    $this->redirect('student/profile/edit');
-                    return;
-                }
-                
-                // Compress PDF to 1MB or less
-                $compressed = $this->compressPdf($tempPath, $targetPath, 1024 * 1024); // 1MB limit
-                
-                if (!$compressed) {
-                    // If compression fails, use original file if it's already under 1MB
-                    if (filesize($tempPath) <= 1024 * 1024) {
-                        rename($tempPath, $targetPath);
-                    } else {
-                        @unlink($tempPath);
-                        $_SESSION['error'] = 'Failed to compress PDF. Please ensure the file is under 1MB or use a PDF compression tool.';
-                        $_SESSION['active_tab'] = 'documents';
-                        $this->redirect('student/profile/edit');
-                        return;
-                    }
-                } else {
-                    // Remove temp file if compression succeeded
-                    @unlink($tempPath);
-                }
-                
-                // Verify final file size
-                if (filesize($targetPath) > 1024 * 1024) {
-                    @unlink($targetPath);
-                    $_SESSION['error'] = 'PDF compression failed. File size is still over 1MB. Please compress the PDF manually before uploading.';
-                    $_SESSION['active_tab'] = 'documents';
-                    $this->redirect('student/profile/edit');
-                    return;
-                }
-                
-                // Update database with filename
-                $data['student_documents_pdf'] = $newFilename;
             } else {
                 $_SESSION['error'] = 'Invalid update section.';
                 $this->redirect('student/profile/edit');
@@ -501,6 +454,30 @@ class StudentController extends Controller {
             
             // Validation for personal information
             if ($validationRequired) {
+                // Enforce English-only for free-text inputs
+                if (!$this->enforceEnglishOnly($data, [
+                    'student_title',
+                    'student_fullname',
+                    'student_ininame',
+                    'student_civil',
+                    'student_email',
+                    'student_nic',
+                    'student_address',
+                    'student_district',
+                    'student_divisions',
+                    'student_provice',
+                    'student_blood',
+                    'student_em_name',
+                    'student_em_address',
+                    'student_em_relation',
+                    'student_nationality',
+                    'student_whatsapp',
+                    'student_religion'
+                ], 'personal')) {
+                    return;
+                }
+                
+                $data['student_nic'] = $this->normalizeSriLankaNic($data['student_nic'] ?? '');
                 if (empty($data['student_fullname']) || empty($data['student_email']) || empty($data['student_nic'])) {
                     $_SESSION['error'] = 'Full Name, Email, and NIC are required.';
                     $_SESSION['active_tab'] = $updateSection;
@@ -513,6 +490,20 @@ class StudentController extends Controller {
                     $_SESSION['error'] = 'Invalid email format.';
                     $_SESSION['active_tab'] = $updateSection;
                     $this->redirect('student/profile/edit');
+                    return;
+                }
+                
+                // Validate NIC format (Sri Lanka: 9 digits + V/X OR 12 digits)
+                if (!$this->isValidSriLankaNic($data['student_nic'])) {
+                    $_SESSION['error'] = 'Invalid NIC format. Use 12 digits (new NIC) or 9 digits + V/X (old NIC).';
+                    $_SESSION['active_tab'] = $updateSection;
+                    $this->redirect('student/profile/edit');
+                    return;
+                }
+            }
+            
+            if ($updateSection === 'bank') {
+                if (!$this->enforceEnglishOnly($data, ['bank_name', 'bank_account_no', 'bank_branch'], 'bank')) {
                     return;
                 }
             }
@@ -620,7 +611,8 @@ class StudentController extends Controller {
         // try using Imagick if available
         if (extension_loaded('imagick')) {
             try {
-                $imagick = new Imagick();
+                $imagickClass = '\\Imagick';
+                $imagick = new $imagickClass();
                 $imagick->setResolution(72, 72);
                 $imagick->readImage($inputPath);
                 $imagick->setImageCompressionQuality(50);

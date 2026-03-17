@@ -163,17 +163,7 @@
         }
     }
     
-    /* Validation Styles */
-    .form-control:required:invalid,
-    .form-select:required:invalid {
-        border-color: #dc3545;
-    }
-    
-    .form-control:required:invalid:focus,
-    .form-select:required:invalid:focus {
-        border-color: #dc3545;
-        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
-    }
+    /* Validation Styles (show errors only when validated/marked invalid) */
     
     .form-control.is-invalid,
     .form-select.is-invalid {
@@ -202,11 +192,19 @@
     }
     
     .invalid-feedback {
-        display: block;
+        display: none;
         width: 100%;
         margin-top: 0.25rem;
         font-size: 0.875rem;
         color: #dc3545;
+    }
+
+    .is-invalid ~ .invalid-feedback {
+        display: block;
+    }
+
+    .was-validated :invalid ~ .invalid-feedback {
+        display: block;
     }
     
     .form-label .text-danger {
@@ -268,11 +266,6 @@
                                 <i class="fas fa-university me-1"></i>Bank Details
                             </button>
                         </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link <?php echo $activeTab === 'documents' ? 'active' : ''; ?>" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents" type="button" role="tab">
-                                <i class="fas fa-file-pdf me-1"></i>Required Documents
-                            </button>
-                        </li>
                     </ul>
                     
                     <div class="tab-content" id="studentTabsContent">
@@ -280,12 +273,7 @@
                         <div class="tab-pane fade <?php echo $activeTab === 'personal' ? 'show active' : ''; ?>" id="personal" role="tabpanel">
                             <form method="POST" action="<?php echo APP_URL; ?>/student/profile/edit" id="personalForm" novalidate>
                                 <input type="hidden" name="update_section" value="personal">
-                                
-                                <div class="alert alert-info">
-                                    <i class="fas fa-info-circle me-2"></i>
-                                    <strong>Note:</strong> You can edit your personal information here. Profile photos and enrollment details cannot be changed by students.
-                                </div>
-                                
+
                                 <div class="row">
                                     <div class="col-12 col-md-6 mb-3">
                                         <label for="student_id" class="form-label fw-semibold">Student ID</label>
@@ -326,7 +314,7 @@
                                         </label>
                                         <input type="text" class="form-control" id="student_fullname" name="student_fullname" 
                                                value="<?php echo htmlspecialchars($student['student_fullname']); ?>" 
-                                               maxlength="255" required>
+                                               maxlength="255" data-english-only="1" required>
                                         <div class="invalid-feedback">Please enter your full name.</div>
                                     </div>
                                     
@@ -334,7 +322,7 @@
                                         <label for="student_ininame" class="form-label fw-semibold">Name with Initials</label>
                                         <input type="text" class="form-control" id="student_ininame" name="student_ininame" 
                                                value="<?php echo htmlspecialchars($student['student_ininame'] ?? ''); ?>" 
-                                               maxlength="255" required>
+                                               maxlength="255" data-english-only="1" required>
                                         <div class="invalid-feedback">Please enter name with initials.</div>
                                     </div>
                                 </div>
@@ -346,7 +334,7 @@
                                         </label>
                                         <input type="email" class="form-control" id="student_email" name="student_email" 
                                                value="<?php echo htmlspecialchars($student['student_email']); ?>" 
-                                               maxlength="254" required>
+                                               maxlength="254" data-english-only="1" required>
                                         <div class="invalid-feedback">Please enter a valid email address.</div>
                                     </div>
                                     
@@ -356,8 +344,12 @@
                                         </label>
                                         <input type="text" class="form-control" id="student_nic" name="student_nic" 
                                                value="<?php echo htmlspecialchars($student['student_nic']); ?>" 
-                                               maxlength="12" required>
-                                        <div class="invalid-feedback">Please enter your NIC number.</div>
+                                               maxlength="12"
+                                               pattern="^(\d{12}|\d{9}[vVxX])$"
+                                               title="Use 12 digits (new NIC) or 9 digits + V/X (old NIC)"
+                                               data-english-only="1"
+                                               required>
+                                        <div class="invalid-feedback">Please enter a valid NIC (12 digits or 9 digits + V/X).</div>
                                     </div>
                                 </div>
                                 
@@ -391,7 +383,7 @@
                                         
                                         <div class="mb-3">
                                             <label for="student_address" class="form-label fw-semibold">Address <span class="text-danger">*</span></label>
-                                            <textarea class="form-control" id="student_address" name="student_address" rows="2" maxlength="255" required><?php echo htmlspecialchars($student['student_address'] ?? ''); ?></textarea>
+                                            <textarea class="form-control" id="student_address" name="student_address" rows="2" maxlength="255" data-english-only="1" required><?php echo htmlspecialchars($student['student_address'] ?? ''); ?></textarea>
                                             <div class="invalid-feedback">Please enter your address.</div>
                                         </div>
                                         
@@ -429,11 +421,11 @@
                                     </div>
                                     
                                     <div class="col-12 col-md-3 mb-3">
-                                        <label for="student_divisions" class="form-label fw-semibold">Divisions <span class="text-danger">*</span></label>
+                                        <label for="student_divisions" class="form-label fw-semibold">GS Division <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control" id="student_divisions" name="student_divisions" 
                                                value="<?php echo htmlspecialchars($student['student_divisions'] ?? ''); ?>" 
                                                maxlength="50" required>
-                                        <div class="invalid-feedback">Please enter divisions.</div>
+                                        <div class="invalid-feedback">Please enter GS division.</div>
                                     </div>
                                 </div>
                                 
@@ -482,7 +474,7 @@
                                         <label for="student_whatsapp" class="form-label fw-semibold">WhatsApp <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control" id="student_whatsapp" name="student_whatsapp" 
                                                value="<?php echo htmlspecialchars($student['student_whatsapp'] ?? ''); ?>" 
-                                               maxlength="20" required>
+                                               maxlength="20" data-english-only="1" required>
                                         <div class="invalid-feedback">Please enter WhatsApp number.</div>
                                     </div>
                                 </div>
@@ -495,7 +487,7 @@
                                         <label for="student_em_name" class="form-label fw-semibold">Emergency Contact Name <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control" id="student_em_name" name="student_em_name" 
                                                value="<?php echo htmlspecialchars($student['student_em_name'] ?? ''); ?>" 
-                                               maxlength="255" required>
+                                               maxlength="255" data-english-only="1" required>
                                         <div class="invalid-feedback">Please enter emergency contact name.</div>
                                     </div>
                                     
@@ -503,7 +495,7 @@
                                         <label for="student_em_relation" class="form-label fw-semibold">Relation <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control" id="student_em_relation" name="student_em_relation" 
                                                value="<?php echo htmlspecialchars($student['student_em_relation'] ?? ''); ?>" 
-                                               maxlength="20" required>
+                                               maxlength="20" data-english-only="1" required>
                                         <div class="invalid-feedback">Please enter relation.</div>
                                     </div>
                                 </div>
@@ -511,7 +503,7 @@
                                 <div class="row">
                                     <div class="col-12 col-md-6 mb-3">
                                         <label for="student_em_address" class="form-label fw-semibold">Emergency Address <span class="text-danger">*</span></label>
-                                        <textarea class="form-control" id="student_em_address" name="student_em_address" rows="2" maxlength="255" required><?php echo htmlspecialchars($student['student_em_address'] ?? ''); ?></textarea>
+                                        <textarea class="form-control" id="student_em_address" name="student_em_address" rows="2" maxlength="255" data-english-only="1" required><?php echo htmlspecialchars($student['student_em_address'] ?? ''); ?></textarea>
                                         <div class="invalid-feedback">Please enter emergency address.</div>
                                     </div>
                                     
@@ -545,7 +537,7 @@
                                         <label for="bank_name" class="form-label fw-semibold">Bank Name <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control" id="bank_name" name="bank_name" 
                                                value="<?php echo htmlspecialchars($student['bank_name'] ?? 'People\'s Bank'); ?>" 
-                                               maxlength="100" required>
+                                            maxlength="100" data-english-only="1" required>
                                         <div class="invalid-feedback">Please enter bank name.</div>
                                     </div>
                                     
@@ -553,7 +545,7 @@
                                         <label for="bank_account_no" class="form-label fw-semibold">Account Number <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control" id="bank_account_no" name="bank_account_no" 
                                                value="<?php echo htmlspecialchars($student['bank_account_no'] ?? ''); ?>" 
-                                               maxlength="50" required>
+                                            maxlength="50" data-english-only="1" required>
                                         <div class="invalid-feedback">Please enter account number.</div>
                                     </div>
                                 </div>
@@ -563,7 +555,7 @@
                                         <label for="bank_branch" class="form-label fw-semibold">Branch <span class="text-danger">*</span></label>
                                         <input type="text" class="form-control" id="bank_branch" name="bank_branch" 
                                                value="<?php echo htmlspecialchars($student['bank_branch'] ?? ''); ?>" 
-                                               maxlength="100" required>
+                                            maxlength="100" data-english-only="1" required>
                                         <div class="invalid-feedback">Please enter branch name.</div>
                                     </div>
                                 </div>
@@ -586,51 +578,6 @@
                             </form>
                         </div>
                         
-                        <!-- Documents Tab -->
-                        <div class="tab-pane fade <?php echo $activeTab === 'documents' ? 'show active' : ''; ?>" id="documents" role="tabpanel">
-                            <form method="POST" action="<?php echo APP_URL; ?>/student/profile/edit" id="documentsForm" enctype="multipart/form-data" novalidate>
-                                <input type="hidden" name="update_section" value="documents">
-                                
-                                <?php if (!empty($student['student_documents_pdf'])): ?>
-                                    <div class="alert alert-success mb-3">
-                                        <i class="fas fa-check-circle me-2"></i>
-                                        <strong>Current Document:</strong> 
-                                        <a href="<?php echo APP_URL . '/assets/studentdoc/' . htmlspecialchars($student['student_documents_pdf']); ?>" target="_blank" class="btn btn-sm btn-outline-primary ms-2">
-                                            <i class="fas fa-download me-1"></i>View/Download PDF
-                                        </a>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="alert alert-warning mb-3">
-                                        <i class="fas fa-exclamation-triangle me-2"></i>
-                                        <strong>No documents uploaded yet.</strong> Please upload your required documents as a single PDF file.
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <div class="row">
-                                    <div class="col-12 mb-3">
-                                        <label for="student_documents_pdf" class="form-label fw-semibold">
-                                            Required Documents (PDF) <span class="text-danger">*</span>
-                                        </label>
-                                        <input type="file" class="form-control" id="student_documents_pdf" name="student_documents_pdf" 
-                                               accept="application/pdf" required>
-                                        <div class="form-text">
-                                            <i class="fas fa-info-circle me-1"></i>
-                                            Upload a single PDF file containing all required documents. File will be compressed automatically.
-                                        </div>
-                                        <div class="invalid-feedback">Please upload a PDF file.</div>
-                                    </div>
-                                </div>
-                                
-                                <div class="d-flex gap-2 mt-4">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-upload me-1"></i>Upload Documents
-                                    </button>
-                                    <a href="<?php echo APP_URL; ?>/student/profile" class="btn btn-outline-secondary">
-                                        <i class="fas fa-times me-1"></i>Cancel
-                                    </a>
-                                </div>
-                            </form>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -706,9 +653,31 @@ document.addEventListener('DOMContentLoaded', function() {
 (function() {
     'use strict';
     
+    function hasNonAscii(value) {
+        return /[^\x00-\x7F]/.test(value || '');
+    }
+    
+    function applyEnglishOnlyValidation(form) {
+        const englishFields = form.querySelectorAll('[data-english-only="1"]');
+        englishFields.forEach(function(field) {
+            const validate = function() {
+                if (hasNonAscii(field.value)) {
+                    field.setCustomValidity('Please fill in English only.');
+                    field.classList.remove('is-valid');
+                    field.classList.add('is-invalid');
+                } else {
+                    field.setCustomValidity('');
+                }
+            };
+            field.addEventListener('input', validate);
+            field.addEventListener('blur', validate);
+        });
+    }
+    
     // Personal Information Form
     const personalForm = document.getElementById('personalForm');
     if (personalForm) {
+        applyEnglishOnlyValidation(personalForm);
         personalForm.addEventListener('submit', function(event) {
             if (!personalForm.checkValidity()) {
                 event.preventDefault();
@@ -755,73 +724,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Documents Form
-    const documentsForm = document.getElementById('documentsForm');
-    if (documentsForm) {
-        documentsForm.addEventListener('submit', function(event) {
-            const fileInput = document.getElementById('student_documents_pdf');
-            
-            if (!fileInput.files || fileInput.files.length === 0) {
-                event.preventDefault();
-                event.stopPropagation();
-                fileInput.classList.add('is-invalid');
-                return;
-            }
-            
-            const file = fileInput.files[0];
-            const maxSize = 10 * 1024 * 1024; // 10MB
-            
-            if (file.size > maxSize) {
-                event.preventDefault();
-                event.stopPropagation();
-                fileInput.classList.add('is-invalid');
-                fileInput.setCustomValidity('File size exceeds 10MB limit. Please compress the PDF before uploading.');
-                return;
-            }
-            
-            if (file.type !== 'application/pdf') {
-                event.preventDefault();
-                event.stopPropagation();
-                fileInput.classList.add('is-invalid');
-                fileInput.setCustomValidity('Only PDF files are allowed.');
-                return;
-            }
-            
-            fileInput.setCustomValidity('');
-            fileInput.classList.remove('is-invalid');
-            fileInput.classList.add('is-valid');
-            documentsForm.classList.add('was-validated');
-        });
-        
-        // Real-time validation
-        const fileInput = document.getElementById('student_documents_pdf');
-        if (fileInput) {
-            fileInput.addEventListener('change', function() {
-                if (this.files && this.files.length > 0) {
-                    const file = this.files[0];
-                    const maxSize = 10 * 1024 * 1024; // 10MB
-                    
-                    if (file.size > maxSize) {
-                        this.classList.remove('is-valid');
-                        this.classList.add('is-invalid');
-                        this.setCustomValidity('File size exceeds 10MB limit.');
-                    } else if (file.type !== 'application/pdf') {
-                        this.classList.remove('is-valid');
-                        this.classList.add('is-invalid');
-                        this.setCustomValidity('Only PDF files are allowed.');
-                    } else {
-                        this.classList.remove('is-invalid');
-                        this.classList.add('is-valid');
-                        this.setCustomValidity('');
-                    }
-                }
-            });
-        }
-    }
-    
     // Bank Details Form
     const bankForm = document.getElementById('bankForm');
     if (bankForm) {
+        applyEnglishOnlyValidation(bankForm);
         bankForm.addEventListener('submit', function(event) {
             if (!bankForm.checkValidity()) {
                 event.preventDefault();

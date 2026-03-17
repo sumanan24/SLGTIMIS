@@ -91,8 +91,15 @@ $busSeasonPayments = $busSeasonPayments ?? [];
                                         <td class="small">
                                             <?php echo htmlspecialchars(!empty($p['pays_date']) ? date('Y-m-d', strtotime($p['pays_date'])) : 'N/A'); ?>
                                         </td>
-                                        <td class="small text-truncate" style="max-width: 200px;" title="<?php echo htmlspecialchars($p['payment_reason'] ?? ''); ?>">
-                                            <?php echo htmlspecialchars($p['payment_reason'] ?? ''); ?>
+                                        <td class="small" style="max-width: 240px;" title="<?php echo htmlspecialchars(trim(($p['payment_reason'] ?? '') . (!empty($p['pays_note']) ? ' - ' . $p['pays_note'] : ''))); ?>">
+                                            <div class="text-truncate" style="max-width: 240px;">
+                                                <?php echo htmlspecialchars($p['payment_reason'] ?? ''); ?>
+                                            </div>
+                                            <?php if (!empty($p['pays_note'])): ?>
+                                                <div class="small text-muted text-truncate" style="max-width: 240px;">
+                                                    <?php echo htmlspecialchars($p['pays_note']); ?>
+                                                </div>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="small text-success">
                                             Rs. <?php echo number_format($p['pays_amount'] ?? 0, 2); ?>

@@ -26,6 +26,7 @@ return [
     'student/payments' => 'StudentDashboardController@payments',
     'student/profile' => 'StudentController@showStudentProfile',
     'student/profile/edit' => 'StudentController@editStudentProfile',
+    'student/change-password' => 'StudentController@changeStudentPassword',
     'student/accept-conduct' => 'StudentController@acceptConduct',
     'student/attendance' => 'StudentAttendanceController@index',
     'students' => 'StudentController@index',

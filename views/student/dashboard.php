@@ -302,36 +302,6 @@ $busSeasonPayments = $busSeasonPayments ?? [];
                 </h5>
                 <div class="row g-2 g-md-3">
                     <div class="col-6 col-md-4 col-lg-3">
-                        <a href="<?php echo APP_URL; ?>/on-peak-requests" class="text-decoration-none">
-                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-primary border-opacity-25 hover-lift quick-link-card">
-                                <div class="flex-shrink-0">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
-                                        <i class="fas fa-calendar-alt text-primary"></i>
-                                    </div>
-                                </div>
-                                <div class="flex-grow-1 min-w-0">
-                                    <div class="fw-bold text-dark quick-link-text">On-Peak Requests</div>
-                                    <div class="small text-muted quick-link-subtext">Submit & View</div>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="col-6 col-md-4 col-lg-3">
-                        <a href="<?php echo APP_URL; ?>/bus-season-requests" class="text-decoration-none">
-                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-success border-opacity-25 hover-lift quick-link-card">
-                                <div class="flex-shrink-0">
-                                    <div class="bg-success bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
-                                        <i class="fas fa-bus text-success"></i>
-                                    </div>
-                                </div>
-                                <div class="flex-grow-1 min-w-0">
-                                    <div class="fw-bold text-dark quick-link-text">Bus Season Request</div>
-                                    <div class="small text-muted quick-link-subtext">Season Ticket</div>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="col-6 col-md-4 col-lg-3">
                         <a href="<?php echo APP_URL; ?>/student/profile" class="text-decoration-none">
                             <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-primary border-opacity-25 hover-lift quick-link-card">
                                 <div class="flex-shrink-0">
@@ -340,7 +310,7 @@ $busSeasonPayments = $busSeasonPayments ?? [];
                                     </div>
                                 </div>
                                 <div class="flex-grow-1 min-w-0">
-                                    <div class="fw-bold text-dark quick-link-text">My Profile</div>
+                                    <div class="fw-bold text-dark quick-link-text">Edit Profile</div>
                                     <div class="small text-muted quick-link-subtext">View & Edit</div>
                                 </div>
                             </div>
@@ -362,21 +332,6 @@ $busSeasonPayments = $busSeasonPayments ?? [];
                         </a>
                     </div>
                     <div class="col-6 col-md-4 col-lg-3">
-                        <a href="<?php echo APP_URL; ?>/group-timetable/student-view" class="text-decoration-none">
-                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-info border-opacity-25 hover-lift quick-link-card">
-                                <div class="flex-shrink-0">
-                                    <div class="bg-info bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
-                                        <i class="fas fa-calendar-alt text-info"></i>
-                                    </div>
-                                </div>
-                                <div class="flex-grow-1 min-w-0">
-                                    <div class="fw-bold text-dark quick-link-text">Timetable</div>
-                                    <div class="small text-muted quick-link-subtext">View Schedule</div>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="col-6 col-md-4 col-lg-3">
                         <a href="<?php echo APP_URL; ?>/student/payments" class="text-decoration-none">
                             <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-warning border-opacity-50 hover-lift quick-link-card">
                                 <div class="flex-shrink-0">
@@ -391,7 +346,67 @@ $busSeasonPayments = $busSeasonPayments ?? [];
                             </div>
                         </a>
                     </div>
+                    <div class="col-6 col-md-4 col-lg-3">
+                        <a href="#" class="text-decoration-none" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-danger border-opacity-25 hover-lift quick-link-card">
+                                <div class="flex-shrink-0">
+                                    <div class="bg-danger bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
+                                        <i class="fas fa-key text-danger"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="fw-bold text-dark quick-link-text">Change Password</div>
+                                    <div class="small text-muted quick-link-subtext">Update Login</div>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div class="modal fade" id="changePasswordModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="POST" action="<?php echo APP_URL; ?>/student/change-password" id="changePasswordForm" novalidate>
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold">
+                            <i class="fas fa-key me-2 text-danger"></i>Change Password
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="old_password" class="form-label fw-semibold">Old Password</label>
+                            <input type="password" class="form-control" id="old_password" name="old_password" required>
+                            <div class="invalid-feedback">Please enter old password.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label fw-semibold">New Password</label>
+                            <input type="password" class="form-control" id="new_password" name="new_password"
+                                   minlength="8"
+                                   pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$"
+                                   required>
+                            <div class="form-text">Minimum 8 characters, must include 1 capital, 1 small, and 1 number.</div>
+                            <div class="invalid-feedback">Password must be at least 8 characters and include 1 capital, 1 small, and 1 number.</div>
+                        </div>
+
+                        <div class="mb-0">
+                            <label for="confirm_password" class="form-label fw-semibold">Confirm Password</label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                            <div class="invalid-feedback">Please confirm the new password.</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-save me-1"></i>Change Password
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -484,6 +499,33 @@ $busSeasonPayments = $busSeasonPayments ?? [];
                             <div class="fw-semibold"><?php echo htmlspecialchars($hostelAllocation['room_no'] ?? 'N/A'); ?></div>
                         </div>
                     </div>
+                    
+                    <div class="mt-3">
+                        <div class="small text-muted mb-1">Roommates</div>
+                        <?php if (!empty($roommates)): ?>
+                            <div class="list-group list-group-flush border rounded">
+                                <?php foreach ($roommates as $rm): ?>
+                                    <div class="list-group-item d-flex justify-content-between align-items-start">
+                                        <div class="me-3">
+                                            <div class="fw-semibold text-dark">
+                                                <?php echo htmlspecialchars($rm['student_fullname'] ?? 'N/A'); ?>
+                                            </div>
+                                            <div class="small text-muted">
+                                                <?php echo htmlspecialchars($rm['student_id'] ?? ''); ?>
+                                            </div>
+                                        </div>
+                                        <?php if (!empty($rm['student_phone'])): ?>
+                                            <div class="small text-muted text-end">
+                                                <?php echo htmlspecialchars($rm['student_phone']); ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-muted small">No other active roommates found.</div>
+                        <?php endif; ?>
+                    </div>
                 <?php else: ?>
                     <p class="text-muted mb-0 small">No hostel allocation</p>
                 <?php endif; ?>
@@ -558,8 +600,15 @@ $busSeasonPayments = $busSeasonPayments ?? [];
                                         <td class="small">
                                             <?php echo htmlspecialchars(!empty($p['pays_date']) ? date('Y-m-d', strtotime($p['pays_date'])) : 'N/A'); ?>
                                         </td>
-                                        <td class="small text-truncate" style="max-width: 150px;" title="<?php echo htmlspecialchars($p['payment_reason'] ?? ''); ?>">
-                                            <?php echo htmlspecialchars($p['payment_reason'] ?? ''); ?>
+                                        <td class="small" style="max-width: 180px;" title="<?php echo htmlspecialchars(trim(($p['payment_reason'] ?? '') . (!empty($p['pays_note']) ? ' - ' . $p['pays_note'] : ''))); ?>">
+                                            <div class="text-truncate" style="max-width: 180px;">
+                                                <?php echo htmlspecialchars($p['payment_reason'] ?? ''); ?>
+                                            </div>
+                                            <?php if (!empty($p['pays_note'])): ?>
+                                                <div class="small text-muted text-truncate" style="max-width: 180px;">
+                                                    <?php echo htmlspecialchars($p['pays_note']); ?>
+                                                </div>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="small text-success">
                                             Rs. <?php echo number_format($p['pays_amount'] ?? 0, 2); ?>
@@ -796,6 +845,32 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Change Password validation
+(function() {
+    const form = document.getElementById('changePasswordForm');
+    if (!form) return;
+    form.addEventListener('submit', function(e) {
+        const newPass = document.getElementById('new_password');
+        const confirmPass = document.getElementById('confirm_password');
+
+        if (!form.checkValidity()) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        if (newPass && confirmPass && newPass.value !== confirmPass.value) {
+            e.preventDefault();
+            e.stopPropagation();
+            confirmPass.setCustomValidity('Passwords do not match');
+            confirmPass.classList.add('is-invalid');
+        } else if (confirmPass) {
+            confirmPass.setCustomValidity('');
+        }
+
+        form.classList.add('was-validated');
+    });
+})();
 </script>
 <?php endif; ?>
 

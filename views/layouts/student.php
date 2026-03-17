@@ -265,6 +265,22 @@
             </div>
         </main>
     <?php endif; ?>
+
+    <?php if (!empty($_SESSION['error']) || !empty($_SESSION['message'])): ?>
+        <?php
+        $flashType = !empty($_SESSION['error']) ? 'danger' : 'success';
+        $flashIcon = !empty($_SESSION['error']) ? 'fa-exclamation-circle' : 'fa-check-circle';
+        $flashText = !empty($_SESSION['error']) ? ($_SESSION['error'] ?? '') : ($_SESSION['message'] ?? '');
+        unset($_SESSION['error'], $_SESSION['message']);
+        ?>
+        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100; max-width: min(520px, 95vw);">
+            <div class="alert alert-<?php echo $flashType; ?> alert-dismissible fade show mb-0 shadow" role="alert">
+                <i class="fas <?php echo $flashIcon; ?> me-2"></i>
+                <?php echo htmlspecialchars($flashText); ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        </div>
+    <?php endif; ?>
     
     <script>
         // Session Timeout Warning

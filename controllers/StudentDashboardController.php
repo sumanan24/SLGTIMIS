@@ -47,6 +47,19 @@ class StudentDashboardController extends Controller {
         // Get hostel allocation
         $hostelAllocation = $roomAllocationModel->getActiveByStudentId($studentId);
         
+        // Get active roommates (other active allocations in same room)
+        $roommates = [];
+        if (!empty($hostelAllocation) && !empty($hostelAllocation['room_id'])) {
+            $roomAllocations = $roomAllocationModel->getByRoomId($hostelAllocation['room_id'], 'active');
+            if (!empty($roomAllocations)) {
+                foreach ($roomAllocations as $a) {
+                    if (!empty($a['student_id']) && $a['student_id'] !== $studentId) {
+                        $roommates[] = $a;
+                    }
+                }
+            }
+        }
+        
         // Get attendance summary for current month
         $currentMonth = date('Y-m');
         $startDate = $currentMonth . '-01';
@@ -115,6 +128,7 @@ class StudentDashboardController extends Controller {
             'student' => $student,
             'currentEnrollment' => $currentEnrollment,
             'hostelAllocation' => $hostelAllocation,
+            'roommates' => $roommates,
             'attendanceRecords' => $attendanceRecords,
             'totalDays' => $totalDays,
             'presentDays' => $presentDays,
