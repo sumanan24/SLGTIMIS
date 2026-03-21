@@ -150,7 +150,7 @@ class GroupModel extends Model {
         $conn->autocommit(false);
         
         try {
-            $sql = "INSERT INTO `group_students` (`group_id`, `student_id`, `enrolled_at`, `status`) 
+            $sql = "INSERT IGNORE INTO `group_students` (`group_id`, `student_id`, `enrolled_at`, `status`) 
                     VALUES (?, ?, NOW(), 'active')";
             $stmt = $conn->prepare($sql);
             
@@ -196,21 +196,27 @@ class GroupModel extends Model {
     }
     
     /**
-     * Get available students for a course (only students NOT assigned to any active group).
+     * Students who can be added: Following enrollment for course/year, not already in any active group.
+     * $groupId is accepted for API compatibility; exclusion is global (one active group membership per student).
      */
     public function getAvailableStudents($courseId, $academicYear, $groupId = null) {
-        $sql = "SELECT DISTINCT s.student_id, s.student_fullname, s.student_email
+        $sql = "SELECT s.student_id, s.student_fullname, s.student_email
                 FROM `student` s
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
-                WHERE se.course_id = ? 
+                WHERE se.course_id = ?
                   AND se.academic_year = ?
-                  AND s.student_id NOT IN (
-                        SELECT student_id FROM `group_students` WHERE status = 'active'
-                  )
-                ORDER BY s.student_fullname ASC";
+                  AND se.student_enroll_status = 'Following'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM `group_students` gs
+                      WHERE gs.student_id = s.student_id
+                        AND gs.status = 'active'
+                  )";
+
+        $sql .= " GROUP BY s.student_id, s.student_fullname, s.student_email
+                  ORDER BY s.student_fullname ASC";
 
         $stmt = $this->db->prepare($sql);
-        $stmt->bind_param("ss", $courseId, $academicYear);
+        $stmt->bind_param('ss', $courseId, $academicYear);
         $stmt->execute();
         $result = $stmt->get_result();
 

@@ -164,7 +164,7 @@ class StudentEnrollmentModel extends Model {
             $this->lastSqlError = $this->db->getConnection()->error ?? 'Prepare failed (student_enroll)';
             return false;
         }
-        $stmt->bind_param("isssss", 
+        $stmt->bind_param("sissss", 
             $data['course_id'],
             $courseVersion,
             $data['academic_year'],
@@ -173,11 +173,16 @@ class StudentEnrollmentModel extends Model {
             $studentId
         );
         
-        if (!$stmt->execute()) {
-            $this->lastSqlError = $stmt->error ?? 'Execute failed (student_enroll)';
+        try {
+            if (!$stmt->execute()) {
+                $this->lastSqlError = $stmt->error ?? 'Execute failed (student_enroll)';
+                return false;
+            }
+            return true;
+        } catch (Throwable $e) {
+            $this->lastSqlError = $e->getMessage();
             return false;
         }
-        return true;
     }
     
     /**
@@ -207,7 +212,7 @@ class StudentEnrollmentModel extends Model {
             $this->lastSqlError = $this->db->getConnection()->error ?? 'Prepare failed (student_enroll)';
             return false;
         }
-        $stmt->bind_param("isssssss", 
+        $stmt->bind_param("sissssss", 
             $data['course_id'],
             $courseVersion,
             $data['academic_year'],
@@ -218,11 +223,16 @@ class StudentEnrollmentModel extends Model {
             $academicYear
         );
         
-        if (!$stmt->execute()) {
-            $this->lastSqlError = $stmt->error ?? 'Execute failed (student_enroll)';
+        try {
+            if (!$stmt->execute()) {
+                $this->lastSqlError = $stmt->error ?? 'Execute failed (student_enroll)';
+                return false;
+            }
+            return true;
+        } catch (Throwable $e) {
+            $this->lastSqlError = $e->getMessage();
             return false;
         }
-        return true;
     }
 }
 

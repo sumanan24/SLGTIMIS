@@ -251,26 +251,7 @@
                         </div>
                     <?php endif; ?>
                     
-                    <!-- Tabs Navigation -->
-                    <?php 
-                    $activeTab = $activeTab ?? 'personal';
-                    ?>
-                    <ul class="nav nav-tabs mb-4" id="studentTabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link <?php echo $activeTab === 'personal' ? 'active' : ''; ?>" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personal" type="button" role="tab">
-                                <i class="fas fa-user me-1"></i>Personal Information
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link <?php echo $activeTab === 'bank' ? 'active' : ''; ?>" id="bank-tab" data-bs-toggle="tab" data-bs-target="#bank" type="button" role="tab">
-                                <i class="fas fa-university me-1"></i>Bank Details
-                            </button>
-                        </li>
-                    </ul>
-                    
-                    <div class="tab-content" id="studentTabsContent">
-                        <!-- Personal Information Tab -->
-                        <div class="tab-pane fade <?php echo $activeTab === 'personal' ? 'show active' : ''; ?>" id="personal" role="tabpanel">
+                    <div id="personal" class="pt-1">
                             <form method="POST" action="<?php echo APP_URL; ?>/student/profile/edit" id="personalForm" novalidate>
                                 <input type="hidden" name="update_section" value="personal">
 
@@ -524,59 +505,6 @@
                                     </a>
                                 </div>
                             </form>
-                        </div>
-                        
-                        <!-- Bank Details Tab -->
-                        <div class="tab-pane fade <?php echo $activeTab === 'bank' ? 'show active' : ''; ?>" id="bank" role="tabpanel">
-                            <form method="POST" action="<?php echo APP_URL; ?>/student/profile/edit" id="bankForm" novalidate>
-                                <input type="hidden" name="update_section" value="bank">
-                                
-                                <div class="row">
-                                    <div class="col-12 col-md-6 mb-3">
-                                        <label for="bank_name" class="form-label fw-semibold">Bank Name <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="bank_name" name="bank_name" 
-                                               value="<?php echo htmlspecialchars($student['bank_name'] ?? 'People\'s Bank'); ?>" 
-                                            maxlength="100" data-english-only="1" required>
-                                        <div class="invalid-feedback">Please enter bank name.</div>
-                                    </div>
-                                    
-                                    <div class="col-12 col-md-6 mb-3">
-                                        <label for="bank_account_no" class="form-label fw-semibold">Account Number <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="bank_account_no" name="bank_account_no" 
-                                               value="<?php echo htmlspecialchars($student['bank_account_no'] ?? ''); ?>" 
-                                            maxlength="50" data-english-only="1" required>
-                                        <div class="invalid-feedback">Please enter account number.</div>
-                                    </div>
-                                </div>
-                                
-                                <div class="row">
-                                    <div class="col-12 mb-3">
-                                        <label for="bank_branch" class="form-label fw-semibold">Branch <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="bank_branch" name="bank_branch" 
-                                               value="<?php echo htmlspecialchars($student['bank_branch'] ?? ''); ?>" 
-                                            maxlength="100" data-english-only="1" required>
-                                        <div class="invalid-feedback">Please enter branch name.</div>
-                                    </div>
-                                </div>
-                                
-                                <?php if (!empty($student['bank_frontsheet_path'])): ?>
-                                    <div class="alert alert-info">
-                                        <i class="fas fa-file-pdf me-2"></i>
-                                        Bank frontsheet: <a href="<?php echo APP_URL . '/assets/' . htmlspecialchars($student['bank_frontsheet_path']); ?>" target="_blank">View Document</a>
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <div class="d-flex gap-2 mt-4">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-1"></i>Update Bank Details
-                                    </button>
-                                    <a href="<?php echo APP_URL; ?>/student/profile" class="btn btn-outline-secondary">
-                                        <i class="fas fa-times me-1"></i>Cancel
-                                    </a>
-                                </div>
-                            </form>
-                        </div>
-                        
                     </div>
                 </div>
             </div>
@@ -618,18 +546,7 @@ function loadDistricts(province, selectedDistrict = '') {
     }
 }
 
-// Initialize Bootstrap tabs using Bootstrap's Tab API
 document.addEventListener('DOMContentLoaded', function() {
-    const tabButtons = document.querySelectorAll('#studentTabs button[data-bs-toggle="tab"]');
-    tabButtons.forEach(function(button) {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            // Use Bootstrap's Tab API
-            const tab = new bootstrap.Tab(button);
-            tab.show();
-        });
-    });
-    
     // Initialize province and district on page load
     const provinceSelect = document.getElementById('student_provice');
     const districtSelect = document.getElementById('student_district');
@@ -715,56 +632,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 field.addEventListener('input', function() {
                     if (this.value && !(this.type === 'select-one' && this.value === '')) {
-                        this.classList.remove('is-invalid');
-                        this.classList.add('is-valid');
-                    }
-                });
-            }
-        });
-    }
-    
-    // Bank Details Form
-    const bankForm = document.getElementById('bankForm');
-    if (bankForm) {
-        applyEnglishOnlyValidation(bankForm);
-        bankForm.addEventListener('submit', function(event) {
-            if (!bankForm.checkValidity()) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-            
-            // Add validation classes to all fields
-            const fields = bankForm.querySelectorAll('input, select, textarea');
-            fields.forEach(function(field) {
-                if (field.hasAttribute('required')) {
-                    if (!field.value) {
-                        field.classList.add('is-invalid');
-                    } else {
-                        field.classList.remove('is-invalid');
-                        field.classList.add('is-valid');
-                    }
-                }
-            });
-            
-            bankForm.classList.add('was-validated');
-        });
-        
-        // Real-time validation on blur
-        const bankFields = bankForm.querySelectorAll('input, select, textarea');
-        bankFields.forEach(function(field) {
-            if (field.hasAttribute('required')) {
-                field.addEventListener('blur', function() {
-                    if (!this.value) {
-                        this.classList.remove('is-valid');
-                        this.classList.add('is-invalid');
-                    } else {
-                        this.classList.remove('is-invalid');
-                        this.classList.add('is-valid');
-                    }
-                });
-                
-                field.addEventListener('input', function() {
-                    if (this.value) {
                         this.classList.remove('is-invalid');
                         this.classList.add('is-valid');
                     }

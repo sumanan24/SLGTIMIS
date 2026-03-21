@@ -11,12 +11,12 @@ class StudentController extends Controller {
         return (bool)preg_match('/[^\x00-\x7F]/', $value);
     }
     
-    private function enforceEnglishOnly($data, $fieldNames, $tab = 'personal') {
+    private function enforceEnglishOnly($data, $fieldNames, $tab = 'personal', $redirectPath = null) {
         foreach ($fieldNames as $field) {
             if (array_key_exists($field, $data) && $this->containsNonEnglishChars($data[$field])) {
                 $_SESSION['error'] = 'Please fill all details in English only.';
                 $_SESSION['active_tab'] = $tab;
-                $this->redirect('student/profile/edit');
+                $this->redirect($redirectPath ?? 'student/profile/edit');
                 return false;
             }
         }
@@ -150,7 +150,7 @@ class StudentController extends Controller {
         $userDepartmentId = $this->getUserDepartment();
         $isDepartmentRestricted = $this->isDepartmentRestricted();
         
-        // HOD, IN1, IN2, IN3: load full students with student_status = Active only; no other filters (district, gender, course, etc.)
+        // HOD, IN1, IN2, IN3: locked to own department + Active; allow search and enrollment filters (year, course, mode, group); ignore district/gender
         if ($isDepartmentRestricted) {
             $filters = [
                 'search' => $this->get('search', ''),
@@ -158,10 +158,10 @@ class StudentController extends Controller {
                 'department_id' => $userDepartmentId ?: '',
                 'district' => '',
                 'gender' => '',
-                'course_id' => '',
-                'academic_year' => '',
-                'course_mode' => '',
-                'group_id' => ''
+                'course_id' => $this->get('course_id', ''),
+                'academic_year' => $this->get('academic_year', ''),
+                'course_mode' => $this->get('course_mode', ''),
+                'group_id' => $this->get('group_id', '')
             ];
         } else {
             $filters = [
@@ -356,8 +356,14 @@ class StudentController extends Controller {
         $currentEnrollment = $enrollmentModel->getCurrentEnrollment($studentId);
         
         // Get hostel information
-        $roomAllocationModel = $this->model('RoomAllocationModel');
-        $hostelAllocation = $roomAllocationModel->getActiveByStudentId($studentId);
+        $hostelAllocation = null;
+        try {
+            $roomAllocationModel = $this->model('RoomAllocationModel');
+            $hostelAllocation = $roomAllocationModel->getActiveByStudentId($studentId);
+        } catch (Throwable $e) {
+            // Hostel data is not required for profile editing to work.
+            $hostelAllocation = null;
+        }
         
         $data = [
             'title' => 'My Profile',
@@ -374,7 +380,7 @@ class StudentController extends Controller {
     
     /**
      * Edit student's own profile (for student portal)
-     * Students can edit personal information and bank details, but NOT photos or enrollment
+     * Students can edit personal information only (not bank details, photos, or enrollment).
      */
     public function editStudentProfile() {
         // Check authentication
@@ -438,14 +444,6 @@ class StudentController extends Controller {
                 $validationRequired = true;
                 $successMessage = 'Personal information updated successfully.';
                 
-            } elseif ($updateSection === 'bank') {
-                // Bank Details fields only
-                $data = [
-                    'bank_name' => trim($this->post('bank_name', '')),
-                    'bank_account_no' => trim($this->post('bank_account_no', '')),
-                    'bank_branch' => trim($this->post('bank_branch', ''))
-                ];
-                $successMessage = 'Bank details updated successfully.';
             } else {
                 $_SESSION['error'] = 'Invalid update section.';
                 $this->redirect('student/profile/edit');
@@ -502,12 +500,6 @@ class StudentController extends Controller {
                 }
             }
             
-            if ($updateSection === 'bank') {
-                if (!$this->enforceEnglishOnly($data, ['bank_name', 'bank_account_no', 'bank_branch'], 'bank')) {
-                    return;
-                }
-            }
-            
             // Update student
             if (!empty($data)) {
                 $result = $studentModel->updateStudent($studentId, $data);
@@ -518,7 +510,9 @@ class StudentController extends Controller {
                     $student = $studentModel->find($studentId);
                     $_SESSION['active_tab'] = $updateSection;
                 } else {
-                    $_SESSION['error'] = 'Failed to update profile. Please try again.';
+                    $sectionLabel = $updateSection === 'personal' ? 'Personal information' : $updateSection;
+                    $sqlErr = $studentModel->getLastSqlError();
+                    $_SESSION['error'] = 'Failed to update ' . $sectionLabel . '.' . ($sqlErr ? ' SQL error: ' . $sqlErr : '');
                 }
             }
             
@@ -527,14 +521,12 @@ class StudentController extends Controller {
         }
         
         // GET request - show edit form
-        $activeTab = $_SESSION['active_tab'] ?? 'personal';
         unset($_SESSION['active_tab']);
         
         $data = [
             'title' => 'Edit My Profile',
             'page' => 'student-profile-edit',
             'student' => $student,
-            'activeTab' => $activeTab,
             'message' => $_SESSION['message'] ?? null,
             'error' => $_SESSION['error'] ?? null
         ];
@@ -1160,14 +1152,25 @@ class StudentController extends Controller {
                 }
                 
             } elseif ($updateSection === 'bank') {
-                // Bank Details fields only
+                $bankNameRaw = trim($this->post('bank_name', ''));
+                $bankAccountNoRaw = trim($this->post('bank_account_no', ''));
+                $bankBranchRaw = trim($this->post('bank_branch', ''));
                 $data = [
-                    'bank_name' => trim($this->post('bank_name', '')),
-                    'bank_account_no' => trim($this->post('bank_account_no', '')),
-                    'bank_branch' => trim($this->post('bank_branch', ''))
+                    'bank_name' => ($bankNameRaw !== '') ? $bankNameRaw : null,
+                    'bank_account_no' => ($bankAccountNoRaw !== '') ? $bankAccountNoRaw : null,
+                    'bank_branch' => ($bankBranchRaw !== '') ? $bankBranchRaw : null
                 ];
                 $successMessage = 'Bank details updated successfully.';
-                
+            } elseif ($updateSection === 'eligibility') {
+                $studentModel->addAllowanceEligibleDateColumnIfNotExists();
+                $eligible = $this->post('allowance_eligible', '') === '1' ? 1 : 0;
+                $dateRaw = trim($this->post('allowance_eligible_date', ''));
+                $eligibleDate = ($eligible && $dateRaw !== '') ? $dateRaw : null;
+                $data = [
+                    'allowance_eligible' => $eligible,
+                    'allowance_eligible_date' => $eligibleDate
+                ];
+                $successMessage = 'Allowance eligibility updated successfully.';
             } elseif ($updateSection === 'enrollment') {
                 // Enrollment update - handled separately
                 $enrollmentModel = $this->model('StudentEnrollmentModel');
@@ -1181,6 +1184,15 @@ class StudentController extends Controller {
                 if ($courseMode === 'Full Time') $courseMode = 'Full';
                 if ($courseMode === 'Part Time') $courseMode = 'Part';
                 $enrollStatus = trim($this->post('student_enroll_status', 'Following'));
+
+                // Validate course_id early to avoid FK constraint failures on student_enroll.course_id
+                if (!empty($courseId)) {
+                    $courseModel = $this->model('CourseModel');
+                    if (!$courseModel->exists($courseId)) {
+                        $_SESSION['error'] = 'Invalid course selected. Please choose a valid course.';
+                        $_SESSION['active_tab'] = 'enrollment';
+                    }
+                }
                 
                 // Update student_id (registration number) if changed
                 if (!empty($newStudentId) && $newStudentId !== $id) {
@@ -1239,15 +1251,15 @@ class StudentController extends Controller {
                 // Skip the normal update flow for enrollment
                 $updateSection = null;
                 
-            } elseif ($updateSection === 'eligibility') {
-                // Eligibility fields only
-                $data = [
-                    'allowance_eligible' => $this->post('allowance_eligible', 0) ? 1 : 0,
-                    'allowance_eligible_date' => trim($this->post('allowance_eligible_date', ''))
-                ];
-                // Ensure allowance_eligible_date column exists
-                $studentModel->addAllowanceEligibleDateColumnIfNotExists();
-                $successMessage = 'Eligibility information updated successfully.';
+            } else {
+                $_SESSION['error'] = 'Invalid update section.';
+                $_SESSION['active_tab'] = 'personal';
+            }
+            
+            if ($updateSection === 'bank' && !empty($data)) {
+                if (!$this->enforceEnglishOnly($data, ['bank_name', 'bank_account_no', 'bank_branch'], 'bank', 'students/edit?id=' . urlencode($id))) {
+                    return;
+                }
             }
             
             // Skip update if enrollment section (handled separately above)
@@ -1303,13 +1315,17 @@ class StudentController extends Controller {
                         // Store active tab for redirect
                         $_SESSION['active_tab'] = $updateSection;
                     } else {
-                        $sectionLabel = $updateSection === 'personal' ? 'Personal information' : ($updateSection === 'bank' ? 'Bank details' : ($updateSection === 'eligibility' ? 'Eligibility' : $updateSection));
+                        $sectionLabel = $updateSection === 'personal' ? 'Personal information' : (
+                            $updateSection === 'bank' ? 'Bank details' : (
+                                $updateSection === 'eligibility' ? 'Allowance eligibility' : $updateSection
+                            )
+                        );
                         $sqlErr = $studentModel->getLastSqlError();
                         $_SESSION['error'] = 'Failed to update ' . $sectionLabel . '.' . ($sqlErr ? ' SQL error: ' . $sqlErr : '');
                     }
                 }
             } else {
-                // Update student (no validation required for bank/eligibility)
+                // Update student (only sections without field-level validation)
                 if (!empty($data)) {
                     // Get old values before update
                     $oldStudent = $studentModel->find($id);
@@ -1348,7 +1364,11 @@ class StudentController extends Controller {
                         // Store active tab for redirect
                         $_SESSION['active_tab'] = $updateSection;
                     } else {
-                        $sectionLabel = $updateSection === 'personal' ? 'Personal information' : ($updateSection === 'bank' ? 'Bank details' : ($updateSection === 'eligibility' ? 'Eligibility' : $updateSection));
+                        $sectionLabel = $updateSection === 'personal' ? 'Personal information' : (
+                            $updateSection === 'bank' ? 'Bank details' : (
+                                $updateSection === 'eligibility' ? 'Allowance eligibility' : $updateSection
+                            )
+                        );
                         $sqlErr = $studentModel->getLastSqlError();
                         $_SESSION['error'] = 'Failed to update ' . $sectionLabel . '.' . ($sqlErr ? ' SQL error: ' . $sqlErr : '');
                     }
@@ -1366,8 +1386,14 @@ class StudentController extends Controller {
         }
         
         // Get hostel information
-        $roomAllocationModel = $this->model('RoomAllocationModel');
-        $hostelAllocation = $roomAllocationModel->getActiveByStudentId($id);
+        $hostelAllocation = null;
+        try {
+            $roomAllocationModel = $this->model('RoomAllocationModel');
+            $hostelAllocation = $roomAllocationModel->getActiveByStudentId($id);
+        } catch (Throwable $e) {
+            // Hostel data is not required for bank/eligibility updates to work.
+            $hostelAllocation = null;
+        }
         
         // Get courses and departments for enrollment
         $courseModel = $this->model('CourseModel');
@@ -1378,10 +1404,8 @@ class StudentController extends Controller {
         $departments = $departmentModel->getAll();
         $academicYears = $academicYearModel->getAcademicYears();
         
-        // Refresh student data if not already refreshed
-        if (!isset($student) || empty($student)) {
-            $student = $studentModel->find($id);
-        }
+        $studentModel->addAllowanceEligibleDateColumnIfNotExists();
+        $student = $studentModel->find($id);
         
         $data = [
             'title' => 'Edit Student',

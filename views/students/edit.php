@@ -1,4 +1,15 @@
 <div class="container-fluid px-4 py-3">
+    <style>
+        /* Ensure only active tab content is visible on this page */
+        #studentTabsContent > .tab-pane {
+            display: none;
+            padding-top: 1rem;
+        }
+        #studentTabsContent > .tab-pane.active,
+        #studentTabsContent > .tab-pane.show.active {
+            display: block;
+        }
+    </style>
     <div class="row justify-content-center">
         <div class="col-12">
             <div class="card shadow-sm border-0">
@@ -30,9 +41,12 @@
                     <!-- Tabs Navigation -->
                     <?php 
                     $activeTab = $_SESSION['active_tab'] ?? 'personal';
+                    if (!in_array($activeTab, ['personal', 'enrollment', 'bank', 'eligibility'], true)) {
+                        $activeTab = 'personal';
+                    }
                     unset($_SESSION['active_tab']);
                     ?>
-                    <ul class="nav nav-tabs mb-4" id="studentTabs" role="tablist">
+                    <ul class="nav nav-tabs flex-nowrap overflow-auto mb-3 pb-1" id="studentTabs" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link <?php echo $activeTab === 'personal' ? 'active' : ''; ?>" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personal" type="button" role="tab">
                                 <i class="fas fa-user me-1"></i>Personal Information
@@ -40,7 +54,7 @@
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link <?php echo $activeTab === 'enrollment' ? 'active' : ''; ?>" id="enrollment-tab" data-bs-toggle="tab" data-bs-target="#enrollment" type="button" role="tab">
-                                <i class="fas fa-graduation-cap me-1"></i>Enrollment
+                                <i class="fas fa-graduation-cap me-1"></i>Enrollment Information
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
@@ -49,13 +63,8 @@
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="hostel-tab" data-bs-toggle="tab" data-bs-target="#hostel" type="button" role="tab">
-                                <i class="fas fa-bed me-1"></i>Hostel
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
                             <button class="nav-link <?php echo $activeTab === 'eligibility' ? 'active' : ''; ?>" id="eligibility-tab" data-bs-toggle="tab" data-bs-target="#eligibility" type="button" role="tab">
-                                <i class="fas fa-check-circle me-1"></i>Eligibility
+                                <i class="fas fa-money-check-alt me-1"></i>Allowance Eligibility
                             </button>
                         </li>
                     </ul>
@@ -348,8 +357,6 @@
                                                        pattern="[0-9]{9,10}">
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
                                 
                                 <div class="d-flex gap-2 mt-4">
                                     <button type="submit" class="btn btn-primary">
@@ -362,7 +369,7 @@
                             </form>
                         </div>
                         
-                        <!-- Enrollment Tab -->
+                        <!-- Enrollment Information Tab -->
                         <div class="tab-pane fade <?php echo $activeTab === 'enrollment' ? 'show active' : ''; ?>" id="enrollment" role="tabpanel">
                             <form method="POST" action="<?php echo APP_URL; ?>/students/edit?id=<?php echo urlencode($student['student_id']); ?>">
                                 <input type="hidden" name="update_section" value="enrollment">
@@ -380,9 +387,9 @@
                                         <?php endif; ?>
                                     </div>
                                     
-                                    <h6 class="fw-bold mb-3">Update Course & Enrollment</h6>
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
+                                    <h6 class="fw-bold mb-3 mt-0">Update Course & Enrollment</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
                                             <label for="course_id" class="form-label fw-semibold">Course <span class="text-danger">*</span></label>
                                             <select class="form-select" id="course_id" name="course_id" required>
                                                 <option value="">Select Course</option>
@@ -396,7 +403,7 @@
                                             </select>
                                         </div>
                                         
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-6">
                                             <label for="academic_year" class="form-label fw-semibold">Academic Year <span class="text-danger">*</span></label>
                                             <select class="form-select" id="academic_year" name="academic_year" required>
                                                 <option value="">Select Academic Year</option>
@@ -410,8 +417,8 @@
                                         </div>
                                     </div>
                                     
-                                    <div class="row mb-4">
-                                        <div class="col-md-6 mb-3">
+                                    <div class="row g-3 mb-2">
+                                        <div class="col-md-6">
                                             <label for="student_id_new" class="form-label fw-semibold">
                                                 Registration Number (Student ID) <span class="text-danger">*</span>
                                             </label>
@@ -427,8 +434,8 @@
                                         </div>
                                     </div>
                                     
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
                                             <label for="course_mode" class="form-label fw-semibold">Course Mode</label>
                                             <select class="form-select" id="course_mode" name="course_mode">
                                                 <?php $mode = $currentEnrollment['course_mode'] ?? ''; ?>
@@ -437,7 +444,7 @@
                                             </select>
                                         </div>
                                         
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-6">
                                             <label for="student_enroll_status" class="form-label fw-semibold">Enrollment Status</label>
                                             <select class="form-select" id="student_enroll_status" name="student_enroll_status">
                                                 <option value="Following" <?php echo ($currentEnrollment['student_enroll_status'] ?? '') === 'Following' ? 'selected' : ''; ?>>Following</option>
@@ -492,7 +499,7 @@
                                 
                                 <div class="d-flex gap-2 mt-4">
                                     <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-1"></i>Update Enrollment
+                                        <i class="fas fa-save me-1"></i>Update Enrollment Information
                                     </button>
                                     <a href="<?php echo APP_URL; ?>/students/view?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-secondary">
                                         <i class="fas fa-times me-1"></i>Cancel
@@ -500,44 +507,32 @@
                                 </div>
                             </form>
                         </div>
-                            
+                        
                         <!-- Bank Details Tab -->
                         <div class="tab-pane fade <?php echo $activeTab === 'bank' ? 'show active' : ''; ?>" id="bank" role="tabpanel">
                             <form method="POST" action="<?php echo APP_URL; ?>/students/edit?id=<?php echo urlencode($student['student_id']); ?>">
                                 <input type="hidden" name="update_section" value="bank">
-                                
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
+                                <p class="text-muted small mb-3">Bank details must be entered in English (letters, numbers, and basic punctuation).</p>
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
                                         <label for="bank_name" class="form-label fw-semibold">Bank Name</label>
                                         <input type="text" class="form-control" id="bank_name" name="bank_name" 
-                                               value="<?php echo htmlspecialchars($student['bank_name'] ?? 'People\'s Bank'); ?>" 
+                                               value="<?php echo htmlspecialchars($student['bank_name'] ?? ''); ?>" 
                                                maxlength="100">
                                     </div>
-                                    
-                                    <div class="col-md-6 mb-3">
+                                    <div class="col-12 col-md-6">
                                         <label for="bank_account_no" class="form-label fw-semibold">Account Number</label>
                                         <input type="text" class="form-control" id="bank_account_no" name="bank_account_no" 
                                                value="<?php echo htmlspecialchars($student['bank_account_no'] ?? ''); ?>" 
                                                maxlength="50">
                                     </div>
-                                </div>
-                                
-                                <div class="row">
-                                    <div class="col-md-12 mb-3">
+                                    <div class="col-12">
                                         <label for="bank_branch" class="form-label fw-semibold">Branch</label>
                                         <input type="text" class="form-control" id="bank_branch" name="bank_branch" 
                                                value="<?php echo htmlspecialchars($student['bank_branch'] ?? ''); ?>" 
                                                maxlength="100">
                                     </div>
                                 </div>
-                                
-                                <?php if (!empty($student['bank_frontsheet_path'])): ?>
-                                    <div class="alert alert-info">
-                                        <i class="fas fa-file-pdf me-2"></i>
-                                        Bank frontsheet: <a href="<?php echo APP_URL . '/assets/' . htmlspecialchars($student['bank_frontsheet_path']); ?>" target="_blank">View Document</a>
-                                    </div>
-                                <?php endif; ?>
-                                
                                 <div class="d-flex gap-2 mt-4">
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-save me-1"></i>Update Bank Details
@@ -548,116 +543,32 @@
                                 </div>
                             </form>
                         </div>
-                            
-                            <!-- Hostel Tab -->
-                            <div class="tab-pane fade" id="hostel" role="tabpanel">
-                                <?php if (!empty($hostelAllocation)): ?>
-                                    <div class="card border">
-                                        <div class="card-body">
-                                            <h6 class="fw-bold mb-3">Current Hostel Allocation</h6>
-                                            <table class="table table-sm table-borderless">
-                                                <tr>
-                                                    <td class="fw-semibold text-muted" style="width: 30%;">Hostel:</td>
-                                                    <td><?php echo htmlspecialchars($hostelAllocation['hostel_name'] ?? 'N/A'); ?></td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="fw-semibold text-muted">Block:</td>
-                                                    <td><?php echo htmlspecialchars($hostelAllocation['block_name'] ?? 'N/A'); ?></td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="fw-semibold text-muted">Room Number:</td>
-                                                    <td>
-                                                        <span class="badge bg-info bg-opacity-10 text-info">
-                                                            <?php echo htmlspecialchars($hostelAllocation['room_no'] ?? 'N/A'); ?>
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="fw-semibold text-muted">Allocated Date:</td>
-                                                    <td><?php echo htmlspecialchars($hostelAllocation['allocated_at'] ?? 'N/A'); ?></td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="fw-semibold text-muted">Status:</td>
-                                                    <td>
-                                                        <span class="badge bg-success rounded-pill">
-                                                            <?php echo ucfirst($hostelAllocation['status'] ?? 'N/A'); ?>
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            </table>
-                                        </div>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="alert alert-info">
-                                        <i class="fas fa-info-circle me-2"></i>Student is not allocated to any hostel.
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                            
-                        <!-- Eligibility Tab -->
+                        
+                        <!-- Allowance Eligibility Tab -->
                         <div class="tab-pane fade <?php echo $activeTab === 'eligibility' ? 'show active' : ''; ?>" id="eligibility" role="tabpanel">
                             <form method="POST" action="<?php echo APP_URL; ?>/students/edit?id=<?php echo urlencode($student['student_id']); ?>">
                                 <input type="hidden" name="update_section" value="eligibility">
-                                
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="allowance_eligible" name="allowance_eligible" 
-                                                   value="1" <?php echo ($student['allowance_eligible'] ?? 0) ? 'checked' : ''; ?>>
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="allowance_eligible" name="allowance_eligible" value="1"
+                                                   <?php echo !empty($student['allowance_eligible']) ? 'checked' : ''; ?>>
                                             <label class="form-check-label fw-semibold" for="allowance_eligible">
-                                                Allowance Eligible
+                                                Allowance eligible
                                             </label>
                                         </div>
-                                        <div class="form-text">Check if student is eligible for allowances</div>
+                                        <div class="form-text">When checked, this student is included in allowance-related reports and FIN attendance views (where filtered).</div>
                                     </div>
-                                    
-                                    <div class="col-md-6 mb-3">
-                                        <label for="allowance_eligible_date" class="form-label fw-semibold">Allowance Eligible Date</label>
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <label for="allowance_eligible_date" class="form-label fw-semibold">Eligible from (optional)</label>
                                         <input type="date" class="form-control" id="allowance_eligible_date" name="allowance_eligible_date" 
                                                value="<?php echo htmlspecialchars($student['allowance_eligible_date'] ?? ''); ?>">
-                                        <div class="form-text">Date from which student becomes eligible for allowance. Allowance will be calculated from this date onwards.</div>
+                                        <div class="form-text">Date from which allowance eligibility applies (used by attendance logic when set).</div>
                                     </div>
                                 </div>
-                                
-                                <div class="row mt-3">
-                                    <div class="col-md-6">
-                                        <div class="card border">
-                                            <div class="card-body">
-                                                <h6 class="fw-bold mb-3">Conduct Acceptance</h6>
-                                                <?php if (!empty($student['student_conduct_accepted_at'])): ?>
-                                                    <p class="mb-0">
-                                                        <span class="badge bg-success rounded-pill">
-                                                            Accepted on <?php echo date('Y-m-d H:i', strtotime($student['student_conduct_accepted_at'])); ?>
-                                                        </span>
-                                                    </p>
-                                                <?php else: ?>
-                                                    <p class="text-muted mb-0">Not yet accepted</p>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="col-md-6">
-                                        <div class="card border">
-                                            <div class="card-body">
-                                                <h6 class="fw-bold mb-3">Leaving Certificate</h6>
-                                                <?php if (!empty($student['leaving_certificate_confirmed_at'])): ?>
-                                                    <p class="mb-0">
-                                                        <span class="badge bg-success rounded-pill">
-                                                            Confirmed on <?php echo date('Y-m-d H:i', strtotime($student['leaving_certificate_confirmed_at'])); ?>
-                                                        </span>
-                                                    </p>
-                                                <?php else: ?>
-                                                    <p class="text-muted mb-0">Not yet confirmed</p>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
                                 <div class="d-flex gap-2 mt-4">
                                     <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-1"></i>Update Eligibility
+                                        <i class="fas fa-save me-1"></i>Update Allowance Eligibility
                                     </button>
                                     <a href="<?php echo APP_URL; ?>/students/view?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-secondary">
                                         <i class="fas fa-times me-1"></i>Cancel
@@ -665,6 +576,7 @@
                                 </div>
                             </form>
                         </div>
+                            
                     </div>
                 </div>
             </div>
