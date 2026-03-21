@@ -7,9 +7,11 @@
 
 class GroupTimetableController extends Controller {
 
-    private function checkTimetableAccess() {
+    /**
+     * Whether current user may manage timetables (no redirect).
+     */
+    private function userCanManageTimetable() {
         if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
             return false;
         }
         require_once BASE_PATH . '/models/UserModel.php';
@@ -17,7 +19,15 @@ class GroupTimetableController extends Controller {
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
         $allowedRoles = ['HOD', 'ADM'];
-        if (!in_array($userRole, $allowedRoles) && !$isAdmin) {
+        return in_array($userRole, $allowedRoles) || $isAdmin;
+    }
+
+    private function checkTimetableAccess() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        if (!$this->userCanManageTimetable()) {
             $_SESSION['error'] = 'Access denied. Only HOD and ADM can manage timetables.';
             $this->redirect('dashboard');
             return false;
@@ -59,13 +69,27 @@ class GroupTimetableController extends Controller {
                     }
                 }
                 foreach ($entries as $e) {
-                    $dayRaw = trim((string)($e['day'] ?? $e['weekday'] ?? ''));
-                    $day = $dayRaw !== '' ? ucfirst(strtolower($dayRaw)) : '';
-                    $slotRaw = trim((string)($e['time_slot'] ?? $e['period'] ?? ''));
-                    $slot = $slotRaw !== '' ? preg_replace('/\s*-\s*/', '-', $slotRaw) : '';
+                    // Day: full name (day column) or legacy weekday 1–7
+                    $day = '';
+                    if (!empty($e['day'])) {
+                        $day = $timetableModel::normalizeDay((string) $e['day']);
+                    } elseif (isset($e['weekday']) && $e['weekday'] !== '') {
+                        $day = $timetableModel::mapWeekdayNumberToDayName($e['weekday']);
+                    }
+                    // Slot: time_slot string or legacy period P1–P4
+                    $slot = '';
+                    if (!empty($e['time_slot'])) {
+                        $slot = $timetableModel::resolveGridSlotKey((string) $e['time_slot']);
+                    } elseif (!empty($e['period'])) {
+                        $slot = $timetableModel::mapPeriodToSlotKey((string) $e['period']);
+                    }
                     if ($day !== '' && $slot !== '' && isset($grid[$day][$slot])) {
-                        if (!isset($e['id']) && isset($e['timetable_id'])) {
-                            $e['id'] = $e['timetable_id'];
+                        if (!isset($e['id']) || $e['id'] === null || $e['id'] === '') {
+                            if (isset($e['timetable_id'])) {
+                                $e['id'] = $e['timetable_id'];
+                            } elseif (isset($e['entry_id'])) {
+                                $e['id'] = $e['entry_id'];
+                            }
                         }
                         $grid[$day][$slot] = $e;
                     }
@@ -90,6 +114,75 @@ class GroupTimetableController extends Controller {
         ];
         unset($_SESSION['message'], $_SESSION['error']);
         return $this->view('group-timetable/index', $data);
+    }
+
+    /**
+     * AJAX: save a new slot (module + staff required). Returns JSON; includes MySQL error text on failure.
+     */
+    public function saveSlot() {
+        header('Content-Type: application/json; charset=utf-8');
+        if (!isset($_SESSION['user_id'])) {
+            echo json_encode(['success' => false, 'error' => 'Not authenticated']);
+            return;
+        }
+        if (!$this->userCanManageTimetable()) {
+            echo json_encode(['success' => false, 'error' => 'Access denied. Only HOD and ADM can manage timetables.']);
+            return;
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Invalid method']);
+            return;
+        }
+        $groupId = trim($this->post('group_id', ''));
+        $day = trim($this->post('day', ''));
+        $timeSlot = trim($this->post('time_slot', ''));
+        $moduleId = trim($this->post('module_id', ''));
+        $staffId = trim($this->post('staff_id', ''));
+        if ($groupId === '' || $day === '' || $timeSlot === '') {
+            echo json_encode(['success' => false, 'error' => 'Group, day, and time slot are required.']);
+            return;
+        }
+        if ($moduleId === '' || $staffId === '') {
+            echo json_encode(['success' => false, 'error' => 'Module and Staff are required.']);
+            return;
+        }
+        $groupModel = $this->model('GroupModel');
+        $departmentId = $this->getUserDepartment();
+        if (!$groupModel->canAccessGroup((int) $groupId, $departmentId)) {
+            echo json_encode(['success' => false, 'error' => 'Access denied for this group.']);
+            return;
+        }
+        $timetableModel = $this->model('GroupTimetableModel');
+        $dayNorm = $timetableModel::normalizeDay($day);
+        $timeSlotNorm = $timetableModel::normalizeTimeSlot($timeSlot);
+        $slotKey = $timetableModel::resolveGridSlotKey($timeSlotNorm);
+        if ($slotKey === '') {
+            $slotKey = $timeSlotNorm;
+        }
+        if ($timetableModel->existsSlot($groupId, $dayNorm, $slotKey, null)) {
+            echo json_encode(['success' => false, 'error' => 'This group already has an entry for the same day and time slot.']);
+            return;
+        }
+        $sqlErr = '';
+        $newId = $timetableModel->createTimetable([
+            'group_id' => (int) $groupId,
+            'day' => $dayNorm ?: null,
+            'time_slot' => $slotKey ?: null,
+            'subject' => null,
+            'session_type' => 'Theory',
+            'module_id' => $moduleId,
+            'staff_id' => $staffId,
+            'room' => null
+        ], $sqlErr);
+        if ($newId) {
+            echo json_encode(['success' => true, 'message' => 'Timetable entry saved.', 'id' => (int) $newId]);
+            return;
+        }
+        echo json_encode([
+            'success' => false,
+            'error' => 'Failed to save timetable entry.',
+            'sql_error' => $sqlErr !== '' ? $sqlErr : null
+        ]);
     }
 
     /**
@@ -125,6 +218,7 @@ class GroupTimetableController extends Controller {
                 $this->redirect('group-timetable/create?group_id=' . urlencode($groupIdPost ?: $groupId) . '&day=' . urlencode($day) . '&time_slot=' . urlencode($timeSlot));
                 return;
             }
+            $sqlErr = '';
             $id = $timetableModel->createTimetable([
                 'group_id' => $groupIdPost ?: null,
                 'day' => $dayNorm ?: null,
@@ -134,12 +228,12 @@ class GroupTimetableController extends Controller {
                 'module_id' => $moduleId ?: null,
                 'staff_id' => $staffId ?: null,
                 'room' => $room ?: null
-            ]);
+            ], $sqlErr);
             if ($id) {
                 $_SESSION['message'] = 'Timetable entry created successfully.';
                 $this->redirect('group-timetable/index?group_id=' . urlencode($groupIdPost ?: $groupId));
             } else {
-                $_SESSION['error'] = 'Failed to create timetable entry.';
+                $_SESSION['error'] = 'Failed to create timetable entry.' . ($sqlErr !== '' ? ' SQL: ' . $sqlErr : '');
                 $this->redirect('group-timetable/create?group_id=' . urlencode($groupIdPost ?: $groupId));
             }
             return;
@@ -210,6 +304,7 @@ class GroupTimetableController extends Controller {
                 $this->redirect('group-timetable/edit?id=' . urlencode($id));
                 return;
             }
+            $sqlErr = '';
             $ok = $timetableModel->updateTimetable($id, [
                 'day' => $dayNorm ?: null,
                 'time_slot' => $timeSlotNorm ?: null,
@@ -218,12 +313,12 @@ class GroupTimetableController extends Controller {
                 'module_id' => $moduleId ?: null,
                 'staff_id' => $staffId ?: null,
                 'room' => $room ?: null
-            ]);
+            ], $sqlErr);
             if ($ok) {
                 $_SESSION['message'] = 'Timetable entry updated successfully.';
                 $this->redirect('group-timetable/index?group_id=' . urlencode($entry['group_id'] ?? ''));
             } else {
-                $_SESSION['error'] = 'Failed to update timetable entry.';
+                $_SESSION['error'] = 'Failed to update timetable entry.' . ($sqlErr !== '' ? ' SQL: ' . $sqlErr : '');
                 $this->redirect('group-timetable/edit?id=' . urlencode($id));
             }
             return;

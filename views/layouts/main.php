@@ -83,8 +83,6 @@
                                 $hasAttendanceReportAccess = in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'HOD', 'IN1', 'IN2', 'IN3', 'ADM']) || $isAdmin;
                                 // Groups access: HOD, IN1, IN2, IN3, ADM, and Admin
                                 $hasGroupAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'ADM']) || $isAdmin;
-                                // Timetable access: HOD, ADM, and Admin (for managing timetables)
-                                $hasTimetableAccess = in_array($userRole, ['HOD', 'ADM']) || $isAdmin;
                                 // Instructor diary access: teaching staff, HOD, DIR/DPA/DPI/REG, ADM, and Admin
                                 $hasInstructorDiaryAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'LE1', 'LE2', 'SLE', 'DIR', 'DPA', 'DPI', 'REG', 'ADM']) || $isAdmin;
                                 // Instructor diary report (HOD + management roles + Admin)
@@ -102,12 +100,9 @@
                             <?php if (!$isSAO): ?>
                             <!-- Deputy Principal Education Branch - Hidden for SAO -->
                             <li class="menu-item-has-children <?php 
-$educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
+$educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory', 'group-timetable'];
                                     if ($hasGroupAccess) {
                                         $educationPages[] = 'groups';
-                                    }
-                                    if ($hasTimetableAccess) {
-                                        $educationPages[] = 'group-timetable';
                                     }
                             if ($isAdminOrADM) {
                                 $educationPages[] = 'staff-roles';
@@ -127,12 +122,9 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
                                 <ul class="submenu" style="<?php 
-                                    $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
+                                    $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory', 'group-timetable'];
                                     if ($hasGroupAccess) {
                                         $educationPages[] = 'groups';
-                                    }
-                                    if ($hasTimetableAccess) {
-                                        $educationPages[] = 'group-timetable';
                                     }
                                     if ($isAdminOrADM) {
                                         $educationPages[] = 'staff-roles';
@@ -168,14 +160,6 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                         <a href="<?php echo APP_URL; ?>/groups" class="<?php echo (isset($page) && $page === 'groups') ? 'active' : ''; ?>">
                                             <i class="fas fa-users"></i>
                                             <span>Groups</span>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
-                                    <?php if ($hasTimetableAccess): ?>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/groups" class="<?php echo (isset($page) && in_array($page, ['group-timetable', 'groups'])) ? 'active' : ''; ?>">
-                                            <i class="fas fa-calendar-alt"></i>
-                                            <span>Timetables</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>

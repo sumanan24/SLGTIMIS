@@ -27,11 +27,11 @@ class GroupTimetableModel extends Model {
      */
     public function getByGroupId($groupId) {
         if ($groupId === null || $groupId === '') return [];
-        $sql = "SELECT tt.*, m.module_name, s.staff_name 
-                FROM `{$this->table}` tt 
-                LEFT JOIN `module` m ON m.module_id = tt.module_id 
-                LEFT JOIN `staff` s ON s.staff_id = tt.staff_id 
-                WHERE tt.group_id = ? 
+        $sql = "SELECT tt.*, m.module_name, s.staff_name
+                FROM `{$this->table}` tt
+                LEFT JOIN `module` m ON m.module_id = tt.module_id
+                LEFT JOIN `staff` s ON s.staff_id = tt.staff_id
+                WHERE tt.group_id = ?
                 ORDER BY FIELD(tt.day, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'), tt.time_slot";
         $stmt = $this->db->prepare($sql);
         $stmt->bind_param("i", $groupId);
@@ -40,6 +40,13 @@ class GroupTimetableModel extends Model {
         $data = [];
         if ($result && $result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
+                // Stable id for edit/delete (PK may be `id` or `timetable_id` depending on schema)
+                if (!empty($row['id'])) {
+                    $row['entry_id'] = $row['id'];
+                } elseif (!empty($row['timetable_id'])) {
+                    $row['entry_id'] = $row['timetable_id'];
+                    $row['id'] = $row['timetable_id'];
+                }
                 $data[] = $row;
             }
         }
@@ -91,7 +98,59 @@ class GroupTimetableModel extends Model {
 
     public static function normalizeTimeSlot($timeSlot) {
         $slot = trim((string) $timeSlot);
-        return $slot !== '' ? preg_replace('/\s*-\s*/', '-', $slot) : '';
+        if ($slot === '') {
+            return '';
+        }
+        // Unicode en/em dash → ASCII hyphen (Word/PDF paste)
+        $slot = str_replace(["\xe2\x80\x93", "\xe2\x80\x94"], '-', $slot);
+        $slot = preg_replace('/\s*-\s*/', '-', $slot);
+        return $slot;
+    }
+
+    /** Map DB / form value to a key from getTimeSlots() so grid cells match */
+    public static function resolveGridSlotKey($timeSlotRaw) {
+        $norm = self::normalizeTimeSlot($timeSlotRaw);
+        if ($norm === '') {
+            return '';
+        }
+        $slots = array_keys(self::getTimeSlots());
+        foreach ($slots as $key) {
+            if (strcasecmp($norm, $key) === 0) {
+                return $key;
+            }
+            if (self::normalizeTimeSlot($key) === $norm) {
+                return $key;
+            }
+        }
+        $normFlat = preg_replace('/\s+/', '', $norm);
+        foreach ($slots as $key) {
+            if (preg_replace('/\s+/', '', $key) === $normFlat) {
+                return $key;
+            }
+        }
+        return '';
+    }
+
+    /** Legacy sis.sql: period enum → grid slot key */
+    public static function mapPeriodToSlotKey($period) {
+        $p = trim((string) $period);
+        $map = [
+            'P1' => '08:30-10:00',
+            'P2' => '10:30-12:00',
+            'P3' => '13:00-14:30',
+            'P4' => '14:45-16:15',
+        ];
+        return $map[$p] ?? '';
+    }
+
+    /** Legacy weekday tinyint 1=Mon … 7=Sun → grid day name */
+    public static function mapWeekdayNumberToDayName($weekday) {
+        if ($weekday === null || $weekday === '') {
+            return '';
+        }
+        $n = (int) $weekday;
+        $map = [1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday', 7 => 'Sunday'];
+        return $map[$n] ?? '';
     }
 
     /**
@@ -132,7 +191,16 @@ class GroupTimetableModel extends Model {
         $stmt->bind_param("i", $id);
         $stmt->execute();
         $result = $stmt->get_result();
-        return $result ? $result->fetch_assoc() : null;
+        $row = $result ? $result->fetch_assoc() : null;
+        if ($row) {
+            if (!empty($row['id'])) {
+                $row['entry_id'] = $row['id'];
+            } elseif (!empty($row['timetable_id'])) {
+                $row['entry_id'] = $row['timetable_id'];
+                $row['id'] = $row['timetable_id'];
+            }
+        }
+        return $row;
     }
 
     /**
@@ -154,12 +222,12 @@ class GroupTimetableModel extends Model {
         return $data;
     }
 
-    public function createTimetable($data) {
-        return $this->create($data);
+    public function createTimetable($data, &$sqlError = null) {
+        return $this->create($data, $sqlError);
     }
 
-    public function updateTimetable($id, $data) {
-        return $this->update($id, $data);
+    public function updateTimetable($id, $data, &$sqlError = null) {
+        return $this->update($id, $data, $sqlError);
     }
 
     public function deleteTimetable($id) {

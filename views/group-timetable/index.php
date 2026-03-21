@@ -14,11 +14,6 @@ $groupsList = $groupsList ?? [];
         <div class="card-header bg-primary text-white">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <h5 class="mb-0 fw-bold"><i class="fas fa-calendar-alt me-2"></i><?php echo $group ? htmlspecialchars('Timetable: ' . $group['name']) : 'Group Timetable'; ?></h5>
-                <?php if ($group_id !== ''): ?>
-                    <a href="<?php echo APP_URL; ?>/group-timetable/create?group_id=<?php echo urlencode($group_id); ?>" class="btn btn-light btn-sm">
-                        <i class="fas fa-plus me-1"></i>Add Entry
-                    </a>
-                <?php endif; ?>
             </div>
         </div>
         <div class="card-body">
@@ -29,11 +24,10 @@ $groupsList = $groupsList ?? [];
                 <div class="alert alert-danger alert-dismissible fade show"><?php echo htmlspecialchars($error); ?> <button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
             <?php endif; ?>
 
-            <!-- Group selector -->
             <?php if (!empty($groupsList)): ?>
-                <form class="row g-2 align-items-end mb-3" method="get" action="<?php echo APP_URL; ?>/group-timetable/index">
-                    <div class="col-md-6">
-                        <label class="form-label fw-bold">Select Group</label>
+                <form class="row g-2 align-items-end mb-4" method="get" action="<?php echo APP_URL; ?>/group-timetable/index">
+                    <div class="col-md-6 col-lg-4">
+                        <label class="form-label fw-bold mb-1">Select Group</label>
                         <select name="group_id" class="form-select" onchange="this.form.submit()">
                             <option value="">-- Choose a group --</option>
                             <?php foreach ($groupsList as $g): ?>
@@ -47,86 +41,88 @@ $groupsList = $groupsList ?? [];
             <?php endif; ?>
 
             <?php if ($group_id === ''): ?>
-                <p class="text-muted mb-0">
-                    Select a group above to view its timetable.
-                </p>
+                <p class="text-muted mb-0">Select a group above to view its timetable.</p>
             <?php elseif (!$group): ?>
-                <p class="text-danger">Group not found.</p>
+                <p class="text-danger mb-0">Group not found.</p>
             <?php else: ?>
-                <div class="mb-3">
-                    <p class="mb-1"><strong>Course:</strong> <?php echo htmlspecialchars($group['course_name'] ?? '—'); ?></p>
-                    <p class="mb-0"><strong>Department:</strong> <?php echo htmlspecialchars($group['department_name'] ?? '—'); ?></p>
+                <div class="card border bg-light mb-4">
+                    <div class="card-body py-3">
+                        <div class="row g-3 small">
+                            <div class="col-sm-6 col-md-4">
+                                <span class="text-muted d-block">Course</span>
+                                <span class="fw-semibold"><?php echo htmlspecialchars($group['course_name'] ?? '—'); ?></span>
+                            </div>
+                            <div class="col-sm-6 col-md-4">
+                                <span class="text-muted d-block">Department</span>
+                                <span class="fw-semibold"><?php echo htmlspecialchars($group['department_name'] ?? '—'); ?></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <!-- Timetable list: one row per day, second column lists all time slots with module & staff -->
-                <div class="table-responsive">
-                    <table class="table table-bordered align-middle mb-0 timetable-list">
+
+                <div class="table-responsive rounded border timetable-wrap">
+                    <table class="table table-hover align-middle mb-0 timetable-grid">
                         <thead class="table-light">
                             <tr>
-                                <th class="fw-bold text-center" style="width: 140px;">Day</th>
-                                <th class="fw-bold">Time Slots / Modules / Staff</th>
+                                <th scope="col" class="text-center" style="width: 11%;">Day</th>
+                                <th scope="col" style="width: 16%;">Time</th>
+                                <th scope="col">Module</th>
+                                <th scope="col">Staff</th>
+                                <th scope="col" class="text-end" style="width: 14%;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($weekdaysToShow as $day): ?>
-                                <tr>
-                                    <td class="fw-bold bg-light align-top text-center"><?php echo htmlspecialchars($day); ?></td>
-                                    <td class="p-2">
-                                        <?php if (!empty($timeSlots)): ?>
-                                            <?php foreach ($timeSlots as $slotKey => $slotLabel):
-                                                $entry = isset($grid[$day][$slotKey]) ? $grid[$day][$slotKey] : null;
-                                                $isAllocated = is_array($entry) && isset($entry['id']) && $entry['id'] !== '' && $entry['id'] !== null;
-                                            ?>
-                                                <div class="d-flex justify-content-between align-items-start mb-2 slot-row">
-                                                    <div class="small text-muted fw-semibold" style="min-width: 140px;">
-                                                        <?php echo htmlspecialchars($slotLabel); ?>
-                                                    </div>
-                                                    <div class="flex-grow-1 ms-2">
-                                                        <?php if ($isAllocated): ?>
-                                                            <?php /* Allocated slot: show details only; no Add button; show Delete + Edit */ ?>
-                                                            <div class="slot-filled">
-                                                                <div class="small fw-bold text-primary">
-                                                                    <span class="text-muted">Module:</span>
-                                                                    <?php echo htmlspecialchars($entry['module_id'] ?? $entry['subject'] ?? '—'); ?>
-                                                                    <?php if (!empty($entry['module_name'])): ?>
-                                                                        <span class="fw-normal text-muted">(<?php echo htmlspecialchars($entry['module_name']); ?>)</span>
-                                                                    <?php endif; ?>
-                                                                </div>
-                                                                <div class="small text-muted">
-                                                                    <span class="text-muted">Staff ID:</span>
-                                                                    <?php echo htmlspecialchars($entry['staff_id'] ?? '—'); ?>
-                                                                    <?php if (!empty($entry['staff_name'])): ?>
-                                                                        <span class="fw-normal">(<?php echo htmlspecialchars($entry['staff_name']); ?>)</span>
-                                                                    <?php endif; ?>
-                                                                </div>
-                                                                <?php if (!empty($entry['room'])): ?>
-                                                                    <div class="small"><?php echo htmlspecialchars($entry['room']); ?></div>
-                                                                <?php endif; ?>
-                                                                <div class="btn-group btn-group-sm mt-1">
-                                                                    <a href="<?php echo APP_URL; ?>/group-timetable/delete?id=<?php echo urlencode($entry['id']); ?>" class="btn btn-danger btn-sm" onclick="return confirm('Delete this slot?');" title="Delete">
-                                                                        <i class="fas fa-trash-alt me-1"></i>Delete
-                                                                    </a>
-                                                                    <a href="<?php echo APP_URL; ?>/group-timetable/edit?id=<?php echo urlencode($entry['id']); ?>" class="btn btn-outline-primary btn-sm" title="Edit">
-                                                                        <i class="fas fa-edit"></i>
-                                                                    </a>
-                                                                </div>
-                                                            </div>
-                                                        <?php else: ?>
-                                                            <?php /* Empty slot: Add button only; no Delete */ ?>
-                                                            <div class="slot-empty d-flex align-items-center">
-                                                                <span class="small text-muted me-2">Empty</span>
-                                                                <a href="<?php echo APP_URL; ?>/group-timetable/create?group_id=<?php echo urlencode($group_id); ?>&day=<?php echo urlencode($day); ?>&time_slot=<?php echo urlencode($slotKey); ?>" class="btn btn-outline-success btn-sm">
-                                                                    <i class="fas fa-plus me-1"></i>Add
-                                                                </a>
-                                                            </div>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <div class="text-muted small">No time slots configured.</div>
+                                <?php
+                                $slotCount = count($timeSlots);
+                                $rowInDay = 0;
+                                ?>
+                                <?php foreach ($timeSlots as $slotKey => $slotLabel): ?>
+                                    <?php
+                                    $entry = isset($grid[$day][$slotKey]) ? $grid[$day][$slotKey] : null;
+                                    $entryPk = is_array($entry) ? ($entry['entry_id'] ?? $entry['id'] ?? $entry['timetable_id'] ?? null) : null;
+                                    $isAllocated = $entryPk !== null && $entryPk !== '';
+                                    $modName = $isAllocated ? trim((string)($entry['module_name'] ?? '')) : '';
+                                    $modDisp = $isAllocated
+                                        ? ($modName !== '' ? $modName : (string)($entry['module_id'] ?? '—'))
+                                        : '';
+                                    $staffName = $isAllocated ? trim((string)($entry['staff_name'] ?? '')) : '';
+                                    $staffDisp = $isAllocated
+                                        ? ($staffName !== '' ? $staffName : (string)($entry['staff_id'] ?? '—'))
+                                        : '';
+                                    ?>
+                                    <tr class="timetable-row">
+                                        <?php if ($rowInDay === 0): ?>
+                                            <td class="bg-light text-center fw-semibold align-middle" rowspan="<?php echo (int)$slotCount; ?>"><?php echo htmlspecialchars($day); ?></td>
                                         <?php endif; ?>
-                                    </td>
-                                </tr>
+                                        <td class="text-nowrap text-muted small"><?php echo htmlspecialchars($slotLabel); ?></td>
+                                        <td class="timetable-cell-module"><?php echo $isAllocated ? htmlspecialchars($modDisp) : '<span class="text-muted">—</span>'; ?></td>
+                                        <td class="timetable-cell-staff"><?php echo $isAllocated ? htmlspecialchars($staffDisp) : '<span class="text-muted">—</span>'; ?></td>
+                                        <td class="text-end text-nowrap">
+                                            <?php if ($isAllocated): ?>
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="<?php echo APP_URL; ?>/group-timetable/delete?id=<?php echo urlencode((string)$entryPk); ?>" class="btn btn-outline-danger" onclick="return confirm('Delete this slot?');" title="Delete">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </a>
+                                                    <a href="<?php echo APP_URL; ?>/group-timetable/edit?id=<?php echo urlencode((string)$entryPk); ?>" class="btn btn-outline-primary" title="Edit">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                </div>
+                                            <?php else: ?>
+                                                <button type="button"
+                                                    class="btn btn-success btn-sm btn-add-slot"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#timetableAddModal"
+                                                    data-day="<?php echo htmlspecialchars($day); ?>"
+                                                    data-slot-key="<?php echo htmlspecialchars($slotKey); ?>"
+                                                    data-slot-label="<?php echo htmlspecialchars($slotLabel); ?>">
+                                                    <i class="fas fa-plus me-1"></i>Add
+                                                </button>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                    <?php $rowInDay++; ?>
+                                <?php endforeach; ?>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
@@ -136,8 +132,175 @@ $groupsList = $groupsList ?? [];
     </div>
 </div>
 
+<?php if ($group && $group_id !== '' && !empty($timeSlots)): ?>
+<!-- Add slot modal -->
+<div class="modal fade" id="timetableAddModal" tabindex="-1" aria-labelledby="timetableAddModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="timetableAddModalLabel"><i class="fas fa-plus-circle me-2 text-success"></i>Add timetable slot</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="timetableAddAlert" class="alert alert-danger py-2 small d-none" role="alert"></div>
+                <form id="timetableAddForm" novalidate>
+                    <input type="hidden" name="group_id" id="timetableAddGroupId" value="<?php echo htmlspecialchars((string)$group_id); ?>">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="timetableAddDay">Day</label>
+                        <select class="form-select" id="timetableAddDay" name="day" required>
+                            <?php foreach ($weekdaysToShow as $d): ?>
+                                <option value="<?php echo htmlspecialchars($d); ?>"><?php echo htmlspecialchars($d); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="timetableAddSlot">Time slot</label>
+                        <select class="form-select" id="timetableAddSlot" name="time_slot" required>
+                            <?php foreach ($timeSlots as $sk => $sl): ?>
+                                <option value="<?php echo htmlspecialchars($sk); ?>"><?php echo htmlspecialchars($sl); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text">You can change the day or slot before saving.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="timetableAddModule">Module <span class="text-danger">*</span></label>
+                        <select class="form-select" id="timetableAddModule" name="module_id" required>
+                            <option value="">— Select module —</option>
+                            <?php foreach ($modules as $m): ?>
+                                <option value="<?php echo htmlspecialchars((string)($m['module_id'] ?? '')); ?>">
+                                    <?php echo htmlspecialchars($m['module_name'] ?? $m['module_id'] ?? '—'); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-semibold" for="timetableAddStaff">Staff <span class="text-danger">*</span></label>
+                        <select class="form-select" id="timetableAddStaff" name="staff_id" required>
+                            <option value="">— Select staff —</option>
+                            <?php foreach ($staff as $s): ?>
+                                <option value="<?php echo htmlspecialchars((string)($s['staff_id'] ?? '')); ?>">
+                                    <?php echo htmlspecialchars($s['staff_name'] ?? $s['staff_id'] ?? '—'); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="timetableAddSave">
+                    <i class="fas fa-save me-1"></i>Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const modalEl = document.getElementById('timetableAddModal');
+    const form = document.getElementById('timetableAddForm');
+    const alertEl = document.getElementById('timetableAddAlert');
+    const saveBtn = document.getElementById('timetableAddSave');
+    const saveUrl = '<?php echo APP_URL; ?>/group-timetable/save-slot';
+
+    function showModalError(msg) {
+        if (!alertEl) return;
+        alertEl.textContent = msg;
+        alertEl.classList.remove('d-none');
+    }
+    function hideModalError() {
+        if (!alertEl) return;
+        alertEl.classList.add('d-none');
+        alertEl.textContent = '';
+    }
+
+    if (modalEl) {
+        modalEl.addEventListener('show.bs.modal', function(ev) {
+            hideModalError();
+            const btn = ev.relatedTarget;
+            if (!btn || !btn.classList.contains('btn-add-slot')) return;
+            const day = btn.getAttribute('data-day') || '';
+            const slotKey = btn.getAttribute('data-slot-key') || '';
+            const daySel = document.getElementById('timetableAddDay');
+            const slotSel = document.getElementById('timetableAddSlot');
+            if (daySel) {
+                for (let i = 0; i < daySel.options.length; i++) {
+                    if (daySel.options[i].value === day) {
+                        daySel.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+            if (slotSel) {
+                for (let j = 0; j < slotSel.options.length; j++) {
+                    if (slotSel.options[j].value === slotKey) {
+                        slotSel.selectedIndex = j;
+                        break;
+                    }
+                }
+            }
+        });
+        modalEl.addEventListener('hidden.bs.modal', function() {
+            hideModalError();
+            if (form) form.reset();
+        });
+    }
+
+    if (saveBtn && form) {
+        saveBtn.addEventListener('click', function() {
+            hideModalError();
+            const groupId = (document.getElementById('timetableAddGroupId') || {}).value || '';
+            const day = (document.getElementById('timetableAddDay') || {}).value || '';
+            const timeSlot = (document.getElementById('timetableAddSlot') || {}).value || '';
+            const moduleId = (document.getElementById('timetableAddModule') || {}).value || '';
+            const staffId = (document.getElementById('timetableAddStaff') || {}).value || '';
+            if (!moduleId || !staffId) {
+                showModalError('Please select both Module and Staff.');
+                return;
+            }
+            const body = new URLSearchParams({
+                group_id: groupId,
+                day: day,
+                time_slot: timeSlot,
+                module_id: moduleId,
+                staff_id: staffId
+            });
+            saveBtn.disabled = true;
+            fetch(saveUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+                body: body.toString(),
+                credentials: 'same-origin'
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    window.location.reload();
+                    return;
+                }
+                let err = data.error || 'Save failed.';
+                if (data.sql_error) {
+                    err += ' SQL: ' + data.sql_error;
+                }
+                showModalError(err);
+            })
+            .catch(function() {
+                showModalError('Network error. Please try again.');
+            })
+            .finally(function() {
+                saveBtn.disabled = false;
+            });
+        });
+    }
+})();
+</script>
+<?php endif; ?>
+
 <style>
-.timetable-list .slot-row:last-child { margin-bottom: 0; }
-.slot-filled { font-size: 0.875rem; }
-.slot-empty { font-size: 0.875rem; }
+.timetable-wrap { overflow: hidden; }
+.timetable-grid thead th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.timetable-grid tbody td { vertical-align: middle; padding-top: 0.65rem; padding-bottom: 0.65rem; }
+.timetable-grid .timetable-cell-module,
+.timetable-grid .timetable-cell-staff { font-size: 0.925rem; }
 </style>

@@ -150,6 +150,7 @@ return [
     'group-timetable/create' => 'GroupTimetableController@create',
     'group-timetable/edit' => 'GroupTimetableController@edit',
     'group-timetable/delete' => 'GroupTimetableController@delete',
+    'group-timetable/save-slot' => 'GroupTimetableController@saveSlot',
     // Staff module enrollment (HOD)
     'hod/staff-module-enroll' => 'StaffModuleEnrollmentController@create',
     'hod/get-modules-by-course' => 'StaffModuleEnrollmentController@getModulesByCourse',
