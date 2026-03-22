@@ -55,6 +55,12 @@ define('HIKVISION_MAX_RESULTS_PER_CHUNK', 100);
 /** Access control events only (Hikvision major type 5). */
 define('HIKVISION_ACS_MAJOR', 5);
 
+/**
+ * Access control sub-type (required by many ISAPI firmwares — omitting causes HTTP 400 "minor" / MessageParametersLack).
+ * 75 is common for face/verify events on terminals; use 0 if your device manual lists "all types", or adjust per model.
+ */
+define('HIKVISION_ACS_MINOR', 75);
+
 /** INSERT IGNORE batch size (multi-row). */
 define('HIKVISION_INSERT_BATCH_SIZE', 500);
 

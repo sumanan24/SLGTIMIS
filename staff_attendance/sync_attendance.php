@@ -87,7 +87,8 @@ require __DIR__ . '/includes/header.php';
     <p class="mb-0 mt-2">
         Device <code><?php echo attendance_escape(HIKVISION_IP); ?></code> (DS-K1T320MFWX):
         <code>POST …/ISAPI/AccessControl/AcsEvent?format=json</code>, Digest auth, JSON body,
-        <strong>major = 5</strong>, <strong>maxResults</strong> per page (config), paginated until empty.
+        <strong>major</strong> / <strong>minor</strong> (config: <code>HIKVISION_ACS_MAJOR</code>, <code>HIKVISION_ACS_MINOR</code>),
+        <strong>maxResults</strong> per page, paginated until empty.
         <code>INSERT IGNORE</code> on <code>staff_attendance</code> (unique <code>employee_no</code> + <code>attendance_time</code>).
         Times: <strong>Asia/Colombo</strong>.
     </p>

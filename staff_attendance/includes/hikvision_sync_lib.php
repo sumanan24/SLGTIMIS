@@ -421,11 +421,12 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     $maxResults = defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? max(10, min(1000, (int) HIKVISION_MAX_RESULTS_PER_CHUNK)) : 100;
     $maxPages = defined('HIKVISION_MAX_SYNC_PAGES') ? max(1, (int) HIKVISION_MAX_SYNC_PAGES) : 20000;
     $acsMajor = defined('HIKVISION_ACS_MAJOR') ? (int) HIKVISION_ACS_MAJOR : 5;
+    $acsMinor = defined('HIKVISION_ACS_MINOR') ? (int) HIKVISION_ACS_MINOR : 75;
 
     $debug = [];
     $debug[] = 'Device: ' . HIKVISION_IP . ' (DS-K1T320MFWX / ISAPI)';
     $debug[] = 'POST ' . $url;
-    $debug[] = 'Digest auth, JSON body, major=' . $acsMajor . ' (Access Control only — minor not sent)';
+    $debug[] = 'Digest auth, JSON body, major=' . $acsMajor . ', minor=' . $acsMinor . ' (Access Control)';
     $debug[] = 'Time window (Asia/Colombo): ' . $startIso . ' → ' . $endIso;
     $debug[] = 'Pagination: searchResultPosition += events returned per page; maxResults=' . $maxResults . ' per request';
 
@@ -442,6 +443,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
                 'searchResultPosition' => $position,
                 'maxResults' => $maxResults,
                 'major' => $acsMajor,
+                'minor' => $acsMinor,
                 'startTime' => $startIso,
                 'endTime' => $endIso,
             ],
