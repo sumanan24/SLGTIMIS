@@ -68,6 +68,35 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
         'error' => null,
     ];
 
+    $connectT = defined('HIKVISION_CURL_CONNECT_TIMEOUT') ? (int) HIKVISION_CURL_CONNECT_TIMEOUT : 10;
+    $timeoutT = defined('HIKVISION_CURL_TIMEOUT') ? (int) HIKVISION_CURL_TIMEOUT : 35;
+
+    try {
+        return attendance_run_hikvision_sync_inner($start, $end, $connectT, $timeoutT);
+    } catch (Throwable $e) {
+        $out['error'] = 'Sync error: ' . $e->getMessage();
+        return $out;
+    }
+}
+
+/**
+ * @internal
+ */
+function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeInterface $end, int $connectT, int $timeoutT): array
+{
+    $out = [
+        'ok' => false,
+        'inserted' => 0,
+        'skipped_dup' => 0,
+        'skipped_bad' => 0,
+        'error' => null,
+    ];
+
+    if (!function_exists('curl_init')) {
+        $out['error'] = 'PHP cURL extension is not enabled on this server.';
+        return $out;
+    }
+
     $startIso = $start->format('Y-m-d\TH:i:s');
     $endIso = $end->format('Y-m-d\TH:i:s');
 
@@ -103,8 +132,8 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPAUTH => CURLAUTH_DIGEST,
             CURLOPT_USERPWD => HIKVISION_USER . ':' . HIKVISION_PASS,
-            CURLOPT_CONNECTTIMEOUT => 15,
-            CURLOPT_TIMEOUT => 120,
+            CURLOPT_CONNECTTIMEOUT => $connectT,
+            CURLOPT_TIMEOUT => $timeoutT,
         ]);
         if (HIKVISION_USE_HTTPS) {
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -178,3 +207,4 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
     $out['ok'] = true;
     return $out;
 }
+

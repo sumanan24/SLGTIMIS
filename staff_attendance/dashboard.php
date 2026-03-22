@@ -10,8 +10,10 @@ $nowTs = time();
 $forceSync = isset($_GET['force_sync']) && $_GET['force_sync'] === '1';
 $lastAuto = (int) ($_SESSION['staff_attendance_last_auto_sync'] ?? 0);
 
-$shouldSync = $forceSync;
-if (!$shouldSync) {
+$shouldSync = false;
+if ($forceSync) {
+    $shouldSync = true;
+} elseif (STAFF_ATT_DASHBOARD_AUTO_SYNC) {
     if (STAFF_ATT_DASHBOARD_SYNC_COOLDOWN === 0) {
         $shouldSync = true;
     } else {
@@ -28,38 +30,66 @@ if ($shouldSync) {
     if (!$result['ok']) {
         $_SESSION['flash_error'] = $result['error'] ?? 'Automatic sync failed.';
     }
-    // Success is silent — totals and table below reflect new data. Manual sync page shows full stats.
 }
 
-$db = attendance_db();
+$total = 0;
+$todayCount = 0;
+$latest = [];
+$dbError = null;
 
-$total = (int) $db->query('SELECT COUNT(*) AS c FROM staff_attendance')->fetch_assoc()['c'];
+try {
+    $db = attendance_db();
+    $total = (int) $db->query('SELECT COUNT(*) AS c FROM staff_attendance')->fetch_assoc()['c'];
 
-$today = date('Y-m-d');
-$stmt = $db->prepare('SELECT COUNT(*) AS c FROM staff_attendance WHERE DATE(attendance_time) = ?');
-$stmt->bind_param('s', $today);
-$stmt->execute();
-$todayCount = (int) ($stmt->get_result()->fetch_assoc()['c'] ?? 0);
-$stmt->close();
+    $today = date('Y-m-d');
+    $stmt = $db->prepare('SELECT COUNT(*) AS c FROM staff_attendance WHERE DATE(attendance_time) = ?');
+    $stmt->bind_param('s', $today);
+    $stmt->execute();
+    $todayCount = (int) ($stmt->get_result()->fetch_assoc()['c'] ?? 0);
+    $stmt->close();
 
-$latest = $db->query(
-    'SELECT attendance_id, employee_no, staff_name, department, attendance_time, device_ip, event_type
-     FROM staff_attendance
-     ORDER BY attendance_time DESC
-     LIMIT 50'
-)->fetch_all(MYSQLI_ASSOC);
+    $latest = $db->query(
+        'SELECT attendance_id, employee_no, staff_name, department, attendance_time, device_ip, event_type
+         FROM staff_attendance
+         ORDER BY attendance_time DESC
+         LIMIT 50'
+    )->fetch_all(MYSQLI_ASSOC);
+} catch (Throwable $e) {
+    $dbError = $e->getMessage();
+    $today = date('Y-m-d');
+}
+
+if (!isset($today)) {
+    $today = date('Y-m-d');
+}
 
 require __DIR__ . '/includes/header.php';
 ?>
 <h1 class="h3 mb-4">Dashboard</h1>
 <p class="text-muted small mb-2">Timezone: Asia/Colombo — Today: <?php echo attendance_escape($today); ?></p>
-<p class="text-muted small mb-4">
-    Opening this page pulls the <strong>last 1 month</strong> of events from the Hikvision device (same as auto-sync).
-    <?php if (STAFF_ATT_DASHBOARD_SYNC_COOLDOWN > 0): ?>
-        Cooldown: <?php echo (int) STAFF_ATT_DASHBOARD_SYNC_COOLDOWN; ?>s between syncs —
-        <a href="dashboard.php?force_sync=1">sync now</a>.
+
+<?php if ($dbError !== null): ?>
+    <div class="alert alert-danger">
+        <strong>Database error.</strong> Import <code>staff_attendance/database.sql</code> if the table is missing.
+        <br><small class="text-break"><?php echo attendance_escape($dbError); ?></small>
+    </div>
+<?php else: ?>
+    <?php if (!STAFF_ATT_DASHBOARD_AUTO_SYNC): ?>
+        <p class="text-muted small mb-2">
+            <strong>Auto-sync from the device is off</strong> on this server (public hosts usually cannot reach a LAN terminal).
+            Use <a href="sync_attendance.php">Manual sync</a> from a machine on the same network as the Hikvision device, or set
+            <code>STAFF_ATT_DASHBOARD_AUTO_SYNC</code> to <code>true</code> in <code>staff_attendance/config.php</code> only if the web server can reach the device IP.
+        </p>
     <?php endif; ?>
-</p>
+    <p class="text-muted small mb-4">
+        <?php if (STAFF_ATT_DASHBOARD_AUTO_SYNC): ?>
+            Dashboard pulls the <strong>last 1 month</strong> when you open this page (subject to cooldown).
+            <?php if (STAFF_ATT_DASHBOARD_SYNC_COOLDOWN > 0): ?>
+                Cooldown: <?php echo (int) STAFF_ATT_DASHBOARD_SYNC_COOLDOWN; ?>s —
+            <?php endif; ?>
+        <?php endif; ?>
+        <a href="dashboard.php?force_sync=1">Re-sync month</a> (contacts the device; may fail if the server cannot reach it).
+    </p>
 
 <div class="row g-3 mb-4">
     <div class="col-md-4">
@@ -118,4 +148,5 @@ require __DIR__ . '/includes/header.php';
         </tbody>
     </table>
 </div>
+<?php endif; ?>
 <?php require __DIR__ . '/includes/footer.php'; ?>
