@@ -179,52 +179,86 @@ function attendance_hikvision_acs_event_url(): string
 }
 
 /**
- * Quick check: can this PHP process open TCP to the device? (Short timeouts; no Digest.)
+ * Interpret HTTP status from device root URL: any response (incl. 401 Digest challenge) means reachable.
  *
  * @return array{ok: bool, message: string}
  */
-function attendance_hikvision_test_reachability(): array
+function attendance_hikvision_test_reachability_from_http(int $http, string $url, ?string $streamErr): array
 {
-    if (!function_exists('curl_init')) {
-        return ['ok' => false, 'message' => 'PHP cURL is not available.'];
-    }
-    $url = attendance_hikvision_device_base_url();
-    $ch = curl_init($url);
-    $opts = [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CONNECTTIMEOUT => 3,
-        CURLOPT_TIMEOUT => 6,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_MAXREDIRS => 2,
-        CURLOPT_USERAGENT => 'SLGTIMIS-staff-attendance/1',
-    ];
-    if (strpos($url, 'https:') === 0) {
-        $opts[CURLOPT_SSL_VERIFYPEER] = false;
-        $opts[CURLOPT_SSL_VERIFYHOST] = 0;
-    }
-    if (defined('CURL_IPRESOLVE_V4')) {
-        $opts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
-    }
-    curl_setopt_array($ch, $opts);
-    curl_exec($ch);
-    $errno = curl_errno($ch);
-    $cerr = curl_error($ch);
-    $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    if ($errno !== 0) {
-        $msg = attendance_hikvision_curl_error_hint($cerr);
-        return ['ok' => false, 'message' => 'cURL error: ' . $msg];
+    if ($streamErr !== null && $streamErr !== '') {
+        $msg = attendance_hikvision_curl_error_hint($streamErr);
+        return ['ok' => false, 'message' => $msg];
     }
     if ($http === 0) {
         return ['ok' => false, 'message' => 'No HTTP response from device (check firewall/port).'];
     }
     if ($http >= 200 && $http < 600) {
+        $note = $http === 401 ? ' (401 = normal before Digest login)' : '';
+
         return [
             'ok' => true,
-            'message' => 'Reachable from this PHP server (HTTP ' . $http . ' on ' . $url . '). You can run a full sync.',
+            'message' => 'Reachable from this PHP server (HTTP ' . $http . $note . ' on ' . $url . '). You can run a full sync.',
         ];
     }
+
     return ['ok' => false, 'message' => 'Unexpected response (HTTP ' . $http . ').'];
+}
+
+/**
+ * Quick check: can this PHP process open TCP to the device? (Short timeouts; no Digest.)
+ * Uses cURL when available; otherwise PHP streams (requires allow_url_fopen), same idea as full sync fallback.
+ *
+ * @return array{ok: bool, message: string}
+ */
+function attendance_hikvision_test_reachability(): array
+{
+    $url = attendance_hikvision_device_base_url();
+
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        $opts = [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 3,
+            CURLOPT_TIMEOUT => 6,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 2,
+            CURLOPT_USERAGENT => 'SLGTIMIS-staff-attendance/1',
+        ];
+        if (strpos($url, 'https:') === 0) {
+            $opts[CURLOPT_SSL_VERIFYPEER] = false;
+            $opts[CURLOPT_SSL_VERIFYHOST] = 0;
+        }
+        if (defined('CURL_IPRESOLVE_V4')) {
+            $opts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+        }
+        curl_setopt_array($ch, $opts);
+        curl_exec($ch);
+        $errno = curl_errno($ch);
+        $cerr = curl_error($ch);
+        $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($errno !== 0) {
+            $msg = attendance_hikvision_curl_error_hint($cerr);
+
+            return ['ok' => false, 'message' => 'cURL error: ' . $msg];
+        }
+
+        return attendance_hikvision_test_reachability_from_http($http, $url, null);
+    }
+
+    if (!ini_get('allow_url_fopen')) {
+        return [
+            'ok' => false,
+            'message' => 'PHP cURL is not loaded and allow_url_fopen is Off. In php.ini enable extension=curl, or set allow_url_fopen=On (then reload Apache).',
+        ];
+    }
+
+    require_once __DIR__ . '/digest_http_client.php';
+    $res = attendance_stream_http_request($url, 'GET', ['User-Agent: SLGTIMIS-staff-attendance/1'], '', 6, false);
+    $err = $res['error'];
+    $http = (int) $res['status'];
+
+    return attendance_hikvision_test_reachability_from_http($http, $url, $err);
 }
 
 /**
