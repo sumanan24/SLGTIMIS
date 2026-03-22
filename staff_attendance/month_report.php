@@ -107,9 +107,9 @@ $pdfPayload = json_encode(
                             <th>Name</th>
                             <th>Date</th>
                             <th>Day</th>
-                            <th>Check-in</th>
-                            <th>Check-out</th>
-                            <th>Other times</th>
+                            <th>IN</th>
+                            <th>OUT</th>
+                            <th>Others</th>
                         </tr>
                         </thead>
                         <tbody>
