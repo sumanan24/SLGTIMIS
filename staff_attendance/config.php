@@ -25,9 +25,21 @@ define('HIKVISION_PASS', 'TCI@itgls2025#@');
 /** Use false if device serves HTTP only */
 define('HIKVISION_USE_HTTPS', false);
 
-/** cURL limits (avoid long hangs / HTTP 500 / gateway timeout when device is unreachable) */
+/** cURL limits (single request; short when device unreachable) */
 define('HIKVISION_CURL_CONNECT_TIMEOUT', 8);
 define('HIKVISION_CURL_TIMEOUT', 35);
+
+/**
+ * Multi-page sync: longer per-request timeout (each chunk may be large).
+ * Full history uses many chunks — see HIKVISION_MAX_RESULTS_PER_CHUNK.
+ */
+define('HIKVISION_SYNC_CURL_TIMEOUT', 300);
+
+/** Events per ISAPI request (chunk). Typical 100–500 depending on firmware. */
+define('HIKVISION_MAX_RESULTS_PER_CHUNK', 300);
+
+/** Safety cap: max HTTP pages per sync (prevents infinite loop). */
+define('HIKVISION_MAX_SYNC_PAGES', 5000);
 
 /** Pagination default */
 define('ATT_PAGE_SIZE', 25);

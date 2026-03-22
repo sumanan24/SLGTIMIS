@@ -69,7 +69,7 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
     ];
 
     $connectT = defined('HIKVISION_CURL_CONNECT_TIMEOUT') ? (int) HIKVISION_CURL_CONNECT_TIMEOUT : 10;
-    $timeoutT = defined('HIKVISION_CURL_TIMEOUT') ? (int) HIKVISION_CURL_TIMEOUT : 35;
+    $timeoutT = defined('HIKVISION_SYNC_CURL_TIMEOUT') ? (int) HIKVISION_SYNC_CURL_TIMEOUT : 300;
 
     try {
         return attendance_run_hikvision_sync_inner($start, $end, $connectT, $timeoutT);
@@ -137,6 +137,10 @@ function attendance_hikvision_isapi_post(string $url, string $body, int $connect
  */
 function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeInterface $end, int $connectT, int $timeoutT): array
 {
+    if (function_exists('set_time_limit')) {
+        @set_time_limit(0);
+    }
+
     $out = [
         'ok' => false,
         'inserted' => 0,
@@ -151,17 +155,22 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     $scheme = HIKVISION_USE_HTTPS ? 'https' : 'http';
     $url = $scheme . '://' . HIKVISION_IP . '/ISAPI/AccessControl/AcsEvent?format=json';
 
+    /** One search session for all chunks — regenerating searchID each request breaks pagination. */
+    $searchId = bin2hex(random_bytes(8));
+
+    $maxResults = defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? max(10, min(2000, (int) HIKVISION_MAX_RESULTS_PER_CHUNK)) : 300;
+    $maxPages = defined('HIKVISION_MAX_SYNC_PAGES') ? max(1, (int) HIKVISION_MAX_SYNC_PAGES) : 5000;
+
     $position = 0;
-    $maxResults = 100;
     $db = attendance_db();
     $insertSql = 'INSERT IGNORE INTO staff_attendance (employee_no, staff_name, department, attendance_time, device_ip, event_type)
                   VALUES (?, ?, ?, ?, ?, ?)';
     $ins = $db->prepare($insertSql);
 
-    do {
+    for ($page = 0; $page < $maxPages; $page++) {
         $payload = [
             'AcsEventCond' => [
-                'searchID' => bin2hex(random_bytes(8)),
+                'searchID' => $searchId,
                 'searchResultPosition' => $position,
                 'maxResults' => $maxResults,
                 'major' => 0,
@@ -191,11 +200,12 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
         }
 
         $list = attendance_extract_info_list($data);
-        if ($list === []) {
+        $listCount = count($list);
+
+        if ($listCount === 0) {
             break;
         }
 
-        $batchCount = 0;
         foreach ($list as $item) {
             if (!is_array($item)) {
                 $out['skipped_bad']++;
@@ -225,14 +235,15 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
             } else {
                 $out['skipped_dup']++;
             }
-            $batchCount++;
         }
 
-        $position += $batchCount;
-        if ($batchCount < $maxResults) {
+        /** Next page offset must match how many events the device returned (not only valid DB rows). */
+        $position += $listCount;
+
+        if ($listCount < $maxResults) {
             break;
         }
-    } while (true);
+    }
 
     $out['ok'] = true;
     return $out;
