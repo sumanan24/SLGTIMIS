@@ -239,6 +239,41 @@ function attendance_flush_staff_batch(mysqli $db, array &$batch, array &$out): v
  *
  * @return int Rows updated (best effort; ignored if tables differ)
  */
+/**
+ * Resolve name/dept from main staff directory (employee_no must match staff.staff_id).
+ *
+ * @return array{staff_name: string, department: string}|null
+ */
+function attendance_lookup_staff_for_attendance(mysqli $db, string $employeeNo): ?array
+{
+    $sql = 'SELECT s.staff_name, d.department_name AS department_name
+            FROM staff s
+            LEFT JOIN department d ON d.department_id = s.department_id
+            WHERE s.staff_id = ?
+            LIMIT 1';
+    $stmt = $db->prepare($sql);
+    if ($stmt === false) {
+        return null;
+    }
+    $stmt->bind_param('s', $employeeNo);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $row = $res ? $res->fetch_assoc() : null;
+    $stmt->close();
+    if ($row === null) {
+        return null;
+    }
+    $name = trim((string) ($row['staff_name'] ?? ''));
+    if ($name === '') {
+        return null;
+    }
+
+    return [
+        'staff_name' => $name,
+        'department' => trim((string) ($row['department_name'] ?? '')),
+    ];
+}
+
 function attendance_enrich_staff_attendance_from_directory(mysqli $db, DateTimeInterface $start, DateTimeInterface $end): int
 {
     $tz = new DateTimeZone(defined('STAFF_TIMEZONE') ? STAFF_TIMEZONE : 'Asia/Colombo');
@@ -277,6 +312,7 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
         'inserted' => 0,
         'skipped_dup' => 0,
         'skipped_bad' => 0,
+        'skipped_not_in_directory' => 0,
         'total_received' => 0,
         'debug' => [],
         'error' => null,
@@ -296,6 +332,7 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
             $out['inserted'] += $part['inserted'];
             $out['skipped_dup'] += $part['skipped_dup'];
             $out['skipped_bad'] += $part['skipped_bad'];
+            $out['skipped_not_in_directory'] += (int) ($part['skipped_not_in_directory'] ?? 0);
             $out['total_received'] += $part['total_received'];
             if (!empty($part['error'])) {
                 $out['error'] = $part['error'];
@@ -303,8 +340,9 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
                 return $out;
             }
         }
-        $mergedDebug[] = '=== All minor passes complete | total received=' . $out['total_received'] . ' | total inserted=' . $out['inserted'] . ' | dup skipped=' . $out['skipped_dup'] . ' | invalid=' . $out['skipped_bad'] . ' ===';
-        if (defined('STAFF_ATTENDANCE_ENRICH_FROM_STAFF_TABLE') && STAFF_ATTENDANCE_ENRICH_FROM_STAFF_TABLE) {
+        $mergedDebug[] = '=== All minor passes complete | total received=' . $out['total_received'] . ' | total inserted=' . $out['inserted'] . ' | dup skipped=' . $out['skipped_dup'] . ' | invalid=' . $out['skipped_bad'] . ' | not in staff directory=' . $out['skipped_not_in_directory'] . ' ===';
+        if (defined('STAFF_ATTENDANCE_ENRICH_FROM_STAFF_TABLE') && STAFF_ATTENDANCE_ENRICH_FROM_STAFF_TABLE
+            && (!defined('STAFF_ATTENDANCE_REQUIRE_STAFF_DIRECTORY') || !STAFF_ATTENDANCE_REQUIRE_STAFF_DIRECTORY)) {
             try {
                 $dbEnrich = attendance_db();
                 $enriched = attendance_enrich_staff_attendance_from_directory($dbEnrich, $start, $end);
@@ -576,6 +614,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
         'inserted' => 0,
         'skipped_dup' => 0,
         'skipped_bad' => 0,
+        'skipped_not_in_directory' => 0,
         'total_received' => 0,
         'debug' => [],
         'error' => null,
@@ -591,6 +630,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     $maxResults = defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? max(1, min(10000, (int) HIKVISION_MAX_RESULTS_PER_CHUNK)) : 2000;
     $maxPages = defined('HIKVISION_MAX_SYNC_PAGES') ? max(1, (int) HIKVISION_MAX_SYNC_PAGES) : 20000;
     $acsMajor = defined('HIKVISION_ACS_MAJOR') ? (int) HIKVISION_ACS_MAJOR : 5;
+    $requireStaffDir = defined('STAFF_ATTENDANCE_REQUIRE_STAFF_DIRECTORY') && STAFF_ATTENDANCE_REQUIRE_STAFF_DIRECTORY;
 
     $debug = [];
     $debug[] = 'Device: ' . HIKVISION_IP . ' (DS-K1T320MFWX / ISAPI)';
@@ -598,6 +638,9 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     $debug[] = 'Digest auth, JSON body, major=' . $acsMajor . ', minor=' . $acsMinor . ' (Access Control)';
     $debug[] = 'Time window (Asia/Colombo): ' . $startIso . ' → ' . $endIso;
     $debug[] = 'Pagination: searchResultPosition += events returned per page; maxResults=' . $maxResults . ' per request';
+    if ($requireStaffDir) {
+        $debug[] = 'Staff directory: INSERT only if employee_no exists in staff.staff_id with non-empty staff_name.';
+    }
 
     $position = 0;
     $totalMatchesKnown = null;
@@ -605,6 +648,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     $db = attendance_db();
     $batch = [];
     $invalidSampleLogged = false;
+    $staffDirCache = [];
 
     for ($page = 0; $page < $maxPages; $page++) {
         $payload = [
@@ -667,7 +711,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
             }
             $emp = attendance_hikvision_extract_employee_from_item($item);
             $timeRaw = attendance_hikvision_extract_time_raw_from_item($item);
-            list($staffName, $dept) = attendance_hikvision_extract_staff_meta($item);
+            list($staffNameDev, $deptDev) = attendance_hikvision_extract_staff_meta($item);
             $major = isset($item['major']) ? (string) $item['major'] : '';
             $minorEv = isset($item['minor']) ? (string) $item['minor'] : '';
             $eventType = ($major !== '' || $minorEv !== '') ? trim($major . '/' . $minorEv, '/') : (string) $acsMajor;
@@ -681,6 +725,22 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
                     $invalidSampleLogged = true;
                 }
                 continue;
+            }
+
+            if ($requireStaffDir) {
+                if (!array_key_exists($emp, $staffDirCache)) {
+                    $staffDirCache[$emp] = attendance_lookup_staff_for_attendance($db, $emp);
+                }
+                $dir = $staffDirCache[$emp];
+                if ($dir === null) {
+                    $out['skipped_not_in_directory']++;
+                    continue;
+                }
+                $staffName = $dir['staff_name'];
+                $dept = $dir['department'];
+            } else {
+                $staffName = $staffNameDev;
+                $dept = $deptDev;
             }
 
             $batch[] = [
@@ -714,7 +774,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     }
 
     $out['total_received'] = $cumulativeReceived;
-    $debug[] = '--- minor=' . $acsMinor . ' | received=' . $cumulativeReceived . ' | inserted=' . $out['inserted'] . ' | dup=' . $out['skipped_dup'] . ' | invalid=' . $out['skipped_bad'];
+    $debug[] = '--- minor=' . $acsMinor . ' | received=' . $cumulativeReceived . ' | inserted=' . $out['inserted'] . ' | dup=' . $out['skipped_dup'] . ' | invalid=' . $out['skipped_bad'] . ' | not_in_dir=' . $out['skipped_not_in_directory'];
 
     $out['debug'] = $debug;
     $out['ok'] = true;

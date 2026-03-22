@@ -6,13 +6,6 @@ require_once __DIR__ . '/includes/hikvision_sync_lib.php';
 
 $pageTitle = 'Attendance dashboard';
 
-$lookbackSpec = defined('STAFF_SYNC_LOOKBACK_INTERVAL') ? (string) STAFF_SYNC_LOOKBACK_INTERVAL : 'P1W';
-try {
-    $syncInterval = new DateInterval($lookbackSpec);
-} catch (Exception $e) {
-    $syncInterval = new DateInterval('P1W');
-}
-
 $nowTs = time();
 $lastAuto = (int) ($_SESSION['staff_attendance_last_auto_sync'] ?? 0);
 
@@ -26,8 +19,14 @@ if (STAFF_ATT_DASHBOARD_AUTO_SYNC) {
 }
 
 if ($shouldSync) {
-    $end = new DateTimeImmutable('now');
-    $start = $end->sub($syncInterval);
+    $tzDash = new DateTimeZone(STAFF_TIMEZONE);
+    $end = (new DateTimeImmutable('now', $tzDash))->setTime(23, 59, 59);
+    $ivStr = defined('STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL') ? (string) STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL : 'P6D';
+    try {
+        $start = $end->sub(new DateInterval($ivStr))->setTime(0, 0, 0);
+    } catch (Exception $e) {
+        $start = $end->sub(new DateInterval('P6D'))->setTime(0, 0, 0);
+    }
     $result = attendance_run_hikvision_sync($start, $end);
     $_SESSION['staff_attendance_last_auto_sync'] = $nowTs;
 
@@ -143,7 +142,7 @@ require __DIR__ . '/includes/header.php';
 <p class="text-muted small mb-3">
     All times use <strong>Sri Lanka (Asia/Colombo, UTC+5:30)</strong>. Today: <?php echo attendance_escape($todayYmd); ?>.
     <?php if (STAFF_ATT_DASHBOARD_AUTO_SYNC): ?>
-        Each visit syncs the last <strong><?php echo attendance_escape($lookbackSpec); ?></strong> of events from the terminal (chunked until all are fetched).
+        Each visit runs a device sync for the <strong>same 7-day calendar window</strong> as Device sync (<code><?php echo attendance_escape(defined('STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL') ? STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL : 'P6D'); ?></code>, ending today, Asia/Colombo).
     <?php else: ?>
         Auto-sync on open is off. Use <a href="sync_attendance.php">Device sync</a> from a PC on the same LAN as the Hikvision (or set <code>STAFF_ATT_DASHBOARD_AUTO_SYNC</code> in config when PHP can reach the device).
     <?php endif; ?>

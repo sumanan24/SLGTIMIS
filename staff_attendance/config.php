@@ -81,12 +81,10 @@ define('HIKVISION_MAX_SYNC_PAGES', 20000);
 define('ATT_PAGE_SIZE', 25);
 
 /**
- * Dashboard: auto-sync when opening dashboard.
- * Keep FALSE if PHP runs on a public server — 172.16.x.x is unreachable from the internet.
- * Use sync_attendance.php from a PC on the same LAN as the Hikvision, or enable this only when
- * the web server is on the LAN / VPN to the device.
+ * Dashboard: auto-sync when opening dashboard (same calendar window as STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL).
+ * Set FALSE if PHP cannot reach the device (e.g. public hosting).
  */
-define('STAFF_ATT_DASHBOARD_AUTO_SYNC', false);
+define('STAFF_ATT_DASHBOARD_AUTO_SYNC', true);
 
 /**
  * Seconds between automatic pulls. 0 = every time you open the dashboard.
@@ -109,9 +107,15 @@ define('STAFF_SYNC_LOOKBACK_INTERVAL', 'P1W');
 define('STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL', 'P6D');
 
 /**
- * After a successful sync, fill empty staff_name / department from `staff` + `department` when employee_no matches staff_id.
+ * After sync, UPDATE rows with empty name/dept from `staff` (only when REQUIRE_STAFF_DIRECTORY is false).
  */
 define('STAFF_ATTENDANCE_ENRICH_FROM_STAFF_TABLE', true);
+
+/**
+ * Only INSERT attendance when employee_no exists in `staff` as staff_id and staff.staff_name is non-empty.
+ * Unknown card numbers / visitors are skipped (not stored).
+ */
+define('STAFF_ATTENDANCE_REQUIRE_STAFF_DIRECTORY', true);
 
 /** Default date range on dashboard summary (days inclusive from date_to backwards) */
 define('STAFF_DASHBOARD_SUMMARY_DAYS', 7);

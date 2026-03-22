@@ -72,11 +72,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tr = (int) ($result['total_received'] ?? 0);
         $ins = (int) ($result['inserted'] ?? 0);
         $_SESSION['flash_success'] = sprintf(
-            'Sync finished. Total received: %d — Total inserted: %d (duplicates skipped: %d, invalid: %d).',
+            'Sync finished. Total received: %d — Total inserted: %d (duplicates skipped: %d, invalid: %d, not in staff list: %d).',
             $tr,
             $ins,
             (int) ($result['skipped_dup'] ?? 0),
-            (int) ($result['skipped_bad'] ?? 0)
+            (int) ($result['skipped_bad'] ?? 0),
+            (int) ($result['skipped_not_in_directory'] ?? 0)
         );
     } else {
         $_SESSION['flash_error'] = $result['error'] ?? 'Sync failed.';
@@ -114,8 +115,12 @@ require __DIR__ . '/includes/header.php';
         minors: <code><?php echo attendance_escape(defined('HIKVISION_ACS_MINORS') ? (string) HIKVISION_ACS_MINORS : ''); ?></code>
         (<code>HIKVISION_ACS_MINORS</code>, empty = single <code>HIKVISION_ACS_MINOR</code>),
         <strong>maxResults</strong>=<?php echo (int) (defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? HIKVISION_MAX_RESULTS_PER_CHUNK : 2000); ?>, paginate until no rows.
-        <code>INSERT IGNORE</code> (employee_no, attendance_time, device_ip, event_type) in chunks of 500;
-        UNIQUE (<code>employee_no</code>, <code>attendance_time</code>). Times: <strong>Asia/Colombo</strong>.
+        <code>INSERT IGNORE</code> (employee_no, staff_name, department, attendance_time, device_ip, event_type) in chunks of <?php echo (int) (defined('HIKVISION_INSERT_BATCH_SIZE') ? HIKVISION_INSERT_BATCH_SIZE : 500); ?>;
+        UNIQUE (<code>employee_no</code>, <code>attendance_time</code>).
+        <?php if (defined('STAFF_ATTENDANCE_REQUIRE_STAFF_DIRECTORY') && STAFF_ATTENDANCE_REQUIRE_STAFF_DIRECTORY): ?>
+            Only rows where <code>employee_no</code> matches <code>staff.staff_id</code> and <code>staff.staff_name</code> is set — others skipped.
+        <?php endif; ?>
+        Times: <strong>Asia/Colombo</strong>. Dashboard auto-sync: <?php echo (defined('STAFF_ATT_DASHBOARD_AUTO_SYNC') && STAFF_ATT_DASHBOARD_AUTO_SYNC) ? 'on (same week window)' : 'off'; ?>.
     </p>
 </details>
 
@@ -130,7 +135,8 @@ require __DIR__ . '/includes/header.php';
             Total received: <strong><?php echo (int) ($showResult['total_received'] ?? 0); ?></strong> —
             Total inserted: <strong><?php echo (int) ($showResult['inserted'] ?? 0); ?></strong> —
             Skipped dup: <?php echo (int) ($showResult['skipped_dup'] ?? 0); ?> —
-            Invalid: <?php echo (int) ($showResult['skipped_bad'] ?? 0); ?>
+            Invalid: <?php echo (int) ($showResult['skipped_bad'] ?? 0); ?> —
+            Not in staff: <?php echo (int) ($showResult['skipped_not_in_directory'] ?? 0); ?>
         </div>
     <?php endif; ?>
 </div>
