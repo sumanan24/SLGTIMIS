@@ -10,7 +10,6 @@ declare(strict_types=1);
 /** @var array $employees */
 /** @var array $grouped */
 /** @var int $rangePunches */
-/** @var int $total */
 /** @var int $todayCount */
 /** @var int $distinctEmployees */
 /** @var string|null $dbError */
@@ -27,12 +26,12 @@ $embed_main_layout = (bool) $embed_main_layout;
 <p class="text-muted small mb-3">
     All times use <strong>Sri Lanka (Asia/Colombo, UTC+5:30)</strong>. Today: <?php echo attendance_escape($todayYmd); ?>.
     <?php if (STAFF_ATT_DASHBOARD_AUTO_SYNC): ?>
-        <?php $dashIv = defined('STAFF_DASHBOARD_AUTO_SYNC_INTERVAL') ? (string) STAFF_DASHBOARD_AUTO_SYNC_INTERVAL : 'P6D'; ?>
-        The table loads from the <strong>database first</strong>; then a device sync runs for <code><?php echo attendance_escape($dashIv); ?></code> (one week of punches, ending today, Asia/Colombo). After a successful sync, the dashboard refreshes from the DB so the filter range matches stored rows. Manual <a href="<?php echo attendance_escape($urls['sync']); ?>">Device sync</a> uses the same default window (<code><?php echo attendance_escape(defined('STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL') ? STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL : 'P6D'); ?></code>) for longer backfills.
+        <?php $dashIv = defined('STAFF_DASHBOARD_AUTO_SYNC_INTERVAL') ? (string) STAFF_DASHBOARD_AUTO_SYNC_INTERVAL : 'P0D'; ?>
+        The table loads from the <strong>database first</strong>; then a quick device sync runs for <code><?php echo attendance_escape($dashIv); ?></code> (today only, Asia/Colombo) so load stays fast. For a full week or more, use <a href="<?php echo attendance_escape($urls['sync']); ?>">Device sync</a> (<code><?php echo attendance_escape(defined('STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL') ? STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL : 'P6D'); ?></code> default).
     <?php else: ?>
         Auto-sync on open is off. Use <a href="<?php echo attendance_escape($urls['sync']); ?>">Device sync</a> from a PC on the same LAN as the Hikvision (or set <code>STAFF_ATT_DASHBOARD_AUTO_SYNC</code> in config when PHP can reach the device).
     <?php endif; ?>
-    The employee list only shows people who have at least one punch stored in the database.
+    The employee list only shows people with at least one punch in the <strong>selected date range</strong>.
 </p>
 
 <?php if ($dbError !== null): ?>
@@ -73,7 +72,7 @@ $embed_main_layout = (bool) $embed_main_layout;
                 <button type="submit" class="btn btn-primary btn-sm">Apply</button>
             </div>
             <div class="col-auto">
-                <a href="<?php echo attendance_escape($urls['device']); ?>" class="btn btn-outline-secondary btn-sm">Reset week</a>
+                <a href="<?php echo attendance_escape($urls['device']); ?>" class="btn btn-outline-secondary btn-sm">Reset to today</a>
             </div>
         </div>
         <p class="text-muted small mb-0 mt-2">
@@ -83,7 +82,7 @@ $embed_main_layout = (bool) $embed_main_layout;
     </div>
 </form>
 
-<div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3 mb-4">
+<div class="row row-cols-1 row-cols-md-3 g-3 mb-4">
     <div class="col">
         <div class="card shadow-sm border-0 bg-white h-100">
             <div class="card-body">
@@ -95,7 +94,7 @@ $embed_main_layout = (bool) $embed_main_layout;
     <div class="col">
         <div class="card shadow-sm border-0 bg-white h-100">
             <div class="card-body">
-                <div class="text-muted small">Today's punches</div>
+                <div class="text-muted small">Today's punches (calendar day)</div>
                 <div class="display-6"><?php echo (int) $todayCount; ?></div>
             </div>
         </div>
@@ -103,15 +102,7 @@ $embed_main_layout = (bool) $embed_main_layout;
     <div class="col">
         <div class="card shadow-sm border-0 bg-white h-100">
             <div class="card-body">
-                <div class="text-muted small">All-time rows</div>
-                <div class="display-6"><?php echo (int) $total; ?></div>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card shadow-sm border-0 bg-white h-100">
-            <div class="card-body">
-                <div class="text-muted small">Distinct employees (in DB)</div>
+                <div class="text-muted small">Distinct employees in range</div>
                 <div class="display-6"><?php echo (int) $distinctEmployees; ?></div>
             </div>
         </div>

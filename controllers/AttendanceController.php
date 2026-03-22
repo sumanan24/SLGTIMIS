@@ -1476,22 +1476,10 @@ class AttendanceController extends Controller {
             $reportMonth = $defaultMonth;
         }
 
-        $nameOk = 'staff_name IS NOT NULL AND TRIM(staff_name) <> \'\'';
-        $db = attendance_db();
-        $sql = "SELECT employee_no,
-                       MAX(staff_name) AS staff_name,
-                       MAX(department) AS department,
-                       COUNT(DISTINCT DATE(attendance_time)) AS days_present,
-                       COUNT(*) AS punch_count
-                FROM staff_attendance
-                WHERE $nameOk AND DATE_FORMAT(attendance_time, '%Y-%m') = ?
-                GROUP BY employee_no
-                ORDER BY staff_name ASC, employee_no ASC";
-        $stmt = $db->prepare($sql);
-        $stmt->bind_param('s', $reportMonth);
-        $stmt->execute();
-        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
+        $staffNameFilter = trim((string) ($_GET['staff_name'] ?? ''));
+
+        require_once BASE_PATH . '/staff_attendance/includes/month_report_data.php';
+        $rows = staff_attendance_month_report_rows($reportMonth, $staffNameFilter);
 
         return $this->view('attendance/staff_device_month', [
             'title' => 'Staff device — Month report',
@@ -1499,6 +1487,7 @@ class AttendanceController extends Controller {
             'staffDeviceSection' => 'month',
             'urls' => $urls,
             'reportMonth' => $reportMonth,
+            'staffNameFilter' => $staffNameFilter,
             'rows' => $rows,
         ]);
     }

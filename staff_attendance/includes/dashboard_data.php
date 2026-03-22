@@ -4,14 +4,13 @@ declare(strict_types=1);
 /**
  * Load dashboard rows and KPIs from DB (same filters used before/after device sync).
  *
- * @return array{employees: array<int, array<string, mixed>>, grouped: array<int, array<string, mixed>>, rangePunches: int, total: int, todayCount: int, distinctEmployees: int, dbError: string|null}
+ * @return array{employees: array<int, array<string, mixed>>, grouped: array<int, array<string, mixed>>, rangePunches: int, todayCount: int, distinctEmployees: int, dbError: string|null}
  */
 function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $dateTo, string $employeeNo, string $todayYmd): array
 {
     $employees = [];
     $grouped = [];
     $rangePunches = 0;
-    $total = 0;
     $todayCount = 0;
     $distinctEmployees = 0;
     $dbError = null;
@@ -22,8 +21,11 @@ function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $date
 
         $nameOk = 'staff_name IS NOT NULL AND TRIM(staff_name) <> \'\'';
 
-        $total = (int) $db->query('SELECT COUNT(*) AS c FROM staff_attendance WHERE ' . $nameOk)->fetch_assoc()['c'];
-        $distinctEmployees = (int) $db->query('SELECT COUNT(DISTINCT employee_no) AS c FROM staff_attendance WHERE ' . $nameOk)->fetch_assoc()['c'];
+        $disR = $db->prepare('SELECT COUNT(DISTINCT employee_no) AS c FROM staff_attendance WHERE DATE(attendance_time) BETWEEN ? AND ? AND ' . $nameOk);
+        $disR->bind_param('ss', $dateFrom, $dateTo);
+        $disR->execute();
+        $distinctEmployees = (int) ($disR->get_result()->fetch_assoc()['c'] ?? 0);
+        $disR->close();
 
         $stmt = $db->prepare('SELECT COUNT(*) AS c FROM staff_attendance WHERE DATE(attendance_time) = ? AND ' . $nameOk);
         $stmt->bind_param('s', $todayYmd);
@@ -31,14 +33,18 @@ function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $date
         $todayCount = (int) ($stmt->get_result()->fetch_assoc()['c'] ?? 0);
         $stmt->close();
 
-        $er = $db->query(
-            'SELECT DISTINCT employee_no, staff_name FROM staff_attendance WHERE ' . $nameOk . ' ORDER BY staff_name ASC, employee_no ASC'
+        $empStmt = $db->prepare(
+            'SELECT DISTINCT employee_no, staff_name FROM staff_attendance WHERE DATE(attendance_time) BETWEEN ? AND ? AND ' . $nameOk . ' ORDER BY staff_name ASC, employee_no ASC'
         );
-        if ($er) {
-            while ($row = $er->fetch_assoc()) {
+        $empStmt->bind_param('ss', $dateFrom, $dateTo);
+        $empStmt->execute();
+        $empRes = $empStmt->get_result();
+        if ($empRes) {
+            while ($row = $empRes->fetch_assoc()) {
                 $employees[] = $row;
             }
         }
+        $empStmt->close();
 
         $rangeStmt = $db->prepare(
             'SELECT COUNT(*) AS c FROM staff_attendance WHERE DATE(attendance_time) BETWEEN ? AND ? AND ' . $nameOk
@@ -87,7 +93,6 @@ function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $date
         'employees' => $employees,
         'grouped' => $grouped,
         'rangePunches' => $rangePunches,
-        'total' => $total,
         'todayCount' => $todayCount,
         'distinctEmployees' => $distinctEmployees,
         'dbError' => $dbError,
@@ -96,7 +101,7 @@ function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $date
 
 /**
  * Shared state for staff device attendance dashboard (standalone + main app layout).
- * Loads from DB first; then pulls one week from device (config) and re-queries DB on success so filters match stored rows.
+ * Loads from DB first; then pulls today-only from device (config) for a fast sync, then re-queries DB on success.
  *
  * @return array<string, mixed>
  */
@@ -109,7 +114,7 @@ function staff_attendance_load_dashboard_state(): array
     $nowInTz = new DateTimeImmutable('now', $tzDash);
     $todayYmd = $nowInTz->format('Y-m-d');
 
-    $summaryDays = defined('STAFF_DASHBOARD_SUMMARY_DAYS') ? max(1, min(31, (int) STAFF_DASHBOARD_SUMMARY_DAYS)) : 7;
+    $summaryDays = defined('STAFF_DASHBOARD_SUMMARY_DAYS') ? max(1, min(31, (int) STAFF_DASHBOARD_SUMMARY_DAYS)) : 1;
 
     $dateToIn = trim((string) ($_GET['date_to'] ?? ''));
     $dateFromIn = trim((string) ($_GET['date_from'] ?? ''));
@@ -164,11 +169,11 @@ function staff_attendance_load_dashboard_state(): array
         $end = $nowInTz->setTime(23, 59, 59);
         $ivStr = defined('STAFF_DASHBOARD_AUTO_SYNC_INTERVAL')
             ? (string) STAFF_DASHBOARD_AUTO_SYNC_INTERVAL
-            : (defined('STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL') ? (string) STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL : 'P6D');
+            : 'P0D';
         try {
             $start = $end->sub(new DateInterval($ivStr))->setTime(0, 0, 0);
         } catch (Exception $e) {
-            $start = $end->sub(new DateInterval('P6D'))->setTime(0, 0, 0);
+            $start = $end->sub(new DateInterval('P0D'))->setTime(0, 0, 0);
         }
         $result = attendance_run_hikvision_sync($start, $end);
         $_SESSION['staff_attendance_last_auto_sync'] = $nowTs;
@@ -189,7 +194,6 @@ function staff_attendance_load_dashboard_state(): array
         'employees' => $data['employees'],
         'grouped' => $data['grouped'],
         'rangePunches' => $data['rangePunches'],
-        'total' => $data['total'],
         'todayCount' => $data['todayCount'],
         'distinctEmployees' => $data['distinctEmployees'],
         'dbError' => $data['dbError'],

@@ -91,10 +91,10 @@ define('STAFF_ATT_DASHBOARD_AUTO_SYNC', true);
 define('STAFF_ATT_DASHBOARD_SYNC_COOLDOWN', 0);
 
 /**
- * Hikvision sync window for dashboard auto-sync (runs after the first DB read; then DB is queried again if sync succeeds).
- * P6D = seven calendar days inclusive — same span as STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL and default summary filter.
+ * Hikvision sync window for dashboard auto-sync only — keep short so sync does not run too long.
+ * P0D = today only (00:00:00–23:59:59 Asia/Colombo). Use Device sync page for a full week backfill.
  */
-define('STAFF_DASHBOARD_AUTO_SYNC_INTERVAL', 'P6D');
+define('STAFF_DASHBOARD_AUTO_SYNC_INTERVAL', 'P0D');
 
 /** Max raw rows (legacy list pages) */
 define('STAFF_ATT_DASHBOARD_ROW_LIMIT', 500);
@@ -116,8 +116,8 @@ define('STAFF_ATTENDANCE_ENRICH_FROM_STAFF_TABLE', true);
  */
 define('STAFF_ATTENDANCE_REQUIRE_STAFF_DIRECTORY', false);
 
-/** Default date range on dashboard summary (days inclusive from date_to backwards) */
-define('STAFF_DASHBOARD_SUMMARY_DAYS', 7);
+/** Default date range on dashboard (days inclusive back from date_to). 1 = today only on first load. */
+define('STAFF_DASHBOARD_SUMMARY_DAYS', 1);
 
 /**
  * @return mysqli
