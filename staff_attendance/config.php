@@ -97,11 +97,21 @@ define('STAFF_ATT_DASHBOARD_SYNC_COOLDOWN', 0);
 define('STAFF_ATT_DASHBOARD_ROW_LIMIT', 500);
 
 /**
- * Hikvision sync window when dashboard opens.
- * Use at least P1M so staff who did not punch every week still appear after sync (200+ employees).
- * P1W only loads people active in that week.
+ * Hikvision sync window when dashboard auto-sync runs (if enabled).
+ * P1W = last 7 days of events (all employees who punched in that window).
  */
-define('STAFF_SYNC_LOOKBACK_INTERVAL', 'P1M');
+define('STAFF_SYNC_LOOKBACK_INTERVAL', 'P1W');
+
+/**
+ * Default date range on Device sync page: end = today 23:59:59, start = (end − interval) at 00:00:00.
+ * P6D = seven calendar days inclusive (today + previous six days).
+ */
+define('STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL', 'P6D');
+
+/**
+ * After a successful sync, fill empty staff_name / department from `staff` + `department` when employee_no matches staff_id.
+ */
+define('STAFF_ATTENDANCE_ENRICH_FROM_STAFF_TABLE', true);
 
 /** Default date range on dashboard summary (days inclusive from date_to backwards) */
 define('STAFF_DASHBOARD_SUMMARY_DAYS', 7);

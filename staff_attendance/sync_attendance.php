@@ -11,6 +11,7 @@ declare(strict_types=1);
  * Pagination: searchResultPosition += count(records returned); loop until zero records.
  * No employee filter — all employeeNoString values from device.
  * DB: INSERT IGNORE chunk size 500; UNIQUE (employee_no, attendance_time).
+ * Default range: one week (config STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL, typically P6D = 7 calendar days). Device may send only employee_no — names filled from staff table when enabled.
  *
  * Config: staff_attendance/config.php — HIKVISION_IP, HIKVISION_ACS_MINORS (comma minors), chunk insert size.
  */
@@ -23,7 +24,15 @@ $pageTitle = 'Hikvision sync';
 $tz = new DateTimeZone(STAFF_TIMEZONE);
 $now = new DateTimeImmutable('now', $tz);
 $defaultEnd = $now->setTime(23, 59, 59);
-$defaultStart = $defaultEnd->sub(new DateInterval('P30D'))->setTime(0, 0, 0);
+$syncIv = 'P6D';
+if (defined('STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL')) {
+    $syncIv = (string) STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL;
+}
+try {
+    $defaultStart = $defaultEnd->sub(new DateInterval($syncIv))->setTime(0, 0, 0);
+} catch (Exception $e) {
+    $defaultStart = $defaultEnd->sub(new DateInterval('P6D'))->setTime(0, 0, 0);
+}
 
 $reachTest = null;
 if (isset($_GET['test']) && (string) $_GET['test'] === '1') {
@@ -134,7 +143,7 @@ require __DIR__ . '/includes/header.php';
             <input type="text" name="sync_start" class="form-control" required
                    value="<?php echo attendance_escape($defaultStartStr); ?>"
                    placeholder="Y-m-d H:i:s">
-            <div class="form-text">Default: 30 days ago at 00:00:00</div>
+            <div class="form-text">Default: seven calendar days (Asia/Colombo), from 00:00 six days ago through tonight</div>
         </div>
         <div class="mb-3">
             <label class="form-label">End (Asia/Colombo)</label>

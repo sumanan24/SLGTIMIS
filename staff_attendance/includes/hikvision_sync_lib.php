@@ -235,6 +235,37 @@ function attendance_flush_staff_batch(mysqli $db, array &$batch, array &$out): v
 }
 
 /**
+ * When the terminal only sends employee_no, fill staff_name / department from `staff` + `department` (staff_id = employee_no).
+ *
+ * @return int Rows updated (best effort; ignored if tables differ)
+ */
+function attendance_enrich_staff_attendance_from_directory(mysqli $db, DateTimeInterface $start, DateTimeInterface $end): int
+{
+    $tz = new DateTimeZone(defined('STAFF_TIMEZONE') ? STAFF_TIMEZONE : 'Asia/Colombo');
+    $s = attendance_datetime_to_immutable($start)->setTimezone($tz)->format('Y-m-d H:i:s');
+    $e = attendance_datetime_to_immutable($end)->setTimezone($tz)->format('Y-m-d H:i:s');
+
+    $sql = 'UPDATE staff_attendance sa
+            INNER JOIN staff s ON s.staff_id = sa.employee_no
+            LEFT JOIN department d ON d.department_id = s.department_id
+            SET sa.staff_name = IF(TRIM(IFNULL(sa.staff_name, \'\')) = \'\', s.staff_name, sa.staff_name),
+                sa.department = IF(TRIM(IFNULL(sa.department, \'\')) = \'\', IFNULL(d.department_name, \'\'), sa.department)
+            WHERE sa.attendance_time >= ? AND sa.attendance_time <= ?
+              AND (TRIM(IFNULL(sa.staff_name, \'\')) = \'\' OR TRIM(IFNULL(sa.department, \'\')) = \'\')';
+
+    $stmt = $db->prepare($sql);
+    if ($stmt === false) {
+        return 0;
+    }
+    $stmt->bind_param('ss', $s, $e);
+    $stmt->execute();
+    $n = $stmt->affected_rows;
+    $stmt->close();
+
+    return $n;
+}
+
+/**
  * Pull events from device and INSERT IGNORE into staff_attendance.
  *
  * @return array{ok: bool, inserted: int, skipped_dup: int, skipped_bad: int, total_received: int, debug: list<string>, error: ?string}
@@ -273,6 +304,17 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
             }
         }
         $mergedDebug[] = '=== All minor passes complete | total received=' . $out['total_received'] . ' | total inserted=' . $out['inserted'] . ' | dup skipped=' . $out['skipped_dup'] . ' | invalid=' . $out['skipped_bad'] . ' ===';
+        if (defined('STAFF_ATTENDANCE_ENRICH_FROM_STAFF_TABLE') && STAFF_ATTENDANCE_ENRICH_FROM_STAFF_TABLE) {
+            try {
+                $dbEnrich = attendance_db();
+                $enriched = attendance_enrich_staff_attendance_from_directory($dbEnrich, $start, $end);
+                if ($enriched > 0) {
+                    $mergedDebug[] = 'Enriched staff_name/department from staff table (employee_no = staff_id): ' . $enriched . ' row(s).';
+                }
+            } catch (Throwable $ex) {
+                // Schema may differ; sync rows still valid with employee_no only
+            }
+        }
         $out['debug'] = $mergedDebug;
         $out['ok'] = true;
         return $out;
