@@ -6,7 +6,7 @@ declare(strict_types=1);
  *
  * API: POST /ISAPI/AccessControl/AcsEvent?format=json — Digest auth
  * Request body (see includes/hikvision_sync_lib.php):
- *   AcsEventCond: searchID, searchResultPosition, maxResults (100), major (5), minor (config),
+ *   AcsEventCond: searchID, searchResultPosition, maxResults (config, e.g. 2000), major (5), minor (config),
  *   startTime, endTime — format YYYY-MM-DDTHH:MM:SS (Asia/Colombo)
  * Pagination: searchResultPosition += count(records returned); loop until zero records.
  * No employee filter — all employeeNoString values from device.
@@ -104,7 +104,7 @@ require __DIR__ . '/includes/header.php';
         <strong>major</strong>=<?php echo (int) (defined('HIKVISION_ACS_MAJOR') ? HIKVISION_ACS_MAJOR : 5); ?>,
         <strong>minor</strong>=<?php echo (int) (defined('HIKVISION_ACS_MINOR') ? HIKVISION_ACS_MINOR : 0); ?>
         (<code>HIKVISION_ACS_MINOR</code> — try <strong>75</strong> if the API rejects <strong>0</strong>),
-        <strong>maxResults</strong>=100, paginate until no rows.
+        <strong>maxResults</strong>=<?php echo (int) (defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? HIKVISION_MAX_RESULTS_PER_CHUNK : 2000); ?>, paginate until no rows.
         <code>INSERT IGNORE</code> (employee_no, attendance_time, device_ip, event_type) in chunks of 500;
         UNIQUE (<code>employee_no</code>, <code>attendance_time</code>). Times: <strong>Asia/Colombo</strong>.
     </p>

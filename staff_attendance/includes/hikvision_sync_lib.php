@@ -417,7 +417,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     $url = attendance_hikvision_acs_event_url();
 
     $searchId = bin2hex(random_bytes(8));
-    $maxResults = defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? max(10, min(1000, (int) HIKVISION_MAX_RESULTS_PER_CHUNK)) : 100;
+    $maxResults = defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? max(1, min(10000, (int) HIKVISION_MAX_RESULTS_PER_CHUNK)) : 2000;
     $maxPages = defined('HIKVISION_MAX_SYNC_PAGES') ? max(1, (int) HIKVISION_MAX_SYNC_PAGES) : 20000;
     $acsMajor = defined('HIKVISION_ACS_MAJOR') ? (int) HIKVISION_ACS_MAJOR : 5;
     $acsMinor = defined('HIKVISION_ACS_MINOR') ? (int) HIKVISION_ACS_MINOR : 0;

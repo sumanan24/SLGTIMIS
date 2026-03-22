@@ -49,8 +49,11 @@ define('HIKVISION_CURL_TIMEOUT', 60);
  */
 define('HIKVISION_SYNC_CURL_TIMEOUT', 300);
 
-/** DS-K1T320MFWX / ISAPI: events per request (pagination step). */
-define('HIKVISION_MAX_RESULTS_PER_CHUNK', 100);
+/**
+ * Events per ISAPI request (maxResults). Larger = fewer HTTP round-trips.
+ * Set 2000 for bigger pages; if the device returns HTTP 400, lower (e.g. 500 or 100) per firmware limits.
+ */
+define('HIKVISION_MAX_RESULTS_PER_CHUNK', 2000);
 
 /** Access control events only (Hikvision major type 5). */
 define('HIKVISION_ACS_MAJOR', 5);
