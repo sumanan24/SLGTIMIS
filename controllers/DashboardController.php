@@ -75,6 +75,18 @@ class DashboardController extends Controller {
                     $seenIds[] = $id;
                 }
             }
+
+            $inventorySummary = null;
+            if (file_exists(BASE_PATH . '/models/InventoryModel.php')) {
+                require_once BASE_PATH . '/models/InventoryModel.php';
+                $inventoryModel = new InventoryModel();
+                if ($inventoryModel->tableExists()) {
+                    $inventorySummary = [
+                        'totalItems' => $inventoryModel->countItems(),
+                        'lowStockCount' => count($inventoryModel->getLowStockItems(null, 999)),
+                    ];
+                }
+            }
             
             $data = [
                 'title' => 'Dashboard',
@@ -94,7 +106,8 @@ class DashboardController extends Controller {
                 'districtStats' => $districtStats,
                 'provinceStats' => $provinceStats,
                 'academicYears' => $academicYears,
-                'selectedAcademicYear' => $selectedAcademicYear
+                'selectedAcademicYear' => $selectedAcademicYear,
+                'inventorySummary' => $inventorySummary
             ];
             
             return $this->view('dashboard/index', $data);

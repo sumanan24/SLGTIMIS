@@ -1,42 +1,55 @@
 <?php
 /**
- * Inventory Model
+ * Inventory items (per department stock line)
  */
-
 class InventoryModel extends Model {
     protected $table = 'inventory';
 
     protected function getPrimaryKey() {
-        return 'inventory_id';
+        return 'item_id';
     }
 
     /**
-     * Get inventory records, optionally filtered by department
+     * @param string|null $departmentId
+     * @param string $search
+     * @param string|null $statusFilter active|inactive|''
+     * @return array<int, array<string, mixed>>
      */
-    public function getInventories($departmentId = null) {
-        $sql = "SELECT i.*,
-                       d.department_name,
-                       ii.inventory_item_description,
-                       ii.item_code
+    public function getItems($departmentId = null, $search = '', $statusFilter = '') {
+        $sql = "SELECT i.*, d.`department_name` 
                 FROM `{$this->table}` i
-                LEFT JOIN `department` d ON i.inventory_department_id = d.department_id
-                LEFT JOIN `inventory_item` ii ON i.item_id = ii.item_id";
-
+                LEFT JOIN `department` d ON i.`department_id` = d.`department_id`";
         $params = [];
-        $types  = '';
+        $types = '';
+        $where = [];
 
-        if (!empty($departmentId)) {
-            $sql .= " WHERE i.inventory_department_id = ?";
+        if ($departmentId !== null && $departmentId !== '') {
+            $where[] = "`i`.`department_id` = ?";
             $params[] = $departmentId;
-            $types   .= 's';
+            $types .= 's';
+        }
+        if ($search !== '') {
+            $where[] = "(`i`.`item_name` LIKE ? OR `i`.`item_code` LIKE ? OR `i`.`category` LIKE ?)";
+            $q = '%' . $search . '%';
+            $params[] = $q;
+            $params[] = $q;
+            $params[] = $q;
+            $types .= 'sss';
+        }
+        if ($statusFilter === 'active' || $statusFilter === 'inactive') {
+            $where[] = "`i`.`status` = ?";
+            $params[] = $statusFilter;
+            $types .= 's';
         }
 
-        $sql .= " ORDER BY i.inventory_department_id, i.item_id";
+        if (!empty($where)) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= " ORDER BY `i`.`item_name` ASC";
 
         if (!empty($params)) {
             $stmt = $this->db->prepare($sql);
             if (!$stmt) {
-                error_log("InventoryModel::getInventories SQL error: " . $this->db->getConnection()->error);
                 return [];
             }
             $stmt->bind_param($types, ...$params);
@@ -46,42 +59,172 @@ class InventoryModel extends Model {
             $result = $this->db->query($sql);
         }
 
-        $data = [];
+        $rows = [];
         if ($result && $result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
-                $data[] = $row;
+                $rows[] = $row;
             }
         }
+        return $rows;
+    }
 
-        return $data;
+    public function countItems($departmentId = null) {
+        $sql = "SELECT COUNT(*) AS c FROM `{$this->table}`";
+        $params = [];
+        $types = '';
+        if ($departmentId !== null && $departmentId !== '') {
+            $sql .= " WHERE `department_id` = ?";
+            $params[] = $departmentId;
+            $types .= 's';
+        }
+        if (!empty($params)) {
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                return 0;
+            }
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+        } else {
+            $result = $this->db->query($sql);
+        }
+        if ($result && $row = $result->fetch_assoc()) {
+            return (int)($row['c'] ?? 0);
+        }
+        return 0;
     }
 
     /**
-     * Get single inventory by ID
+     * @return array<int, array<string, mixed>>
      */
-    public function getById($id) {
-        return $this->find($id);
+    public function getLowStockItems($departmentId = null, $limit = 20) {
+        $limit = max(1, min(100, (int)$limit));
+        $sql = "SELECT i.*, d.`department_name` FROM `{$this->table}` i
+                LEFT JOIN `department` d ON i.`department_id` = d.`department_id`
+                WHERE `i`.`status` = 'active' AND `i`.`quantity` < `i`.`reorder_level`";
+        $params = [];
+        $types = '';
+        if ($departmentId !== null && $departmentId !== '') {
+            $sql .= " AND `i`.`department_id` = ?";
+            $params[] = $departmentId;
+            $types .= 's';
+        }
+        $sql .= " ORDER BY `i`.`quantity` ASC LIMIT {$limit}";
+
+        if (!empty($params)) {
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                return [];
+            }
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+        } else {
+            $result = $this->db->query($sql);
+        }
+
+        $rows = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $rows[] = $row;
+            }
+        }
+        return $rows;
     }
 
-    /**
-     * Create inventory record
-     */
-    public function createInventory($data, &$sqlError = null) {
+    public function createItem($data, &$sqlError = null) {
         return $this->create($data, $sqlError);
     }
 
-    /**
-     * Update inventory
-     */
-    public function updateInventory($id, $data, &$sqlError = null) {
+    public function updateItem($id, $data, &$sqlError = null) {
         return $this->update($id, $data, $sqlError);
     }
 
-    /**
-     * Delete inventory
-     */
-    public function deleteInventory($id) {
+    public function deleteItem($id) {
         return $this->delete($id);
     }
-}
 
+    /**
+     * @return int|false new quantity or false
+     */
+    public function adjustQuantity($itemId, $delta, &$sqlError = null) {
+        $delta = (int)$delta;
+        $delta = $delta === 0 ? 0 : $delta;
+        $sql = "UPDATE `{$this->table}` SET `quantity` = `quantity` + ? WHERE `item_id` = ?";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            $sqlError = $this->db->getConnection()->error ?? 'Prepare failed';
+            return false;
+        }
+        $stmt->bind_param('ii', $delta, $itemId);
+        if (!$stmt->execute()) {
+            $sqlError = $stmt->error ?? 'Execute failed';
+            return false;
+        }
+        $row = $this->find($itemId);
+        return $row ? (int)($row['quantity'] ?? 0) : false;
+    }
+
+    public function getQuantity($itemId) {
+        $row = $this->find($itemId);
+        return $row ? (int)($row['quantity'] ?? 0) : null;
+    }
+
+    /**
+     * Find another row with same item_code in to_department (for transfer).
+     */
+    public function findByCodeAndDepartment($itemCode, $departmentId) {
+        if ($itemCode === '' || $itemCode === null) {
+            return null;
+        }
+        $sql = "SELECT * FROM `{$this->table}` WHERE `item_code` = ? AND `department_id` <=> ? LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return null;
+        }
+        $stmt->bind_param('ss', $itemCode, $departmentId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        return $res ? $res->fetch_assoc() : null;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getItemsForSelect($departmentId = null) {
+        $sql = "SELECT `item_id`, `item_name`, `item_code`, `department_id`, `quantity` FROM `{$this->table}` WHERE `status` = 'active'";
+        $params = [];
+        $types = '';
+        if ($departmentId !== null && $departmentId !== '') {
+            $sql .= " AND `department_id` = ?";
+            $params[] = $departmentId;
+            $types .= 's';
+        }
+        $sql .= " ORDER BY `item_name` ASC";
+
+        if (!empty($params)) {
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                return [];
+            }
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+        } else {
+            $result = $this->db->query($sql);
+        }
+
+        $rows = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $rows[] = $row;
+            }
+        }
+        return $rows;
+    }
+
+    public function tableExists() {
+        $r = $this->db->query("SHOW TABLES LIKE 'inventory'");
+        return $r && $r->num_rows > 0;
+    }
+}

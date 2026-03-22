@@ -47,7 +47,7 @@ class StaffModuleEnrollmentController extends Controller
         // Load required models
         $staffModel = $this->model('StaffModel');
         $courseModel = $this->model('CourseModel');
-        $groupTimetableModel = $this->model('GroupTimetableModel');
+        $moduleModel = $this->model('ModuleModel');
         $staffModuleEnrollmentModel = $this->model('StaffModuleEnrollmentModel');
         // Ensure enrollment table exists before use
         $staffModuleEnrollmentModel->ensureTableStructure();
@@ -146,7 +146,7 @@ class StaffModuleEnrollmentController extends Controller
             }
             
             // Optional: ensure module belongs to this course
-            $availableModules = $groupTimetableModel->getModulesByCourseId($courseId);
+            $availableModules = $moduleModel->getAllWithCourse($courseId);
             $validModuleIds = array_column($availableModules, 'module_id');
             if (!in_array($moduleId, $validModuleIds, true)) {
                 $_SESSION['error'] = 'Invalid module selected for the chosen course.';
@@ -238,8 +238,15 @@ class StaffModuleEnrollmentController extends Controller
         }
 
         try {
-            $timetableModel = $this->model('GroupTimetableModel');
-            $modules = $timetableModel->getModulesByCourseId($courseId);
+            $moduleModel = $this->model('ModuleModel');
+            $rows = $moduleModel->getAllWithCourse($courseId);
+            $modules = [];
+            foreach ($rows as $r) {
+                $modules[] = [
+                    'module_id' => $r['module_id'] ?? '',
+                    'module_name' => $r['module_name'] ?? ($r['module_id'] ?? ''),
+                ];
+            }
             $this->json(['success' => true, 'modules' => $modules]);
         } catch (Exception $e) {
             error_log('StaffModuleEnrollmentController::getModulesByCourse - ' . $e->getMessage());

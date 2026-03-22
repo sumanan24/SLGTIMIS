@@ -735,6 +735,55 @@
             </div>
         </div>
     </div>
+
+    <?php if (!empty($inventorySummary)): ?>
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card dashboard-stats-card" style="border-left-color: #0d9488;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-start justify-content-between">
+                        <div>
+                            <div class="stats-card-label">Inventory items</div>
+                            <div class="stats-card-value" style="color: #0f766e;"><?php echo number_format((int)($inventorySummary['totalItems'] ?? 0)); ?></div>
+                            <a href="<?php echo APP_URL; ?>/inventory" class="small">Open inventory &rarr;</a>
+                        </div>
+                        <div class="stats-card-icon flex-shrink-0 ms-3" style="background: rgba(13, 148, 136, 0.1); color: #0d9488;">
+                            <i class="fas fa-boxes"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card dashboard-stats-card" style="border-left-color: #f59e0b;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-start justify-content-between">
+                        <div>
+                            <div class="stats-card-label">Low stock (below reorder)</div>
+                            <div class="stats-card-value text-warning"><?php echo number_format((int)($inventorySummary['lowStockCount'] ?? 0)); ?></div>
+                            <a href="<?php echo APP_URL; ?>/inventory" class="small">View dashboard &rarr;</a>
+                        </div>
+                        <div class="stats-card-icon flex-shrink-0 ms-3" style="background: rgba(245, 158, 11, 0.12); color: #d97706;">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card dashboard-stats-card" style="border-left-color: #64748b;">
+                <div class="card-body p-4 d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="stats-card-label">Stock activity</div>
+                        <div class="small text-muted mb-2">Recent movements on the inventory log.</div>
+                        <a href="<?php echo APP_URL; ?>/inventory/log" class="btn btn-sm btn-outline-secondary">View log</a>
+                    </div>
+                    <i class="fas fa-clipboard-list fa-2x text-secondary opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
     
     <!-- Course Enrollment by Department -->
     <?php if (!empty($courseEnrollmentByDepartment)): ?>

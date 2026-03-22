@@ -100,7 +100,7 @@
                             <?php if (!$isSAO): ?>
                             <!-- Deputy Principal Education Branch - Hidden for SAO -->
                             <li class="menu-item-has-children <?php 
-$educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory', 'group-timetable'];
+$educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                     if ($hasGroupAccess) {
                                         $educationPages[] = 'groups';
                                     }
@@ -122,7 +122,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory', 'g
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
                                 <ul class="submenu" style="<?php 
-                                    $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory', 'group-timetable'];
+                                    $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                     if ($hasGroupAccess) {
                                         $educationPages[] = 'groups';
                                     }
@@ -307,13 +307,13 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory', 'g
                             
                             <!-- Attendance Management - Show if user has attendance access or report access -->
                             <?php if ($hasAttendanceAccess || $hasAttendanceReportAccess): ?>
-                            <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, ['attendance', 'attendance-report', 'staff-attendance'])) ? 'active' : ''; ?>">
+                            <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, ['attendance', 'attendance-report', 'staff-attendance', 'staff-attendance-device'])) ? 'active' : ''; ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-calendar-check"></i>
                                     <span>Attendance</span>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
-                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, ['attendance', 'attendance-report', 'staff-attendance'])) ? 'display: block;' : ''; ?>">
+                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, ['attendance', 'attendance-report', 'staff-attendance', 'staff-attendance-device'])) ? 'display: block;' : ''; ?>">
                                     <?php if ($hasAttendanceAccess): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/attendance" class="<?php echo (isset($page) && $page === 'attendance') ? 'active' : ''; ?>">
@@ -335,6 +335,12 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory', 'g
                                         <a href="<?php echo APP_URL; ?>/attendance/staff" class="<?php echo (isset($page) && $page === 'staff-attendance') ? 'active' : ''; ?>">
                                             <i class="fas fa-fingerprint"></i>
                                             <span>Staff Attendance</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/staff_attendance/dashboard.php" class="<?php echo (isset($page) && $page === 'staff-attendance-device') ? 'active' : ''; ?>">
+                                            <i class="fas fa-id-card"></i>
+                                            <span>Staff attendance (device)</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>

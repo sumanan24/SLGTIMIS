@@ -83,34 +83,6 @@
                 </div>
             </div>
             
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-info text-white">
-                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                        <h5 class="mb-0 fw-bold"><i class="fas fa-calendar-alt me-2"></i>Group Timetable</h5>
-                        <?php
-                        require_once BASE_PATH . '/models/UserModel.php';
-                        $userModel = new UserModel();
-                        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-                        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-                        $canManageTimetable = in_array($userRole, ['HOD', 'ADM']) || $isAdmin;
-                        ?>
-                        <?php if ($canManageTimetable): ?>
-                        <a href="<?php echo APP_URL; ?>/group-timetable/index?group_id=<?php echo urlencode($group['id']); ?>" class="btn btn-light btn-sm">
-                            <i class="fas fa-cog me-1"></i>Manage Timetable
-                        </a>
-                        <?php endif; ?>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="text-center py-3">
-                        <p class="mb-2">View and manage the timetable for this group</p>
-                        <a href="<?php echo APP_URL; ?>/group-timetable/index?group_id=<?php echo urlencode($group['id']); ?>" class="btn btn-info">
-                            <i class="fas fa-calendar-alt me-1"></i>View Timetable
-                        </a>
-                    </div>
-                </div>
-            </div>
-            
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-secondary text-white">
                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">

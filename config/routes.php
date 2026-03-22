@@ -145,12 +145,6 @@ return [
     'groups/remove-student' => 'GroupController@removeStudent',
     'groups/get-courses-by-department' => 'GroupController@getCoursesByDepartment',
     'groups/get-available-students' => 'GroupController@getAvailableStudents',
-    // Group Timetable (CRUD)
-    'group-timetable/index' => 'GroupTimetableController@index',
-    'group-timetable/create' => 'GroupTimetableController@create',
-    'group-timetable/edit' => 'GroupTimetableController@edit',
-    'group-timetable/delete' => 'GroupTimetableController@delete',
-    'group-timetable/save-slot' => 'GroupTimetableController@saveSlot',
     // Staff module enrollment (HOD)
     'hod/staff-module-enroll' => 'StaffModuleEnrollmentController@create',
     'hod/get-modules-by-course' => 'StaffModuleEnrollmentController@getModulesByCourse',
@@ -159,9 +153,15 @@ return [
     'instructor-diary/create' => 'InstructorDiaryController@create',
     'hod/instructor-diary' => 'InstructorDiaryController@hodReport',
     'hod/instructor-diary/export' => 'InstructorDiaryController@hodReportExport',
-    // Inventory
-    'inventory' => 'InventoryController@index',
-    'inventory/create' => 'InventoryController@create',
-    'inventory/delete' => 'InventoryController@delete',
+    // Inventory management
+    'inventory' => 'InventoryController@dashboard',
+    'inventory/items' => 'InventoryController@itemsIndex',
+    'inventory/items/create' => 'InventoryController@itemsCreate',
+    'inventory/items/edit' => 'InventoryController@itemsEdit',
+    'inventory/items/delete' => 'InventoryController@itemsDelete',
+    'inventory/stock-in' => 'InventoryController@stockIn',
+    'inventory/stock-out' => 'InventoryController@stockOut',
+    'inventory/transfer' => 'InventoryController@transfer',
+    'inventory/log' => 'InventoryController@log',
 ];
 
