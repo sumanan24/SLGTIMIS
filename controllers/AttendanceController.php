@@ -1241,6 +1241,32 @@ class AttendanceController extends Controller {
         unset($_SESSION['message'], $_SESSION['error']);
         return $this->view('attendance/staff', $data);
     }
+
+    /**
+     * Staff device attendance dashboard (Hikvision ISAPI → staff_attendance table) — same logic as staff_attendance/dashboard.php, main app layout.
+     */
+    public function staffDeviceDashboard() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        if (!$this->checkNotSAO()) {
+            return;
+        }
+        if (!$this->checkAttendanceAccess()) {
+            return;
+        }
+
+        require_once BASE_PATH . '/staff_attendance/includes/dashboard_data.php';
+        $state = staff_attendance_load_dashboard_state();
+        $state['title'] = 'Staff attendance (device)';
+        $state['page'] = 'staff-attendance-device';
+        $state['dash_form_action'] = rtrim(APP_URL, '/') . '/attendance/staff-device';
+        $state['urls'] = staff_attendance_embed_nav_urls();
+        $state['embed_main_layout'] = true;
+
+        return $this->view('attendance/staff_device_dashboard', $state);
+    }
     
     /**
      * View machine attendance records directly from device

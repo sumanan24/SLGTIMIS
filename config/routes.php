@@ -72,6 +72,7 @@ return [
     'attendance/lock-month' => 'AttendanceController@lockMonth',
     'attendance/unlock-month' => 'AttendanceController@unlockMonth',
     'attendance/staff' => 'AttendanceController@staffAttendance',
+    'attendance/staff-device' => 'AttendanceController@staffDeviceDashboard',
     'attendance/sync-hikvision' => 'AttendanceController@syncHikvision',
     'attendance/test-hikvision' => 'AttendanceController@testHikvision',
     'attendance/hikvision-report' => 'AttendanceController@getHikvisionReport',

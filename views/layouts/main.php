@@ -338,7 +338,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                         </a>
                                     </li>
                                     <li>
-                                        <a href="<?php echo APP_URL; ?>/staff_attendance/dashboard.php" class="<?php echo (isset($page) && $page === 'staff-attendance-device') ? 'active' : ''; ?>">
+                                        <a href="<?php echo APP_URL; ?>/attendance/staff-device" class="<?php echo (isset($page) && $page === 'staff-attendance-device') ? 'active' : ''; ?>">
                                             <i class="fas fa-id-card"></i>
                                             <span>Staff attendance (device)</span>
                                         </a>
