@@ -179,6 +179,53 @@ function attendance_hikvision_acs_event_url(): string
 }
 
 /**
+ * IP and TCP port for the device web interface (same as URL: 80/443 or HIKVISION_HTTP_PORT).
+ *
+ * @return array{host: string, port: int}
+ */
+function attendance_hikvision_device_socket_target(): array
+{
+    $https = defined('HIKVISION_USE_HTTPS') && HIKVISION_USE_HTTPS;
+    $defaultPort = $https ? 443 : 80;
+    $port = defined('HIKVISION_HTTP_PORT') ? (int) HIKVISION_HTTP_PORT : 0;
+    if ($port <= 0) {
+        $port = $defaultPort;
+    }
+
+    return ['host' => HIKVISION_IP, 'port' => $port];
+}
+
+/**
+ * Raw TCP connect test (no HTTP wrapper). Reliable on Windows when file_get_contents(http://…) returns "operation failed".
+ *
+ * @return array{ok: bool, detail: string}
+ */
+function attendance_hikvision_test_tcp_to_device(int $timeoutSec = 3): array
+{
+    $t = attendance_hikvision_device_socket_target();
+    $host = $t['host'];
+    $port = $t['port'];
+    $errno = 0;
+    $errstr = '';
+    $target = sprintf('tcp://%s:%d', $host, $port);
+    $fp = @stream_socket_client(
+        $target,
+        $errno,
+        $errstr,
+        $timeoutSec,
+        STREAM_CLIENT_CONNECT
+    );
+    if (is_resource($fp)) {
+        fclose($fp);
+
+        return ['ok' => true, 'detail' => $host . ':' . $port];
+    }
+    $detail = $errstr !== '' ? $errstr : ('socket error ' . (string) $errno);
+
+    return ['ok' => false, 'detail' => $detail];
+}
+
+/**
  * Interpret HTTP status from device root URL: any response (incl. 401 Digest challenge) means reachable.
  *
  * @return array{ok: bool, message: string}
@@ -205,8 +252,8 @@ function attendance_hikvision_test_reachability_from_http(int $http, string $url
 }
 
 /**
- * Quick check: can this PHP process open TCP to the device? (Short timeouts; no Digest.)
- * Uses cURL when available; otherwise PHP streams (requires allow_url_fopen), same idea as full sync fallback.
+ * Quick check: can this PHP process reach the device? Short timeout.
+ * Prefers cURL + HTTP; without cURL uses raw TCP (avoids Windows file_get_contents(http) "operation failed").
  *
  * @return array{ok: bool, message: string}
  */
@@ -246,19 +293,20 @@ function attendance_hikvision_test_reachability(): array
         return attendance_hikvision_test_reachability_from_http($http, $url, null);
     }
 
-    if (!ini_get('allow_url_fopen')) {
+    $tcp = attendance_hikvision_test_tcp_to_device(3);
+    if ($tcp['ok']) {
+        $extra = '';
+        if (!ini_get('allow_url_fopen')) {
+            $extra = ' Enable extension=curl in php.ini for full sync (streams need allow_url_fopen=On without cURL).';
+        }
+
         return [
-            'ok' => false,
-            'message' => 'PHP cURL is not loaded and allow_url_fopen is Off. In php.ini enable extension=curl, or set allow_url_fopen=On (then reload Apache).',
+            'ok' => true,
+            'message' => 'Reachable from this PHP server (TCP ' . $tcp['detail'] . '). You can run a full sync.' . $extra,
         ];
     }
 
-    require_once __DIR__ . '/digest_http_client.php';
-    $res = attendance_stream_http_request($url, 'GET', ['User-Agent: SLGTIMIS-staff-attendance/1'], '', 6, false);
-    $err = $res['error'];
-    $http = (int) $res['status'];
-
-    return attendance_hikvision_test_reachability_from_http($http, $url, $err);
+    return ['ok' => false, 'message' => attendance_hikvision_curl_error_hint($tcp['detail'])];
 }
 
 /**
@@ -272,7 +320,12 @@ function attendance_hikvision_curl_error_hint(string $curlErr): string
         || strpos($e, 'timed out') !== false
         || strpos($e, 'couldn\'t connect') !== false
         || strpos($e, 'could not resolve') !== false
-        || strpos($e, 'network is unreachable') !== false) {
+        || strpos($e, 'network is unreachable') !== false
+        || strpos($e, 'failed to open stream') !== false
+        || strpos($e, 'operation failed') !== false
+        || strpos($e, 'connection refused') !== false
+        || strpos($e, 'actively refused') !== false
+        || strpos($e, 'no connection could be made') !== false) {
         return $curlErr . ' — ' . HIKVISION_IP . ' is a private LAN address: this PHP server has no route to it. '
             . 'Open sync from a machine on the same network as the terminal (e.g. local WAMP), or put the app server on that LAN/VPN. '
             . 'Longer timeouts do not fix a wrong network.';
