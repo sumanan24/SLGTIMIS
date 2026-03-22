@@ -5,6 +5,18 @@ declare(strict_types=1);
  * Hikvision ISAPI AcsEvent pull + insert into staff_attendance.
  */
 
+/** PHP 7 compatible (DateTimeImmutable::createFromInterface is PHP 8+). */
+function attendance_datetime_to_immutable(DateTimeInterface $dt): DateTimeImmutable
+{
+    if ($dt instanceof DateTimeImmutable) {
+        return $dt;
+    }
+    if ($dt instanceof DateTime) {
+        return DateTimeImmutable::createFromMutable($dt);
+    }
+    return new DateTimeImmutable($dt->format('Y-m-d H:i:s'), $dt->getTimezone());
+}
+
 function attendance_parse_device_time(string $raw): ?string
 {
     $raw = trim($raw);
@@ -178,8 +190,8 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     ];
 
     $tz = new DateTimeZone(defined('STAFF_TIMEZONE') ? STAFF_TIMEZONE : 'Asia/Colombo');
-    $startIso = DateTimeImmutable::createFromInterface($start)->setTimezone($tz)->format('Y-m-d\TH:i:s');
-    $endIso = DateTimeImmutable::createFromInterface($end)->setTimezone($tz)->format('Y-m-d\TH:i:s');
+    $startIso = attendance_datetime_to_immutable($start)->setTimezone($tz)->format('Y-m-d\TH:i:s');
+    $endIso = attendance_datetime_to_immutable($end)->setTimezone($tz)->format('Y-m-d\TH:i:s');
 
     $scheme = HIKVISION_USE_HTTPS ? 'https' : 'http';
     $url = $scheme . '://' . HIKVISION_IP . '/ISAPI/AccessControl/AcsEvent?format=json';
