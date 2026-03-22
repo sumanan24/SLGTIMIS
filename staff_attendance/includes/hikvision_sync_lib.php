@@ -94,9 +94,10 @@ function attendance_extract_info_list(array $data): array
 }
 
 /**
- * Flush buffered rows with INSERT IGNORE (multi-row batches).
+ * Flush buffered rows with INSERT IGNORE (multi-row batches, up to HIKVISION_INSERT_BATCH_SIZE per query).
+ * Columns: employee_no, attendance_time, device_ip, event_type (others use table DEFAULTs).
  *
- * @param array<int, array{employee_no: string, staff_name: string, department: string, attendance_time: string, device_ip: string, event_type: string}> $batch
+ * @param array<int, array{employee_no: string, attendance_time: string, device_ip: string, event_type: string}> $batch
  */
 function attendance_flush_staff_batch(mysqli $db, array &$batch, array &$out): void
 {
@@ -108,16 +109,14 @@ function attendance_flush_staff_batch(mysqli $db, array &$batch, array &$out): v
         $parts = [];
         foreach ($chunk as $r) {
             $parts[] = sprintf(
-                "('%s','%s','%s','%s','%s','%s')",
+                "('%s','%s','%s','%s')",
                 $db->real_escape_string($r['employee_no']),
-                $db->real_escape_string($r['staff_name']),
-                $db->real_escape_string($r['department']),
                 $db->real_escape_string($r['attendance_time']),
                 $db->real_escape_string($r['device_ip']),
                 $db->real_escape_string($r['event_type'])
             );
         }
-        $sql = 'INSERT IGNORE INTO staff_attendance (employee_no, staff_name, department, attendance_time, device_ip, event_type) VALUES ' . implode(',', $parts);
+        $sql = 'INSERT IGNORE INTO staff_attendance (employee_no, attendance_time, device_ip, event_type) VALUES ' . implode(',', $parts);
         $db->query($sql);
         $aff = $db->affected_rows;
         $out['inserted'] += $aff;
@@ -421,7 +420,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     $maxResults = defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? max(10, min(1000, (int) HIKVISION_MAX_RESULTS_PER_CHUNK)) : 100;
     $maxPages = defined('HIKVISION_MAX_SYNC_PAGES') ? max(1, (int) HIKVISION_MAX_SYNC_PAGES) : 20000;
     $acsMajor = defined('HIKVISION_ACS_MAJOR') ? (int) HIKVISION_ACS_MAJOR : 5;
-    $acsMinor = defined('HIKVISION_ACS_MINOR') ? (int) HIKVISION_ACS_MINOR : 75;
+    $acsMinor = defined('HIKVISION_ACS_MINOR') ? (int) HIKVISION_ACS_MINOR : 0;
 
     $debug = [];
     $debug[] = 'Device: ' . HIKVISION_IP . ' (DS-K1T320MFWX / ISAPI)';
@@ -487,12 +486,8 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
         }
 
         $cumulativeReceived += $listCount;
-        $debug[] = sprintf(
-            'Fetched %d records at position %d (cumulative received: %d)',
-            $listCount,
-            $position,
-            $cumulativeReceived
-        );
+        $debug[] = sprintf('Fetched %d records', $listCount);
+        $debug[] = sprintf('searchResultPosition: %d → %d (+%d rows)', $position, $position + $listCount, $listCount);
 
         foreach ($list as $item) {
             if (!is_array($item)) {
@@ -501,12 +496,11 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
             }
             $emp = (string) ($item['employeeNoString'] ?? $item['EmployeeNoString'] ?? $item['employeeNo'] ?? $item['EmployeeNo'] ?? $item['employeeID'] ?? '');
             $emp = trim($emp);
-            $name = (string) ($item['name'] ?? $item['Name'] ?? '');
-            $dept = (string) ($item['department'] ?? $item['Department'] ?? '');
             $timeRaw = (string) ($item['time'] ?? $item['Time'] ?? '');
             $major = isset($item['major']) ? (string) $item['major'] : '';
             $minor = isset($item['minor']) ? (string) $item['minor'] : '';
             $eventType = ($major !== '' || $minor !== '') ? trim($major . '/' . $minor, '/') : (string) $acsMajor;
+            $eventType = substr($eventType, 0, 20);
 
             $attTime = attendance_parse_device_time($timeRaw);
             if ($emp === '' || $attTime === null) {
@@ -516,8 +510,6 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
 
             $batch[] = [
                 'employee_no' => $emp,
-                'staff_name' => $name,
-                'department' => $dept,
                 'attendance_time' => $attTime,
                 'device_ip' => HIKVISION_IP,
                 'event_type' => $eventType,
@@ -547,9 +539,9 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     $out['total_received'] = $cumulativeReceived;
     $debug[] = '---';
     $debug[] = 'Total received: ' . $cumulativeReceived;
-    $debug[] = 'Total inserted (new rows): ' . $out['inserted'];
-    $debug[] = 'Total skipped (duplicates): ' . $out['skipped_dup'];
-    $debug[] = 'Total skipped (invalid rows): ' . $out['skipped_bad'];
+    $debug[] = 'Total inserted: ' . $out['inserted'];
+    $debug[] = 'Skipped (duplicate key): ' . $out['skipped_dup'];
+    $debug[] = 'Skipped (invalid rows): ' . $out['skipped_bad'];
 
     $out['debug'] = $debug;
     $out['ok'] = true;

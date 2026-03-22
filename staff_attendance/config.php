@@ -56,10 +56,10 @@ define('HIKVISION_MAX_RESULTS_PER_CHUNK', 100);
 define('HIKVISION_ACS_MAJOR', 5);
 
 /**
- * Access control sub-type (required by many ISAPI firmwares — omitting causes HTTP 400 "minor" / MessageParametersLack).
- * 75 is common for face/verify events on terminals; use 0 if your device manual lists "all types", or adjust per model.
+ * Access control sub-type (required with major=5 — omitting causes HTTP 400 errorMsg "minor").
+ * Use 0 for all sub-types on many DS-K* terminals; use 75 if you need face-recognition events only or if 0 returns HTTP 400.
  */
-define('HIKVISION_ACS_MINOR', 75);
+define('HIKVISION_ACS_MINOR', 0);
 
 /** INSERT IGNORE batch size (multi-row). */
 define('HIKVISION_INSERT_BATCH_SIZE', 500);

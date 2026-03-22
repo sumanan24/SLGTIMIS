@@ -2,14 +2,28 @@
 declare(strict_types=1);
 
 /**
- * Hikvision DS-K1T320MFWX — full AcsEvent sync (last 30 days by default).
- * Uses attendance_run_hikvision_sync() in includes/hikvision_sync_lib.php
+ * Hikvision DS-K1T320MFWX — AcsEvent sync (staff_attendance table)
+ *
+ * API: POST /ISAPI/AccessControl/AcsEvent?format=json — Digest auth
+ * Request body (see includes/hikvision_sync_lib.php):
+ *   AcsEventCond: searchID, searchResultPosition, maxResults (100), major (5), minor (config),
+ *   startTime, endTime — format YYYY-MM-DDTHH:MM:SS (Asia/Colombo)
+ * Pagination: searchResultPosition += count(records returned); loop until zero records.
+ * No employee filter — all employeeNoString values from device.
+ * DB: INSERT IGNORE chunk size 500; UNIQUE (employee_no, attendance_time).
+ *
+ * Config: staff_attendance/config.php — HIKVISION_IP, HIKVISION_ACS_MINOR (0 or 75 if device rejects 0).
  */
 
 require __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/hikvision_sync_lib.php';
 
 $pageTitle = 'Hikvision sync';
+
+$tz = new DateTimeZone(STAFF_TIMEZONE);
+$now = new DateTimeImmutable('now', $tz);
+$defaultEnd = $now->setTime(23, 59, 59);
+$defaultStart = $defaultEnd->sub(new DateInterval('P30D'))->setTime(0, 0, 0);
 
 $reachTest = null;
 if (isset($_GET['test']) && (string) $_GET['test'] === '1') {
@@ -27,10 +41,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $endRaw = trim((string) ($_POST['sync_end'] ?? ''));
 
     if ($startRaw === '') {
-        $startRaw = date('Y-m-d 00:00:00', strtotime('-30 days'));
+        $startRaw = $defaultStart->format('Y-m-d H:i:s');
     }
     if ($endRaw === '') {
-        $endRaw = date('Y-m-d 23:59:59');
+        $endRaw = $defaultEnd->format('Y-m-d H:i:s');
     }
 
     $startDt = DateTime::createFromFormat('Y-m-d H:i:s', $startRaw);
@@ -49,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tr = (int) ($result['total_received'] ?? 0);
         $ins = (int) ($result['inserted'] ?? 0);
         $_SESSION['flash_success'] = sprintf(
-            'Sync finished. Received %d events, inserted %d new rows (duplicates skipped: %d, invalid: %d).',
+            'Sync finished. Total received: %d — Total inserted: %d (duplicates skipped: %d, invalid: %d).',
             $tr,
             $ins,
             (int) ($result['skipped_dup'] ?? 0),
@@ -63,8 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$defaultStart = date('Y-m-d 00:00:00', strtotime('-30 days'));
-$defaultEnd = date('Y-m-d 23:59:59');
+$defaultStartStr = $defaultStart->format('Y-m-d H:i:s');
+$defaultEndStr = $defaultEnd->format('Y-m-d H:i:s');
 
 require __DIR__ . '/includes/header.php';
 ?>
@@ -86,11 +100,13 @@ require __DIR__ . '/includes/header.php';
     <summary class="text-secondary" style="cursor: pointer;">Technical details</summary>
     <p class="mb-0 mt-2">
         Device <code><?php echo attendance_escape(HIKVISION_IP); ?></code> (DS-K1T320MFWX):
-        <code>POST …/ISAPI/AccessControl/AcsEvent?format=json</code>, Digest auth, JSON body,
-        <strong>major</strong> / <strong>minor</strong> (config: <code>HIKVISION_ACS_MAJOR</code>, <code>HIKVISION_ACS_MINOR</code>),
-        <strong>maxResults</strong> per page, paginated until empty.
-        <code>INSERT IGNORE</code> on <code>staff_attendance</code> (unique <code>employee_no</code> + <code>attendance_time</code>).
-        Times: <strong>Asia/Colombo</strong>.
+        <code>POST …/ISAPI/AccessControl/AcsEvent?format=json</code>, Digest auth,
+        <strong>major</strong>=<?php echo (int) (defined('HIKVISION_ACS_MAJOR') ? HIKVISION_ACS_MAJOR : 5); ?>,
+        <strong>minor</strong>=<?php echo (int) (defined('HIKVISION_ACS_MINOR') ? HIKVISION_ACS_MINOR : 0); ?>
+        (<code>HIKVISION_ACS_MINOR</code> — try <strong>75</strong> if the API rejects <strong>0</strong>),
+        <strong>maxResults</strong>=100, paginate until no rows.
+        <code>INSERT IGNORE</code> (employee_no, attendance_time, device_ip, event_type) in chunks of 500;
+        UNIQUE (<code>employee_no</code>, <code>attendance_time</code>). Times: <strong>Asia/Colombo</strong>.
     </p>
 </details>
 
@@ -103,7 +119,7 @@ require __DIR__ . '/includes/header.php';
     <?php if (!empty($showResult['ok'])): ?>
         <div class="card-footer small text-muted">
             Total received: <strong><?php echo (int) ($showResult['total_received'] ?? 0); ?></strong> —
-            Inserted: <strong><?php echo (int) ($showResult['inserted'] ?? 0); ?></strong> —
+            Total inserted: <strong><?php echo (int) ($showResult['inserted'] ?? 0); ?></strong> —
             Skipped dup: <?php echo (int) ($showResult['skipped_dup'] ?? 0); ?> —
             Invalid: <?php echo (int) ($showResult['skipped_bad'] ?? 0); ?>
         </div>
@@ -116,14 +132,14 @@ require __DIR__ . '/includes/header.php';
         <div class="mb-3">
             <label class="form-label">Start (Asia/Colombo)</label>
             <input type="text" name="sync_start" class="form-control" required
-                   value="<?php echo attendance_escape($defaultStart); ?>"
+                   value="<?php echo attendance_escape($defaultStartStr); ?>"
                    placeholder="Y-m-d H:i:s">
             <div class="form-text">Default: 30 days ago at 00:00:00</div>
         </div>
         <div class="mb-3">
             <label class="form-label">End (Asia/Colombo)</label>
             <input type="text" name="sync_end" class="form-control" required
-                   value="<?php echo attendance_escape($defaultEnd); ?>"
+                   value="<?php echo attendance_escape($defaultEndStr); ?>"
                    placeholder="Y-m-d H:i:s">
             <div class="form-text">Default: today 23:59:59</div>
         </div>
