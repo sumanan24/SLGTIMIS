@@ -70,27 +70,28 @@ require __DIR__ . '/includes/header.php';
 ?>
 <h1 class="h3 mb-3">Sync from Hikvision</h1>
 <div class="alert alert-warning small mb-3" role="alert">
-    <strong>Where PHP runs matters.</strong> Sync is executed by the <strong>web server process</strong>, not your browser.
-    If the site is hosted on the public internet, PHP cannot reach a private IP like <code><?php echo attendance_escape(HIKVISION_IP); ?></code>.
-    Install/run this app on <strong>WAMP (or similar) on the same LAN as the terminal</strong>, extend VPN to the app server, or use an on‑prem sync job.
-    Opening this page in a browser on the office PC does <em>not</em> help unless PHP runs there too.
+    Sync runs on the <strong>web server</strong> (where PHP runs), not in your browser. A private address like
+    <code><?php echo attendance_escape(HIKVISION_IP); ?></code> is only reachable if that server is on the same LAN as the device, on VPN to it, or you use an on‑prem sync job.
 </div>
-<p class="mb-2">
-    <a class="btn btn-sm btn-outline-secondary" href="sync_attendance.php?test=1">Test connection to device</a>
-    <span class="text-muted small ms-2">~3s; checks from this server only.</span>
+<p class="mb-2 d-flex flex-wrap align-items-center gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="sync_attendance.php?test=1">Test connection</a>
+    <span class="text-muted small">Quick check from this server (~3s).</span>
 </p>
 <?php if ($reachTest !== null): ?>
     <div class="alert <?php echo $reachTest['ok'] ? 'alert-success' : 'alert-danger'; ?> small py-2 mb-3" role="alert">
         <?php echo attendance_escape($reachTest['message']); ?>
     </div>
 <?php endif; ?>
-<p class="text-muted small mb-3">
-    Device: <code><?php echo attendance_escape(HIKVISION_IP); ?></code> (DS-K1T320MFWX) —
-    <code>POST /ISAPI/AccessControl/AcsEvent?format=json</code> with Digest auth, JSON body,
-    <strong>major = 5</strong> (access control), <strong>maxResults = 100</strong> per page,
-    paginated until no more records. Inserts use <code>INSERT IGNORE</code> (unique employee_no + attendance_time).
-    Times stored in <strong>Asia/Colombo</strong>.
-</p>
+<details class="small text-muted mb-3">
+    <summary class="text-secondary" style="cursor: pointer;">Technical details</summary>
+    <p class="mb-0 mt-2">
+        Device <code><?php echo attendance_escape(HIKVISION_IP); ?></code> (DS-K1T320MFWX):
+        <code>POST …/ISAPI/AccessControl/AcsEvent?format=json</code>, Digest auth, JSON body,
+        <strong>major = 5</strong>, <strong>maxResults</strong> per page (config), paginated until empty.
+        <code>INSERT IGNORE</code> on <code>staff_attendance</code> (unique <code>employee_no</code> + <code>attendance_time</code>).
+        Times: <strong>Asia/Colombo</strong>.
+    </p>
+</details>
 
 <?php if ($showResult !== null && !empty($showResult['debug'])): ?>
 <div class="card shadow-sm mb-4 border-info">
