@@ -80,6 +80,59 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
 }
 
 /**
+ * POST to Hikvision ISAPI: prefer ext-curl; otherwise HTTP Digest via PHP streams (allow_url_fopen).
+ *
+ * @return array{http_code: int, body: string, error: ?string}
+ */
+function attendance_hikvision_isapi_post(string $url, string $body, int $connectT, int $timeoutT): array
+{
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $body,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPAUTH => CURLAUTH_DIGEST,
+            CURLOPT_USERPWD => HIKVISION_USER . ':' . HIKVISION_PASS,
+            CURLOPT_CONNECTTIMEOUT => $connectT,
+            CURLOPT_TIMEOUT => $timeoutT,
+        ]);
+        if (strpos($url, 'https:') === 0) {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        }
+        $response = curl_exec($ch);
+        $curlErr = curl_error($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($response === false) {
+            return ['http_code' => 0, 'body' => '', 'error' => 'cURL error: ' . $curlErr];
+        }
+        return ['http_code' => $httpCode, 'body' => (string) $response, 'error' => null];
+    }
+
+    if (!ini_get('allow_url_fopen')) {
+        return [
+            'http_code' => 0,
+            'body' => '',
+            'error' => 'Enable PHP extension curl, or set allow_url_fopen=On in php.ini for HTTP Digest fallback.',
+        ];
+    }
+
+    require_once __DIR__ . '/digest_http_client.php';
+    $r = attendance_digest_post_json($url, $body, HIKVISION_USER, HIKVISION_PASS, $timeoutT, false);
+    if ($r['ok']) {
+        return ['http_code' => $r['http_code'], 'body' => $r['body'], 'error' => null];
+    }
+    return [
+        'http_code' => $r['http_code'],
+        'body' => $r['body'],
+        'error' => $r['error'] ?? ('HTTP ' . $r['http_code']),
+    ];
+}
+
+/**
  * @internal
  */
 function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeInterface $end, int $connectT, int $timeoutT): array
@@ -91,11 +144,6 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
         'skipped_bad' => 0,
         'error' => null,
     ];
-
-    if (!function_exists('curl_init')) {
-        $out['error'] = 'PHP cURL extension is not enabled on this server.';
-        return $out;
-    }
 
     $startIso = $start->format('Y-m-d\TH:i:s');
     $endIso = $end->format('Y-m-d\TH:i:s');
@@ -124,31 +172,13 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
         ];
 
         $body = json_encode($payload, JSON_UNESCAPED_SLASHES);
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $body,
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPAUTH => CURLAUTH_DIGEST,
-            CURLOPT_USERPWD => HIKVISION_USER . ':' . HIKVISION_PASS,
-            CURLOPT_CONNECTTIMEOUT => $connectT,
-            CURLOPT_TIMEOUT => $timeoutT,
-        ]);
-        if (HIKVISION_USE_HTTPS) {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-        }
-
-        $response = curl_exec($ch);
-        $curlErr = curl_error($ch);
-        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($response === false) {
-            $out['error'] = 'cURL error: ' . $curlErr;
+        $req = attendance_hikvision_isapi_post($url, $body, $connectT, $timeoutT);
+        if ($req['error'] !== null) {
+            $out['error'] = $req['error'];
             return $out;
         }
+        $httpCode = $req['http_code'];
+        $response = $req['body'];
         if ($httpCode < 200 || $httpCode >= 300) {
             $out['error'] = 'HTTP ' . $httpCode . ' — ' . substr((string) $response, 0, 500);
             return $out;
