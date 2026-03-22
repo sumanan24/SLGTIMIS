@@ -81,8 +81,7 @@ define('HIKVISION_MAX_SYNC_PAGES', 20000);
 define('ATT_PAGE_SIZE', 25);
 
 /**
- * Dashboard: auto-sync when opening dashboard (same calendar window as STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL).
- * Set FALSE if PHP cannot reach the device (e.g. public hosting).
+ * Dashboard: auto-sync after loading data from DB (see dashboard_data.php). Set FALSE if PHP cannot reach the device.
  */
 define('STAFF_ATT_DASHBOARD_AUTO_SYNC', true);
 
@@ -91,14 +90,14 @@ define('STAFF_ATT_DASHBOARD_AUTO_SYNC', true);
  */
 define('STAFF_ATT_DASHBOARD_SYNC_COOLDOWN', 0);
 
+/**
+ * Hikvision sync window for dashboard auto-sync (runs after the first DB read; then DB is queried again if sync succeeds).
+ * P6D = seven calendar days inclusive — same span as STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL and default summary filter.
+ */
+define('STAFF_DASHBOARD_AUTO_SYNC_INTERVAL', 'P6D');
+
 /** Max raw rows (legacy list pages) */
 define('STAFF_ATT_DASHBOARD_ROW_LIMIT', 500);
-
-/**
- * Hikvision sync window when dashboard auto-sync runs (if enabled).
- * P1W = last 7 days of events (all employees who punched in that window).
- */
-define('STAFF_SYNC_LOOKBACK_INTERVAL', 'P1W');
 
 /**
  * Default date range on Device sync page: end = today 23:59:59, start = (end − interval) at 00:00:00.

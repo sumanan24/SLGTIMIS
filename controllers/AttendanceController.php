@@ -1267,6 +1267,330 @@ class AttendanceController extends Controller {
 
         return $this->view('attendance/staff_device_dashboard', $state);
     }
+
+    /**
+     * @return array{device: string, list: string, daily: string, month: string, sync: string}|null
+     */
+    private function staffDeviceNavUrls(): array {
+        require_once BASE_PATH . '/staff_attendance/includes/dashboard_data.php';
+        return staff_attendance_embed_nav_urls();
+    }
+
+    private function staffDeviceAccessOk(): bool {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        if (!$this->checkNotSAO()) {
+            return false;
+        }
+        if (!$this->checkAttendanceAccess()) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Raw punch list (device table) — main app layout + staff device side nav.
+     */
+    public function staffDeviceList() {
+        if (!$this->staffDeviceAccessOk()) {
+            return;
+        }
+        require_once BASE_PATH . '/staff_attendance/config.php';
+
+        $urls = $this->staffDeviceNavUrls();
+        $listBase = $urls['list'];
+
+        $perPage = isset($_GET['per_page']) ? max(5, min(100, (int) $_GET['per_page'])) : (defined('ATT_PAGE_SIZE') ? ATT_PAGE_SIZE : 25);
+        $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+        $offset = ($page - 1) * $perPage;
+
+        $q = trim((string) ($_GET['q'] ?? ''));
+        $employeeNo = trim((string) ($_GET['employee_no'] ?? ''));
+        $staffName = trim((string) ($_GET['staff_name'] ?? ''));
+        $department = trim((string) ($_GET['department'] ?? ''));
+        $startDate = trim((string) ($_GET['start_date'] ?? ''));
+        $endDate = trim((string) ($_GET['end_date'] ?? ''));
+
+        $where = [];
+        $params = [];
+        $types = '';
+
+        if ($q !== '') {
+            $where[] = '(employee_no LIKE ? OR staff_name LIKE ?)';
+            $like = '%' . $q . '%';
+            $params[] = $like;
+            $params[] = $like;
+            $types .= 'ss';
+        }
+        if ($employeeNo !== '') {
+            $where[] = 'employee_no LIKE ?';
+            $params[] = '%' . $employeeNo . '%';
+            $types .= 's';
+        }
+        if ($staffName !== '') {
+            $where[] = 'staff_name LIKE ?';
+            $params[] = '%' . $staffName . '%';
+            $types .= 's';
+        }
+        if ($department !== '') {
+            $where[] = 'department LIKE ?';
+            $params[] = '%' . $department . '%';
+            $types .= 's';
+        }
+        if ($startDate !== '' && $endDate !== '') {
+            $where[] = 'DATE(attendance_time) BETWEEN ? AND ?';
+            $params[] = $startDate;
+            $params[] = $endDate;
+            $types .= 'ss';
+        } elseif ($startDate !== '') {
+            $where[] = 'DATE(attendance_time) >= ?';
+            $params[] = $startDate;
+            $types .= 's';
+        } elseif ($endDate !== '') {
+            $where[] = 'DATE(attendance_time) <= ?';
+            $params[] = $endDate;
+            $types .= 's';
+        }
+
+        $sqlWhere = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+
+        $db = attendance_db();
+
+        $countSql = "SELECT COUNT(*) AS c FROM staff_attendance $sqlWhere";
+        $countStmt = $db->prepare($countSql);
+        if ($types !== '') {
+            $countStmt->bind_param($types, ...$params);
+        }
+        $countStmt->execute();
+        $totalRows = (int) ($countStmt->get_result()->fetch_assoc()['c'] ?? 0);
+        $countStmt->close();
+
+        $totalPages = max(1, (int) ceil($totalRows / $perPage));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+            $offset = ($page - 1) * $perPage;
+        }
+
+        $listSql = "SELECT attendance_id, employee_no, staff_name, department, attendance_time, device_ip, event_type, created_at
+            FROM staff_attendance $sqlWhere
+            ORDER BY attendance_time DESC
+            LIMIT ? OFFSET ?";
+        $listStmt = $db->prepare($listSql);
+        $typesList = $types . 'ii';
+        $paramsList = array_merge($params, [$perPage, $offset]);
+        if ($typesList !== 'ii') {
+            $listStmt->bind_param($typesList, ...$paramsList);
+        } else {
+            $listStmt->bind_param('ii', $perPage, $offset);
+        }
+        $listStmt->execute();
+        $rows = $listStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $listStmt->close();
+
+        $qs = $_GET;
+        unset($qs['page']);
+        $baseQuery = http_build_query($qs);
+
+        return $this->view('attendance/staff_device_list', [
+            'title' => 'Staff device — All punches',
+            'page' => 'staff-attendance-device-list',
+            'staffDeviceSection' => 'list',
+            'urls' => $urls,
+            'listBase' => $listBase,
+            'baseQuery' => $baseQuery,
+            'rows' => $rows,
+            'totalRows' => $totalRows,
+            'totalPages' => $totalPages,
+            'pageNum' => $page,
+            'perPage' => $perPage,
+            'q' => $q,
+            'employeeNo' => $employeeNo,
+            'staffName' => $staffName,
+            'department' => $department,
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+        ]);
+    }
+
+    /**
+     * Daily check-in / check-out summary — main app layout.
+     */
+    public function staffDeviceDaily() {
+        if (!$this->staffDeviceAccessOk()) {
+            return;
+        }
+        require_once BASE_PATH . '/staff_attendance/config.php';
+
+        $urls = $this->staffDeviceNavUrls();
+        $tz = new DateTimeZone(STAFF_TIMEZONE);
+        $todayYmd = (new DateTimeImmutable('now', $tz))->format('Y-m-d');
+
+        $reportDate = trim((string) ($_GET['report_date'] ?? ''));
+        if ($reportDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $reportDate)) {
+            $reportDate = $todayYmd;
+        }
+
+        $nameOk = 'staff_name IS NOT NULL AND TRIM(staff_name) <> \'\'';
+        $db = attendance_db();
+        $sql = "SELECT employee_no, MAX(staff_name) AS staff_name,
+                MIN(attendance_time) AS check_in,
+                MAX(attendance_time) AS check_out
+                FROM staff_attendance
+                WHERE DATE(attendance_time) = ? AND $nameOk
+                GROUP BY employee_no
+                ORDER BY employee_no";
+        $stmt = $db->prepare($sql);
+        $stmt->bind_param('s', $reportDate);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        return $this->view('attendance/staff_device_daily', [
+            'title' => 'Staff device — Daily report',
+            'page' => 'staff-attendance-device-daily',
+            'staffDeviceSection' => 'daily',
+            'urls' => $urls,
+            'reportDate' => $reportDate,
+            'todayYmd' => $todayYmd,
+            'rows' => $rows,
+        ]);
+    }
+
+    /**
+     * Monthly summary (days present per employee) — main app layout.
+     */
+    public function staffDeviceMonth() {
+        if (!$this->staffDeviceAccessOk()) {
+            return;
+        }
+        require_once BASE_PATH . '/staff_attendance/config.php';
+
+        $urls = $this->staffDeviceNavUrls();
+        $tz = new DateTimeZone(STAFF_TIMEZONE);
+        $defaultMonth = (new DateTimeImmutable('now', $tz))->format('Y-m');
+
+        $reportMonth = trim((string) ($_GET['report_month'] ?? ''));
+        if ($reportMonth === '' || !preg_match('/^\d{4}-\d{2}$/', $reportMonth)) {
+            $reportMonth = $defaultMonth;
+        }
+
+        $nameOk = 'staff_name IS NOT NULL AND TRIM(staff_name) <> \'\'';
+        $db = attendance_db();
+        $sql = "SELECT employee_no,
+                       MAX(staff_name) AS staff_name,
+                       MAX(department) AS department,
+                       COUNT(DISTINCT DATE(attendance_time)) AS days_present,
+                       COUNT(*) AS punch_count
+                FROM staff_attendance
+                WHERE $nameOk AND DATE_FORMAT(attendance_time, '%Y-%m') = ?
+                GROUP BY employee_no
+                ORDER BY staff_name ASC, employee_no ASC";
+        $stmt = $db->prepare($sql);
+        $stmt->bind_param('s', $reportMonth);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        return $this->view('attendance/staff_device_month', [
+            'title' => 'Staff device — Month report',
+            'page' => 'staff-attendance-device-month',
+            'staffDeviceSection' => 'month',
+            'urls' => $urls,
+            'reportMonth' => $reportMonth,
+            'rows' => $rows,
+        ]);
+    }
+
+    /**
+     * Manual Hikvision sync — main app layout (POST redirects back here).
+     */
+    public function staffDeviceSync() {
+        if (!$this->staffDeviceAccessOk()) {
+            return;
+        }
+        require_once BASE_PATH . '/staff_attendance/config.php';
+        require_once BASE_PATH . '/staff_attendance/includes/hikvision_sync_lib.php';
+
+        $urls = $this->staffDeviceNavUrls();
+
+        $tz = new DateTimeZone(STAFF_TIMEZONE);
+        $now = new DateTimeImmutable('now', $tz);
+        $defaultEnd = $now->setTime(23, 59, 59);
+        $syncIv = defined('STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL') ? (string) STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL : 'P6D';
+        try {
+            $defaultStart = $defaultEnd->sub(new DateInterval($syncIv))->setTime(0, 0, 0);
+        } catch (Exception $e) {
+            $defaultStart = $defaultEnd->sub(new DateInterval('P6D'))->setTime(0, 0, 0);
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $startRaw = trim((string) ($_POST['sync_start'] ?? ''));
+            $endRaw = trim((string) ($_POST['sync_end'] ?? ''));
+
+            if ($startRaw === '') {
+                $startRaw = $defaultStart->format('Y-m-d H:i:s');
+            }
+            if ($endRaw === '') {
+                $endRaw = $defaultEnd->format('Y-m-d H:i:s');
+            }
+
+            $startDt = DateTime::createFromFormat('Y-m-d H:i:s', $startRaw);
+            if ($startDt === false) {
+                $startDt = new DateTime($startRaw);
+            }
+            $endDt = DateTime::createFromFormat('Y-m-d H:i:s', $endRaw);
+            if ($endDt === false) {
+                $endDt = new DateTime($endRaw);
+            }
+
+            $result = attendance_run_hikvision_sync($startDt, $endDt);
+            $_SESSION['staff_attendance_sync_result'] = $result;
+
+            if ($result['ok']) {
+                $tr = (int) ($result['total_received'] ?? 0);
+                $ins = (int) ($result['inserted'] ?? 0);
+                $_SESSION['flash_success'] = sprintf(
+                    'Sync finished. Total received: %d — Total inserted: %d (duplicates skipped: %d, invalid: %d, not in staff list: %d).',
+                    $tr,
+                    $ins,
+                    (int) ($result['skipped_dup'] ?? 0),
+                    (int) ($result['skipped_bad'] ?? 0),
+                    (int) ($result['skipped_not_in_directory'] ?? 0)
+                );
+            } else {
+                $_SESSION['flash_error'] = $result['error'] ?? 'Sync failed.';
+            }
+
+            $this->redirect('attendance/staff-device/sync');
+        }
+
+        $reachTest = null;
+        if (isset($_GET['test']) && (string) $_GET['test'] === '1') {
+            $reachTest = attendance_hikvision_test_reachability();
+        }
+
+        $showResult = null;
+        if (!empty($_SESSION['staff_attendance_sync_result'])) {
+            $showResult = $_SESSION['staff_attendance_sync_result'];
+            unset($_SESSION['staff_attendance_sync_result']);
+        }
+
+        $defaultStartStr = $defaultStart->format('Y-m-d H:i:s');
+        $defaultEndStr = $defaultEnd->format('Y-m-d H:i:s');
+
+        return $this->view('attendance/staff_device_sync', [
+            'title' => 'Staff device — Hikvision sync',
+            'page' => 'staff-attendance-device-sync',
+            'staffDeviceSection' => 'sync',
+            'urls' => $urls,
+            'defaultStartStr' => $defaultStartStr,
+            'defaultEndStr' => $defaultEndStr,
+            'reachTest' => $reachTest,
+            'showResult' => $showResult,
+        ]);
+    }
     
     /**
      * View machine attendance records directly from device

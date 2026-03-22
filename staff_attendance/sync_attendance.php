@@ -18,8 +18,11 @@ declare(strict_types=1);
 
 require __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/hikvision_sync_lib.php';
+require_once __DIR__ . '/includes/dashboard_data.php';
 
 $pageTitle = 'Hikvision sync';
+$urls = staff_attendance_dashboard_urls_for_module('dashboard.php');
+$staffDeviceSection = 'sync';
 
 $tz = new DateTimeZone(STAFF_TIMEZONE);
 $now = new DateTimeImmutable('now', $tz);
@@ -92,7 +95,16 @@ $defaultEndStr = $defaultEnd->format('Y-m-d H:i:s');
 
 require __DIR__ . '/includes/header.php';
 ?>
-<h1 class="h3 mb-3">Sync from Hikvision</h1>
+<div class="row g-4">
+    <div class="col-lg-2 col-md-3">
+        <?php include __DIR__ . '/partials/staff_device_nav.php'; ?>
+    </div>
+    <div class="col-lg-10 col-md-9">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-sync me-2"></i>Sync from Hikvision</h5>
+            </div>
+            <div class="card-body">
 <div class="alert alert-warning small mb-3" role="alert">
     Sync runs on the <strong>web server</strong> (where PHP runs), not in your browser. A private address like
     <code><?php echo attendance_escape(HIKVISION_IP); ?></code> is only reachable if that server is on the same LAN as the device, on VPN to it, or you use an on‑prem sync job.
@@ -159,7 +171,10 @@ require __DIR__ . '/includes/header.php';
             <div class="form-text">Default: today 23:59:59</div>
         </div>
         <button type="submit" class="btn btn-primary">Run full sync</button>
-        <a href="dashboard.php" class="btn btn-outline-secondary">Dashboard</a>
     </div>
 </form>
+            </div>
+        </div>
+    </div>
+</div>
 <?php require __DIR__ . '/includes/footer.php'; ?>

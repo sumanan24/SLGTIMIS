@@ -307,13 +307,14 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                             
                             <!-- Attendance Management - Show if user has attendance access or report access -->
                             <?php if ($hasAttendanceAccess || $hasAttendanceReportAccess): ?>
-                            <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, ['attendance', 'attendance-report', 'staff-attendance', 'staff-attendance-device'])) ? 'active' : ''; ?>">
+                            <?php $staffDevicePages = ['staff-attendance-device', 'staff-attendance-device-list', 'staff-attendance-device-daily', 'staff-attendance-device-month', 'staff-attendance-device-sync']; ?>
+                            <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, array_merge(['attendance', 'attendance-report'], $staffDevicePages), true)) ? 'active' : ''; ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-calendar-check"></i>
                                     <span>Attendance</span>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
-                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, ['attendance', 'attendance-report', 'staff-attendance', 'staff-attendance-device'])) ? 'display: block;' : ''; ?>">
+                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, array_merge(['attendance', 'attendance-report'], $staffDevicePages), true)) ? 'display: block;' : ''; ?>">
                                     <?php if ($hasAttendanceAccess): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/attendance" class="<?php echo (isset($page) && $page === 'attendance') ? 'active' : ''; ?>">
@@ -332,13 +333,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                     <?php endif; ?>
                                     <?php if (!$isSAO && $hasAttendanceAccess): ?>
                                     <li>
-                                        <a href="<?php echo APP_URL; ?>/attendance/staff" class="<?php echo (isset($page) && $page === 'staff-attendance') ? 'active' : ''; ?>">
-                                            <i class="fas fa-fingerprint"></i>
-                                            <span>Staff Attendance</span>
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/attendance/staff-device" class="<?php echo (isset($page) && $page === 'staff-attendance-device') ? 'active' : ''; ?>">
+                                        <a href="<?php echo APP_URL; ?>/attendance/staff-device" class="<?php echo (isset($page) && in_array($page, $staffDevicePages, true)) ? 'active' : ''; ?>">
                                             <i class="fas fa-id-card"></i>
                                             <span>Staff attendance (device)</span>
                                         </a>

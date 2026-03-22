@@ -2,74 +2,12 @@
 declare(strict_types=1);
 
 /**
- * Shared state for staff device attendance dashboard (standalone + main app layout).
+ * Load dashboard rows and KPIs from DB (same filters used before/after device sync).
  *
- * @return array<string, mixed>
+ * @return array{employees: array<int, array<string, mixed>>, grouped: array<int, array<string, mixed>>, rangePunches: int, total: int, todayCount: int, distinctEmployees: int, dbError: string|null}
  */
-function staff_attendance_load_dashboard_state(): array
+function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $dateTo, string $employeeNo, string $todayYmd): array
 {
-    require_once __DIR__ . '/../config.php';
-    require_once __DIR__ . '/hikvision_sync_lib.php';
-
-    $nowTs = time();
-    $lastAuto = (int) ($_SESSION['staff_attendance_last_auto_sync'] ?? 0);
-
-    $shouldSync = false;
-    if (STAFF_ATT_DASHBOARD_AUTO_SYNC) {
-        if (STAFF_ATT_DASHBOARD_SYNC_COOLDOWN === 0) {
-            $shouldSync = true;
-        } else {
-            $shouldSync = ($nowTs - $lastAuto >= STAFF_ATT_DASHBOARD_SYNC_COOLDOWN);
-        }
-    }
-
-    if ($shouldSync) {
-        $tzDash = new DateTimeZone(STAFF_TIMEZONE);
-        $end = (new DateTimeImmutable('now', $tzDash))->setTime(23, 59, 59);
-        $ivStr = defined('STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL') ? (string) STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL : 'P6D';
-        try {
-            $start = $end->sub(new DateInterval($ivStr))->setTime(0, 0, 0);
-        } catch (Exception $e) {
-            $start = $end->sub(new DateInterval('P6D'))->setTime(0, 0, 0);
-        }
-        $result = attendance_run_hikvision_sync($start, $end);
-        $_SESSION['staff_attendance_last_auto_sync'] = $nowTs;
-
-        if (!$result['ok']) {
-            $_SESSION['flash_error'] = $result['error'] ?? 'Automatic sync failed.';
-        }
-    }
-
-    $summaryDays = defined('STAFF_DASHBOARD_SUMMARY_DAYS') ? max(1, min(31, (int) STAFF_DASHBOARD_SUMMARY_DAYS)) : 7;
-
-    $dateToIn = trim((string) ($_GET['date_to'] ?? ''));
-    $dateFromIn = trim((string) ($_GET['date_from'] ?? ''));
-    $employeeNo = trim((string) ($_GET['employee_no'] ?? ''));
-
-    $todayYmd = date('Y-m-d');
-    if ($dateToIn === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateToIn)) {
-        $dateTo = $todayYmd;
-    } else {
-        $dateTo = $dateToIn;
-    }
-
-    if ($dateFromIn === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFromIn)) {
-        $dateFrom = date('Y-m-d', strtotime($dateTo . ' -' . ($summaryDays - 1) . ' days'));
-    } else {
-        $dateFrom = $dateFromIn;
-    }
-
-    if ($dateFrom > $dateTo) {
-        $tmp = $dateFrom;
-        $dateFrom = $dateTo;
-        $dateTo = $tmp;
-    }
-
-    $spanDays = (int) floor((strtotime($dateTo) - strtotime($dateFrom)) / 86400) + 1;
-    if ($spanDays > 31) {
-        $dateFrom = date('Y-m-d', strtotime($dateTo . ' -30 days'));
-    }
-
     $employees = [];
     $grouped = [];
     $rangePunches = 0;
@@ -146,11 +84,6 @@ function staff_attendance_load_dashboard_state(): array
     }
 
     return [
-        'summaryDays' => $summaryDays,
-        'dateFrom' => $dateFrom,
-        'dateTo' => $dateTo,
-        'employeeNo' => $employeeNo,
-        'todayYmd' => $todayYmd,
         'employees' => $employees,
         'grouped' => $grouped,
         'rangePunches' => $rangePunches,
@@ -162,9 +95,111 @@ function staff_attendance_load_dashboard_state(): array
 }
 
 /**
+ * Shared state for staff device attendance dashboard (standalone + main app layout).
+ * Loads from DB first; then pulls one week from device (config) and re-queries DB on success so filters match stored rows.
+ *
+ * @return array<string, mixed>
+ */
+function staff_attendance_load_dashboard_state(): array
+{
+    require_once __DIR__ . '/../config.php';
+    require_once __DIR__ . '/hikvision_sync_lib.php';
+
+    $tzDash = new DateTimeZone(STAFF_TIMEZONE);
+    $nowInTz = new DateTimeImmutable('now', $tzDash);
+    $todayYmd = $nowInTz->format('Y-m-d');
+
+    $summaryDays = defined('STAFF_DASHBOARD_SUMMARY_DAYS') ? max(1, min(31, (int) STAFF_DASHBOARD_SUMMARY_DAYS)) : 7;
+
+    $dateToIn = trim((string) ($_GET['date_to'] ?? ''));
+    $dateFromIn = trim((string) ($_GET['date_from'] ?? ''));
+    $employeeNo = trim((string) ($_GET['employee_no'] ?? ''));
+
+    if ($dateToIn === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateToIn)) {
+        $dateTo = $todayYmd;
+    } else {
+        $dateTo = $dateToIn;
+    }
+
+    $dateToDt = DateTimeImmutable::createFromFormat('Y-m-d', $dateTo, $tzDash);
+    if ($dateToDt === false) {
+        $dateToDt = $nowInTz;
+        $dateTo = $todayYmd;
+    }
+
+    if ($dateFromIn === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFromIn)) {
+        $dateFrom = $dateToDt->modify('-' . ($summaryDays - 1) . ' days')->format('Y-m-d');
+    } else {
+        $dateFrom = $dateFromIn;
+    }
+
+    if ($dateFrom > $dateTo) {
+        $tmp = $dateFrom;
+        $dateFrom = $dateTo;
+        $dateTo = $tmp;
+    }
+
+    $spanDays = (int) floor((strtotime($dateTo) - strtotime($dateFrom)) / 86400) + 1;
+    if ($spanDays > 31) {
+        $dateFrom = (DateTimeImmutable::createFromFormat('Y-m-d', $dateTo, $tzDash) ?: $nowInTz)
+            ->modify('-30 days')
+            ->format('Y-m-d');
+    }
+
+    $data = staff_attendance_dashboard_fetch_from_db($dateFrom, $dateTo, $employeeNo, $todayYmd);
+
+    $nowTs = time();
+    $lastAuto = (int) ($_SESSION['staff_attendance_last_auto_sync'] ?? 0);
+
+    $shouldSync = false;
+    if (STAFF_ATT_DASHBOARD_AUTO_SYNC) {
+        if (STAFF_ATT_DASHBOARD_SYNC_COOLDOWN === 0) {
+            $shouldSync = true;
+        } else {
+            $shouldSync = ($nowTs - $lastAuto >= STAFF_ATT_DASHBOARD_SYNC_COOLDOWN);
+        }
+    }
+
+    if ($shouldSync) {
+        $end = $nowInTz->setTime(23, 59, 59);
+        $ivStr = defined('STAFF_DASHBOARD_AUTO_SYNC_INTERVAL')
+            ? (string) STAFF_DASHBOARD_AUTO_SYNC_INTERVAL
+            : (defined('STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL') ? (string) STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL : 'P6D');
+        try {
+            $start = $end->sub(new DateInterval($ivStr))->setTime(0, 0, 0);
+        } catch (Exception $e) {
+            $start = $end->sub(new DateInterval('P6D'))->setTime(0, 0, 0);
+        }
+        $result = attendance_run_hikvision_sync($start, $end);
+        $_SESSION['staff_attendance_last_auto_sync'] = $nowTs;
+
+        if (!$result['ok']) {
+            $_SESSION['flash_error'] = $result['error'] ?? 'Automatic sync failed.';
+        } else {
+            $data = staff_attendance_dashboard_fetch_from_db($dateFrom, $dateTo, $employeeNo, $todayYmd);
+        }
+    }
+
+    return [
+        'summaryDays' => $summaryDays,
+        'dateFrom' => $dateFrom,
+        'dateTo' => $dateTo,
+        'employeeNo' => $employeeNo,
+        'todayYmd' => $todayYmd,
+        'employees' => $data['employees'],
+        'grouped' => $data['grouped'],
+        'rangePunches' => $data['rangePunches'],
+        'total' => $data['total'],
+        'todayCount' => $data['todayCount'],
+        'distinctEmployees' => $data['distinctEmployees'],
+        'dbError' => $data['dbError'],
+    ];
+}
+
+/**
  * Nav links for staff_attendance/*.php (relative to module folder).
  *
- * @return array{device: string, list: string, daily: string, sync: string}
+ * @return array{device: string, list: string, daily: string, month: string, sync: string}
  */
 function staff_attendance_dashboard_urls_for_module(string $deviceDashboardHref): array
 {
@@ -175,23 +210,25 @@ function staff_attendance_dashboard_urls_for_module(string $deviceDashboardHref)
         'device' => $deviceDashboardHref,
         'list' => $prefix . 'list_attendance.php',
         'daily' => $prefix . 'daily_report.php',
+        'month' => $prefix . 'month_report.php',
         'sync' => $prefix . 'sync_attendance.php',
     ];
 }
 
 /**
- * Nav URLs when dashboard is shown inside main SLGTIMIS layout (module PHP files stay under /staff_attendance/).
+ * Nav URLs inside main SLGTIMIS layout (AttendanceController routes).
  *
- * @return array{device: string, list: string, daily: string, sync: string}
+ * @return array{device: string, list: string, daily: string, month: string, sync: string}
  */
 function staff_attendance_embed_nav_urls(): array
 {
-    $root = rtrim(APP_URL, '/') . '/staff_attendance/';
+    $root = rtrim(APP_URL, '/') . '/attendance/staff-device';
 
     return [
-        'device' => rtrim(APP_URL, '/') . '/attendance/staff-device',
-        'list' => $root . 'list_attendance.php',
-        'daily' => $root . 'daily_report.php',
-        'sync' => $root . 'sync_attendance.php',
+        'device' => $root,
+        'list' => $root . '/list',
+        'daily' => $root . '/daily',
+        'month' => $root . '/month',
+        'sync' => $root . '/sync',
     ];
 }

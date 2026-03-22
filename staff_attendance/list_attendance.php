@@ -2,8 +2,11 @@
 declare(strict_types=1);
 
 require __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/dashboard_data.php';
 
 $pageTitle = 'Attendance list';
+$urls = staff_attendance_dashboard_urls_for_module('dashboard.php');
+$staffDeviceSection = 'list';
 
 $perPage = isset($_GET['per_page']) ? max(5, min(100, (int) $_GET['per_page'])) : ATT_PAGE_SIZE;
 $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
@@ -98,9 +101,17 @@ $baseQuery = http_build_query($qs);
 
 require __DIR__ . '/includes/header.php';
 ?>
-<h1 class="h3 mb-3">All attendance</h1>
-
-<form class="card shadow-sm mb-4" method="get" action="">
+<div class="row g-4">
+    <div class="col-lg-2 col-md-3">
+        <?php include __DIR__ . '/partials/staff_device_nav.php'; ?>
+    </div>
+    <div class="col-lg-10 col-md-9">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-list me-2"></i>All punches</h5>
+            </div>
+            <div class="card-body">
+<form class="card bg-light border mb-4" method="get" action="">
     <div class="card-body">
         <div class="row g-2 align-items-end">
             <div class="col-md-3">
@@ -213,5 +224,10 @@ require __DIR__ . '/includes/header.php';
     </ul>
 </nav>
 <?php endif; ?>
+
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php require __DIR__ . '/includes/footer.php'; ?>

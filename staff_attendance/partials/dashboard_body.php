@@ -27,7 +27,8 @@ $embed_main_layout = (bool) $embed_main_layout;
 <p class="text-muted small mb-3">
     All times use <strong>Sri Lanka (Asia/Colombo, UTC+5:30)</strong>. Today: <?php echo attendance_escape($todayYmd); ?>.
     <?php if (STAFF_ATT_DASHBOARD_AUTO_SYNC): ?>
-        Each visit runs a device sync for the <strong>same 7-day calendar window</strong> as Device sync (<code><?php echo attendance_escape(defined('STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL') ? STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL : 'P6D'); ?></code>, ending today, Asia/Colombo).
+        <?php $dashIv = defined('STAFF_DASHBOARD_AUTO_SYNC_INTERVAL') ? (string) STAFF_DASHBOARD_AUTO_SYNC_INTERVAL : 'P6D'; ?>
+        The table loads from the <strong>database first</strong>; then a device sync runs for <code><?php echo attendance_escape($dashIv); ?></code> (one week of punches, ending today, Asia/Colombo). After a successful sync, the dashboard refreshes from the DB so the filter range matches stored rows. Manual <a href="<?php echo attendance_escape($urls['sync']); ?>">Device sync</a> uses the same default window (<code><?php echo attendance_escape(defined('STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL') ? STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL : 'P6D'); ?></code>) for longer backfills.
     <?php else: ?>
         Auto-sync on open is off. Use <a href="<?php echo attendance_escape($urls['sync']); ?>">Device sync</a> from a PC on the same LAN as the Hikvision (or set <code>STAFF_ATT_DASHBOARD_AUTO_SYNC</code> in config when PHP can reach the device).
     <?php endif; ?>
