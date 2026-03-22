@@ -53,7 +53,6 @@ function staff_attendance_month_report_pdf_rows(array $grouped): array
         $out[] = [
             'employee_no' => (string) ($r['employee_no'] ?? ''),
             'name' => (string) ($r['staff_name'] ?? ''),
-            'department' => (string) ($r['department'] ?? ''),
             'date' => $d,
             'day' => $dayLabel,
             'check_in' => $split['in'],
@@ -63,4 +62,40 @@ function staff_attendance_month_report_pdf_rows(array $grouped): array
     }
 
     return $out;
+}
+
+/**
+ * Display month label and employee filter line for report header / PDF.
+ *
+ * @param array<int, array<string, mixed>> $employees
+ * @return array{monthDisplay: string, employeeFilterLabel: string}
+ */
+function staff_attendance_month_report_header_meta(string $reportMonth, string $employeeNo, array $employees): array
+{
+    $monthDisplay = '';
+    if ($reportMonth !== '' && preg_match('/^\d{4}-\d{2}$/', $reportMonth)) {
+        $monthDisplay = date('F Y', strtotime($reportMonth . '-01'));
+    }
+
+    $employeeFilterLabel = 'All employees';
+    $employeeNo = trim($employeeNo);
+    if ($employeeNo !== '') {
+        $found = false;
+        foreach ($employees as $em) {
+            if ((string) ($em['employee_no'] ?? '') === $employeeNo) {
+                $sn = trim((string) ($em['staff_name'] ?? ''));
+                $employeeFilterLabel = $sn !== '' ? $sn . ' (' . $employeeNo . ')' : $employeeNo;
+                $found = true;
+                break;
+            }
+        }
+        if (!$found) {
+            $employeeFilterLabel = $employeeNo;
+        }
+    }
+
+    return [
+        'monthDisplay' => $monthDisplay,
+        'employeeFilterLabel' => $employeeFilterLabel,
+    ];
 }
