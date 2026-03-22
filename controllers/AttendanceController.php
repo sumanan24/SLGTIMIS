@@ -1476,10 +1476,11 @@ class AttendanceController extends Controller {
             $reportMonth = $defaultMonth;
         }
 
-        $staffNameFilter = trim((string) ($_GET['staff_name'] ?? ''));
+        $employeeNo = trim((string) ($_GET['employee_no'] ?? ''));
 
         require_once BASE_PATH . '/staff_attendance/includes/month_report_data.php';
-        $rows = staff_attendance_month_report_rows($reportMonth, $staffNameFilter);
+        $state = staff_attendance_month_report_fetch($reportMonth, $employeeNo);
+        $pdfRows = staff_attendance_month_report_pdf_rows($state['grouped']);
 
         return $this->view('attendance/staff_device_month', [
             'title' => 'Staff device — Month report',
@@ -1487,8 +1488,11 @@ class AttendanceController extends Controller {
             'staffDeviceSection' => 'month',
             'urls' => $urls,
             'reportMonth' => $reportMonth,
-            'staffNameFilter' => $staffNameFilter,
-            'rows' => $rows,
+            'employeeNo' => $employeeNo,
+            'employees' => $state['employees'],
+            'grouped' => $state['grouped'],
+            'dbError' => $state['dbError'],
+            'pdfRows' => $pdfRows,
         ]);
     }
 

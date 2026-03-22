@@ -64,7 +64,7 @@ function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $date
                     WHERE DATE(attendance_time) BETWEEN ? AND ?
                       AND ' . $nameOk . '
                     GROUP BY employee_no, DATE(attendance_time)
-                    ORDER BY d DESC, staff_name ASC, employee_no ASC';
+                    ORDER BY d DESC, MAX(attendance_time) DESC, staff_name ASC, employee_no ASC';
             $gq = $db->prepare($sql);
             $gq->bind_param('ss', $dateFrom, $dateTo);
         } else {
@@ -78,7 +78,7 @@ function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $date
                       AND employee_no = ?
                       AND ' . $nameOk . '
                     GROUP BY employee_no, DATE(attendance_time)
-                    ORDER BY d DESC, staff_name ASC, employee_no ASC';
+                    ORDER BY d DESC, MAX(attendance_time) DESC, staff_name ASC, employee_no ASC';
             $gq = $db->prepare($sql);
             $gq->bind_param('sss', $dateFrom, $dateTo, $employeeNo);
         }
