@@ -93,8 +93,8 @@ $hasRows = !empty($grouped);
                                 <th>Name</th>
                                 <th>Date</th>
                                 <th>Day</th>
-                                <th>Check-in</th>
-                                <th>Check-out</th>
+                                <th>IN TIME</th>
+                                <th>OUT TIME</th>
                                 <th>Other times</th>
                             </tr>
                             </thead>
@@ -174,7 +174,7 @@ $hasRows = !empty($grouped);
             startY: y,
             margin: { left: marginX, right: marginX },
             tableWidth: pageW - marginX * 2,
-            head: [['Employee no.', 'Name', 'Date', 'Day', 'Check-in', 'Check-out', 'Other times']],
+            head: [['Employee no.', 'Name', 'Date', 'Day', 'IN TIME', 'OUT TIME', 'Other times']],
             body: body,
             styles: {
                 fontSize: 8,

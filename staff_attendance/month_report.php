@@ -107,8 +107,8 @@ $pdfPayload = json_encode(
                             <th>Name</th>
                             <th>Date</th>
                             <th>Day</th>
-                            <th>IN</th>
-                            <th>OUT</th>
+                            <th>IN TIME</th>
+                            <th>OUT TIME</th>
                             <th>Others</th>
                         </tr>
                         </thead>
@@ -187,7 +187,7 @@ $pdfPayload = json_encode(
             startY: y,
             margin: { left: marginX, right: marginX },
             tableWidth: pageW - marginX * 2,
-            head: [['Employee no.', 'Name', 'Date', 'Day', 'Check-in', 'Check-out', 'Other times']],
+            head: [['Employee no.', 'Name', 'Date', 'Day', 'IN TIME', 'OUT TIME', 'Other times']],
             body: body,
             styles: {
                 fontSize: 8,
