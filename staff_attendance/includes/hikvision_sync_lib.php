@@ -235,18 +235,15 @@ function attendance_flush_staff_batch(mysqli $db, array &$batch, array &$out): v
 }
 
 /**
- * When the terminal only sends employee_no, fill staff_name / department from `staff` + `department` (staff_id = employee_no).
+ * Resolve name/dept from main `staff` directory.
+ * Tries staff.staff_id first, then staff.staff_nic (device often sends NIC or card id).
+ * Returns canonical employee_no = staff_id for storage.
  *
- * @return int Rows updated (best effort; ignored if tables differ)
+ * @return array{employee_no: string, staff_name: string, department: string}|null
  */
-/**
- * Resolve name/dept from main staff directory (employee_no must match staff.staff_id).
- *
- * @return array{staff_name: string, department: string}|null
- */
-function attendance_lookup_staff_for_attendance(mysqli $db, string $employeeNo): ?array
+function attendance_lookup_staff_for_attendance(mysqli $db, string $rawFromDevice): ?array
 {
-    $sql = 'SELECT s.staff_name, d.department_name AS department_name
+    $sql = 'SELECT s.staff_id, s.staff_name, d.department_name AS department_name
             FROM staff s
             LEFT JOIN department d ON d.department_id = s.department_id
             WHERE s.staff_id = ?
@@ -255,11 +252,29 @@ function attendance_lookup_staff_for_attendance(mysqli $db, string $employeeNo):
     if ($stmt === false) {
         return null;
     }
-    $stmt->bind_param('s', $employeeNo);
+    $stmt->bind_param('s', $rawFromDevice);
     $stmt->execute();
     $res = $stmt->get_result();
     $row = $res ? $res->fetch_assoc() : null;
     $stmt->close();
+
+    if ($row === null) {
+        $sql2 = 'SELECT s.staff_id, s.staff_name, d.department_name AS department_name
+                FROM staff s
+                LEFT JOIN department d ON d.department_id = s.department_id
+                WHERE s.staff_nic = ?
+                LIMIT 1';
+        $stmt2 = $db->prepare($sql2);
+        if ($stmt2 === false) {
+            return null;
+        }
+        $stmt2->bind_param('s', $rawFromDevice);
+        $stmt2->execute();
+        $res2 = $stmt2->get_result();
+        $row = $res2 ? $res2->fetch_assoc() : null;
+        $stmt2->close();
+    }
+
     if ($row === null) {
         return null;
     }
@@ -267,12 +282,20 @@ function attendance_lookup_staff_for_attendance(mysqli $db, string $employeeNo):
     if ($name === '') {
         return null;
     }
+    $canonicalId = trim((string) ($row['staff_id'] ?? ''));
 
     return [
+        'employee_no' => $canonicalId !== '' ? $canonicalId : $rawFromDevice,
         'staff_name' => $name,
         'department' => trim((string) ($row['department_name'] ?? '')),
     ];
 }
+
+/**
+ * When the terminal only sends employee_no, fill staff_name / department from `staff` + `department` (staff_id = employee_no).
+ *
+ * @return int Rows updated (best effort; ignored if tables differ)
+ */
 
 function attendance_enrich_staff_attendance_from_directory(mysqli $db, DateTimeInterface $start, DateTimeInterface $end): int
 {
@@ -639,7 +662,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     $debug[] = 'Time window (Asia/Colombo): ' . $startIso . ' → ' . $endIso;
     $debug[] = 'Pagination: searchResultPosition += events returned per page; maxResults=' . $maxResults . ' per request';
     if ($requireStaffDir) {
-        $debug[] = 'Staff directory: INSERT only if employee_no exists in staff.staff_id with non-empty staff_name.';
+        $debug[] = 'Staff directory: match device id to staff.staff_id or staff.staff_nic; store canonical staff_id; non-empty staff_name required.';
     }
 
     $position = 0;
@@ -736,15 +759,17 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
                     $out['skipped_not_in_directory']++;
                     continue;
                 }
+                $empStore = $dir['employee_no'];
                 $staffName = $dir['staff_name'];
                 $dept = $dir['department'];
             } else {
+                $empStore = $emp;
                 $staffName = $staffNameDev;
                 $dept = $deptDev;
             }
 
             $batch[] = [
-                'employee_no' => $emp,
+                'employee_no' => $empStore,
                 'staff_name' => $staffName,
                 'department' => $dept,
                 'attendance_time' => $attTime,
@@ -767,9 +792,11 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
             break;
         }
 
-        if ($listCount < $maxResults) {
-            $debug[] = 'Last page had fewer than maxResults (' . $listCount . ' < ' . $maxResults . ').';
-            break;
+        // Hikvision often returns pages smaller than maxResults (e.g. 30) while totalMatches is thousands — keep paging.
+        if ($listCount < $maxResults && $totalMatchesKnown !== null && $position < $totalMatchesKnown) {
+            $debug[] = 'Partial page (' . $listCount . ' < maxResults); continuing (position ' . $position . ' / ' . $totalMatchesKnown . ').';
+        } elseif ($listCount < $maxResults && $totalMatchesKnown === null) {
+            $debug[] = 'Partial page (' . $listCount . ' < maxResults); total unknown — continuing until empty page.';
         }
     }
 

@@ -118,7 +118,7 @@ require __DIR__ . '/includes/header.php';
         <code>INSERT IGNORE</code> (employee_no, staff_name, department, attendance_time, device_ip, event_type) in chunks of <?php echo (int) (defined('HIKVISION_INSERT_BATCH_SIZE') ? HIKVISION_INSERT_BATCH_SIZE : 500); ?>;
         UNIQUE (<code>employee_no</code>, <code>attendance_time</code>).
         <?php if (defined('STAFF_ATTENDANCE_REQUIRE_STAFF_DIRECTORY') && STAFF_ATTENDANCE_REQUIRE_STAFF_DIRECTORY): ?>
-            Only rows where <code>employee_no</code> matches <code>staff.staff_id</code> and <code>staff.staff_name</code> is set — others skipped.
+            Only rows where the device id matches <code>staff.staff_id</code> or <code>staff.staff_nic</code> (stored as <code>staff_id</code>) and <code>staff.staff_name</code> is set — others skipped.
         <?php endif; ?>
         Times: <strong>Asia/Colombo</strong>. Dashboard auto-sync: <?php echo (defined('STAFF_ATT_DASHBOARD_AUTO_SYNC') && STAFF_ATT_DASHBOARD_AUTO_SYNC) ? 'on (same week window)' : 'off'; ?>.
     </p>
