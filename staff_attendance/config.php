@@ -38,10 +38,16 @@ define('HIKVISION_CURL_TIMEOUT', 35);
  */
 define('HIKVISION_SYNC_CURL_TIMEOUT', 300);
 
-/** Events per ISAPI request (chunk). Raise if device allows (larger = fewer HTTP round-trips). */
-define('HIKVISION_MAX_RESULTS_PER_CHUNK', 500);
+/** DS-K1T320MFWX / ISAPI: events per request (pagination step). */
+define('HIKVISION_MAX_RESULTS_PER_CHUNK', 100);
 
-/** Safety cap: max HTTP pages per sync (200+ employees × many days needs many pages). */
+/** Access control events only (Hikvision major type 5). */
+define('HIKVISION_ACS_MAJOR', 5);
+
+/** INSERT IGNORE batch size (multi-row). */
+define('HIKVISION_INSERT_BATCH_SIZE', 500);
+
+/** Safety cap: max HTTP pages per sync. */
 define('HIKVISION_MAX_SYNC_PAGES', 20000);
 
 /** Pagination default */

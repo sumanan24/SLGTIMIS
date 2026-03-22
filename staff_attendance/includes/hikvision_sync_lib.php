@@ -94,9 +94,42 @@ function attendance_extract_info_list(array $data): array
 }
 
 /**
+ * Flush buffered rows with INSERT IGNORE (multi-row batches).
+ *
+ * @param array<int, array{employee_no: string, staff_name: string, department: string, attendance_time: string, device_ip: string, event_type: string}> $batch
+ */
+function attendance_flush_staff_batch(mysqli $db, array &$batch, array &$out): void
+{
+    if ($batch === []) {
+        return;
+    }
+    $chunkSize = defined('HIKVISION_INSERT_BATCH_SIZE') ? max(1, min(1000, (int) HIKVISION_INSERT_BATCH_SIZE)) : 500;
+    foreach (array_chunk($batch, $chunkSize) as $chunk) {
+        $parts = [];
+        foreach ($chunk as $r) {
+            $parts[] = sprintf(
+                "('%s','%s','%s','%s','%s','%s')",
+                $db->real_escape_string($r['employee_no']),
+                $db->real_escape_string($r['staff_name']),
+                $db->real_escape_string($r['department']),
+                $db->real_escape_string($r['attendance_time']),
+                $db->real_escape_string($r['device_ip']),
+                $db->real_escape_string($r['event_type'])
+            );
+        }
+        $sql = 'INSERT IGNORE INTO staff_attendance (employee_no, staff_name, department, attendance_time, device_ip, event_type) VALUES ' . implode(',', $parts);
+        $db->query($sql);
+        $aff = $db->affected_rows;
+        $out['inserted'] += $aff;
+        $out['skipped_dup'] += count($chunk) - $aff;
+    }
+    $batch = [];
+}
+
+/**
  * Pull events from device and INSERT IGNORE into staff_attendance.
  *
- * @return array{ok: bool, inserted: int, skipped_dup: int, skipped_bad: int, error: ?string}
+ * @return array{ok: bool, inserted: int, skipped_dup: int, skipped_bad: int, total_received: int, debug: list<string>, error: ?string}
  */
 function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterface $end): array
 {
@@ -105,6 +138,8 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
         'inserted' => 0,
         'skipped_dup' => 0,
         'skipped_bad' => 0,
+        'total_received' => 0,
+        'debug' => [],
         'error' => null,
     ];
 
@@ -174,6 +209,8 @@ function attendance_hikvision_isapi_post(string $url, string $body, int $connect
 
 /**
  * @internal
+ *
+ * @return array{ok: bool, inserted: int, skipped_dup: int, skipped_bad: int, total_received: int, debug: list<string>, error: ?string}
  */
 function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeInterface $end, int $connectT, int $timeoutT): array
 {
@@ -186,6 +223,8 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
         'inserted' => 0,
         'skipped_dup' => 0,
         'skipped_bad' => 0,
+        'total_received' => 0,
+        'debug' => [],
         'error' => null,
     ];
 
@@ -196,18 +235,23 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     $scheme = HIKVISION_USE_HTTPS ? 'https' : 'http';
     $url = $scheme . '://' . HIKVISION_IP . '/ISAPI/AccessControl/AcsEvent?format=json';
 
-    /** One search session for all chunks — regenerating searchID each request breaks pagination. */
     $searchId = bin2hex(random_bytes(8));
-
-    $maxResults = defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? max(10, min(2000, (int) HIKVISION_MAX_RESULTS_PER_CHUNK)) : 500;
+    $maxResults = defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? max(10, min(1000, (int) HIKVISION_MAX_RESULTS_PER_CHUNK)) : 100;
     $maxPages = defined('HIKVISION_MAX_SYNC_PAGES') ? max(1, (int) HIKVISION_MAX_SYNC_PAGES) : 20000;
+    $acsMajor = defined('HIKVISION_ACS_MAJOR') ? (int) HIKVISION_ACS_MAJOR : 5;
+
+    $debug = [];
+    $debug[] = 'Device: ' . HIKVISION_IP . ' (DS-K1T320MFWX / ISAPI)';
+    $debug[] = 'POST ' . $url;
+    $debug[] = 'Digest auth, JSON body, major=' . $acsMajor . ' (Access Control only — minor not sent)';
+    $debug[] = 'Time window (Asia/Colombo): ' . $startIso . ' → ' . $endIso;
+    $debug[] = 'Pagination: searchResultPosition += events returned per page; maxResults=' . $maxResults . ' per request';
 
     $position = 0;
     $totalMatchesKnown = null;
+    $cumulativeReceived = 0;
     $db = attendance_db();
-    $insertSql = 'INSERT IGNORE INTO staff_attendance (employee_no, staff_name, department, attendance_time, device_ip, event_type)
-                  VALUES (?, ?, ?, ?, ?, ?)';
-    $ins = $db->prepare($insertSql);
+    $batch = [];
 
     for ($page = 0; $page < $maxPages; $page++) {
         $payload = [
@@ -215,8 +259,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
                 'searchID' => $searchId,
                 'searchResultPosition' => $position,
                 'maxResults' => $maxResults,
-                'major' => 0,
-                'minor' => 0,
+                'major' => $acsMajor,
                 'startTime' => $startIso,
                 'endTime' => $endIso,
             ],
@@ -226,31 +269,46 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
         $req = attendance_hikvision_isapi_post($url, $body, $connectT, $timeoutT);
         if ($req['error'] !== null) {
             $out['error'] = $req['error'];
+            $out['debug'] = $debug;
             return $out;
         }
         $httpCode = $req['http_code'];
         $response = $req['body'];
         if ($httpCode < 200 || $httpCode >= 300) {
             $out['error'] = 'HTTP ' . $httpCode . ' — ' . substr((string) $response, 0, 500);
+            $out['debug'] = $debug;
             return $out;
         }
 
         $data = json_decode((string) $response, true);
         if (!is_array($data)) {
             $out['error'] = 'Invalid JSON from device.';
+            $out['debug'] = $debug;
             return $out;
         }
 
         if ($totalMatchesKnown === null) {
             $totalMatchesKnown = attendance_hikvision_acs_event_total($data);
+            if ($totalMatchesKnown !== null) {
+                $debug[] = 'Device reports totalMatches: ' . $totalMatchesKnown;
+            }
         }
 
         $list = attendance_extract_info_list($data);
         $listCount = count($list);
 
         if ($listCount === 0) {
+            $debug[] = 'No more records at searchResultPosition=' . $position . ' (end of result set).';
             break;
         }
+
+        $cumulativeReceived += $listCount;
+        $debug[] = sprintf(
+            'Fetched %d records at position %d (cumulative received: %d)',
+            $listCount,
+            $position,
+            $cumulativeReceived
+        );
 
         foreach ($list as $item) {
             if (!is_array($item)) {
@@ -264,7 +322,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
             $timeRaw = (string) ($item['time'] ?? $item['Time'] ?? '');
             $major = isset($item['major']) ? (string) $item['major'] : '';
             $minor = isset($item['minor']) ? (string) $item['minor'] : '';
-            $eventType = ($major !== '' || $minor !== '') ? trim($major . '/' . $minor, '/') : 'event';
+            $eventType = ($major !== '' || $minor !== '') ? trim($major . '/' . $minor, '/') : (string) $acsMajor;
 
             $attTime = attendance_parse_device_time($timeRaw);
             if ($emp === '' || $attTime === null) {
@@ -272,29 +330,44 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
                 continue;
             }
 
-            $deviceIp = HIKVISION_IP;
-            $ins->bind_param('ssssss', $emp, $name, $dept, $attTime, $deviceIp, $eventType);
-            $ins->execute();
-            $aff = $ins->affected_rows;
-            if ($aff === 1) {
-                $out['inserted']++;
-            } else {
-                $out['skipped_dup']++;
+            $batch[] = [
+                'employee_no' => $emp,
+                'staff_name' => $name,
+                'department' => $dept,
+                'attendance_time' => $attTime,
+                'device_ip' => HIKVISION_IP,
+                'event_type' => $eventType,
+            ];
+
+            $insertChunk = defined('HIKVISION_INSERT_BATCH_SIZE') ? max(1, min(1000, (int) HIKVISION_INSERT_BATCH_SIZE)) : 500;
+            if (count($batch) >= $insertChunk) {
+                attendance_flush_staff_batch($db, $batch, $out);
             }
         }
 
-        /** Next page offset must match how many events the device returned (not only valid DB rows). */
+        attendance_flush_staff_batch($db, $batch, $out);
+
         $position += $listCount;
 
         if ($totalMatchesKnown !== null && $position >= $totalMatchesKnown) {
+            $debug[] = 'Reached totalMatches from device (' . $totalMatchesKnown . ').';
             break;
         }
 
         if ($listCount < $maxResults) {
+            $debug[] = 'Last page had fewer than maxResults (' . $listCount . ' < ' . $maxResults . ').';
             break;
         }
     }
 
+    $out['total_received'] = $cumulativeReceived;
+    $debug[] = '---';
+    $debug[] = 'Total received: ' . $cumulativeReceived;
+    $debug[] = 'Total inserted (new rows): ' . $out['inserted'];
+    $debug[] = 'Total skipped (duplicates): ' . $out['skipped_dup'];
+    $debug[] = 'Total skipped (invalid rows): ' . $out['skipped_bad'];
+
+    $out['debug'] = $debug;
     $out['ok'] = true;
     return $out;
 }
