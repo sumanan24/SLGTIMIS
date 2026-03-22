@@ -65,10 +65,12 @@ define('HIKVISION_MAX_SYNC_PAGES', 20000);
 define('ATT_PAGE_SIZE', 25);
 
 /**
- * Dashboard: pull last month from device when this page is opened.
- * Set false only if the web server cannot reach the Hikvision IP (e.g. public host without VPN).
+ * Dashboard: auto-sync when opening dashboard.
+ * Keep FALSE if PHP runs on a public server — 172.16.x.x is unreachable from the internet.
+ * Use sync_attendance.php from a PC on the same LAN as the Hikvision, or enable this only when
+ * the web server is on the LAN / VPN to the device.
  */
-define('STAFF_ATT_DASHBOARD_AUTO_SYNC', true);
+define('STAFF_ATT_DASHBOARD_AUTO_SYNC', false);
 
 /**
  * Seconds between automatic pulls. 0 = every time you open the dashboard.

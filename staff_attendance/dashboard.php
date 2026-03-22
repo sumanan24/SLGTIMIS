@@ -142,7 +142,11 @@ require __DIR__ . '/includes/header.php';
 <h1 class="h3 mb-3">Dashboard</h1>
 <p class="text-muted small mb-3">
     All times use <strong>Sri Lanka (Asia/Colombo, UTC+5:30)</strong>. Today: <?php echo attendance_escape($todayYmd); ?>.
-    Each visit syncs the last <strong><?php echo attendance_escape($lookbackSpec); ?></strong> of events from the terminal (chunked until all are fetched).
+    <?php if (STAFF_ATT_DASHBOARD_AUTO_SYNC): ?>
+        Each visit syncs the last <strong><?php echo attendance_escape($lookbackSpec); ?></strong> of events from the terminal (chunked until all are fetched).
+    <?php else: ?>
+        Auto-sync on open is off. Use <a href="sync_attendance.php">Device sync</a> from a PC on the same LAN as the Hikvision (or set <code>STAFF_ATT_DASHBOARD_AUTO_SYNC</code> in config when PHP can reach the device).
+    <?php endif; ?>
     The employee list only shows people who have at least one punch stored in the database.
 </p>
 

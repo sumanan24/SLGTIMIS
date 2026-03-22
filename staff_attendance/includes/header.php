@@ -24,6 +24,7 @@ $base = attendance_base_url();
                 <li class="nav-item"><a class="nav-link" href="<?php echo attendance_escape($base); ?>/dashboard.php">Dashboard</a></li>
                 <li class="nav-item"><a class="nav-link" href="<?php echo attendance_escape($base); ?>/list_attendance.php">List</a></li>
                 <li class="nav-item"><a class="nav-link" href="<?php echo attendance_escape($base); ?>/daily_report.php">Daily report</a></li>
+                <li class="nav-item"><a class="nav-link" href="<?php echo attendance_escape($base); ?>/sync_attendance.php">Device sync</a></li>
             </ul>
         </div>
     </div>

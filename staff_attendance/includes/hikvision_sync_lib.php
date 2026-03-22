@@ -179,12 +179,12 @@ function attendance_hikvision_curl_error_hint(string $curlErr): string
     if (strpos($e, 'failed to connect') !== false
         || strpos($e, 'connection timed out') !== false
         || strpos($e, 'timed out') !== false
+        || strpos($e, 'couldn\'t connect') !== false
         || strpos($e, 'could not resolve') !== false
         || strpos($e, 'network is unreachable') !== false) {
-        return $curlErr . ' — The PHP server cannot reach ' . HIKVISION_IP
-            . ' on the LAN. Use a browser on the same network to confirm http://' . HIKVISION_IP
-            . ' , run PHP on the LAN (same VLAN as the terminal), or connect the server via VPN. '
-            . 'Increase HIKVISION_CURL_CONNECT_TIMEOUT in config only if the network is slow.';
+        return $curlErr . ' — ' . HIKVISION_IP . ' is a private LAN address: this PHP server has no route to it. '
+            . 'Open sync from a machine on the same network as the terminal (e.g. local WAMP), or put the app server on that LAN/VPN. '
+            . 'Longer timeouts do not fix a wrong network.';
     }
     return $curlErr;
 }
