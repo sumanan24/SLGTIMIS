@@ -11,6 +11,11 @@ require_once __DIR__ . '/includes/hikvision_sync_lib.php';
 
 $pageTitle = 'Hikvision sync';
 
+$reachTest = null;
+if (isset($_GET['test']) && (string) $_GET['test'] === '1') {
+    $reachTest = attendance_hikvision_test_reachability();
+}
+
 $showResult = null;
 if (!empty($_SESSION['staff_attendance_sync_result'])) {
     $showResult = $_SESSION['staff_attendance_sync_result'];
@@ -64,6 +69,21 @@ $defaultEnd = date('Y-m-d 23:59:59');
 require __DIR__ . '/includes/header.php';
 ?>
 <h1 class="h3 mb-3">Sync from Hikvision</h1>
+<div class="alert alert-warning small mb-3" role="alert">
+    <strong>Where PHP runs matters.</strong> Sync is executed by the <strong>web server process</strong>, not your browser.
+    If the site is hosted on the public internet, PHP cannot reach a private IP like <code><?php echo attendance_escape(HIKVISION_IP); ?></code>.
+    Install/run this app on <strong>WAMP (or similar) on the same LAN as the terminal</strong>, extend VPN to the app server, or use an on‑prem sync job.
+    Opening this page in a browser on the office PC does <em>not</em> help unless PHP runs there too.
+</div>
+<p class="mb-2">
+    <a class="btn btn-sm btn-outline-secondary" href="sync_attendance.php?test=1">Test connection to device</a>
+    <span class="text-muted small ms-2">~3s; checks from this server only.</span>
+</p>
+<?php if ($reachTest !== null): ?>
+    <div class="alert <?php echo $reachTest['ok'] ? 'alert-success' : 'alert-danger'; ?> small py-2 mb-3" role="alert">
+        <?php echo attendance_escape($reachTest['message']); ?>
+    </div>
+<?php endif; ?>
 <p class="text-muted small mb-3">
     Device: <code><?php echo attendance_escape(HIKVISION_IP); ?></code> (DS-K1T320MFWX) —
     <code>POST /ISAPI/AccessControl/AcsEvent?format=json</code> with Digest auth, JSON body,

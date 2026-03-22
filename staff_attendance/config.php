@@ -37,8 +37,8 @@ define('HIKVISION_USE_HTTPS', false);
  */
 define('HIKVISION_HTTP_PORT', 0);
 
-/** Seconds to wait for TCP connect (raise on slow LAN; won't fix wrong network). */
-define('HIKVISION_CURL_CONNECT_TIMEOUT', 25);
+/** Seconds to wait for TCP connect per ISAPI request (raise on slow LAN; won't fix wrong network). */
+define('HIKVISION_CURL_CONNECT_TIMEOUT', 12);
 
 /** Whole-request timeout for single HTTP call (fallback / digest streams). */
 define('HIKVISION_CURL_TIMEOUT', 60);

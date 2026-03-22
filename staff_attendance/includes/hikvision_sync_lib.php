@@ -155,9 +155,9 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
 }
 
 /**
- * Full URL for AcsEvent search (includes optional port).
+ * Base URL for the device (scheme + host[:port] + trailing slash).
  */
-function attendance_hikvision_acs_event_url(): string
+function attendance_hikvision_device_base_url(): string
 {
     $https = defined('HIKVISION_USE_HTTPS') && HIKVISION_USE_HTTPS;
     $scheme = $https ? 'https' : 'http';
@@ -167,7 +167,64 @@ function attendance_hikvision_acs_event_url(): string
     if ($port > 0 && $port !== $defaultPort) {
         $host .= ':' . $port;
     }
-    return $scheme . '://' . $host . '/ISAPI/AccessControl/AcsEvent?format=json';
+    return $scheme . '://' . $host . '/';
+}
+
+/**
+ * Full URL for AcsEvent search (includes optional port).
+ */
+function attendance_hikvision_acs_event_url(): string
+{
+    return rtrim(attendance_hikvision_device_base_url(), '/') . '/ISAPI/AccessControl/AcsEvent?format=json';
+}
+
+/**
+ * Quick check: can this PHP process open TCP to the device? (Short timeouts; no Digest.)
+ *
+ * @return array{ok: bool, message: string}
+ */
+function attendance_hikvision_test_reachability(): array
+{
+    if (!function_exists('curl_init')) {
+        return ['ok' => false, 'message' => 'PHP cURL is not available.'];
+    }
+    $url = attendance_hikvision_device_base_url();
+    $ch = curl_init($url);
+    $opts = [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 3,
+        CURLOPT_TIMEOUT => 6,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_MAXREDIRS => 2,
+        CURLOPT_USERAGENT => 'SLGTIMIS-staff-attendance/1',
+    ];
+    if (strpos($url, 'https:') === 0) {
+        $opts[CURLOPT_SSL_VERIFYPEER] = false;
+        $opts[CURLOPT_SSL_VERIFYHOST] = 0;
+    }
+    if (defined('CURL_IPRESOLVE_V4')) {
+        $opts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+    }
+    curl_setopt_array($ch, $opts);
+    curl_exec($ch);
+    $errno = curl_errno($ch);
+    $cerr = curl_error($ch);
+    $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($errno !== 0) {
+        $msg = attendance_hikvision_curl_error_hint($cerr);
+        return ['ok' => false, 'message' => 'cURL error: ' . $msg];
+    }
+    if ($http === 0) {
+        return ['ok' => false, 'message' => 'No HTTP response from device (check firewall/port).'];
+    }
+    if ($http >= 200 && $http < 600) {
+        return [
+            'ok' => true,
+            'message' => 'Reachable from this PHP server (HTTP ' . $http . ' on ' . $url . '). You can run a full sync.',
+        ];
+    }
+    return ['ok' => false, 'message' => 'Unexpected response (HTTP ' . $http . ').'];
 }
 
 /**
