@@ -7,13 +7,10 @@ require_once __DIR__ . '/includes/hikvision_sync_lib.php';
 $pageTitle = 'Attendance dashboard';
 
 $nowTs = time();
-$forceSync = isset($_GET['force_sync']) && $_GET['force_sync'] === '1';
 $lastAuto = (int) ($_SESSION['staff_attendance_last_auto_sync'] ?? 0);
 
 $shouldSync = false;
-if ($forceSync) {
-    $shouldSync = true;
-} elseif (STAFF_ATT_DASHBOARD_AUTO_SYNC) {
+if (STAFF_ATT_DASHBOARD_AUTO_SYNC) {
     if (STAFF_ATT_DASHBOARD_SYNC_COOLDOWN === 0) {
         $shouldSync = true;
     } else {
@@ -32,14 +29,24 @@ if ($shouldSync) {
     }
 }
 
+$staffNameFilter = trim((string) ($_GET['staff_name'] ?? ''));
+
 $total = 0;
+$monthCount = 0;
 $todayCount = 0;
 $latest = [];
 $dbError = null;
 
+$rowLimit = defined('STAFF_ATT_DASHBOARD_ROW_LIMIT') ? max(50, min(2000, (int) STAFF_ATT_DASHBOARD_ROW_LIMIT)) : 500;
+
 try {
     $db = attendance_db();
+
     $total = (int) $db->query('SELECT COUNT(*) AS c FROM staff_attendance')->fetch_assoc()['c'];
+
+    $monthCount = (int) $db->query(
+        'SELECT COUNT(*) AS c FROM staff_attendance WHERE attendance_time >= DATE_SUB(NOW(), INTERVAL 1 MONTH)'
+    )->fetch_assoc()['c'];
 
     $today = date('Y-m-d');
     $stmt = $db->prepare('SELECT COUNT(*) AS c FROM staff_attendance WHERE DATE(attendance_time) = ?');
@@ -48,25 +55,44 @@ try {
     $todayCount = (int) ($stmt->get_result()->fetch_assoc()['c'] ?? 0);
     $stmt->close();
 
-    $latest = $db->query(
-        'SELECT attendance_id, employee_no, staff_name, department, attendance_time, device_ip, event_type
-         FROM staff_attendance
-         ORDER BY attendance_time DESC
-         LIMIT 50'
-    )->fetch_all(MYSQLI_ASSOC);
+    if ($staffNameFilter !== '') {
+        $like = '%' . $staffNameFilter . '%';
+        $q = 'SELECT attendance_id, employee_no, staff_name, department, attendance_time, device_ip, event_type
+              FROM staff_attendance
+              WHERE attendance_time >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
+              AND staff_name LIKE ?
+              ORDER BY attendance_time DESC
+              LIMIT ?';
+        $st = $db->prepare($q);
+        $st->bind_param('si', $like, $rowLimit);
+        $st->execute();
+        $latest = $st->get_result()->fetch_all(MYSQLI_ASSOC);
+        $st->close();
+    } else {
+        $q = 'SELECT attendance_id, employee_no, staff_name, department, attendance_time, device_ip, event_type
+              FROM staff_attendance
+              WHERE attendance_time >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
+              ORDER BY attendance_time DESC
+              LIMIT ?';
+        $st = $db->prepare($q);
+        $st->bind_param('i', $rowLimit);
+        $st->execute();
+        $latest = $st->get_result()->fetch_all(MYSQLI_ASSOC);
+        $st->close();
+    }
 } catch (Throwable $e) {
     $dbError = $e->getMessage();
-    $today = date('Y-m-d');
 }
 
-if (!isset($today)) {
-    $today = date('Y-m-d');
-}
+$today = date('Y-m-d');
 
 require __DIR__ . '/includes/header.php';
 ?>
-<h1 class="h3 mb-4">Dashboard</h1>
-<p class="text-muted small mb-2">Timezone: Asia/Colombo — Today: <?php echo attendance_escape($today); ?></p>
+<h1 class="h3 mb-3">Dashboard</h1>
+<p class="text-muted small mb-4">
+    Timezone: Asia/Colombo — Today: <?php echo attendance_escape($today); ?>.
+    Opening this page syncs the <strong>last month</strong> of events from the device for all employees.
+</p>
 
 <?php if ($dbError !== null): ?>
     <div class="alert alert-danger">
@@ -74,29 +100,35 @@ require __DIR__ . '/includes/header.php';
         <br><small class="text-break"><?php echo attendance_escape($dbError); ?></small>
     </div>
 <?php else: ?>
-    <?php if (!STAFF_ATT_DASHBOARD_AUTO_SYNC): ?>
-        <p class="text-muted small mb-2">
-            <strong>Auto-sync from the device is off</strong> on this server (public hosts usually cannot reach a LAN terminal).
-            Use <a href="sync_attendance.php">Manual sync</a> from a machine on the same network as the Hikvision device, or set
-            <code>STAFF_ATT_DASHBOARD_AUTO_SYNC</code> to <code>true</code> in <code>staff_attendance/config.php</code> only if the web server can reach the device IP.
-        </p>
-    <?php endif; ?>
-    <p class="text-muted small mb-4">
-        <?php if (STAFF_ATT_DASHBOARD_AUTO_SYNC): ?>
-            Dashboard pulls the <strong>last 1 month</strong> when you open this page (subject to cooldown).
-            <?php if (STAFF_ATT_DASHBOARD_SYNC_COOLDOWN > 0): ?>
-                Cooldown: <?php echo (int) STAFF_ATT_DASHBOARD_SYNC_COOLDOWN; ?>s —
+
+<form class="card shadow-sm mb-4" method="get" action="dashboard.php">
+    <div class="card-body py-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-6 col-lg-4">
+                <label class="form-label small mb-0">Filter by staff name</label>
+                <input type="text" name="staff_name" class="form-control form-control-sm"
+                       placeholder="Type part of name…"
+                       value="<?php echo attendance_escape($staffNameFilter); ?>">
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+            </div>
+            <?php if ($staffNameFilter !== ''): ?>
+                <div class="col-auto">
+                    <a href="dashboard.php" class="btn btn-outline-secondary btn-sm">Clear</a>
+                </div>
             <?php endif; ?>
-        <?php endif; ?>
-        <a href="dashboard.php?force_sync=1">Re-sync month</a> (contacts the device; may fail if the server cannot reach it).
-    </p>
+        </div>
+        <p class="text-muted small mb-0 mt-2">Table shows up to <?php echo (int) $rowLimit; ?> rows from the <strong>last month</strong> (rolling).</p>
+    </div>
+</form>
 
 <div class="row g-3 mb-4">
     <div class="col-md-4">
         <div class="card shadow-sm border-0 bg-white">
             <div class="card-body">
-                <div class="text-muted small">Total attendance rows</div>
-                <div class="display-6"><?php echo $total; ?></div>
+                <div class="text-muted small">Last month (stored rows)</div>
+                <div class="display-6"><?php echo $monthCount; ?></div>
             </div>
         </div>
     </div>
@@ -108,14 +140,17 @@ require __DIR__ . '/includes/header.php';
             </div>
         </div>
     </div>
-    <div class="col-md-4 d-flex align-items-center flex-wrap gap-2">
-        <a href="list_attendance.php" class="btn btn-primary">Full list</a>
-        <a href="sync_attendance.php" class="btn btn-outline-primary">Manual sync</a>
-        <a href="dashboard.php?force_sync=1" class="btn btn-outline-secondary btn-sm">Re-sync month</a>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 bg-white">
+            <div class="card-body">
+                <div class="text-muted small">All-time rows (database)</div>
+                <div class="display-6"><?php echo $total; ?></div>
+            </div>
+        </div>
     </div>
 </div>
 
-<h2 class="h5 mb-3">Latest 50 records</h2>
+<h2 class="h5 mb-3"><?php echo $staffNameFilter !== '' ? 'Last month — filtered by name' : 'Last month — all employees'; ?></h2>
 <div class="table-responsive shadow-sm bg-white rounded">
     <table class="table table-sm table-striped mb-0">
         <thead class="table-light">
@@ -131,7 +166,7 @@ require __DIR__ . '/includes/header.php';
         </thead>
         <tbody>
         <?php if (!$latest): ?>
-            <tr><td colspan="7" class="text-center py-4 text-muted">No data yet.</td></tr>
+            <tr><td colspan="7" class="text-center py-4 text-muted">No rows in the last month<?php echo $staffNameFilter !== '' ? ' for this name filter' : ''; ?>.</td></tr>
         <?php else: ?>
             <?php foreach ($latest as $r): ?>
                 <tr>

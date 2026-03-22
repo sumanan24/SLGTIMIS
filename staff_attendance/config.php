@@ -33,17 +33,18 @@ define('HIKVISION_CURL_TIMEOUT', 35);
 define('ATT_PAGE_SIZE', 25);
 
 /**
- * If true, dashboard loads pull 1 month from the device automatically.
- * Set false on public web servers — they usually cannot reach a LAN IP like 172.16.x.x.
- * Use Manual sync / ?force_sync=1 from a PC that can reach the terminal, or run sync on the LAN.
+ * Dashboard: pull last month from device when this page is opened.
+ * Set false only if the web server cannot reach the Hikvision IP (e.g. public host without VPN).
  */
-define('STAFF_ATT_DASHBOARD_AUTO_SYNC', false);
+define('STAFF_ATT_DASHBOARD_AUTO_SYNC', true);
 
 /**
- * When auto-sync is on: seconds between pulls. 0 = every dashboard load.
- * ?force_sync=1 bypasses cooldown.
+ * Seconds between automatic pulls. 0 = every time you open the dashboard.
  */
-define('STAFF_ATT_DASHBOARD_SYNC_COOLDOWN', 300);
+define('STAFF_ATT_DASHBOARD_SYNC_COOLDOWN', 0);
+
+/** Max rows shown on dashboard (last-month window, after name filter) */
+define('STAFF_ATT_DASHBOARD_ROW_LIMIT', 500);
 
 /**
  * @return mysqli
