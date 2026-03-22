@@ -112,10 +112,10 @@ define('STAFF_ATTENDANCE_SYNC_DEFAULT_INTERVAL', 'P6D');
 define('STAFF_ATTENDANCE_ENRICH_FROM_STAFF_TABLE', true);
 
 /**
- * Only INSERT attendance when employee_no exists in `staff` as staff_id and staff.staff_name is non-empty.
- * Unknown card numbers / visitors are skipped (not stored).
+ * If true: only INSERT when employee_no matches staff.staff_id or staff.staff_nic (names from staff).
+ * If false: INSERT every valid punch from the device (full data); empty names can be filled later via STAFF_ATTENDANCE_ENRICH_FROM_STAFF_TABLE.
  */
-define('STAFF_ATTENDANCE_REQUIRE_STAFF_DIRECTORY', true);
+define('STAFF_ATTENDANCE_REQUIRE_STAFF_DIRECTORY', false);
 
 /** Default date range on dashboard summary (days inclusive from date_to backwards) */
 define('STAFF_DASHBOARD_SUMMARY_DAYS', 7);
