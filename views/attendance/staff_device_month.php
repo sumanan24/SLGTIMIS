@@ -93,8 +93,8 @@ $hasRows = !empty($grouped);
                                 <th>Name</th>
                                 <th>Date</th>
                                 <th>Day</th>
-                                <th>Check-in <span class="text-muted fw-normal">(min)</span></th>
-                                <th>Check-out <span class="text-muted fw-normal">(max)</span></th>
+                                <th>Check-in</th>
+                                <th>Check-out</th>
                                 <th>Other times</th>
                             </tr>
                             </thead>
@@ -139,22 +139,26 @@ $hasRows = !empty($grouped);
     if (!btn || typeof window.jspdf === 'undefined') return;
     btn.addEventListener('click', function () {
         var jsPDF = window.jspdf.jsPDF;
-        var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        var y = 12;
-        doc.setFontSize(12);
-        doc.text('Sri Lanka German Training Institute', 14, y);
+        var doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        var pageW = doc.internal.pageSize.getWidth();
+        var marginX = 14;
+        var y = 16;
+        doc.setFontSize(13);
+        doc.text('Sri Lanka German Training Institute', pageW / 2, y, { align: 'center' });
         y += 7;
         doc.setFontSize(11);
-        doc.text('Staff Attendance Summary', 14, y);
+        doc.text('Staff Attendance Summary', pageW / 2, y, { align: 'center' });
         y += 6;
         doc.setFontSize(10);
         if (payload.monthDisplay) {
-            doc.text(payload.monthDisplay, 14, y);
+            doc.text(payload.monthDisplay, pageW / 2, y, { align: 'center' });
             y += 6;
         }
         doc.setFontSize(9);
-        doc.text('Employee: ' + payload.employeeFilterLabel, 14, y);
-        y += 8;
+        doc.setTextColor(80, 80, 80);
+        doc.text('Employee: ' + payload.employeeFilterLabel, pageW / 2, y, { align: 'center' });
+        doc.setTextColor(0, 0, 0);
+        y += 10;
         var body = (payload.rows || []).map(function (r) {
             return [
                 String(r.employee_no || ''),
@@ -168,10 +172,34 @@ $hasRows = !empty($grouped);
         });
         doc.autoTable({
             startY: y,
-            head: [['Employee no.', 'Name', 'Date', 'Day', 'Check-in (min)', 'Check-out (max)', 'Other times']],
+            margin: { left: marginX, right: marginX },
+            tableWidth: pageW - marginX * 2,
+            head: [['Employee no.', 'Name', 'Date', 'Day', 'Check-in', 'Check-out', 'Other times']],
             body: body,
-            styles: { fontSize: 7, cellPadding: 1.2 },
-            headStyles: { fillColor: [13, 110, 253] }
+            styles: {
+                fontSize: 8,
+                cellPadding: 1.5,
+                valign: 'middle',
+                overflow: 'linebreak',
+                lineColor: [220, 220, 220],
+                lineWidth: 0.1
+            },
+            headStyles: {
+                fillColor: [13, 110, 253],
+                textColor: 255,
+                halign: 'center',
+                valign: 'middle',
+                fontStyle: 'bold'
+            },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 18 },
+                1: { halign: 'left', cellWidth: 36 },
+                2: { halign: 'center', cellWidth: 18 },
+                3: { halign: 'center', cellWidth: 24 },
+                4: { halign: 'center', cellWidth: 16 },
+                5: { halign: 'center', cellWidth: 16 },
+                6: { halign: 'left', cellWidth: 54 }
+            }
         });
         doc.save('staff-attendance-summary-' + payload.reportMonth + '.pdf');
     });

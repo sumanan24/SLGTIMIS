@@ -6,7 +6,7 @@ declare(strict_types=1);
  *
  * @return array{employees: array<int, array<string, mixed>>, grouped: array<int, array<string, mixed>>, rangePunches: int, todayCount: int, distinctEmployees: int, dbError: string|null}
  */
-function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $dateTo, string $employeeNo, string $todayYmd): array
+function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $dateTo, string $employeeNo, string $todayYmd, bool $groupedSortAsc = false): array
 {
     $employees = [];
     $grouped = [];
@@ -54,6 +54,10 @@ function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $date
         $rangePunches = (int) ($rangeStmt->get_result()->fetch_assoc()['c'] ?? 0);
         $rangeStmt->close();
 
+        $orderGrouped = $groupedSortAsc
+            ? 'ORDER BY d ASC, MIN(attendance_time) ASC, staff_name ASC, employee_no ASC'
+            : 'ORDER BY d DESC, MAX(attendance_time) DESC, staff_name ASC, employee_no ASC';
+
         if ($employeeNo === '') {
             $sql = 'SELECT employee_no,
                            MAX(staff_name) AS staff_name,
@@ -64,7 +68,7 @@ function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $date
                     WHERE DATE(attendance_time) BETWEEN ? AND ?
                       AND ' . $nameOk . '
                     GROUP BY employee_no, DATE(attendance_time)
-                    ORDER BY d DESC, MAX(attendance_time) DESC, staff_name ASC, employee_no ASC';
+                    ' . $orderGrouped;
             $gq = $db->prepare($sql);
             $gq->bind_param('ss', $dateFrom, $dateTo);
         } else {
@@ -78,7 +82,7 @@ function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $date
                       AND employee_no = ?
                       AND ' . $nameOk . '
                     GROUP BY employee_no, DATE(attendance_time)
-                    ORDER BY d DESC, MAX(attendance_time) DESC, staff_name ASC, employee_no ASC';
+                    ' . $orderGrouped;
             $gq = $db->prepare($sql);
             $gq->bind_param('sss', $dateFrom, $dateTo, $employeeNo);
         }

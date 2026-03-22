@@ -30,7 +30,7 @@ function staff_attendance_month_report_fetch(string $reportMonth, string $employ
     $dateTo = date('Y-m-t', strtotime($dateFrom));
     $employeeNo = trim($employeeNo);
 
-    return staff_attendance_dashboard_fetch_from_db($dateFrom, $dateTo, $employeeNo, $todayYmd);
+    return staff_attendance_dashboard_fetch_from_db($dateFrom, $dateTo, $employeeNo, $todayYmd, true);
 }
 
 /**
