@@ -60,9 +60,16 @@ define('HIKVISION_ACS_MAJOR', 5);
 
 /**
  * Access control sub-type (required with major=5 — omitting causes HTTP 400 errorMsg "minor").
- * Use 0 for all sub-types on many DS-K* terminals; use 75 if you need face-recognition events only or if 0 returns HTTP 400.
+ * Used when HIKVISION_ACS_MINORS is empty.
  */
 define('HIKVISION_ACS_MINOR', 0);
+
+/**
+ * Comma-separated minor codes: runs one full paginated sync per value (chunked HTTP + INSERT IGNORE).
+ * Captures different event subtypes under major=5 (face, card, door, etc.). Same punch may appear in multiple passes — duplicates are ignored.
+ * Leave empty ("") to use only HIKVISION_ACS_MINOR once. Example: 0,1,2,3,75,76
+ */
+define('HIKVISION_ACS_MINORS', '0,75,1,2,3');
 
 /** INSERT IGNORE batch size (multi-row). */
 define('HIKVISION_INSERT_BATCH_SIZE', 500);

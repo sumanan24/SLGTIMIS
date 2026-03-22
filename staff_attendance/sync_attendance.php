@@ -12,7 +12,7 @@ declare(strict_types=1);
  * No employee filter — all employeeNoString values from device.
  * DB: INSERT IGNORE chunk size 500; UNIQUE (employee_no, attendance_time).
  *
- * Config: staff_attendance/config.php — HIKVISION_IP, HIKVISION_ACS_MINOR (0 or 75 if device rejects 0).
+ * Config: staff_attendance/config.php — HIKVISION_IP, HIKVISION_ACS_MINORS (comma minors), chunk insert size.
  */
 
 require __DIR__ . '/config.php';
@@ -102,8 +102,8 @@ require __DIR__ . '/includes/header.php';
         Device <code><?php echo attendance_escape(HIKVISION_IP); ?></code> (DS-K1T320MFWX):
         <code>POST …/ISAPI/AccessControl/AcsEvent?format=json</code>, Digest auth,
         <strong>major</strong>=<?php echo (int) (defined('HIKVISION_ACS_MAJOR') ? HIKVISION_ACS_MAJOR : 5); ?>,
-        <strong>minor</strong>=<?php echo (int) (defined('HIKVISION_ACS_MINOR') ? HIKVISION_ACS_MINOR : 0); ?>
-        (<code>HIKVISION_ACS_MINOR</code> — try <strong>75</strong> if the API rejects <strong>0</strong>),
+        minors: <code><?php echo attendance_escape(defined('HIKVISION_ACS_MINORS') ? (string) HIKVISION_ACS_MINORS : ''); ?></code>
+        (<code>HIKVISION_ACS_MINORS</code>, empty = single <code>HIKVISION_ACS_MINOR</code>),
         <strong>maxResults</strong>=<?php echo (int) (defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? HIKVISION_MAX_RESULTS_PER_CHUNK : 2000); ?>, paginate until no rows.
         <code>INSERT IGNORE</code> (employee_no, attendance_time, device_ip, event_type) in chunks of 500;
         UNIQUE (<code>employee_no</code>, <code>attendance_time</code>). Times: <strong>Asia/Colombo</strong>.

@@ -36,6 +36,9 @@ function attendance_parse_device_time(string $raw): ?string
         'Y-m-d H:i:s',
         'Y/m/d H:i:s',
         'Y-m-d\TH:i:s.v',
+        'Y-m-d\TH:i:s.u',
+        'Y-m-d\TH:i:s.uP',
+        'Y-m-d H:i:s.u',
     ];
     foreach ($formats as $f) {
         $dt = DateTimeImmutable::createFromFormat($f, $raw, $tz);
@@ -48,6 +51,95 @@ function attendance_parse_device_time(string $raw): ?string
         return (new DateTimeImmutable('@' . $ts))->setTimezone($tz)->format('Y-m-d H:i:s');
     }
     return null;
+}
+
+/**
+ * @return array<int, int>
+ */
+function attendance_hikvision_config_minors(): array
+{
+    if (defined('HIKVISION_ACS_MINORS')) {
+        $s = trim((string) HIKVISION_ACS_MINORS);
+        if ($s !== '') {
+            $parts = [];
+            foreach (explode(',', $s) as $p) {
+                $p = trim($p);
+                if ($p !== '' && is_numeric($p)) {
+                    $parts[] = (int) $p;
+                }
+            }
+            $parts = array_values(array_unique($parts));
+            if ($parts !== []) {
+                return $parts;
+            }
+        }
+    }
+
+    return [defined('HIKVISION_ACS_MINOR') ? (int) HIKVISION_ACS_MINOR : 0];
+}
+
+/**
+ * @param array<string, mixed> $item
+ */
+function attendance_hikvision_extract_employee_from_item(array $item): string
+{
+    $keys = [
+        'employeeNoString', 'EmployeeNoString', 'employeeNo', 'EmployeeNo',
+        'employeeID', 'EmployeeID', 'employeeId', 'cardNo', 'CardNo',
+        'cardNumber', 'CardNumber', 'serialNo', 'SerialNo', 'personID', 'PersonID',
+    ];
+    foreach ($keys as $k) {
+        if (isset($item[$k])) {
+            $v = trim((string) $item[$k]);
+            if ($v !== '') {
+                return $v;
+            }
+        }
+    }
+    return '';
+}
+
+/**
+ * @param array<string, mixed> $item
+ */
+function attendance_hikvision_extract_time_raw_from_item(array $item): string
+{
+    $keys = [
+        'time', 'Time', 'attendanceTime', 'AttendanceTime', 'dateTime', 'DateTime',
+        'eventTime', 'EventTime', 'recvTime', 'RecvTime',
+    ];
+    foreach ($keys as $k) {
+        if (isset($item[$k]) && trim((string) $item[$k]) !== '') {
+            return trim((string) $item[$k]);
+        }
+    }
+    return '';
+}
+
+/**
+ * @param array<string, mixed> $item
+ * @return array{0: string, 1: string}
+ */
+function attendance_hikvision_extract_staff_meta(array $item): array
+{
+    $name = trim((string) ($item['name'] ?? $item['Name'] ?? $item['personName'] ?? $item['PersonName'] ?? ''));
+    $dept = trim((string) ($item['department'] ?? $item['Department'] ?? $item['orgName'] ?? ''));
+
+    return [$name, $dept];
+}
+
+/**
+ * @return bool
+ */
+function attendance_hikvision_is_list_array(array $arr)
+{
+    $i = 0;
+    foreach ($arr as $k => $_) {
+        if ($k !== $i++) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /**
@@ -77,6 +169,22 @@ function attendance_extract_info_list(array $data): array
         if (isset($il['time']) || isset($il['Time']) || isset($il['employeeNoString']) || isset($il['EmployeeNoString'])) {
             return [$il];
         }
+        if (attendance_hikvision_is_list_array($il)) {
+            $out = [];
+            foreach ($il as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                if (isset($row['Info']) && is_array($row['Info'])) {
+                    $out[] = $row['Info'];
+                } else {
+                    $out[] = $row;
+                }
+            }
+            if ($out !== []) {
+                return $out;
+            }
+        }
         return array_values(array_filter($il, 'is_array'));
     }
     if (isset($data['AcsEvent']['InfoList']['Info']) && is_array($data['AcsEvent']['InfoList']['Info'])) {
@@ -95,9 +203,8 @@ function attendance_extract_info_list(array $data): array
 
 /**
  * Flush buffered rows with INSERT IGNORE (multi-row batches, up to HIKVISION_INSERT_BATCH_SIZE per query).
- * Columns: employee_no, attendance_time, device_ip, event_type (others use table DEFAULTs).
  *
- * @param array<int, array{employee_no: string, attendance_time: string, device_ip: string, event_type: string}> $batch
+ * @param array<int, array{employee_no: string, staff_name: string, department: string, attendance_time: string, device_ip: string, event_type: string}> $batch
  */
 function attendance_flush_staff_batch(mysqli $db, array &$batch, array &$out): void
 {
@@ -109,14 +216,16 @@ function attendance_flush_staff_batch(mysqli $db, array &$batch, array &$out): v
         $parts = [];
         foreach ($chunk as $r) {
             $parts[] = sprintf(
-                "('%s','%s','%s','%s')",
+                "('%s','%s','%s','%s','%s','%s')",
                 $db->real_escape_string($r['employee_no']),
+                $db->real_escape_string($r['staff_name']),
+                $db->real_escape_string($r['department']),
                 $db->real_escape_string($r['attendance_time']),
                 $db->real_escape_string($r['device_ip']),
                 $db->real_escape_string($r['event_type'])
             );
         }
-        $sql = 'INSERT IGNORE INTO staff_attendance (employee_no, attendance_time, device_ip, event_type) VALUES ' . implode(',', $parts);
+        $sql = 'INSERT IGNORE INTO staff_attendance (employee_no, staff_name, department, attendance_time, device_ip, event_type) VALUES ' . implode(',', $parts);
         $db->query($sql);
         $aff = $db->affected_rows;
         $out['inserted'] += $aff;
@@ -146,7 +255,27 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
     $timeoutT = defined('HIKVISION_SYNC_CURL_TIMEOUT') ? (int) HIKVISION_SYNC_CURL_TIMEOUT : 300;
 
     try {
-        return attendance_run_hikvision_sync_inner($start, $end, $connectT, $timeoutT);
+        $minors = attendance_hikvision_config_minors();
+        $mergedDebug = [];
+        $n = count($minors);
+        foreach ($minors as $idx => $minor) {
+            $mergedDebug[] = '—— Pass ' . ($idx + 1) . '/' . $n . ': minor=' . $minor . ' (major=' . (defined('HIKVISION_ACS_MAJOR') ? (int) HIKVISION_ACS_MAJOR : 5) . ') ——';
+            $part = attendance_run_hikvision_sync_inner($start, $end, $connectT, $timeoutT, $minor);
+            $mergedDebug = array_merge($mergedDebug, $part['debug']);
+            $out['inserted'] += $part['inserted'];
+            $out['skipped_dup'] += $part['skipped_dup'];
+            $out['skipped_bad'] += $part['skipped_bad'];
+            $out['total_received'] += $part['total_received'];
+            if (!empty($part['error'])) {
+                $out['error'] = $part['error'];
+                $out['debug'] = $mergedDebug;
+                return $out;
+            }
+        }
+        $mergedDebug[] = '=== All minor passes complete | total received=' . $out['total_received'] . ' | total inserted=' . $out['inserted'] . ' | dup skipped=' . $out['skipped_dup'] . ' | invalid=' . $out['skipped_bad'] . ' ===';
+        $out['debug'] = $mergedDebug;
+        $out['ok'] = true;
+        return $out;
     } catch (Throwable $e) {
         $out['error'] = 'Sync error: ' . $e->getMessage();
         return $out;
@@ -394,7 +523,7 @@ function attendance_hikvision_isapi_post(string $url, string $body, int $connect
  *
  * @return array{ok: bool, inserted: int, skipped_dup: int, skipped_bad: int, total_received: int, debug: list<string>, error: ?string}
  */
-function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeInterface $end, int $connectT, int $timeoutT): array
+function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeInterface $end, int $connectT, int $timeoutT, int $acsMinor): array
 {
     if (function_exists('set_time_limit')) {
         @set_time_limit(0);
@@ -420,7 +549,6 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     $maxResults = defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? max(1, min(10000, (int) HIKVISION_MAX_RESULTS_PER_CHUNK)) : 2000;
     $maxPages = defined('HIKVISION_MAX_SYNC_PAGES') ? max(1, (int) HIKVISION_MAX_SYNC_PAGES) : 20000;
     $acsMajor = defined('HIKVISION_ACS_MAJOR') ? (int) HIKVISION_ACS_MAJOR : 5;
-    $acsMinor = defined('HIKVISION_ACS_MINOR') ? (int) HIKVISION_ACS_MINOR : 0;
 
     $debug = [];
     $debug[] = 'Device: ' . HIKVISION_IP . ' (DS-K1T320MFWX / ISAPI)';
@@ -434,6 +562,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     $cumulativeReceived = 0;
     $db = attendance_db();
     $batch = [];
+    $invalidSampleLogged = false;
 
     for ($page = 0; $page < $maxPages; $page++) {
         $payload = [
@@ -494,22 +623,28 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
                 $out['skipped_bad']++;
                 continue;
             }
-            $emp = (string) ($item['employeeNoString'] ?? $item['EmployeeNoString'] ?? $item['employeeNo'] ?? $item['EmployeeNo'] ?? $item['employeeID'] ?? '');
-            $emp = trim($emp);
-            $timeRaw = (string) ($item['time'] ?? $item['Time'] ?? '');
+            $emp = attendance_hikvision_extract_employee_from_item($item);
+            $timeRaw = attendance_hikvision_extract_time_raw_from_item($item);
+            list($staffName, $dept) = attendance_hikvision_extract_staff_meta($item);
             $major = isset($item['major']) ? (string) $item['major'] : '';
-            $minor = isset($item['minor']) ? (string) $item['minor'] : '';
-            $eventType = ($major !== '' || $minor !== '') ? trim($major . '/' . $minor, '/') : (string) $acsMajor;
+            $minorEv = isset($item['minor']) ? (string) $item['minor'] : '';
+            $eventType = ($major !== '' || $minorEv !== '') ? trim($major . '/' . $minorEv, '/') : (string) $acsMajor;
             $eventType = substr($eventType, 0, 20);
 
             $attTime = attendance_parse_device_time($timeRaw);
             if ($emp === '' || $attTime === null) {
                 $out['skipped_bad']++;
+                if (!$invalidSampleLogged) {
+                    $debug[] = 'First skipped row (missing employee or time): keys=' . implode(',', array_keys($item));
+                    $invalidSampleLogged = true;
+                }
                 continue;
             }
 
             $batch[] = [
                 'employee_no' => $emp,
+                'staff_name' => $staffName,
+                'department' => $dept,
                 'attendance_time' => $attTime,
                 'device_ip' => HIKVISION_IP,
                 'event_type' => $eventType,
@@ -537,11 +672,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     }
 
     $out['total_received'] = $cumulativeReceived;
-    $debug[] = '---';
-    $debug[] = 'Total received: ' . $cumulativeReceived;
-    $debug[] = 'Total inserted: ' . $out['inserted'];
-    $debug[] = 'Skipped (duplicate key): ' . $out['skipped_dup'];
-    $debug[] = 'Skipped (invalid rows): ' . $out['skipped_bad'];
+    $debug[] = '--- minor=' . $acsMinor . ' | received=' . $cumulativeReceived . ' | inserted=' . $out['inserted'] . ' | dup=' . $out['skipped_dup'] . ' | invalid=' . $out['skipped_bad'];
 
     $out['debug'] = $debug;
     $out['ok'] = true;
