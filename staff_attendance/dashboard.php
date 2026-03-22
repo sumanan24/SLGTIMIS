@@ -71,6 +71,7 @@ $grouped = [];
 $rangePunches = 0;
 $total = 0;
 $todayCount = 0;
+$distinctEmployees = 0;
 $dbError = null;
 
 try {
@@ -78,6 +79,7 @@ try {
     $db->query('SET SESSION group_concat_max_len = 16384');
 
     $total = (int) $db->query('SELECT COUNT(*) AS c FROM staff_attendance')->fetch_assoc()['c'];
+    $distinctEmployees = (int) $db->query('SELECT COUNT(DISTINCT employee_no) AS c FROM staff_attendance')->fetch_assoc()['c'];
 
     $stmt = $db->prepare('SELECT COUNT(*) AS c FROM staff_attendance WHERE DATE(attendance_time) = ?');
     $stmt->bind_param('s', $todayYmd);
@@ -139,8 +141,9 @@ require __DIR__ . '/includes/header.php';
 ?>
 <h1 class="h3 mb-3">Dashboard</h1>
 <p class="text-muted small mb-3">
-    Timezone: Asia/Colombo — Today: <?php echo attendance_escape($todayYmd); ?>.
-    Opening this page syncs the last <strong><?php echo attendance_escape($lookbackSpec); ?></strong> of events from the device.
+    All times use <strong>Sri Lanka (Asia/Colombo, UTC+5:30)</strong>. Today: <?php echo attendance_escape($todayYmd); ?>.
+    Each visit syncs the last <strong><?php echo attendance_escape($lookbackSpec); ?></strong> of events from the terminal (chunked until all are fetched).
+    The employee list only shows people who have at least one punch stored in the database.
 </p>
 
 <?php if ($dbError !== null): ?>
@@ -191,28 +194,36 @@ require __DIR__ . '/includes/header.php';
     </div>
 </form>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 bg-white">
+<div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3 mb-4">
+    <div class="col">
+        <div class="card shadow-sm border-0 bg-white h-100">
             <div class="card-body">
                 <div class="text-muted small">Punches in selected range</div>
                 <div class="display-6"><?php echo $rangePunches; ?></div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 bg-white">
+    <div class="col">
+        <div class="card shadow-sm border-0 bg-white h-100">
             <div class="card-body">
                 <div class="text-muted small">Today's punches</div>
                 <div class="display-6"><?php echo $todayCount; ?></div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 bg-white">
+    <div class="col">
+        <div class="card shadow-sm border-0 bg-white h-100">
             <div class="card-body">
                 <div class="text-muted small">All-time rows</div>
                 <div class="display-6"><?php echo $total; ?></div>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card shadow-sm border-0 bg-white h-100">
+            <div class="card-body">
+                <div class="text-muted small">Distinct employees (in DB)</div>
+                <div class="display-6"><?php echo $distinctEmployees; ?></div>
             </div>
         </div>
     </div>

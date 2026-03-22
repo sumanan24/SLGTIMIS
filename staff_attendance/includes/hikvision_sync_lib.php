@@ -11,6 +11,13 @@ function attendance_parse_device_time(string $raw): ?string
     if ($raw === '') {
         return null;
     }
+    $tz = new DateTimeZone(defined('STAFF_TIMEZONE') ? STAFF_TIMEZONE : 'Asia/Colombo');
+    try {
+        $dt = new DateTimeImmutable($raw);
+        return $dt->setTimezone($tz)->format('Y-m-d H:i:s');
+    } catch (Exception $e) {
+        // continue with explicit formats
+    }
     $formats = [
         'Y-m-d\TH:i:s',
         'Y-m-d\TH:i:sP',
@@ -19,14 +26,31 @@ function attendance_parse_device_time(string $raw): ?string
         'Y-m-d\TH:i:s.v',
     ];
     foreach ($formats as $f) {
-        $dt = DateTime::createFromFormat($f, $raw);
-        if ($dt instanceof DateTime) {
-            return $dt->format('Y-m-d H:i:s');
+        $dt = DateTimeImmutable::createFromFormat($f, $raw, $tz);
+        if ($dt !== false) {
+            return $dt->setTimezone($tz)->format('Y-m-d H:i:s');
         }
     }
     $ts = strtotime($raw);
     if ($ts !== false) {
-        return date('Y-m-d H:i:s', $ts);
+        return (new DateTimeImmutable('@' . $ts))->setTimezone($tz)->format('Y-m-d H:i:s');
+    }
+    return null;
+}
+
+/**
+ * Total events in search (if device reports it). Used to page until all rows are fetched.
+ */
+function attendance_hikvision_acs_event_total(array $data): ?int
+{
+    $acs = $data['AcsEvent'] ?? null;
+    if (!is_array($acs)) {
+        return null;
+    }
+    foreach (['totalMatches', 'TotalMatches'] as $k) {
+        if (isset($acs[$k]) && $acs[$k] !== '' && is_numeric($acs[$k])) {
+            return (int) $acs[$k];
+        }
     }
     return null;
 }
@@ -49,6 +73,10 @@ function attendance_extract_info_list(array $data): array
     }
     if (isset($data['AcsEventList']) && is_array($data['AcsEventList'])) {
         return $data['AcsEventList'];
+    }
+    if (isset($data['AcsEvent']['Info']) && is_array($data['AcsEvent']['Info'])) {
+        $x = $data['AcsEvent']['Info'];
+        return isset($x[0]) ? $x : [$x];
     }
     return [];
 }
@@ -149,8 +177,9 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
         'error' => null,
     ];
 
-    $startIso = $start->format('Y-m-d\TH:i:s');
-    $endIso = $end->format('Y-m-d\TH:i:s');
+    $tz = new DateTimeZone(defined('STAFF_TIMEZONE') ? STAFF_TIMEZONE : 'Asia/Colombo');
+    $startIso = DateTimeImmutable::createFromInterface($start)->setTimezone($tz)->format('Y-m-d\TH:i:s');
+    $endIso = DateTimeImmutable::createFromInterface($end)->setTimezone($tz)->format('Y-m-d\TH:i:s');
 
     $scheme = HIKVISION_USE_HTTPS ? 'https' : 'http';
     $url = $scheme . '://' . HIKVISION_IP . '/ISAPI/AccessControl/AcsEvent?format=json';
@@ -158,10 +187,11 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     /** One search session for all chunks — regenerating searchID each request breaks pagination. */
     $searchId = bin2hex(random_bytes(8));
 
-    $maxResults = defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? max(10, min(2000, (int) HIKVISION_MAX_RESULTS_PER_CHUNK)) : 300;
-    $maxPages = defined('HIKVISION_MAX_SYNC_PAGES') ? max(1, (int) HIKVISION_MAX_SYNC_PAGES) : 5000;
+    $maxResults = defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? max(10, min(2000, (int) HIKVISION_MAX_RESULTS_PER_CHUNK)) : 500;
+    $maxPages = defined('HIKVISION_MAX_SYNC_PAGES') ? max(1, (int) HIKVISION_MAX_SYNC_PAGES) : 20000;
 
     $position = 0;
+    $totalMatchesKnown = null;
     $db = attendance_db();
     $insertSql = 'INSERT IGNORE INTO staff_attendance (employee_no, staff_name, department, attendance_time, device_ip, event_type)
                   VALUES (?, ?, ?, ?, ?, ?)';
@@ -199,6 +229,10 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
             return $out;
         }
 
+        if ($totalMatchesKnown === null) {
+            $totalMatchesKnown = attendance_hikvision_acs_event_total($data);
+        }
+
         $list = attendance_extract_info_list($data);
         $listCount = count($list);
 
@@ -211,7 +245,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
                 $out['skipped_bad']++;
                 continue;
             }
-            $emp = (string) ($item['employeeNoString'] ?? $item['EmployeeNoString'] ?? $item['employeeNo'] ?? '');
+            $emp = (string) ($item['employeeNoString'] ?? $item['EmployeeNoString'] ?? $item['employeeNo'] ?? $item['EmployeeNo'] ?? $item['employeeID'] ?? '');
             $emp = trim($emp);
             $name = (string) ($item['name'] ?? $item['Name'] ?? '');
             $dept = (string) ($item['department'] ?? $item['Department'] ?? '');
@@ -239,6 +273,10 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
 
         /** Next page offset must match how many events the device returned (not only valid DB rows). */
         $position += $listCount;
+
+        if ($totalMatchesKnown !== null && $position >= $totalMatchesKnown) {
+            break;
+        }
 
         if ($listCount < $maxResults) {
             break;

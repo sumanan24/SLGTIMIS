@@ -11,7 +11,10 @@ if (!defined('BASE_PATH')) {
 
 require_once BASE_PATH . '/config/database.php';
 
-date_default_timezone_set('Asia/Colombo');
+/** Application & attendance storage timezone (Sri Lanka) */
+define('STAFF_TIMEZONE', 'Asia/Colombo');
+
+date_default_timezone_set(STAFF_TIMEZONE);
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -35,11 +38,11 @@ define('HIKVISION_CURL_TIMEOUT', 35);
  */
 define('HIKVISION_SYNC_CURL_TIMEOUT', 300);
 
-/** Events per ISAPI request (chunk). Typical 100–500 depending on firmware. */
-define('HIKVISION_MAX_RESULTS_PER_CHUNK', 300);
+/** Events per ISAPI request (chunk). Raise if device allows (larger = fewer HTTP round-trips). */
+define('HIKVISION_MAX_RESULTS_PER_CHUNK', 500);
 
-/** Safety cap: max HTTP pages per sync (prevents infinite loop). */
-define('HIKVISION_MAX_SYNC_PAGES', 5000);
+/** Safety cap: max HTTP pages per sync (200+ employees × many days needs many pages). */
+define('HIKVISION_MAX_SYNC_PAGES', 20000);
 
 /** Pagination default */
 define('ATT_PAGE_SIZE', 25);
@@ -58,8 +61,12 @@ define('STAFF_ATT_DASHBOARD_SYNC_COOLDOWN', 0);
 /** Max raw rows (legacy list pages) */
 define('STAFF_ATT_DASHBOARD_ROW_LIMIT', 500);
 
-/** Hikvision sync window when dashboard opens: P1W = 1 week, P1M = 1 month */
-define('STAFF_SYNC_LOOKBACK_INTERVAL', 'P1W');
+/**
+ * Hikvision sync window when dashboard opens.
+ * Use at least P1M so staff who did not punch every week still appear after sync (200+ employees).
+ * P1W only loads people active in that week.
+ */
+define('STAFF_SYNC_LOOKBACK_INTERVAL', 'P1M');
 
 /** Default date range on dashboard summary (days inclusive from date_to backwards) */
 define('STAFF_DASHBOARD_SUMMARY_DAYS', 7);
@@ -76,6 +83,7 @@ function attendance_db(): mysqli
     mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
     $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
     $conn->set_charset(DB_CHARSET);
+    @$conn->query("SET time_zone = '+05:30'");
     return $conn;
 }
 
