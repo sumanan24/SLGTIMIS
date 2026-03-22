@@ -53,7 +53,9 @@ function attendance_parse_digest_params(string $digestHeader): array
     $rest = $m[1];
     if (preg_match_all('/(\w+)\s*=\s*(?:"([^"]*)"|([^\s,]+))/', $rest, $matches, PREG_SET_ORDER)) {
         foreach ($matches as $match) {
-            $val = $match[2] !== '' ? $match[2] : $match[3];
+            // Quoted branch sets [2]; unquoted sets [3]. When one branch matches, the other
+            // capture may be omitted — never access [3] without ?? (fixes "Undefined offset: 3").
+            $val = ($match[2] ?? '') !== '' ? ($match[2] ?? '') : ($match[3] ?? '');
             $out[$match[1]] = $val;
         }
     }
