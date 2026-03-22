@@ -152,7 +152,7 @@ $pdfPayload = json_encode(
     if (!btn || typeof window.jspdf === 'undefined') return;
     btn.addEventListener('click', function () {
         var jsPDF = window.jspdf.jsPDF;
-        var doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
         var pageW = doc.internal.pageSize.getWidth();
         var marginX = 14;
         var y = 16;
@@ -205,13 +205,13 @@ $pdfPayload = json_encode(
                 fontStyle: 'bold'
             },
             columnStyles: {
-                0: { halign: 'center', cellWidth: 18 },
-                1: { halign: 'left', cellWidth: 36 },
-                2: { halign: 'center', cellWidth: 18 },
-                3: { halign: 'center', cellWidth: 24 },
-                4: { halign: 'center', cellWidth: 16 },
-                5: { halign: 'center', cellWidth: 16 },
-                6: { halign: 'left', cellWidth: 54 }
+                0: { halign: 'center', cellWidth: 22 },
+                1: { halign: 'left', cellWidth: 52 },
+                2: { halign: 'center', cellWidth: 22 },
+                3: { halign: 'center', cellWidth: 28 },
+                4: { halign: 'center', cellWidth: 22 },
+                5: { halign: 'center', cellWidth: 22 },
+                6: { halign: 'left', cellWidth: 101 }
             }
         });
         doc.save('staff-attendance-summary-' + payload.reportMonth + '.pdf');
