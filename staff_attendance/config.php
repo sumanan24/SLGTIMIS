@@ -43,8 +43,14 @@ define('STAFF_ATT_DASHBOARD_AUTO_SYNC', true);
  */
 define('STAFF_ATT_DASHBOARD_SYNC_COOLDOWN', 0);
 
-/** Max rows shown on dashboard (last-month window, after name filter) */
+/** Max raw rows (legacy list pages) */
 define('STAFF_ATT_DASHBOARD_ROW_LIMIT', 500);
+
+/** Hikvision sync window when dashboard opens: P1W = 1 week, P1M = 1 month */
+define('STAFF_SYNC_LOOKBACK_INTERVAL', 'P1W');
+
+/** Default date range on dashboard summary (days inclusive from date_to backwards) */
+define('STAFF_DASHBOARD_SUMMARY_DAYS', 7);
 
 /**
  * @return mysqli
@@ -74,4 +80,33 @@ function attendance_base_url(): string
         return '';
     }
     return rtrim($dir, '/');
+}
+
+/**
+ * From GROUP_CONCAT of times (HH:MM:SS) ordered: first = check-in, last = check-out, between = other punches.
+ *
+ * @return array{in: string, out: string, other: list<string>}
+ */
+function attendance_split_day_times(string $timesCsv): array
+{
+    $timesCsv = trim($timesCsv);
+    if ($timesCsv === '') {
+        return ['in' => '', 'out' => '', 'other' => []];
+    }
+    $parts = array_map('trim', explode(',', $timesCsv));
+    $parts = array_values(array_filter($parts, static function ($t) {
+        return $t !== '';
+    }));
+    $n = count($parts);
+    if ($n === 0) {
+        return ['in' => '', 'out' => '', 'other' => []];
+    }
+    if ($n === 1) {
+        return ['in' => $parts[0], 'out' => $parts[0], 'other' => []];
+    }
+    return [
+        'in' => $parts[0],
+        'out' => $parts[$n - 1],
+        'other' => array_slice($parts, 1, $n - 2),
+    ];
 }
