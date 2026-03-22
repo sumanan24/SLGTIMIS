@@ -20,7 +20,11 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-/** Hikvision terminal (Digest auth) */
+/**
+ * Hikvision terminal (Digest auth) — 172.16.x.x is private LAN only.
+ * The machine running PHP must have a route to this IP (same network, VPN, or run sync on the LAN server).
+ * If you see "Failed to connect / Timeout", the server cannot reach the device (not a password issue).
+ */
 define('HIKVISION_IP', '172.16.0.230');
 define('HIKVISION_USER', 'admin');
 define('HIKVISION_PASS', 'TCI@itgls2025#@');
@@ -28,9 +32,16 @@ define('HIKVISION_PASS', 'TCI@itgls2025#@');
 /** Use false if device serves HTTP only */
 define('HIKVISION_USE_HTTPS', false);
 
-/** cURL limits (single request; short when device unreachable) */
-define('HIKVISION_CURL_CONNECT_TIMEOUT', 8);
-define('HIKVISION_CURL_TIMEOUT', 35);
+/**
+ * Non-standard port only (e.g. 8080). Use 0 for HTTP default 80 or HTTPS default 443.
+ */
+define('HIKVISION_HTTP_PORT', 0);
+
+/** Seconds to wait for TCP connect (raise on slow LAN; won't fix wrong network). */
+define('HIKVISION_CURL_CONNECT_TIMEOUT', 25);
+
+/** Whole-request timeout for single HTTP call (fallback / digest streams). */
+define('HIKVISION_CURL_TIMEOUT', 60);
 
 /**
  * Multi-page sync: longer per-request timeout (each chunk may be large).

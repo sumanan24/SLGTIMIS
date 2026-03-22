@@ -155,6 +155,41 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
 }
 
 /**
+ * Full URL for AcsEvent search (includes optional port).
+ */
+function attendance_hikvision_acs_event_url(): string
+{
+    $https = defined('HIKVISION_USE_HTTPS') && HIKVISION_USE_HTTPS;
+    $scheme = $https ? 'https' : 'http';
+    $defaultPort = $https ? 443 : 80;
+    $port = defined('HIKVISION_HTTP_PORT') ? (int) HIKVISION_HTTP_PORT : 0;
+    $host = HIKVISION_IP;
+    if ($port > 0 && $port !== $defaultPort) {
+        $host .= ':' . $port;
+    }
+    return $scheme . '://' . $host . '/ISAPI/AccessControl/AcsEvent?format=json';
+}
+
+/**
+ * Append hint when connection fails (typical: public web server vs private 172.16.x.x).
+ */
+function attendance_hikvision_curl_error_hint(string $curlErr): string
+{
+    $e = strtolower($curlErr);
+    if (strpos($e, 'failed to connect') !== false
+        || strpos($e, 'connection timed out') !== false
+        || strpos($e, 'timed out') !== false
+        || strpos($e, 'could not resolve') !== false
+        || strpos($e, 'network is unreachable') !== false) {
+        return $curlErr . ' — The PHP server cannot reach ' . HIKVISION_IP
+            . ' on the LAN. Use a browser on the same network to confirm http://' . HIKVISION_IP
+            . ' , run PHP on the LAN (same VLAN as the terminal), or connect the server via VPN. '
+            . 'Increase HIKVISION_CURL_CONNECT_TIMEOUT in config only if the network is slow.';
+    }
+    return $curlErr;
+}
+
+/**
  * POST to Hikvision ISAPI: prefer ext-curl; otherwise HTTP Digest via PHP streams (allow_url_fopen).
  *
  * @return array{http_code: int, body: string, error: ?string}
@@ -163,7 +198,7 @@ function attendance_hikvision_isapi_post(string $url, string $body, int $connect
 {
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
-        curl_setopt_array($ch, [
+        $opts = [
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => $body,
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
@@ -172,7 +207,11 @@ function attendance_hikvision_isapi_post(string $url, string $body, int $connect
             CURLOPT_USERPWD => HIKVISION_USER . ':' . HIKVISION_PASS,
             CURLOPT_CONNECTTIMEOUT => $connectT,
             CURLOPT_TIMEOUT => $timeoutT,
-        ]);
+        ];
+        if (defined('CURL_IPRESOLVE_V4')) {
+            $opts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+        }
+        curl_setopt_array($ch, $opts);
         if (strpos($url, 'https:') === 0) {
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
@@ -182,7 +221,7 @@ function attendance_hikvision_isapi_post(string $url, string $body, int $connect
         $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         if ($response === false) {
-            return ['http_code' => 0, 'body' => '', 'error' => 'cURL error: ' . $curlErr];
+            return ['http_code' => 0, 'body' => '', 'error' => 'cURL error: ' . attendance_hikvision_curl_error_hint($curlErr)];
         }
         return ['http_code' => $httpCode, 'body' => (string) $response, 'error' => null];
     }
@@ -232,8 +271,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
     $startIso = attendance_datetime_to_immutable($start)->setTimezone($tz)->format('Y-m-d\TH:i:s');
     $endIso = attendance_datetime_to_immutable($end)->setTimezone($tz)->format('Y-m-d\TH:i:s');
 
-    $scheme = HIKVISION_USE_HTTPS ? 'https' : 'http';
-    $url = $scheme . '://' . HIKVISION_IP . '/ISAPI/AccessControl/AcsEvent?format=json';
+    $url = attendance_hikvision_acs_event_url();
 
     $searchId = bin2hex(random_bytes(8));
     $maxResults = defined('HIKVISION_MAX_RESULTS_PER_CHUNK') ? max(10, min(1000, (int) HIKVISION_MAX_RESULTS_PER_CHUNK)) : 100;
