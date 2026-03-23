@@ -2,7 +2,8 @@
 declare(strict_types=1);
 $staffDeviceSection = 'dashboard';
 ?>
-<div class="container-fluid px-4 py-3">
+<div class="container-fluid px-3 px-sm-4 py-3 staff-device-page">
+    <?php include BASE_PATH . '/staff_attendance/partials/staff_device_embed_styles.php'; ?>
     <?php if (!empty($_SESSION['flash_error'])): ?>
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <i class="fas fa-exclamation-circle me-2"></i><?php echo htmlspecialchars((string) $_SESSION['flash_error'], ENT_QUOTES, 'UTF-8'); ?>
@@ -11,14 +12,14 @@ $staffDeviceSection = 'dashboard';
         <?php unset($_SESSION['flash_error']); ?>
     <?php endif; ?>
 
-    <div class="row g-4">
-        <div class="col-lg-2 col-md-3">
+    <div class="row g-3 g-lg-4">
+        <div class="col-12 col-md-3 col-lg-2">
             <?php include BASE_PATH . '/staff_attendance/partials/staff_device_nav.php'; ?>
         </div>
-        <div class="col-lg-10 col-md-9">
+        <div class="col-12 col-md-9 col-lg-10 min-w-0">
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0 fw-bold">
+                    <h5 class="mb-0 fw-bold text-break">
                         <i class="fas fa-id-card me-2"></i>Staff attendance (device)
                     </h5>
                 </div>

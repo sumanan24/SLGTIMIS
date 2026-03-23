@@ -21,17 +21,18 @@ $hasRows = !empty($grouped);
 $showMonthPdfCurrentBtn = $hasRows;
 $showMonthPdfAllBtn = !empty($hasRowsAll);
 ?>
-<div class="container-fluid px-4 py-3">
-    <div class="row g-4">
-        <div class="col-lg-2 col-md-3">
+<div class="container-fluid px-3 px-sm-4 py-3 staff-device-page">
+    <?php include BASE_PATH . '/staff_attendance/partials/staff_device_embed_styles.php'; ?>
+    <div class="row g-3 g-lg-4">
+        <div class="col-12 col-md-3 col-lg-2">
             <?php include BASE_PATH . '/staff_attendance/partials/staff_device_nav.php'; ?>
         </div>
-        <div class="col-lg-10 col-md-9">
+        <div class="col-12 col-md-9 col-lg-10 min-w-0">
             <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-primary text-white d-flex flex-wrap align-items-center justify-content-between gap-2">
-                    <h5 class="mb-0 fw-bold"><i class="fas fa-calendar-alt me-2"></i>Staff Attendance Summary</h5>
+                <div class="card-header bg-primary text-white d-flex flex-column flex-md-row align-items-stretch align-items-md-center justify-content-between gap-2 gap-md-3">
+                    <h5 class="mb-0 fw-bold text-break"><i class="fas fa-calendar-alt me-2"></i>Staff Attendance Summary</h5>
                     <?php if ($showMonthPdfCurrentBtn || $showMonthPdfAllBtn): ?>
-                    <div class="d-flex flex-wrap gap-2">
+                    <div class="d-flex flex-wrap gap-2 staff-device-card-header-actions">
                         <?php if ($showMonthPdfCurrentBtn): ?>
                         <button type="button" class="btn btn-light btn-sm" id="staffMonthReportPdfBtn" title="A4 portrait, one page per employee for this view">
                             <i class="fas fa-file-pdf me-1"></i>Download PDF
@@ -46,14 +47,15 @@ $showMonthPdfAllBtn = !empty($hasRowsAll);
                     <?php endif; ?>
                 </div>
                 <div class="card-body">
-                    <form method="get" class="row g-2 align-items-end mb-4" action="<?php echo htmlspecialchars($monthBase, ENT_QUOTES, 'UTF-8'); ?>" id="staffMonthReportForm">
-                        <div class="col-auto">
-                            <label class="form-label small mb-0">Month</label>
-                            <input type="month" name="report_month" class="form-control" value="<?php echo htmlspecialchars($reportMonth, ENT_QUOTES, 'UTF-8'); ?>">
+                    <form method="get" class="row g-3 align-items-end mb-4 staff-device-filter-form" action="<?php echo htmlspecialchars($monthBase, ENT_QUOTES, 'UTF-8'); ?>" id="staffMonthReportForm">
+                        <div class="col-12 col-sm-6 col-xl-3">
+                            <label class="form-label small mb-0 text-body-secondary" for="staffMonthReportMonth">Month</label>
+                            <input type="month" id="staffMonthReportMonth" name="report_month" class="form-control" value="<?php echo htmlspecialchars($reportMonth, ENT_QUOTES, 'UTF-8'); ?>">
                         </div>
-                        <div class="col-md-6 col-lg-4">
-                            <label class="form-label small mb-0">Employee</label>
-                            <select name="employee_no" class="form-select form-select-sm js-employee-select-search" aria-label="Employee">
+                        <div class="col-12 col-md min-w-0">
+                            <label class="form-label small mb-0 text-body-secondary" for="staffMonthReportEmployee">Employee</label>
+                            <div class="staff-device-ts-wrap">
+                            <select id="staffMonthReportEmployee" name="employee_no" class="form-select js-employee-select-search" aria-label="Employee">
                                 <option value="">All employees</option>
                                 <?php foreach ($employees as $em): ?>
                                     <?php
@@ -66,9 +68,10 @@ $showMonthPdfAllBtn = !empty($hasRowsAll);
                                     </option>
                                 <?php endforeach; ?>
                             </select>
+                            </div>
                         </div>
-                        <div class="col-auto">
-                            <button type="submit" class="btn btn-primary">Show</button>
+                        <div class="col-12 col-sm-6 col-xl-auto d-grid d-sm-block align-self-end">
+                            <button type="submit" class="btn btn-primary" id="staffMonthReportShow">Show</button>
                         </div>
                     </form>
 

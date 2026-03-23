@@ -24,12 +24,13 @@ $embed_main_layout = (bool) $embed_main_layout;
     </div>
 <?php else: ?>
 
-<form class="card shadow-sm mb-4" method="get" action="<?php echo attendance_escape($dash_form_action); ?>" id="dashFilter">
+<form class="card shadow-sm mb-4 staff-device-filter-form" method="get" action="<?php echo attendance_escape($dash_form_action); ?>" id="dashFilter">
     <div class="card-body py-3">
-        <div class="row g-2 align-items-end">
-            <div class="col-md-8 col-lg-6">
-                <label class="form-label small mb-0">Employee</label>
-                <select name="employee_no" class="form-select form-select-sm js-employee-select-search" aria-label="Employee filter">
+        <div class="row g-3 align-items-end">
+            <div class="col-12 col-lg min-w-0">
+                <label class="form-label small mb-0 text-body-secondary" for="dashFilterEmployee">Employee</label>
+                <div class="staff-device-ts-wrap">
+                <select id="dashFilterEmployee" name="employee_no" class="form-select form-select-sm js-employee-select-search" aria-label="Employee filter">
                     <option value="">All employees</option>
                     <?php foreach ($employees as $em): ?>
                         <?php
@@ -42,11 +43,10 @@ $embed_main_layout = (bool) $embed_main_layout;
                         </option>
                     <?php endforeach; ?>
                 </select>
+                </div>
             </div>
-            <div class="col-auto">
+            <div class="col-12 col-sm-auto d-grid d-sm-flex flex-sm-wrap gap-2">
                 <button type="submit" class="btn btn-primary btn-sm">Apply</button>
-            </div>
-            <div class="col-auto">
                 <a href="<?php echo attendance_escape($urls['device']); ?>" class="btn btn-outline-secondary btn-sm">Reset</a>
             </div>
         </div>

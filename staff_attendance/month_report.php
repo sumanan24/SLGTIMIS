@@ -52,16 +52,18 @@ $pdfPayloadAll = json_encode(
 
 require __DIR__ . '/includes/header.php';
 ?>
-<div class="row g-4">
-    <div class="col-lg-2 col-md-3">
+<div class="staff-device-page">
+<?php include __DIR__ . '/partials/staff_device_embed_styles.php'; ?>
+<div class="row g-3 g-lg-4">
+    <div class="col-12 col-md-3 col-lg-2">
         <?php include __DIR__ . '/partials/staff_device_nav.php'; ?>
     </div>
-    <div class="col-lg-10 col-md-9">
+    <div class="col-12 col-md-9 col-lg-10 min-w-0">
         <div class="card shadow-sm border-0 mb-4">
-            <div class="card-header bg-primary text-white d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <h5 class="mb-0 fw-bold">Staff Attendance Summary</h5>
+            <div class="card-header bg-primary text-white d-flex flex-column flex-md-row align-items-stretch align-items-md-center justify-content-between gap-2 gap-md-3">
+                <h5 class="mb-0 fw-bold text-break">Staff Attendance Summary</h5>
                 <?php if ($showMonthPdfCurrentBtn || $showMonthPdfAllBtn): ?>
-                <div class="d-flex flex-wrap gap-2">
+                <div class="d-flex flex-wrap gap-2 staff-device-card-header-actions">
                     <?php if ($showMonthPdfCurrentBtn): ?>
                     <button type="button" class="btn btn-light btn-sm" id="staffMonthReportPdfBtn" title="A4 portrait, one page per employee for this view">
                         <i class="fas fa-file-pdf me-1"></i>Download PDF
@@ -76,14 +78,15 @@ require __DIR__ . '/includes/header.php';
                 <?php endif; ?>
             </div>
             <div class="card-body">
-                <form method="get" class="row g-2 align-items-end mb-4" action="<?php echo attendance_escape($monthBase); ?>">
-                    <div class="col-auto">
-                        <label class="form-label small mb-0">Month</label>
-                        <input type="month" name="report_month" class="form-control" value="<?php echo attendance_escape($reportMonth); ?>">
+                <form method="get" class="row g-3 align-items-end mb-4 staff-device-filter-form" action="<?php echo attendance_escape($monthBase); ?>">
+                    <div class="col-12 col-sm-6 col-xl-3">
+                        <label class="form-label small mb-0 text-body-secondary" for="staffMonthReportMonthStandalone">Month</label>
+                        <input type="month" id="staffMonthReportMonthStandalone" name="report_month" class="form-control" value="<?php echo attendance_escape($reportMonth); ?>">
                     </div>
-                    <div class="col-md-6 col-lg-4">
-                        <label class="form-label small mb-0">Employee</label>
-                        <select name="employee_no" class="form-select form-select-sm js-employee-select-search" aria-label="Employee">
+                    <div class="col-12 col-md min-w-0">
+                        <label class="form-label small mb-0 text-body-secondary" for="staffMonthReportEmployeeStandalone">Employee</label>
+                        <div class="staff-device-ts-wrap">
+                        <select id="staffMonthReportEmployeeStandalone" name="employee_no" class="form-select js-employee-select-search" aria-label="Employee">
                             <option value="">All employees</option>
                             <?php foreach ($employees as $em): ?>
                                 <?php
@@ -96,8 +99,9 @@ require __DIR__ . '/includes/header.php';
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        </div>
                     </div>
-                    <div class="col-auto">
+                    <div class="col-12 col-sm-6 col-xl-auto d-grid d-sm-block align-self-end">
                         <button type="submit" class="btn btn-primary">Show</button>
                     </div>
                 </form>
@@ -169,6 +173,7 @@ require __DIR__ . '/includes/header.php';
             </div>
         </div>
     </div>
+</div>
 </div>
 <?php
 if ($showMonthPdfCurrentBtn || $showMonthPdfAllBtn) {
