@@ -67,6 +67,7 @@
                             $hasAttendanceAccess = false;
                             $hasAttendanceReportAccess = false;
                             $hasGroupAccess = false;
+                            $canStaffDeviceAttendanceMenu = false;
                             if (isset($_SESSION['user_id'])) {
                                 require_once BASE_PATH . '/models/UserModel.php';
                                 $userModel = new UserModel();
@@ -87,6 +88,8 @@
                                 $hasInstructorDiaryAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'LE1', 'LE2', 'SLE', 'DIR', 'DPA', 'DPI', 'REG', 'ADM']) || $isAdmin;
                                 // Instructor diary report (HOD + management roles + Admin)
                                 $hasInstructorDiaryReportAccess = in_array($userRole, ['HOD', 'DIR', 'DPA', 'DPI', 'REG', 'ADM']) || $isAdmin;
+                                // Staff device (Hikvision) menu: ADM/Admin full module; DIR, REG, FIN, HOD see dashboard + month only
+                                $canStaffDeviceAttendanceMenu = !$isSAO && ($isAdminOrADM || in_array($userRole, ['DIR', 'REG', 'FIN', 'HOD'], true));
                             }
                             ?>
                             
@@ -331,7 +334,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    <?php if (!$isSAO && $isAdminOrADM): ?>
+                                    <?php if (!empty($canStaffDeviceAttendanceMenu)): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/attendance/staff-device" class="<?php echo (isset($page) && in_array($page, $staffDevicePages, true)) ? 'active' : ''; ?>">
                                             <i class="fas fa-id-card"></i>

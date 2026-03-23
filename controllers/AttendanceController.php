@@ -1246,23 +1246,26 @@ class AttendanceController extends Controller {
      * Staff device attendance dashboard (Hikvision ISAPI → staff_attendance table) — same logic as staff_attendance/dashboard.php, main app layout.
      */
     public function staffDeviceDashboard() {
-        if (!$this->checkStaffDeviceAccess()) {
+        if (!$this->checkStaffDeviceDashboardMonthAccess()) {
             return;
         }
 
         require_once BASE_PATH . '/staff_attendance/includes/dashboard_data.php';
+        require_once BASE_PATH . '/models/UserModel.php';
         $state = staff_attendance_load_dashboard_state();
         $state['title'] = 'Staff attendance (device)';
         $state['page'] = 'staff-attendance-device';
         $state['dash_form_action'] = rtrim(APP_URL, '/') . '/attendance/staff-device';
         $state['urls'] = staff_attendance_embed_nav_urls();
         $state['embed_main_layout'] = true;
+        $userModel = new UserModel();
+        $state['staffDeviceNavLimited'] = !$userModel->isAdminOrADM((int) $_SESSION['user_id']);
 
         return $this->view('attendance/staff_device_dashboard', $state);
     }
 
     /**
-     * Staff device (Hikvision) UI: ADM position or system Admin only — not HOD/instructors.
+     * Full staff device module (all punches, daily, sync): Admin / ADM only.
      */
     private function checkStaffDeviceAccess(): bool {
         if (!isset($_SESSION['user_id'])) {
@@ -1275,11 +1278,32 @@ class AttendanceController extends Controller {
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         if (!$userModel->isAdminOrADM($_SESSION['user_id'])) {
-            $_SESSION['error'] = 'Access denied. Staff device attendance is only available to Administrators (ADM).';
+            $_SESSION['error'] = 'Access denied. This staff device section is only available to Administrators (ADM).';
             $this->redirect('dashboard');
             return false;
         }
         return true;
+    }
+
+    /**
+     * Dashboard + month report: Admin/ADM, or DIR, REG, FIN, HOD.
+     */
+    private function checkStaffDeviceDashboardMonthAccess(): bool {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        if (!$this->checkNotSAO()) {
+            return false;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        if ($userModel->canViewStaffDeviceDashboardMonth($_SESSION['user_id'])) {
+            return true;
+        }
+        $_SESSION['error'] = 'Access denied. Staff device attendance is available to DIR, REG, FIN, HOD, ADM, or Administrators.';
+        $this->redirect('dashboard');
+        return false;
     }
 
     /**
@@ -1466,12 +1490,15 @@ class AttendanceController extends Controller {
      * Monthly summary (days present per employee) — main app layout.
      */
     public function staffDeviceMonth() {
-        if (!$this->staffDeviceAccessOk()) {
+        if (!$this->checkStaffDeviceDashboardMonthAccess()) {
             return;
         }
         require_once BASE_PATH . '/staff_attendance/config.php';
+        require_once BASE_PATH . '/models/UserModel.php';
 
         $urls = $this->staffDeviceNavUrls();
+        $userModel = new UserModel();
+        $staffDeviceNavLimited = !$userModel->isAdminOrADM((int) $_SESSION['user_id']);
         $tz = new DateTimeZone(STAFF_TIMEZONE);
         $defaultMonth = (new DateTimeImmutable('now', $tz))->format('Y-m');
 
@@ -1511,6 +1538,7 @@ class AttendanceController extends Controller {
             'title' => 'Staff Attendance Summary',
             'page' => 'staff-attendance-device-month',
             'staffDeviceSection' => 'month',
+            'staffDeviceNavLimited' => $staffDeviceNavLimited,
             'urls' => $urls,
             'reportMonth' => $reportMonth,
             'employeeNo' => $employeeNo,

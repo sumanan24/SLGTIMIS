@@ -239,6 +239,18 @@ class UserModel extends Model {
         $role = $this->getUserRole($userId);
         return $role === 'ADM';
     }
+
+    /**
+     * Staff device attendance: dashboard + month report (embedded app).
+     * List / daily / sync remain restricted to Admin/ADM via AttendanceController.
+     */
+    public function canViewStaffDeviceDashboardMonth($userId) {
+        if ($this->isAdminOrADM($userId)) {
+            return true;
+        }
+        $role = $this->getUserRole($userId);
+        return in_array($role, ['DIR', 'REG', 'FIN', 'HOD'], true);
+    }
     
     /**
      * Check if user can access room/hostel management (ADM only)
