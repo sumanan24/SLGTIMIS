@@ -28,4 +28,5 @@ require __DIR__ . '/includes/header.php';
         </div>
     </div>
 </div>
+<?php include __DIR__ . '/partials/employee_select_search_assets.php'; ?>
 <?php require __DIR__ . '/includes/footer.php'; ?>

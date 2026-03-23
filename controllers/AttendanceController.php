@@ -1484,8 +1484,28 @@ class AttendanceController extends Controller {
 
         require_once BASE_PATH . '/staff_attendance/includes/month_report_data.php';
         $state = staff_attendance_month_report_fetch($reportMonth, $employeeNo);
-        $pdfRows = staff_attendance_month_report_pdf_rows($state['grouped']);
+        $stateAll = staff_attendance_month_report_fetch($reportMonth, '');
+        $groupedSorted = staff_attendance_month_report_sort_grouped($state['grouped']);
+        $pdfSectionsCurrent = staff_attendance_month_report_sections_from_grouped($state['grouped']);
+        $pdfSectionsAll = staff_attendance_month_report_sections_from_grouped($stateAll['grouped']);
         $headerMeta = staff_attendance_month_report_header_meta($reportMonth, $employeeNo, $state['employees']);
+        $monthDisplay = $headerMeta['monthDisplay'];
+        $pdfPayloadCurrent = json_encode(
+            [
+                'reportMonth' => $reportMonth,
+                'monthDisplay' => $monthDisplay,
+                'sections' => $pdfSectionsCurrent,
+            ],
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE
+        );
+        $pdfPayloadAll = json_encode(
+            [
+                'reportMonth' => $reportMonth,
+                'monthDisplay' => $monthDisplay,
+                'sections' => $pdfSectionsAll,
+            ],
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE
+        );
 
         return $this->view('attendance/staff_device_month', [
             'title' => 'Staff Attendance Summary',
@@ -1496,10 +1516,13 @@ class AttendanceController extends Controller {
             'employeeNo' => $employeeNo,
             'employees' => $state['employees'],
             'grouped' => $state['grouped'],
+            'groupedSorted' => $groupedSorted,
             'dbError' => $state['dbError'],
-            'pdfRows' => $pdfRows,
-            'monthDisplay' => $headerMeta['monthDisplay'],
+            'monthDisplay' => $monthDisplay,
             'employeeFilterLabel' => $headerMeta['employeeFilterLabel'],
+            'pdfPayloadCurrent' => $pdfPayloadCurrent,
+            'pdfPayloadAll' => $pdfPayloadAll,
+            'hasRowsAll' => $stateAll['grouped'] !== [],
         ]);
     }
 

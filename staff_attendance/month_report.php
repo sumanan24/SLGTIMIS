@@ -18,26 +18,39 @@ if ($reportMonth === '' || !preg_match('/^\d{4}-\d{2}$/', $reportMonth)) {
 
 $employeeNo = trim((string) ($_GET['employee_no'] ?? ''));
 $state = staff_attendance_month_report_fetch($reportMonth, $employeeNo);
-$pdfRows = staff_attendance_month_report_pdf_rows($state['grouped']);
+$stateAll = staff_attendance_month_report_fetch($reportMonth, '');
+$groupedSorted = staff_attendance_month_report_sort_grouped($state['grouped']);
+$pdfSectionsCurrent = staff_attendance_month_report_sections_from_grouped($state['grouped']);
+$pdfSectionsAll = staff_attendance_month_report_sections_from_grouped($stateAll['grouped']);
 $employees = $state['employees'];
 $grouped = $state['grouped'];
 $dbError = $state['dbError'];
 $headerMeta = staff_attendance_month_report_header_meta($reportMonth, $employeeNo, $employees);
 $monthDisplay = $headerMeta['monthDisplay'];
 $employeeFilterLabel = $headerMeta['employeeFilterLabel'];
-
-require __DIR__ . '/includes/header.php';
 $monthBase = $urls['month'];
 $hasRows = !empty($grouped);
-$pdfPayload = json_encode(
+$hasRowsAll = $stateAll['grouped'] !== [];
+$showMonthPdfCurrentBtn = $hasRows;
+$showMonthPdfAllBtn = $hasRowsAll;
+$pdfPayloadCurrent = json_encode(
     [
         'reportMonth' => $reportMonth,
         'monthDisplay' => $monthDisplay,
-        'employeeFilterLabel' => $employeeFilterLabel,
-        'rows' => $pdfRows,
+        'sections' => $pdfSectionsCurrent,
     ],
     JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE
 );
+$pdfPayloadAll = json_encode(
+    [
+        'reportMonth' => $reportMonth,
+        'monthDisplay' => $monthDisplay,
+        'sections' => $pdfSectionsAll,
+    ],
+    JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE
+);
+
+require __DIR__ . '/includes/header.php';
 ?>
 <div class="row g-4">
     <div class="col-lg-2 col-md-3">
@@ -47,10 +60,19 @@ $pdfPayload = json_encode(
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-primary text-white d-flex flex-wrap align-items-center justify-content-between gap-2">
                 <h5 class="mb-0 fw-bold">Staff Attendance Summary</h5>
-                <?php if ($hasRows): ?>
-                <button type="button" class="btn btn-light btn-sm" id="staffMonthReportPdfBtn" title="Download table as PDF">
-                    <i class="fas fa-file-pdf me-1"></i>Download PDF
-                </button>
+                <?php if ($showMonthPdfCurrentBtn || $showMonthPdfAllBtn): ?>
+                <div class="d-flex flex-wrap gap-2">
+                    <?php if ($showMonthPdfCurrentBtn): ?>
+                    <button type="button" class="btn btn-light btn-sm" id="staffMonthReportPdfBtn" title="A4 portrait, one page per employee for this view">
+                        <i class="fas fa-file-pdf me-1"></i>Download PDF
+                    </button>
+                    <?php endif; ?>
+                    <?php if ($showMonthPdfAllBtn): ?>
+                    <button type="button" class="btn btn-outline-light btn-sm" id="staffMonthReportPdfAllBtn" title="All employees for this month, one page per employee">
+                        <i class="fas fa-file-download me-1"></i>All employees (PDF)
+                    </button>
+                    <?php endif; ?>
+                </div>
                 <?php endif; ?>
             </div>
             <div class="card-body">
@@ -61,7 +83,7 @@ $pdfPayload = json_encode(
                     </div>
                     <div class="col-md-6 col-lg-4">
                         <label class="form-label small mb-0">Employee</label>
-                        <select name="employee_no" class="form-select form-select-sm">
+                        <select name="employee_no" class="form-select form-select-sm js-employee-select-search" aria-label="Employee">
                             <option value="">All employees</option>
                             <?php foreach ($employees as $em): ?>
                                 <?php
@@ -90,7 +112,7 @@ $pdfPayload = json_encode(
                 </div>
 
                 <p class="text-muted small mb-3">
-                    One row per day per employee. Employees listed have at least one punch in the selected month.
+                    One row per day. Employee name and number appear in the header or in section headings when viewing all staff.
                 </p>
 
                 <?php if ($dbError !== null): ?>
@@ -103,8 +125,6 @@ $pdfPayload = json_encode(
                     <table class="table table-striped table-sm mb-0" id="staffMonthReportTable">
                         <thead class="table-light">
                         <tr>
-                            <th>Employee no.</th>
-                            <th>Name</th>
                             <th>Date</th>
                             <th>Day</th>
                             <th>IN TIME</th>
@@ -114,24 +134,32 @@ $pdfPayload = json_encode(
                         </thead>
                         <tbody>
                         <?php if (!$grouped): ?>
-                            <tr><td colspan="7" class="text-center py-4 text-muted">No attendance in this month<?php echo $employeeNo !== '' ? ' for this employee' : ''; ?>.</td></tr>
+                            <tr><td colspan="5" class="text-center py-4 text-muted">No attendance in this month<?php echo $employeeNo !== '' ? ' for this employee' : ''; ?>.</td></tr>
                         <?php else: ?>
-                            <?php foreach ($grouped as $r): ?>
-                                <?php
+                            <?php
+                            $prevEmp = null;
+                            foreach ($groupedSorted as $r):
                                 $split = attendance_split_day_times((string) ($r['times_csv'] ?? ''));
                                 $d = (string) $r['d'];
                                 $dayLabel = $d !== '' ? date('l', strtotime($d . ' 12:00:00')) : '';
                                 $otherStr = $split['other'] !== [] ? implode(', ', $split['other']) : '—';
-                                ?>
-                                <tr>
-                                    <td><?php echo attendance_escape((string) $r['employee_no']); ?></td>
-                                    <td><?php echo attendance_escape((string) $r['staff_name']); ?></td>
-                                    <td><span class="text-nowrap"><?php echo attendance_escape($d); ?></span></td>
-                                    <td><?php echo attendance_escape($dayLabel); ?></td>
-                                    <td><code><?php echo attendance_escape($split['in']); ?></code></td>
-                                    <td><code><?php echo attendance_escape($split['out']); ?></code></td>
-                                    <td class="small"><?php echo $otherStr === '—' ? '—' : attendance_escape($otherStr); ?></td>
-                                </tr>
+                                $enoRow = (string) ($r['employee_no'] ?? '');
+                                $snRow = trim((string) ($r['staff_name'] ?? ''));
+                                $empHeading = $snRow !== '' ? $snRow . ' (' . $enoRow . ')' : $enoRow;
+                                if ($employeeNo === '' && $prevEmp !== $enoRow):
+                                    $prevEmp = $enoRow;
+                            ?>
+                            <tr class="table-secondary">
+                                <td colspan="5" class="fw-semibold small py-2"><?php echo attendance_escape($empHeading); ?></td>
+                            </tr>
+                            <?php endif; ?>
+                            <tr>
+                                <td><span class="text-nowrap"><?php echo attendance_escape($d); ?></span></td>
+                                <td><?php echo attendance_escape($dayLabel); ?></td>
+                                <td><code><?php echo attendance_escape($split['in']); ?></code></td>
+                                <td><code><?php echo attendance_escape($split['out']); ?></code></td>
+                                <td class="small"><?php echo $otherStr === '—' ? '—' : attendance_escape($otherStr); ?></td>
+                            </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
                         </tbody>
@@ -142,81 +170,10 @@ $pdfPayload = json_encode(
         </div>
     </div>
 </div>
-<?php if ($hasRows): ?>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" crossorigin="anonymous"></script>
-<script>
-(function () {
-    var payload = <?php echo $pdfPayload; ?>;
-    var btn = document.getElementById('staffMonthReportPdfBtn');
-    if (!btn || typeof window.jspdf === 'undefined') return;
-    btn.addEventListener('click', function () {
-        var jsPDF = window.jspdf.jsPDF;
-        var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        var pageW = doc.internal.pageSize.getWidth();
-        var marginX = 14;
-        var y = 16;
-        doc.setFontSize(13);
-        doc.text('Sri Lanka German Training Institute', pageW / 2, y, { align: 'center' });
-        y += 7;
-        doc.setFontSize(11);
-        doc.text('Staff Attendance Summary', pageW / 2, y, { align: 'center' });
-        y += 6;
-        doc.setFontSize(10);
-        if (payload.monthDisplay) {
-            doc.text(payload.monthDisplay, pageW / 2, y, { align: 'center' });
-            y += 6;
-        }
-        doc.setFontSize(9);
-        doc.setTextColor(80, 80, 80);
-        doc.text('Employee: ' + payload.employeeFilterLabel, pageW / 2, y, { align: 'center' });
-        doc.setTextColor(0, 0, 0);
-        y += 10;
-        var body = (payload.rows || []).map(function (r) {
-            return [
-                String(r.employee_no || ''),
-                String(r.name || ''),
-                String(r.date || ''),
-                String(r.day || ''),
-                String(r.check_in || ''),
-                String(r.check_out || ''),
-                String(r.other || '')
-            ];
-        });
-        doc.autoTable({
-            startY: y,
-            margin: { left: marginX, right: marginX },
-            tableWidth: pageW - marginX * 2,
-            head: [['Employee no.', 'Name', 'Date', 'Day', 'IN TIME', 'OUT TIME', 'Other times']],
-            body: body,
-            styles: {
-                fontSize: 8,
-                cellPadding: 1.5,
-                valign: 'middle',
-                overflow: 'linebreak',
-                lineColor: [220, 220, 220],
-                lineWidth: 0.1
-            },
-            headStyles: {
-                fillColor: [13, 110, 253],
-                textColor: 255,
-                halign: 'center',
-                valign: 'middle',
-                fontStyle: 'bold'
-            },
-            columnStyles: {
-                0: { halign: 'center', cellWidth: 22 },
-                1: { halign: 'left', cellWidth: 52 },
-                2: { halign: 'center', cellWidth: 22 },
-                3: { halign: 'center', cellWidth: 28 },
-                4: { halign: 'center', cellWidth: 22 },
-                5: { halign: 'center', cellWidth: 22 },
-                6: { halign: 'left', cellWidth: 101 }
-            }
-        });
-        doc.save('staff-attendance-summary-' + payload.reportMonth + '.pdf');
-    });
-})();
-</script>
-<?php endif; ?>
+<?php
+if ($showMonthPdfCurrentBtn || $showMonthPdfAllBtn) {
+    include __DIR__ . '/partials/month_report_pdf_scripts.php';
+}
+include __DIR__ . '/partials/employee_select_search_assets.php';
+?>
 <?php require __DIR__ . '/includes/footer.php'; ?>

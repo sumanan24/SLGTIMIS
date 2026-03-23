@@ -32,3 +32,4 @@ $staffDeviceSection = 'dashboard';
         </div>
     </div>
 </div>
+<?php include BASE_PATH . '/staff_attendance/partials/employee_select_search_assets.php'; ?>

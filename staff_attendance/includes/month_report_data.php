@@ -28,34 +28,87 @@ function staff_attendance_month_report_fetch(string $reportMonth, string $employ
 }
 
 /**
- * Flat rows for PDF export (same columns as on-screen table).
+ * Sort grouped rows by staff name, employee no., then date (for “all employees” view and PDF sections).
  *
  * @param array<int, array<string, mixed>> $grouped
- * @return array<int, array<string, string>>
+ * @return array<int, array<string, mixed>>
  */
-function staff_attendance_month_report_pdf_rows(array $grouped): array
+function staff_attendance_month_report_sort_grouped(array $grouped): array
+{
+    $rows = $grouped;
+    usort($rows, static function (array $a, array $b): int {
+        $cmp = strcmp((string) ($a['staff_name'] ?? ''), (string) ($b['staff_name'] ?? ''));
+        if ($cmp !== 0) {
+            return $cmp;
+        }
+        $cmp = strcmp((string) ($a['employee_no'] ?? ''), (string) ($b['employee_no'] ?? ''));
+        if ($cmp !== 0) {
+            return $cmp;
+        }
+
+        return strcmp((string) ($a['d'] ?? ''), (string) ($b['d'] ?? ''));
+    });
+
+    return $rows;
+}
+
+/**
+ * One PDF table row (no employee columns — name appears in section header).
+ *
+ * @param array<string, mixed> $r
+ * @return array<string, string>
+ */
+function staff_attendance_month_report_row_for_pdf(array $r): array
 {
     require_once __DIR__ . '/../config.php';
 
-    $out = [];
-    foreach ($grouped as $r) {
-        $split = attendance_split_day_times((string) ($r['times_csv'] ?? ''));
-        $d = (string) ($r['d'] ?? '');
-        $dayLabel = $d !== '' ? date('l', strtotime($d . ' 12:00:00')) : '';
-        $otherStr = $split['other'] !== [] ? implode(', ', $split['other']) : '—';
+    $split = attendance_split_day_times((string) ($r['times_csv'] ?? ''));
+    $d = (string) ($r['d'] ?? '');
+    $dayLabel = $d !== '' ? date('l', strtotime($d . ' 12:00:00')) : '';
+    $otherStr = $split['other'] !== [] ? implode(', ', $split['other']) : '—';
 
-        $out[] = [
-            'employee_no' => (string) ($r['employee_no'] ?? ''),
-            'name' => (string) ($r['staff_name'] ?? ''),
-            'date' => $d,
-            'day' => $dayLabel,
-            'check_in' => $split['in'],
-            'check_out' => $split['out'],
-            'other' => $otherStr === '—' ? '' : $otherStr,
-        ];
+    return [
+        'date' => $d,
+        'day' => $dayLabel,
+        'check_in' => $split['in'],
+        'check_out' => $split['out'],
+        'other' => $otherStr === '—' ? '' : $otherStr,
+    ];
+}
+
+/**
+ * Group rows into PDF sections: one section per employee (A4 portrait, one page per employee).
+ *
+ * @param array<int, array<string, mixed>> $grouped
+ * @return array<int, array{employeeLabel: string, rows: array<int, array<string, string>>}>
+ */
+function staff_attendance_month_report_sections_from_grouped(array $grouped): array
+{
+    if ($grouped === []) {
+        return [];
     }
 
-    return $out;
+    $sorted = staff_attendance_month_report_sort_grouped($grouped);
+    $sections = [];
+    $lastEno = null;
+
+    foreach ($sorted as $r) {
+        $eno = (string) ($r['employee_no'] ?? '');
+        $sn = trim((string) ($r['staff_name'] ?? ''));
+        $label = $sn !== '' ? $sn . ' (' . $eno . ')' : $eno;
+
+        if ($lastEno !== $eno) {
+            $sections[] = [
+                'employeeLabel' => $label,
+                'rows' => [],
+            ];
+            $lastEno = $eno;
+        }
+
+        $sections[count($sections) - 1]['rows'][] = staff_attendance_month_report_row_for_pdf($r);
+    }
+
+    return $sections;
 }
 
 /**

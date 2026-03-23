@@ -29,7 +29,7 @@ $embed_main_layout = (bool) $embed_main_layout;
         <div class="row g-2 align-items-end">
             <div class="col-md-8 col-lg-6">
                 <label class="form-label small mb-0">Employee</label>
-                <select name="employee_no" class="form-select form-select-sm">
+                <select name="employee_no" class="form-select form-select-sm js-employee-select-search" aria-label="Employee filter">
                     <option value="">All employees</option>
                     <?php foreach ($employees as $em): ?>
                         <?php
