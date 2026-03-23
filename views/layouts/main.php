@@ -331,7 +331,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    <?php if (!$isSAO && $hasAttendanceAccess): ?>
+                                    <?php if (!$isSAO && $isAdminOrADM): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/attendance/staff-device" class="<?php echo (isset($page) && in_array($page, $staffDevicePages, true)) ? 'active' : ''; ?>">
                                             <i class="fas fa-id-card"></i>

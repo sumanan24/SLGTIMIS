@@ -1246,14 +1246,7 @@ class AttendanceController extends Controller {
      * Staff device attendance dashboard (Hikvision ISAPI → staff_attendance table) — same logic as staff_attendance/dashboard.php, main app layout.
      */
     public function staffDeviceDashboard() {
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return;
-        }
-        if (!$this->checkNotSAO()) {
-            return;
-        }
-        if (!$this->checkAttendanceAccess()) {
+        if (!$this->checkStaffDeviceAccess()) {
             return;
         }
 
@@ -1269,6 +1262,27 @@ class AttendanceController extends Controller {
     }
 
     /**
+     * Staff device (Hikvision) UI: ADM position or system Admin only — not HOD/instructors.
+     */
+    private function checkStaffDeviceAccess(): bool {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        if (!$this->checkNotSAO()) {
+            return false;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        if (!$userModel->isAdminOrADM($_SESSION['user_id'])) {
+            $_SESSION['error'] = 'Access denied. Staff device attendance is only available to Administrators (ADM).';
+            $this->redirect('dashboard');
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * @return array{device: string, list: string, daily: string, month: string, sync: string}|null
      */
     private function staffDeviceNavUrls(): array {
@@ -1277,17 +1291,7 @@ class AttendanceController extends Controller {
     }
 
     private function staffDeviceAccessOk(): bool {
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return false;
-        }
-        if (!$this->checkNotSAO()) {
-            return false;
-        }
-        if (!$this->checkAttendanceAccess()) {
-            return false;
-        }
-        return true;
+        return $this->checkStaffDeviceAccess();
     }
 
     /**

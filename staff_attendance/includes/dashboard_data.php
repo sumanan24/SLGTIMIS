@@ -2,17 +2,14 @@
 declare(strict_types=1);
 
 /**
- * Load dashboard rows and KPIs from DB (same filters used before/after device sync).
+ * Load dashboard rows from DB (same filters used before/after device sync).
  *
- * @return array{employees: array<int, array<string, mixed>>, grouped: array<int, array<string, mixed>>, rangePunches: int, todayCount: int, distinctEmployees: int, dbError: string|null}
+ * @return array{employees: array<int, array<string, mixed>>, grouped: array<int, array<string, mixed>>, dbError: string|null}
  */
-function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $dateTo, string $employeeNo, string $todayYmd, bool $groupedSortAsc = false): array
+function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $dateTo, string $employeeNo, bool $groupedSortAsc = false): array
 {
     $employees = [];
     $grouped = [];
-    $rangePunches = 0;
-    $todayCount = 0;
-    $distinctEmployees = 0;
     $dbError = null;
 
     try {
@@ -20,18 +17,6 @@ function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $date
         $db->query('SET SESSION group_concat_max_len = 16384');
 
         $nameOk = 'staff_name IS NOT NULL AND TRIM(staff_name) <> \'\'';
-
-        $disR = $db->prepare('SELECT COUNT(DISTINCT employee_no) AS c FROM staff_attendance WHERE DATE(attendance_time) BETWEEN ? AND ? AND ' . $nameOk);
-        $disR->bind_param('ss', $dateFrom, $dateTo);
-        $disR->execute();
-        $distinctEmployees = (int) ($disR->get_result()->fetch_assoc()['c'] ?? 0);
-        $disR->close();
-
-        $stmt = $db->prepare('SELECT COUNT(*) AS c FROM staff_attendance WHERE DATE(attendance_time) = ? AND ' . $nameOk);
-        $stmt->bind_param('s', $todayYmd);
-        $stmt->execute();
-        $todayCount = (int) ($stmt->get_result()->fetch_assoc()['c'] ?? 0);
-        $stmt->close();
 
         $empStmt = $db->prepare(
             'SELECT DISTINCT employee_no, staff_name FROM staff_attendance WHERE DATE(attendance_time) BETWEEN ? AND ? AND ' . $nameOk . ' ORDER BY staff_name ASC, employee_no ASC'
@@ -46,14 +31,6 @@ function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $date
         }
         $empStmt->close();
 
-        $rangeStmt = $db->prepare(
-            'SELECT COUNT(*) AS c FROM staff_attendance WHERE DATE(attendance_time) BETWEEN ? AND ? AND ' . $nameOk
-        );
-        $rangeStmt->bind_param('ss', $dateFrom, $dateTo);
-        $rangeStmt->execute();
-        $rangePunches = (int) ($rangeStmt->get_result()->fetch_assoc()['c'] ?? 0);
-        $rangeStmt->close();
-
         $orderGrouped = $groupedSortAsc
             ? 'ORDER BY d ASC, MIN(attendance_time) ASC, staff_name ASC, employee_no ASC'
             : 'ORDER BY d DESC, MAX(attendance_time) DESC, staff_name ASC, employee_no ASC';
@@ -61,7 +38,6 @@ function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $date
         if ($employeeNo === '') {
             $sql = 'SELECT employee_no,
                            MAX(staff_name) AS staff_name,
-                           MAX(department) AS department,
                            DATE(attendance_time) AS d,
                            GROUP_CONCAT(DATE_FORMAT(attendance_time, \'%H:%i:%s\') ORDER BY attendance_time SEPARATOR \',\') AS times_csv
                     FROM staff_attendance
@@ -74,7 +50,6 @@ function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $date
         } else {
             $sql = 'SELECT employee_no,
                            MAX(staff_name) AS staff_name,
-                           MAX(department) AS department,
                            DATE(attendance_time) AS d,
                            GROUP_CONCAT(DATE_FORMAT(attendance_time, \'%H:%i:%s\') ORDER BY attendance_time SEPARATOR \',\') AS times_csv
                     FROM staff_attendance
@@ -96,9 +71,6 @@ function staff_attendance_dashboard_fetch_from_db(string $dateFrom, string $date
     return [
         'employees' => $employees,
         'grouped' => $grouped,
-        'rangePunches' => $rangePunches,
-        'todayCount' => $todayCount,
-        'distinctEmployees' => $distinctEmployees,
         'dbError' => $dbError,
     ];
 }
@@ -120,42 +92,18 @@ function staff_attendance_load_dashboard_state(): array
 
     $summaryDays = defined('STAFF_DASHBOARD_SUMMARY_DAYS') ? max(1, min(31, (int) STAFF_DASHBOARD_SUMMARY_DAYS)) : 1;
 
-    $dateToIn = trim((string) ($_GET['date_to'] ?? ''));
-    $dateFromIn = trim((string) ($_GET['date_from'] ?? ''));
     $employeeNo = trim((string) ($_GET['employee_no'] ?? ''));
 
-    if ($dateToIn === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateToIn)) {
-        $dateTo = $todayYmd;
-    } else {
-        $dateTo = $dateToIn;
-    }
-
+    $dateTo = $todayYmd;
     $dateToDt = DateTimeImmutable::createFromFormat('Y-m-d', $dateTo, $tzDash);
     if ($dateToDt === false) {
         $dateToDt = $nowInTz;
         $dateTo = $todayYmd;
     }
 
-    if ($dateFromIn === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFromIn)) {
-        $dateFrom = $dateToDt->modify('-' . ($summaryDays - 1) . ' days')->format('Y-m-d');
-    } else {
-        $dateFrom = $dateFromIn;
-    }
+    $dateFrom = $dateToDt->modify('-' . ($summaryDays - 1) . ' days')->format('Y-m-d');
 
-    if ($dateFrom > $dateTo) {
-        $tmp = $dateFrom;
-        $dateFrom = $dateTo;
-        $dateTo = $tmp;
-    }
-
-    $spanDays = (int) floor((strtotime($dateTo) - strtotime($dateFrom)) / 86400) + 1;
-    if ($spanDays > 31) {
-        $dateFrom = (DateTimeImmutable::createFromFormat('Y-m-d', $dateTo, $tzDash) ?: $nowInTz)
-            ->modify('-30 days')
-            ->format('Y-m-d');
-    }
-
-    $data = staff_attendance_dashboard_fetch_from_db($dateFrom, $dateTo, $employeeNo, $todayYmd);
+    $data = staff_attendance_dashboard_fetch_from_db($dateFrom, $dateTo, $employeeNo);
 
     $nowTs = time();
     $lastAuto = (int) ($_SESSION['staff_attendance_last_auto_sync'] ?? 0);
@@ -185,7 +133,7 @@ function staff_attendance_load_dashboard_state(): array
         if (!$result['ok']) {
             $_SESSION['flash_error'] = $result['error'] ?? 'Automatic sync failed.';
         } else {
-            $data = staff_attendance_dashboard_fetch_from_db($dateFrom, $dateTo, $employeeNo, $todayYmd);
+            $data = staff_attendance_dashboard_fetch_from_db($dateFrom, $dateTo, $employeeNo);
         }
     }
 
@@ -197,9 +145,6 @@ function staff_attendance_load_dashboard_state(): array
         'todayYmd' => $todayYmd,
         'employees' => $data['employees'],
         'grouped' => $data['grouped'],
-        'rangePunches' => $data['rangePunches'],
-        'todayCount' => $data['todayCount'],
-        'distinctEmployees' => $data['distinctEmployees'],
         'dbError' => $data['dbError'],
     ];
 }

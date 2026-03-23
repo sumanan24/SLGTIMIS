@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Month report detail: same rows as the device dashboard (per employee per day with times),
  * for the calendar month range. Uses staff_attendance_dashboard_fetch_from_db().
  *
- * @return array{employees: array, grouped: array, rangePunches: int, todayCount: int, distinctEmployees: int, dbError: string|null}
+ * @return array{employees: array, grouped: array, dbError: string|null}
  */
 function staff_attendance_month_report_fetch(string $reportMonth, string $employeeNo): array
 {
@@ -16,21 +16,15 @@ function staff_attendance_month_report_fetch(string $reportMonth, string $employ
         return [
             'employees' => [],
             'grouped' => [],
-            'rangePunches' => 0,
-            'todayCount' => 0,
-            'distinctEmployees' => 0,
             'dbError' => null,
         ];
     }
-
-    $tz = new DateTimeZone(STAFF_TIMEZONE);
-    $todayYmd = (new DateTimeImmutable('now', $tz))->format('Y-m-d');
 
     $dateFrom = $reportMonth . '-01';
     $dateTo = date('Y-m-t', strtotime($dateFrom));
     $employeeNo = trim($employeeNo);
 
-    return staff_attendance_dashboard_fetch_from_db($dateFrom, $dateTo, $employeeNo, $todayYmd, true);
+    return staff_attendance_dashboard_fetch_from_db($dateFrom, $dateTo, $employeeNo, true);
 }
 
 /**
