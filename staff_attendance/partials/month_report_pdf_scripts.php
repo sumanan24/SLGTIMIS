@@ -54,7 +54,7 @@ if (!($showMonthPdfCurrentBtn || $showMonthPdfAllBtn)) {
             doc.autoTable({
                 startY: y,
                 margin: { left: marginX, right: marginX, bottom: 10 },
-                head: [['Date', 'Day', 'IN TIME', 'OUT TIME', 'Other times']],
+                head: [['Date', 'Day', 'In', 'Out', 'Others']],
                 body: body,
                 styles: {
                     fontSize: 12,
