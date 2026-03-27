@@ -131,9 +131,9 @@ require __DIR__ . '/includes/header.php';
                         <tr>
                             <th>Date</th>
                             <th>Day</th>
-                            <th>IN TIME</th>
-                            <th>OUT TIME</th>
-                            <th>Others</th>
+                            <th>In</th>
+                            <th>Out</th>
+                            <th>Other</th>
                         </tr>
                         </thead>
                         <tbody>
