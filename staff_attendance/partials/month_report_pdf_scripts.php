@@ -38,7 +38,7 @@ if (!($showMonthPdfCurrentBtn || $showMonthPdfAllBtn)) {
                 doc.text(payload.monthDisplay, pageW / 2, y, { align: 'center' });
                 y += 5;
             }
-            doc.setTextColor(55, 55, 55);
+            doc.setTextColor(0, 0, 0);
             doc.text('Employee: ' + String(sec.employeeLabel || ''), pageW / 2, y, { align: 'center' });
             doc.setTextColor(0, 0, 0);
             y += 8;
@@ -57,27 +57,29 @@ if (!($showMonthPdfCurrentBtn || $showMonthPdfAllBtn)) {
                 head: [['Date', 'Day', 'IN TIME', 'OUT TIME', 'Other times']],
                 body: body,
                 styles: {
-                    fontSize: 7,
+                    fontSize: 12,
                     cellPadding: 1.1,
+                    halign: 'center',
                     valign: 'middle',
                     overflow: 'linebreak',
+                    textColor: [0, 0, 0],
                     lineColor: [220, 220, 220],
                     lineWidth: 0.1
                 },
                 headStyles: {
                     fillColor: [13, 110, 253],
-                    textColor: 255,
+                    textColor: [0, 0, 0],
                     halign: 'center',
                     valign: 'middle',
                     fontStyle: 'bold',
-                    fontSize: 7
+                    fontSize: 12
                 },
                 columnStyles: {
                     0: { halign: 'center', cellWidth: 24 },
                     1: { halign: 'center', cellWidth: 28 },
                     2: { halign: 'center', cellWidth: 22 },
                     3: { halign: 'center', cellWidth: 22 },
-                    4: { halign: 'left', cellWidth: 'auto' }
+                    4: { halign: 'center', cellWidth: 'auto' }
                 }
             });
         });
