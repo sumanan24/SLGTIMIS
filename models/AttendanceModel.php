@@ -248,6 +248,7 @@ class AttendanceModel extends Model {
                     s.bank_account_no,
                     s.bank_branch,
                     s.allowance_eligible,
+                    s.allowance_eligible_date,
                     se.course_id,
                     c.course_name,
                     d.department_name,
@@ -287,6 +288,11 @@ class AttendanceModel extends Model {
         
         // Attendance report: load only full-time students (course_mode = 'Full')
         $sql .= " AND se.course_mode = 'Full'";
+        
+        // Eligibility month: if set, student appears only from that calendar month onward; NULL skips this filter
+        $sql .= " AND (s.allowance_eligible_date IS NULL OR DATE_FORMAT(s.allowance_eligible_date, '%Y-%m') <= DATE_FORMAT(?, '%Y-%m'))";
+        $params[] = $startDate;
+        $types .= 's';
         
         $sql .= " ORDER BY s.student_fullname ASC";
         
@@ -364,25 +370,20 @@ class AttendanceModel extends Model {
                 $attendancePercentage = ($presentDays / $effectiveWorkingDays) * 100;
             }
             
-            // Calculate allowance based on percentage and eligibility date
+            // Calculate allowance based on percentage and eligibility month
             // 90% - 100% = 5000, 75% - 89% = 4000
-            // Only provide allowance if student is eligible and eligible date is before or on the report month
+            // Payment only when report month (YYYY-MM) is on or after allowance_eligible_date month; NULL date = no month gate
             $allowance = 0;
             $isEligibleForMonth = false;
             
-            // Check if student is eligible
             if (!empty($row['allowance_eligible']) && $row['allowance_eligible'] == 1) {
-                // Check if eligible date is set and is before or on the report month
                 if (!empty($row['allowance_eligible_date'])) {
-                    $eligibleDate = $row['allowance_eligible_date'];
-                    $reportMonthStart = $startDate; // First day of report month
-                    
-                    // If eligible date is before or on the report month start, student is eligible
-                    if ($eligibleDate <= $reportMonthStart) {
+                    $reportYm = substr($startDate, 0, 7);
+                    $eligibleYm = substr($row['allowance_eligible_date'], 0, 7);
+                    if ($reportYm >= $eligibleYm) {
                         $isEligibleForMonth = true;
                     }
                 } else {
-                    // If no eligible date set, assume eligible (backward compatibility)
                     $isEligibleForMonth = true;
                 }
             }
