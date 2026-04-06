@@ -88,8 +88,8 @@
                                 $hasInstructorDiaryAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'LE1', 'LE2', 'SLE', 'DIR', 'DPA', 'DPI', 'REG', 'ADM']) || $isAdmin;
                                 // Instructor diary report (HOD + management roles + Admin)
                                 $hasInstructorDiaryReportAccess = in_array($userRole, ['HOD', 'DIR', 'DPA', 'DPI', 'REG', 'ADM']) || $isAdmin;
-                                // Staff device (Hikvision) menu: ADM/Admin full module; DIR, REG, FIN, HOD see dashboard + month only
-                                $canStaffDeviceAttendanceMenu = !$isSAO && ($isAdminOrADM || in_array($userRole, ['DIR', 'REG', 'FIN', 'HOD'], true));
+                                // Staff device (Hikvision) menu: ADM/Admin full module; DIR, REG, FIN, ACC, HOD see dashboard + month only
+                                $canStaffDeviceAttendanceMenu = !$isSAO && ($isAdminOrADM || in_array($userRole, ['DIR', 'REG', 'FIN', 'ACC', 'HOD'], true));
                             }
                             ?>
                             

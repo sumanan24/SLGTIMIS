@@ -243,13 +243,14 @@ class UserModel extends Model {
     /**
      * Staff device attendance: dashboard + month report (embedded app).
      * List / daily / sync remain restricted to Admin/ADM via AttendanceController.
+     * DIR, REG, FIN, ACC, HOD: dashboard + month only (limited side nav).
      */
     public function canViewStaffDeviceDashboardMonth($userId) {
         if ($this->isAdminOrADM($userId)) {
             return true;
         }
         $role = $this->getUserRole($userId);
-        return in_array($role, ['DIR', 'REG', 'FIN', 'HOD'], true);
+        return in_array($role, ['DIR', 'REG', 'FIN', 'ACC', 'HOD'], true);
     }
     
     /**

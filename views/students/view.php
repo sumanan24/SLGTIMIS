@@ -774,6 +774,20 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="cv-info-item">
+                            <div class="cv-info-icon"><i class="fas fa-calendar-check"></i></div>
+                            <div class="cv-info-content">
+                                <div class="cv-info-label">Financial eligibility date</div>
+                                <div class="cv-info-value">
+                                    <?php
+                                    $finEligDate = $student['allowance_eligible_date'] ?? null;
+                                    echo !empty($finEligDate)
+                                        ? htmlspecialchars(date('M d, Y', strtotime((string) $finEligDate)))
+                                        : 'Not set';
+                                    ?>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

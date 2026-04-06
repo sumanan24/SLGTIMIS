@@ -1286,7 +1286,7 @@ class AttendanceController extends Controller {
     }
 
     /**
-     * Dashboard + month report: Admin/ADM, or DIR, REG, FIN, HOD.
+     * Dashboard + month report: Admin/ADM, or DIR, REG, FIN, ACC, HOD.
      */
     private function checkStaffDeviceDashboardMonthAccess(): bool {
         if (!isset($_SESSION['user_id'])) {
@@ -1301,7 +1301,7 @@ class AttendanceController extends Controller {
         if ($userModel->canViewStaffDeviceDashboardMonth($_SESSION['user_id'])) {
             return true;
         }
-        $_SESSION['error'] = 'Access denied. Staff device attendance is available to DIR, REG, FIN, HOD, ADM, or Administrators.';
+        $_SESSION['error'] = 'Access denied. Staff device attendance is available to DIR, REG, FIN, ACC, HOD, ADM, or Administrators.';
         $this->redirect('dashboard');
         return false;
     }

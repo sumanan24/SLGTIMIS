@@ -2,7 +2,7 @@
 declare(strict_types=1);
 /** @var string $staffDeviceSection */
 /** @var array{device: string, list: string, daily: string, month: string, sync: string} $urls */
-/** @var bool $staffDeviceNavLimited DIR/REG/FIN/HOD: dashboard + month only (embedded app). */
+/** @var bool $staffDeviceNavLimited DIR/REG/FIN/ACC/HOD: dashboard + month only (embedded app). */
 $sec = $staffDeviceSection ?? 'dashboard';
 $navLimited = !empty($staffDeviceNavLimited);
 ?>
