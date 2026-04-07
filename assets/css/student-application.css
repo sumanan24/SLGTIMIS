@@ -1,0 +1,431 @@
+/**
+ * Public student application — layout, theme, mobile-first.
+ */
+
+:root {
+    --app-brand: #0c4a6e;
+    --app-brand-mid: #0369a1;
+    --app-brand-light: #e0f2fe;
+    --app-accent: #d97706;
+    --app-accent-soft: #fff7ed;
+    --app-surface: #ffffff;
+    --app-text: #0f172a;
+    --app-text-muted: #64748b;
+    --app-border: rgba(15, 23, 42, 0.08);
+    --app-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+    --app-shadow-lg: 0 10px 40px -10px rgba(12, 74, 110, 0.25);
+    --app-radius: 14px;
+    --app-radius-sm: 10px;
+    --app-font: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Page shell */
+body.public-app {
+    min-height: 100vh;
+    margin: 0;
+    font-family: var(--app-font);
+    font-size: 1rem;
+    color: var(--app-text);
+    background: linear-gradient(165deg, #f0f9ff 0%, #e0f2fe 35%, #f8fafc 70%, #f1f5f9 100%);
+    background-attachment: fixed;
+    padding-bottom: 0;
+}
+
+.app-form-bg {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(56, 189, 248, 0.18), transparent 55%),
+        radial-gradient(ellipse 60% 40% at 100% 50%, rgba(251, 191, 36, 0.06), transparent 50%);
+}
+
+.app-form-main {
+    position: relative;
+    z-index: 1;
+    max-width: 920px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Cards (sections) */
+.app-form-page .card:not(.app-form-hero):not(.app-form-actions-card) {
+    border-radius: var(--app-radius);
+    border: 1px solid var(--app-border);
+    background: var(--app-surface);
+    box-shadow: var(--app-shadow);
+    transition: box-shadow 0.2s ease;
+}
+
+.app-form-page .card:not(.app-form-hero):not(.app-form-actions-card):hover {
+    box-shadow: 0 8px 30px -8px rgba(15, 23, 42, 0.1);
+}
+
+.app-form-page .card-body {
+    padding: 1.25rem 1.5rem;
+}
+
+@media (max-width: 575.98px) {
+    .app-form-page .card-body {
+        padding: 1rem 1.15rem;
+    }
+}
+
+/* Hero */
+.app-form-hero {
+    position: relative;
+    border-radius: var(--app-radius);
+    border: 1px solid rgba(12, 74, 110, 0.12);
+    background: linear-gradient(135deg, #ffffff 0%, #f8fbff 55%, #f0f9ff 100%);
+    box-shadow: var(--app-shadow-lg);
+    overflow: hidden;
+}
+
+.app-form-hero-accent {
+    height: 5px;
+    background: linear-gradient(90deg, var(--app-brand) 0%, var(--app-brand-mid) 45%, var(--app-accent) 100%);
+}
+
+.app-form-level-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.45rem 1rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--app-brand);
+    background: linear-gradient(180deg, #fff 0%, var(--app-brand-light) 100%);
+    border: 1px solid rgba(12, 74, 110, 0.15);
+    border-radius: 999px;
+    box-shadow: 0 1px 2px rgba(12, 74, 110, 0.08);
+    flex-shrink: 0;
+}
+
+.app-form-hero-kicker {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--app-brand-mid);
+    letter-spacing: 0.02em;
+}
+
+.app-form-hero-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--app-brand);
+    line-height: 1.25;
+}
+
+@media (min-width: 576px) {
+    .app-form-hero-title {
+        font-size: 1.75rem;
+    }
+}
+
+.app-form-hero-text {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--app-text-muted);
+}
+
+.app-form-hero-text strong {
+    color: var(--app-text);
+    font-weight: 600;
+}
+
+/* Section titles */
+.app-form-section-title {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--app-brand);
+    margin-bottom: 1.1rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.app-form-section-title::after {
+    content: "";
+    flex: 1 1 100%;
+    height: 3px;
+    margin-top: 0.35rem;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--app-brand-mid) 0%, rgba(56, 189, 248, 0.45) 55%, rgba(251, 191, 36, 0.35) 100%);
+}
+
+.app-form-section-title i {
+    opacity: 0.9;
+    color: var(--app-brand-mid);
+}
+
+.app-form-grid {
+    --bs-gutter-x: 1rem;
+    --bs-gutter-y: 0.75rem;
+}
+
+.app-form-page .form-label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    margin-bottom: 0.3rem;
+    color: #334155;
+}
+
+.app-form-page .form-control,
+.app-form-page .form-select {
+    border-radius: var(--app-radius-sm);
+    border-color: #cbd5e1;
+    min-height: calc(1.5em + 0.75rem + 2px);
+    font-size: 0.9375rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.app-form-page .form-control-sm,
+.app-form-page .form-select-sm {
+    min-height: calc(1.5em + 0.5rem + 2px);
+    font-size: 0.875rem;
+}
+
+.app-form-page textarea.form-control {
+    min-height: 5rem;
+}
+
+.app-form-page input[type="file"].form-control {
+    padding: 0.45rem 0.65rem;
+    line-height: 1.4;
+    background: #fafbfc;
+}
+
+.app-form-page input[type="date"].app-input-dob {
+    cursor: pointer;
+    min-height: calc(1.5em + 0.5rem + 2px);
+}
+
+.app-form-page .form-control:hover,
+.app-form-page .form-select:hover {
+    border-color: #94a3b8;
+}
+
+.app-form-page .form-control:focus,
+.app-form-page .form-select:focus {
+    border-color: var(--app-brand-mid);
+    box-shadow: 0 0 0 3px rgba(3, 105, 161, 0.18);
+}
+
+/* Subject rows — line 1: title; line 2: name + Mark (aligned) */
+.app-ol-row,
+.app-al-row {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.app-ol-row:last-child,
+.app-al-row:last-child {
+    border-bottom: none;
+}
+
+.app-subject-block {
+    width: 100%;
+}
+
+.app-subj-title {
+    font-weight: 600;
+    color: #334155;
+    font-size: 0.8125rem;
+    letter-spacing: 0.01em;
+    margin-bottom: 0.35rem;
+    line-height: 1.3;
+}
+
+.app-subj-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 0.75rem;
+    row-gap: 0.35rem;
+}
+
+.app-subj-mark-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-shrink: 0;
+}
+
+.app-form-page .app-subj-mark-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #64748b;
+    margin-bottom: 0;
+    white-space: nowrap;
+}
+
+.app-mark-input {
+    width: 4rem;
+    min-width: 3.75rem;
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
+    text-align: center;
+}
+
+.app-subj-name {
+    min-width: 0;
+    width: 100%;
+}
+
+/* O/L & A/L subjects: 2 per row on desktop (lg+), compact fields */
+.app-exam-subjects-grid .app-ol-row.app-exam-subj-cell,
+.app-exam-subjects-grid .app-al-row.app-exam-subj-cell {
+    padding: 0.4rem 0.55rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fafbfc;
+}
+
+.app-exam-subjects-grid .app-subj-title {
+    font-size: 0.75rem;
+    margin-bottom: 0.28rem;
+}
+
+.app-exam-subjects-grid .app-subj-fields {
+    column-gap: 0.5rem;
+}
+
+.app-exam-subjects-grid .app-subj-mark-label {
+    font-size: 0.7rem;
+}
+
+.app-exam-subjects-grid .app-mark-input {
+    width: 3.35rem;
+    min-width: 3rem;
+    padding-left: 0.3rem;
+    padding-right: 0.3rem;
+}
+
+.app-exam-input-compact {
+    font-size: 0.8125rem !important;
+    padding: 0.22rem 0.45rem !important;
+    min-height: calc(1.4em + 0.35rem + 2px) !important;
+}
+
+.app-course-pref .form-label {
+    display: block;
+}
+
+.app-course-pref .border.rounded-3 {
+    border-color: #e2e8f0 !important;
+    background: linear-gradient(180deg, #fafbfc 0%, #ffffff 100%) !important;
+}
+
+/* Alerts */
+.app-form-alert {
+    border-radius: var(--app-radius-sm);
+    border: none;
+    border-left: 4px solid;
+    padding: 1rem 1.15rem;
+    font-size: 0.9375rem;
+}
+
+.app-form-alert-success {
+    background: linear-gradient(90deg, #ecfdf5 0%, #f0fdf4 100%);
+    border-left-color: #059669;
+    color: #065f46;
+}
+
+.app-form-alert-danger {
+    background: linear-gradient(90deg, #fef2f2 0%, #fff7f7 100%);
+    border-left-color: #dc2626;
+    color: #7f1d1d;
+}
+
+.app-form-info-banner {
+    border-radius: var(--app-radius-sm);
+    border: none;
+    border-left: 4px solid var(--app-brand-mid);
+    background: linear-gradient(90deg, #ecfdf5 0%, #f0f9ff 50%, #fffbeb 100%);
+    color: #0c4a6e;
+    padding: 1rem 1.15rem;
+    box-shadow: var(--app-shadow);
+}
+
+.app-form-info-banner strong {
+    color: var(--app-brand);
+}
+
+/* Footer */
+.app-form-footer {
+    position: relative;
+    z-index: 1;
+    border-top: 1px solid rgba(12, 74, 110, 0.1);
+    margin-top: 1rem;
+    background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.6) 100%);
+}
+
+.app-form-footer-inner {
+    max-width: 920px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.app-form-footer-brand {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--app-brand);
+    letter-spacing: 0.02em;
+}
+
+.app-form-footer-meta {
+    font-size: 0.8125rem;
+    color: var(--app-text-muted);
+}
+
+/* Submit actions */
+.app-form-actions-card {
+    border-radius: var(--app-radius);
+    background: linear-gradient(165deg, #f8fafc 0%, #ffffff 100%);
+    border: 1px solid var(--app-border) !important;
+    box-shadow: var(--app-shadow);
+}
+
+.app-form-btn-submit {
+    font-weight: 600;
+    border: none;
+    border-radius: var(--app-radius-sm);
+    padding: 0.65rem 1.5rem;
+    color: #fff;
+    background: linear-gradient(135deg, var(--app-brand) 0%, var(--app-brand-mid) 55%, #0284c7 100%);
+    box-shadow: 0 4px 14px -3px rgba(12, 74, 110, 0.45);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.app-form-btn-submit:hover {
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px -4px rgba(12, 74, 110, 0.5);
+}
+
+.app-form-btn-submit:active {
+    transform: translateY(0);
+}
+
+.app-form-btn-back {
+    font-weight: 600;
+    border-radius: var(--app-radius-sm);
+    border: 2px solid #cbd5e1;
+    color: #475569;
+    background: #fff;
+    border-color: #cbd5e1;
+}
+
+.app-form-btn-back:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+    color: #334155;
+}
+
+/* Legacy alert compatibility */
+.app-form-page .alert:not(.app-form-alert):not(.app-form-info-banner) {
+    border-radius: var(--app-radius-sm);
+}

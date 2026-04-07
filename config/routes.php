@@ -168,5 +168,13 @@ return [
     'inventory/stock-out' => 'InventoryController@stockOut',
     'inventory/transfer' => 'InventoryController@transfer',
     'inventory/log' => 'InventoryController@log',
+
+    // Public student applications (NVQ Level 04 / 05) — no login
+    'level04application' => 'StudentApplicationController@level04',
+    'level05application' => 'StudentApplicationController@level05',
+    'student-application/api/departments' => 'StudentApplicationController@apiDepartments',
+    'student-application/api/courses' => 'StudentApplicationController@apiCourses',
+    'student-applications' => 'StudentApplicationController@adminIndex',
+    'student-applications/view' => 'StudentApplicationController@adminView',
 ];
 

@@ -18,11 +18,10 @@ if (!defined('APP_NAME')) {
                 (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
                 (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
                 ? 'https://' : 'http://';
-    // Get base path and normalize it (remove trailing slash, handle root case)
-    $basePath = dirname($_SERVER['SCRIPT_NAME']);
-    $basePath = rtrim($basePath, '/\\'); // Remove trailing slashes
-    // If basePath is empty or just a slash, set it to empty string
-    if ($basePath === '/' || $basePath === '\\' || empty($basePath)) {
+    // Web path to app root (always forward slashes — dirname() can use backslashes on Windows)
+    $basePath = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+    $basePath = rtrim($basePath, '/');
+    if ($basePath === '/' || $basePath === '') {
         $basePath = '';
     }
     define('APP_URL', $protocol . $_SERVER['HTTP_HOST'] . $basePath);

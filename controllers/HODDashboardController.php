@@ -75,6 +75,7 @@ class HODDashboardController extends Controller {
             $departmentGenderStats = [];
             $departmentReligionStats = [];
             $departmentDistrictStats = [];
+            $departmentCourses = [];
             
             // Get department-specific data only if user has a department
             if ($userDepartmentId) {

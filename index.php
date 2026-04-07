@@ -75,27 +75,31 @@ try {
     die("Error loading core classes: " . $e->getMessage());
 }
 
-// Get the URI
-$uri = $_SERVER['REQUEST_URI'];
-$basePath = dirname($_SERVER['SCRIPT_NAME']);
+// Get the URI path relative to this app (normalize slashes for Windows + subdirectory installs)
+$requestUri = $_SERVER['REQUEST_URI'] ?? '/';
+$path = parse_url($requestUri, PHP_URL_PATH);
+if ($path === null || $path === false) {
+    $path = '/';
+}
+$path = str_replace('\\', '/', $path);
 
-// Remove base path from URI
-if ($basePath !== '/' && $basePath !== '\\') {
-    $uri = str_replace($basePath, '', $uri);
+$scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+$scriptDir = rtrim($scriptDir, '/');
+if ($scriptDir !== '' && $scriptDir !== '/' && strpos($path, $scriptDir) === 0) {
+    $path = substr($path, strlen($scriptDir));
 }
 
-// Clean up URI
-$uri = parse_url($uri, PHP_URL_PATH);
-$uri = trim($uri, '/');
+$uri = trim($path, '/');
 
 // If empty, set to empty string for home route
-if (empty($uri)) {
+if ($uri === '') {
     $uri = '';
 }
 
 // Check session timeout for logged-in users (after URI is determined and all classes are loaded)
 // Only check timeout if NOT already on login or home page to avoid redirect loops
-if ($uri !== 'login' && $uri !== 'home' && $uri !== '') {
+$publicNoTimeoutUris = ['login', 'home', '', 'level04application', 'level05application', 'student-application/api/departments', 'student-application/api/courses'];
+if (!in_array($uri, $publicNoTimeoutUris, true)) {
     if (isset($_SESSION['user_id'])) {
         require_once BASE_PATH . '/controllers/AuthController.php';
         $sessionValid = AuthController::checkSessionTimeout();
