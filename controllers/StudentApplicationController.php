@@ -5,7 +5,9 @@
 
 class StudentApplicationController extends Controller {
 
-    private const UPLOAD_MAX_BYTES = 5242880; // 5 MB
+    private const UPLOAD_MAX_BYTES = 5242880; // 5 MB (incoming)
+    /** Stored files are compressed to JPEG at or below this size. */
+    private const STORED_MAX_BYTES = 102400; // 100 KB
     private const ALLOWED_EXT = ['pdf', 'jpg', 'jpeg', 'png'];
 
     public function level04() {
@@ -88,7 +90,8 @@ class StudentApplicationController extends Controller {
 
         $paths = [];
         try {
-            $paths = $this->collectUploads((int) $newId);
+            $nic = $this->normalizeNic((string) $this->post('student_nic', ''));
+            $paths = $this->collectUploads((int) $newId, $nic);
         } catch (Exception $e) {
             return $this->renderForm($level, ['Upload problem: ' . $e->getMessage()], $_POST, null);
         }
@@ -428,7 +431,7 @@ class StudentApplicationController extends Controller {
     /**
      * @return array<string, string>
      */
-    private function collectUploads(int $applicationId): array {
+    private function collectUploads(int $applicationId, string $nic): array {
         $map = [
             'nic_document' => 'nic_document_path',
             'birth_certificate' => 'birth_certificate_path',
@@ -439,7 +442,7 @@ class StudentApplicationController extends Controller {
         ];
         $out = [];
         foreach ($map as $fileKey => $dbCol) {
-            $path = $this->handleUpload($fileKey, $applicationId, $fileKey);
+            $path = $this->handleUpload($fileKey, $applicationId, $fileKey, $nic);
             if ($path === null) {
                 throw new Exception('Missing or invalid upload: ' . $fileKey);
             }
@@ -448,7 +451,7 @@ class StudentApplicationController extends Controller {
         return $out;
     }
 
-    private function handleUpload(string $fieldName, int $applicationId, string $prefix): ?string {
+    private function handleUpload(string $fieldName, int $applicationId, string $documentKey, string $nic): ?string {
         if (empty($_FILES[$fieldName]['tmp_name']) || !is_uploaded_file($_FILES[$fieldName]['tmp_name'])) {
             return null;
         }
@@ -470,12 +473,145 @@ class StudentApplicationController extends Controller {
                 throw new Exception('Could not create upload directory.');
             }
         }
-        $safe = $prefix . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+        $base = $this->uploadBasename($documentKey, $nic);
+        $safe = $base . '.jpg';
         $full = $dir . DIRECTORY_SEPARATOR . $safe;
-        if (!move_uploaded_file($_FILES[$fieldName]['tmp_name'], $full)) {
-            throw new Exception('Could not save uploaded file.');
+        $tmp = (string) $_FILES[$fieldName]['tmp_name'];
+
+        if ($ext === 'pdf') {
+            $raster = $this->pdfFirstPageToTempJpeg($tmp);
+            try {
+                $this->compressRasterToJpegUnderLimit($raster, $full);
+            } finally {
+                @unlink($raster);
+            }
+        } else {
+            $this->compressRasterToJpegUnderLimit($tmp, $full);
         }
+
         return 'uploads/student_applications/' . $applicationId . '/' . $safe;
+    }
+
+    /**
+     * Filename stem: document key + NIC (e.g. nic_document_123456789V).
+     */
+    private function uploadBasename(string $documentKey, string $nic): string {
+        $key = strtolower(preg_replace('/[^a-z0-9_]/', '', $documentKey));
+        if ($key === '') {
+            $key = 'document';
+        }
+        $nicPart = strtoupper(preg_replace('/[^0-9VX]/', '', $nic));
+        if ($nicPart === '') {
+            $nicPart = 'unknown';
+        }
+        return $key . '_' . $nicPart;
+    }
+
+    /**
+     * Rasterize first PDF page to a temporary JPEG, then caller compresses further.
+     *
+     * @return string Path to temp .jpg file
+     */
+    private function pdfFirstPageToTempJpeg(string $pdfPath): string {
+        if (!extension_loaded('imagick') || !class_exists('Imagick')) {
+            throw new Exception('PDF could not be processed: please upload JPG or PNG instead, or ask the institute to enable ImageMagick on the server.');
+        }
+        $out = tempnam(sys_get_temp_dir(), 'sapdf');
+        if ($out === false) {
+            throw new Exception('Could not create temporary file for PDF.');
+        }
+        @unlink($out);
+        $outJpg = $out . '.jpg';
+        try {
+            $im = new Imagick();
+            $im->setResolution(144, 144);
+            $im->readImage($pdfPath . '[0]');
+            if (method_exists($im, 'setImageBackgroundColor')) {
+                $im->setImageBackgroundColor(new ImagickPixel('white'));
+            }
+            if (defined('Imagick::ALPHACHANNEL_REMOVE')) {
+                $im->setImageAlphaChannel(Imagick::ALPHACHANNEL_REMOVE);
+            }
+            if (defined('Imagick::LAYERMETHOD_FLATTEN')) {
+                $im = $im->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
+            }
+            $im->setImageFormat('jpeg');
+            $im->setImageCompression(Imagick::COMPRESSION_JPEG);
+            $im->setImageCompressionQuality(82);
+            $im->writeImage($outJpg);
+            $im->clear();
+            $im->destroy();
+        } catch (Throwable $e) {
+            @unlink($outJpg);
+            error_log('StudentApplication PDF rasterize: ' . $e->getMessage());
+            throw new Exception('Could not read or convert this PDF. Please upload a JPG or PNG scan instead.');
+        }
+        return $outJpg;
+    }
+
+    /**
+     * Resize and recompress to JPEG until file size is at most STORED_MAX_BYTES.
+     */
+    private function compressRasterToJpegUnderLimit(string $srcPath, string $destJpgPath): void {
+        if (!extension_loaded('gd')) {
+            throw new Exception('Server GD extension is required to save documents.');
+        }
+        $raw = @file_get_contents($srcPath);
+        if ($raw === false || $raw === '') {
+            throw new Exception('Could not read uploaded file.');
+        }
+        $srcImg = @imagecreatefromstring($raw);
+        if ($srcImg === false) {
+            throw new Exception('Could not read image data.');
+        }
+        $w = imagesx($srcImg);
+        $h = imagesy($srcImg);
+        if ($w < 1 || $h < 1) {
+            imagedestroy($srcImg);
+            throw new Exception('Invalid image dimensions.');
+        }
+        $maxBytes = self::STORED_MAX_BYTES;
+        $scale = 1.0;
+        for ($round = 0; $round < 28; $round++) {
+            $nw = max(1, (int) round($w * $scale));
+            $nh = max(1, (int) round($h * $scale));
+            $dst = imagecreatetruecolor($nw, $nh);
+            $white = imagecolorallocate($dst, 255, 255, 255);
+            imagefill($dst, 0, 0, $white);
+            imagecopyresampled($dst, $srcImg, 0, 0, 0, 0, $nw, $nh, $w, $h);
+            for ($q = 90; $q >= 35; $q -= 2) {
+                $tmpFile = tempnam(sys_get_temp_dir(), 'sacmp');
+                if ($tmpFile === false) {
+                    imagedestroy($dst);
+                    imagedestroy($srcImg);
+                    throw new Exception('Could not create temporary file.');
+                }
+                imagejpeg($dst, $tmpFile, $q);
+                $sz = @filesize($tmpFile);
+                if ($sz !== false && $sz <= $maxBytes) {
+                    if (!@rename($tmpFile, $destJpgPath)) {
+                        if (!@copy($tmpFile, $destJpgPath)) {
+                            @unlink($tmpFile);
+                            imagedestroy($dst);
+                            imagedestroy($srcImg);
+                            throw new Exception('Could not save compressed file.');
+                        }
+                        @unlink($tmpFile);
+                    }
+                    imagedestroy($dst);
+                    imagedestroy($srcImg);
+                    return;
+                }
+                @unlink($tmpFile);
+            }
+            imagedestroy($dst);
+            $scale *= 0.82;
+            if ($scale < 0.1) {
+                break;
+            }
+        }
+        imagedestroy($srcImg);
+        throw new Exception('Could not compress this file under 100 KB. Please upload a smaller or simpler scan.');
     }
 
     /**

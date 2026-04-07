@@ -278,7 +278,7 @@ $dbNvqHint = ($application_level ?? '04') === '05' ? '5' : '4';
     <div class="card-body">
         <div class="app-form-section-title"><i class="fas fa-tools me-2"></i>NVQ</div>
         <?php if ($isLevel05): ?>
-        <p class="small text-muted mb-3">Use this part <strong>only</strong> if you apply with an NVQ (not with O/L + A/L above). Write something in <strong>all four</strong> boxes if you use this way.</p>
+        <p class="small text-muted mb-3">Use this part <strong>only</strong> if you apply with an NVQ (not with O/L + A/L above).</p>
         <?php else: ?>
         <p class="small text-muted mb-3">If you have no NVQ yet, type <strong>N/A</strong> in the text boxes. For year, you can type <strong>2000</strong>.</p>
         <?php endif; ?>
@@ -306,8 +306,8 @@ $dbNvqHint = ($application_level ?? '04') === '05' ? '5' : '4';
 <!-- Documents -->
 <div class="card shadow-sm border-0 mb-4">
     <div class="card-body">
-        <div class="app-form-section-title"><i class="fas fa-file-upload me-2"></i>Upload your papers</div>
-        <p class="small text-muted mb-3">PDF or picture (JPG, PNG). Each file max <strong>5 MB</strong>. You must upload <strong>all</strong> files below.</p>
+        <div class="app-form-section-title"><i class="fas fa-file-upload me-2"></i>Upload your documents</div>
+        <p class="small text-muted mb-3">PDF or picture (JPG, PNG), each max <strong>5 MB</strong>. Each file is stored as a compressed JPEG under <strong>100 KB</strong>, named <code>{document}_{your_NIC}.jpg</code> (for example <code>nic_document_123456789V.jpg</code>). You must upload <strong>all</strong> files below.</p>
         <div class="row app-form-grid g-3">
                 <?php
                 $docs = [
