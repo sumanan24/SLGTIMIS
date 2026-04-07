@@ -75,24 +75,21 @@ try {
     die("Error loading core classes: " . $e->getMessage());
 }
 
-// Get the URI path relative to this app (normalize slashes for Windows + subdirectory installs)
-$requestUri = $_SERVER['REQUEST_URI'] ?? '/';
-$path = parse_url($requestUri, PHP_URL_PATH);
-if ($path === null || $path === false) {
-    $path = '/';
-}
-$path = str_replace('\\', '/', $path);
+// Get the URI
+$uri = $_SERVER['REQUEST_URI'];
+$basePath = dirname($_SERVER['SCRIPT_NAME']);
 
-$scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
-$scriptDir = rtrim($scriptDir, '/');
-if ($scriptDir !== '' && $scriptDir !== '/' && strpos($path, $scriptDir) === 0) {
-    $path = substr($path, strlen($scriptDir));
+// Remove base path from URI
+if ($basePath !== '/' && $basePath !== '\\') {
+    $uri = str_replace($basePath, '', $uri);
 }
 
-$uri = trim($path, '/');
+// Clean up URI
+$uri = parse_url($uri, PHP_URL_PATH);
+$uri = trim($uri, '/');
 
 // If empty, set to empty string for home route
-if ($uri === '') {
+if (empty($uri)) {
     $uri = '';
 }
 
