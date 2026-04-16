@@ -169,12 +169,14 @@ return [
     'inventory/transfer' => 'InventoryController@transfer',
     'inventory/log' => 'InventoryController@log',
 
-    // Public student applications (NVQ Level 04 / 05) — no login
+    // Public student applications — no login (Level 05 uses /level05application/ procedural wizard folder)
     'level04application' => 'StudentApplicationController@level04',
-    'level05application' => 'StudentApplicationController@level05',
     'student-application/api/departments' => 'StudentApplicationController@apiDepartments',
     'student-application/api/courses' => 'StudentApplicationController@apiCourses',
     'student-applications' => 'StudentApplicationController@adminIndex',
     'student-applications/view' => 'StudentApplicationController@adminView',
+    'student-applications/download-document' => 'StudentApplicationController@adminDownloadDocument',
+    'student-applications/export-data' => 'StudentApplicationController@adminExportApplicationData',
+    'student-applications/export-pdf' => 'StudentApplicationController@adminExportApplicationPdf',
 ];
 

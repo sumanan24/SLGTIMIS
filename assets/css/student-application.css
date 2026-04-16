@@ -429,3 +429,22 @@ body.public-app {
 .app-form-page .alert:not(.app-form-alert):not(.app-form-info-banner) {
     border-radius: var(--app-radius-sm);
 }
+
+/* Live field validation (phone, WhatsApp, NIC) */
+.app-live-feedback {
+    min-height: 1.25rem;
+    margin-top: 0.25rem;
+    line-height: 1.35;
+}
+
+.app-live-feedback-valid {
+    color: #0f5132;
+}
+
+.app-live-feedback-invalid {
+    color: #842029;
+}
+
+.app-live-feedback-muted {
+    color: var(--app-text-muted);
+}

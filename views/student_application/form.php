@@ -39,7 +39,7 @@ $req = '<span class="text-danger fw-bold" aria-hidden="true">*</span>';
                 <p class="app-form-hero-kicker mb-2">Sri Lanka German Training Institute · Apply online 2026</p>
                 <h1 class="app-form-hero-title mb-2">Online application</h1>
                 <?php if (($application_level ?? '04') === '05'): ?>
-                <p class="app-form-hero-text mb-0">Fill in <strong>all</strong> boxes about you, your address, and your first course. Upload <strong>all</strong> files. For exams: write <strong>all</strong> O/L and A/L details, <strong>or</strong> write <strong>all</strong> NVQ details, <strong>or</strong> both. You can use English. You do <strong>not</strong> need a password or login.</p>
+                <p class="app-form-hero-text mb-0">Fill in <strong>all</strong> boxes about you, your address, and your first course. Upload <strong>all</strong> files. For Level 05 exams: <strong>O/L is required</strong>; then provide <strong>either</strong> full A/L <strong>or</strong> full NVQ (not both incomplete). You can use English. You do <strong>not</strong> need a password or login.</p>
                 <?php else: ?>
                 <p class="app-form-hero-text mb-0">Fill in <strong>every</strong> box and upload <strong>every</strong> file. You can use English. You do <strong>not</strong> need a password or login.</p>
                 <?php endif; ?>
@@ -73,3 +73,4 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
 </script>
 <?php require __DIR__ . '/_address_province_scripts.php'; ?>
 <?php require __DIR__ . '/_course_preferences_scripts.php'; ?>
+<?php require __DIR__ . '/_contact_validation_scripts.php'; ?>

@@ -24,7 +24,8 @@ if (!defined('APP_NAME')) {
     if ($basePath === '/' || $basePath === '') {
         $basePath = '';
     }
-    define('APP_URL', $protocol . $_SERVER['HTTP_HOST'] . $basePath);
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    define('APP_URL', $protocol . $host . $basePath);
 }
 
 // BASE_PATH is defined in index.php

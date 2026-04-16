@@ -182,6 +182,7 @@ class UserModel extends Model {
     
     /**
      * Get user role (staff_position_type_id)
+     * String codes are trimmed and uppercased so comparisons match (e.g. "sao", " SAO " → SAO).
      */
     public function getUserRole($userId) {
         try {
@@ -192,7 +193,14 @@ class UserModel extends Model {
             $result = $stmt->get_result();
             $row = $result->fetch_assoc();
             
-            return $row ? $row['staff_position_type_id'] : null;
+            $val = $row ? $row['staff_position_type_id'] : null;
+            if ($val === null || $val === '') {
+                return null;
+            }
+            if (is_string($val)) {
+                return strtoupper(trim($val));
+            }
+            return (string) $val;
         } catch (Exception $e) {
             error_log("Error getting user role: " . $e->getMessage());
             return null;
@@ -258,6 +266,13 @@ class UserModel extends Model {
      */
     public function canManageHostelsRooms($userId) {
         return $this->isAdminOrADM($userId);
+    }
+
+    /**
+     * Online applications list and detail: SAO/RSA, ADM, system admin.
+     */
+    public function canViewOnlineStudentApplications($userId): bool {
+        return $this->isSAO($userId) || $this->isAdminOrADM($userId);
     }
     
     /**

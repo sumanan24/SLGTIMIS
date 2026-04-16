@@ -8,6 +8,13 @@
 $req = $req ?? '<span class="text-danger fw-bold">*</span>';
 $isLevel05 = (($application_level ?? '04') === '05');
 $examAttr = $isLevel05 ? '' : ' required';
+/** Level 05: O/L always required in HTML5; A/L and NVQ validated server-side (either full A/L or full NVQ). */
+$olFieldAttr = $isLevel05 ? ' required' : $examAttr;
+/** English ordinal for exam subject row titles (1 → First, … 9 → Ninth). */
+$subjectOrdinalEn = static function (int $n): string {
+    $map = [1 => 'First', 2 => 'Second', 3 => 'Third', 4 => 'Fourth', 5 => 'Fifth', 6 => 'Sixth', 7 => 'Seventh', 8 => 'Eighth', 9 => 'Ninth'];
+    return $map[$n] ?? (string) $n;
+};
 $sl_provinces_districts = $sl_provinces_districts ?? [];
 $sl_district_postal_codes = $sl_district_postal_codes ?? [];
 $default_zip = (string) ($old['student_zip_code'] ?? '');
@@ -27,7 +34,7 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
                 <label class="form-label" for="student_title">Title <?php echo $req; ?></label>
                 <select name="student_title" id="student_title" class="form-select form-select-sm" required>
                     <option value="">Choose…</option>
-                    <?php foreach (['Mr', 'Ms', 'Mrs', 'Miss', 'Rev', 'Dr', 'Other'] as $opt): ?>
+                    <?php foreach (['Mr', 'Miss', 'Mrs'] as $opt): ?>
                     <option value="<?php echo htmlspecialchars($opt, ENT_QUOTES, 'UTF-8'); ?>" <?php echo (($old['student_title'] ?? '') === $opt) ? 'selected' : ''; ?>><?php echo htmlspecialchars($opt, ENT_QUOTES, 'UTF-8'); ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -64,15 +71,18 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
             </div>
             <div class="col-12 col-sm-6 col-md-4">
                 <label class="form-label" for="student_phone">Phone <?php echo $req; ?></label>
-                <input type="tel" name="student_phone" id="student_phone" class="form-control form-control-sm" required maxlength="20" value="<?php echo $v('student_phone'); ?>" autocomplete="tel">
+                <input type="tel" name="student_phone" id="student_phone" class="form-control form-control-sm" required maxlength="20" value="<?php echo $v('student_phone'); ?>" autocomplete="tel" inputmode="tel" aria-describedby="student_phone_feedback">
+                <div id="student_phone_feedback" class="app-live-feedback small" role="status" aria-live="polite"></div>
             </div>
             <div class="col-12 col-sm-6 col-md-4">
                 <label class="form-label" for="student_whatsapp">WhatsApp <?php echo $req; ?></label>
-                <input type="tel" name="student_whatsapp" id="student_whatsapp" class="form-control form-control-sm" required maxlength="20" value="<?php echo $v('student_whatsapp'); ?>" autocomplete="tel">
+                <input type="tel" name="student_whatsapp" id="student_whatsapp" class="form-control form-control-sm" required maxlength="20" value="<?php echo $v('student_whatsapp'); ?>" autocomplete="tel" inputmode="tel" aria-describedby="student_whatsapp_feedback">
+                <div id="student_whatsapp_feedback" class="app-live-feedback small" role="status" aria-live="polite"></div>
             </div>
             <div class="col-12 col-md-6 col-xl-4">
                 <label class="form-label" for="student_nic">ID card number (NIC) <?php echo $req; ?></label>
-                <input type="text" name="student_nic" id="student_nic" class="form-control form-control-sm" required maxlength="20" placeholder="Example: 123456789V or 12 numbers" value="<?php echo $v('student_nic'); ?>" autocomplete="off">
+                <input type="text" name="student_nic" id="student_nic" class="form-control form-control-sm" required maxlength="20" placeholder="Example: 123456789V or 12 numbers" value="<?php echo $v('student_nic'); ?>" autocomplete="off" autocapitalize="characters" aria-describedby="student_nic_feedback">
+                <div id="student_nic_feedback" class="app-live-feedback small" role="status" aria-live="polite"></div>
             </div>
             <div class="col-12 col-sm-6 col-md-4">
                 <label class="form-label" for="student_dob">Date of birth <?php echo $req; ?></label>
@@ -196,7 +206,7 @@ $dbNvqHint = ($application_level ?? '04') === '05' ? '5' : '4';
 </div>
 
 <?php if ($isLevel05): ?>
-<div class="alert app-form-info-banner small mb-4"><strong>Level 05:</strong> Fill <strong>all</strong> O/L and <strong>all</strong> A/L boxes below, <strong>or</strong> fill <strong>all</strong> NVQ boxes in the next part, <strong>or</strong> both. Do not leave both empty.</div>
+<div class="alert app-form-info-banner small mb-4"><strong>Level 05:</strong> <strong>O/L is required.</strong> Then provide <strong>either</strong> full A/L below <strong>or</strong> full NVQ in the next section (not both incomplete). Clear A/L completely if you use NVQ only.</div>
 <?php endif; ?>
 
 <!-- O/L -->
@@ -205,12 +215,12 @@ $dbNvqHint = ($application_level ?? '04') === '05' ? '5' : '4';
         <div class="app-form-section-title"><i class="fas fa-certificate me-2"></i>O/L exam</div>
         <div class="row app-form-grid g-3 mb-3">
             <div class="col-12 col-sm-6 col-md-4">
-                <label class="form-label" for="ol_index_number">Index number <?php echo $isLevel05 ? '' : $req; ?></label>
-                <input type="text" name="ol_index_number" id="ol_index_number" class="form-control form-control-sm" maxlength="20" value="<?php echo $v('ol_index_number'); ?>"<?php echo $examAttr; ?>>
+                <label class="form-label" for="ol_index_number">Index number <?php echo $req; ?></label>
+                <input type="text" name="ol_index_number" id="ol_index_number" class="form-control form-control-sm" maxlength="20" value="<?php echo $v('ol_index_number'); ?>"<?php echo $olFieldAttr; ?>>
             </div>
             <div class="col-12 col-sm-6 col-md-4">
-                <label class="form-label" for="ol_exam_year">Year of exam <?php echo $isLevel05 ? '' : $req; ?></label>
-                <input type="number" name="ol_exam_year" id="ol_exam_year" class="form-control form-control-sm" min="1990" max="2100" placeholder="Year" value="<?php echo $v('ol_exam_year'); ?>"<?php echo $examAttr; ?>>
+                <label class="form-label" for="ol_exam_year">Year of exam <?php echo $req; ?></label>
+                <input type="number" name="ol_exam_year" id="ol_exam_year" class="form-control form-control-sm" min="1990" max="2100" placeholder="Year" value="<?php echo $v('ol_exam_year'); ?>"<?php echo $olFieldAttr; ?>>
             </div>
         </div>
         <div class="row g-2 g-lg-3 app-exam-subjects-grid">
@@ -218,12 +228,12 @@ $dbNvqHint = ($application_level ?? '04') === '05' ? '5' : '4';
                 <div class="col-12 col-lg-6">
                     <div class="app-ol-row app-exam-subj-cell h-100">
                         <div class="app-subject-block">
-                            <div class="app-subj-title">Subject <?php echo $s; ?> <?php echo $isLevel05 ? '' : $req; ?></div>
+                            <div class="app-subj-title"><?php echo htmlspecialchars($subjectOrdinalEn($i), ENT_QUOTES, 'UTF-8'); ?> subject <?php echo $req; ?></div>
                             <div class="app-subj-fields">
-                                <input type="text" name="ol_subject_name_<?php echo $s; ?>" id="ol_subject_name_<?php echo $s; ?>" class="form-control form-control-sm app-subj-name app-exam-input-compact" maxlength="100" value="<?php echo $v('ol_subject_name_' . $s); ?>" aria-label="O/L Subject <?php echo $s; ?>"<?php echo $examAttr; ?>>
+                                <input type="text" name="ol_subject_name_<?php echo $s; ?>" id="ol_subject_name_<?php echo $s; ?>" class="form-control form-control-sm app-subj-name app-exam-input-compact" maxlength="100" value="<?php echo $v('ol_subject_name_' . $s); ?>" aria-label="O/L <?php echo htmlspecialchars($subjectOrdinalEn($i), ENT_QUOTES, 'UTF-8'); ?> subject name"<?php echo $olFieldAttr; ?>>
                                 <div class="app-subj-mark-group">
-                                    <label class="form-label app-subj-mark-label mb-0" for="ol_subject_<?php echo $s; ?>_marks">Mark</label>
-                                    <input type="number" name="ol_subject_<?php echo $s; ?>_marks" id="ol_subject_<?php echo $s; ?>_marks" class="form-control form-control-sm app-mark-input app-exam-input-compact" min="0" max="100" value="<?php echo $v('ol_subject_' . $s . '_marks'); ?>"<?php echo $examAttr; ?>>
+                                    <label class="form-label app-subj-mark-label mb-0" for="ol_subject_<?php echo $s; ?>_marks">Result</label>
+                                    <input type="text" name="ol_subject_<?php echo $s; ?>_marks" id="ol_subject_<?php echo $s; ?>_marks" class="form-control form-control-sm app-mark-input app-exam-input-compact" maxlength="10" placeholder="A, B, C… or 0–100" value="<?php echo $v('ol_subject_' . $s . '_marks'); ?>" aria-label="O/L <?php echo htmlspecialchars($subjectOrdinalEn($i), ENT_QUOTES, 'UTF-8'); ?> subject result"<?php echo $olFieldAttr; ?>>
                                 </div>
                             </div>
                         </div>
@@ -257,12 +267,12 @@ $dbNvqHint = ($application_level ?? '04') === '05' ? '5' : '4';
                 <div class="col-12 col-lg-6">
                     <div class="app-al-row app-exam-subj-cell h-100">
                         <div class="app-subject-block">
-                            <div class="app-subj-title">Subject <?php echo $s; ?> <?php echo $isLevel05 ? '' : $req; ?></div>
+                            <div class="app-subj-title"><?php echo htmlspecialchars($subjectOrdinalEn($i), ENT_QUOTES, 'UTF-8'); ?> subject <?php echo $isLevel05 ? '' : $req; ?></div>
                             <div class="app-subj-fields">
-                                <input type="text" name="al_subject_name_<?php echo $s; ?>" id="al_subject_name_<?php echo $s; ?>" class="form-control form-control-sm app-subj-name app-exam-input-compact" maxlength="100" value="<?php echo $v('al_subject_name_' . $s); ?>" aria-label="A/L Subject <?php echo $s; ?>"<?php echo $examAttr; ?>>
+                                <input type="text" name="al_subject_name_<?php echo $s; ?>" id="al_subject_name_<?php echo $s; ?>" class="form-control form-control-sm app-subj-name app-exam-input-compact" maxlength="100" value="<?php echo $v('al_subject_name_' . $s); ?>" aria-label="A/L <?php echo htmlspecialchars($subjectOrdinalEn($i), ENT_QUOTES, 'UTF-8'); ?> subject name"<?php echo $examAttr; ?>>
                                 <div class="app-subj-mark-group">
-                                    <label class="form-label app-subj-mark-label mb-0" for="al_subject_<?php echo $s; ?>_marks">Mark</label>
-                                    <input type="number" name="al_subject_<?php echo $s; ?>_marks" id="al_subject_<?php echo $s; ?>_marks" class="form-control form-control-sm app-mark-input app-exam-input-compact" min="0" max="100" value="<?php echo $v('al_subject_' . $s . '_marks'); ?>"<?php echo $examAttr; ?>>
+                                    <label class="form-label app-subj-mark-label mb-0" for="al_subject_<?php echo $s; ?>_marks">Result</label>
+                                    <input type="text" name="al_subject_<?php echo $s; ?>_marks" id="al_subject_<?php echo $s; ?>_marks" class="form-control form-control-sm app-mark-input app-exam-input-compact" maxlength="10" placeholder="A, B, C… or 0–100" value="<?php echo $v('al_subject_' . $s . '_marks'); ?>" aria-label="A/L <?php echo htmlspecialchars($subjectOrdinalEn($i), ENT_QUOTES, 'UTF-8'); ?> subject result"<?php echo $examAttr; ?>>
                                 </div>
                             </div>
                         </div>
@@ -278,7 +288,7 @@ $dbNvqHint = ($application_level ?? '04') === '05' ? '5' : '4';
     <div class="card-body">
         <div class="app-form-section-title"><i class="fas fa-tools me-2"></i>NVQ</div>
         <?php if ($isLevel05): ?>
-        <p class="small text-muted mb-3">Use this part <strong>only</strong> if you apply with an NVQ (not with O/L + A/L above).</p>
+        <p class="small text-muted mb-3">Fill <strong>all four</strong> fields if you use NVQ instead of A/L. Leave them empty if you completed A/L above (O/L is still required).</p>
         <?php else: ?>
         <p class="small text-muted mb-3">If you have no NVQ yet, type <strong>N/A</strong> in the text boxes. For year, you can type <strong>2000</strong>.</p>
         <?php endif; ?>

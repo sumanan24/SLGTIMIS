@@ -143,13 +143,20 @@ try {
     
     $router = new Router();
     $output = $router->route($uri);
-    
-    // Output the result if it's a string
+
     if (is_string($output)) {
         echo $output;
+    } elseif ($output === null) {
+        // Controller returned nothing (e.g. missing `return $this->view(...)`); avoid a blank page
+        http_response_code(500);
+        echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Application error</title>';
+        echo '<style>body{font-family:system-ui,sans-serif;padding:2rem;max-width:40rem;margin:0 auto;}code{background:#f0f0f0;padding:0 .2rem;}</style></head><body>';
+        echo '<h1>Something went wrong</h1>';
+        echo '<p>This page did not produce any output. The server log may have more detail.</p>';
+        echo '<p><small>If you are developing: ensure the route handler uses <code>return $this->view(...)</code> when it should render a page.</small></p>';
+        echo '</body></html>';
     }
-    
-    // Flush output buffer
+
     ob_end_flush();
     
 } catch (ErrorException $e) {

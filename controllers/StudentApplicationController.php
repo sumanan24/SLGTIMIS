@@ -9,6 +9,59 @@ class StudentApplicationController extends Controller {
     /** Stored files are compressed to JPEG at or below this size. */
     private const STORED_MAX_BYTES = 102400; // 100 KB
     private const ALLOWED_EXT = ['pdf', 'jpg', 'jpeg', 'png'];
+    /** CSRF token lifetime (seconds); long enough to fill the form without relying on PHP session. */
+    private const STUDENT_APP_CSRF_TTL = 604800; // 7 days
+
+    /** Whitelist: staff download only these DB columns (paths under uploads/student_applications/). Keep in sync with StudentApplicationModel::DOCUMENT_PATH_COLUMNS. */
+    private const STAFF_DOWNLOAD_DOCUMENT_COLUMNS = [
+        'nic_document_path',
+        'birth_certificate_path',
+        'ol_certificate_path',
+        'al_certificate_path',
+        'nvq_certificate_path',
+        'bank_receipt_path',
+    ];
+
+    /**
+     * Signing key for public application form (no session storage).
+     */
+    private function studentApplicationCsrfKey(): string {
+        return hash('sha256', 'SLGTI|student_app_csrf_v1|' . DB_NAME . '|' . DB_USER . '|' . DB_PASS, true);
+    }
+
+    private function generateStudentApplicationCsrfToken(): string {
+        $exp = time() + self::STUDENT_APP_CSRF_TTL;
+        $nonce = bin2hex(random_bytes(16));
+        $payload = $exp . '|' . $nonce;
+        $mac = hash_hmac('sha256', $payload, $this->studentApplicationCsrfKey());
+        return base64_encode($payload . '|' . $mac);
+    }
+
+    private function verifyStudentApplicationCsrfToken(string $token): bool {
+        $raw = base64_decode(trim($token), true);
+        if ($raw === false || $raw === '') {
+            return false;
+        }
+        $lastSep = strrpos($raw, '|');
+        if ($lastSep === false || $lastSep < 1) {
+            return false;
+        }
+        $mac = substr($raw, $lastSep + 1);
+        $payload = substr($raw, 0, $lastSep);
+        if ($mac === '' || $payload === '' || strlen($mac) !== 64) {
+            return false;
+        }
+        $expected = hash_hmac('sha256', $payload, $this->studentApplicationCsrfKey());
+        if (!hash_equals($expected, $mac)) {
+            return false;
+        }
+        $parts = explode('|', $payload);
+        if (count($parts) !== 2) {
+            return false;
+        }
+        $exp = (int) $parts[0];
+        return $exp >= time();
+    }
 
     public function level04() {
         return $this->showForm('04');
@@ -21,9 +74,6 @@ class StudentApplicationController extends Controller {
     private function showForm(string $level) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             return $this->processSubmit($level);
-        }
-        if (empty($_SESSION['csrf_student_app'])) {
-            $_SESSION['csrf_student_app'] = bin2hex(random_bytes(32));
         }
         $flash = null;
         if ($this->get('submitted') === '1' && !empty($_SESSION['flash_student_application_ok'])) {
@@ -43,7 +93,7 @@ class StudentApplicationController extends Controller {
             'title' => $title,
             'use_public_layout' => true,
             'application_level' => $level,
-            'csrf_token' => $_SESSION['csrf_student_app'] ?? '',
+            'csrf_token' => $this->generateStudentApplicationCsrfToken(),
             'errors' => $errors,
             'old' => $old,
             'flash_success' => $flashSuccess,
@@ -54,11 +104,9 @@ class StudentApplicationController extends Controller {
 
     private function processSubmit(string $level) {
         $token = (string) $this->post('csrf_token', '');
-        if (empty($_SESSION['csrf_student_app']) || !hash_equals($_SESSION['csrf_student_app'], $token)) {
-            $_SESSION['csrf_student_app'] = bin2hex(random_bytes(32));
-            return $this->renderForm($level, ['Your session expired. Please refresh this page and try again.'], $_POST, null);
+        if (!$this->verifyStudentApplicationCsrfToken($token)) {
+            return $this->renderForm($level, ['This form is out of date or the security check failed. Please refresh the page and send again.'], $_POST, null);
         }
-        $_SESSION['csrf_student_app'] = bin2hex(random_bytes(32));
 
         $postedLevel = (string) $this->post('application_level', '');
         if ($postedLevel !== $level) {
@@ -106,17 +154,32 @@ class StudentApplicationController extends Controller {
     }
 
     /**
-     * Field keys for full G.C.E. O/L + A/L examination blocks.
+     * Field keys for full G.C.E. O/L + A/L examination blocks (Level 04 — all required).
      *
      * @return list<string>
      */
     private function schoolExamFieldKeys(): array {
-        $keys = ['ol_index_number', 'ol_exam_year', 'al_index_number', 'al_exam_year', 'al_stream'];
+        return array_merge($this->olExamFieldKeys(), $this->alExamFieldKeys());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function olExamFieldKeys(): array {
+        $keys = ['ol_index_number', 'ol_exam_year'];
         for ($i = 1; $i <= 9; $i++) {
             $s = sprintf('%02d', $i);
             $keys[] = 'ol_subject_name_' . $s;
             $keys[] = 'ol_subject_' . $s . '_marks';
         }
+        return $keys;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function alExamFieldKeys(): array {
+        $keys = ['al_index_number', 'al_exam_year', 'al_stream'];
         for ($i = 1; $i <= 3; $i++) {
             $s = sprintf('%02d', $i);
             $keys[] = 'al_subject_name_' . $s;
@@ -135,13 +198,49 @@ class StudentApplicationController extends Controller {
     /**
      * @param callable(string): string $t
      */
-    private function isSchoolExamPathComplete(callable $t): bool {
-        foreach ($this->schoolExamFieldKeys() as $k) {
+    private function isOlPathComplete(callable $t): bool {
+        foreach ($this->olExamFieldKeys() as $k) {
             if ($t($k) === '') {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * @param callable(string): string $t
+     */
+    private function isAlPathComplete(callable $t): bool {
+        foreach ($this->alExamFieldKeys() as $k) {
+            if ($t($k) === '') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @param callable(string): string $t
+     */
+    private function isAlAnyFilled(callable $t): bool {
+        foreach ($this->alExamFieldKeys() as $k) {
+            if ($t($k) !== '') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param callable(string): string $t
+     */
+    private function isNvqAnyFilled(callable $t): bool {
+        foreach ($this->nvqFieldKeys() as $k) {
+            if ($t($k) !== '') {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -208,10 +307,20 @@ class StudentApplicationController extends Controller {
         }
 
         if ($level === '05') {
-            $school = $this->isSchoolExamPathComplete($t);
-            $nvq = $this->isNvqPathComplete($t);
-            if (!$school && !$nvq) {
-                return ['For Level 05: fill all O/L and A/L, or fill all NVQ boxes, or both. One path must be complete.'];
+            $olOk = $this->isOlPathComplete($t);
+            $alOk = $this->isAlPathComplete($t);
+            $nvqOk = $this->isNvqPathComplete($t);
+            if (!$olOk) {
+                return ['For Level 05: G.C.E. O/L is required (index, year, nine subjects and results).'];
+            }
+            if ($this->isAlAnyFilled($t) && !$alOk) {
+                return ['For Level 05: either complete all A/L fields or clear them if you use NVQ only.'];
+            }
+            if ($this->isNvqAnyFilled($t) && !$nvqOk) {
+                return ['For Level 05: either complete all NVQ fields or clear them if you use A/L only.'];
+            }
+            if (!$alOk && !$nvqOk) {
+                return ['For Level 05: provide either full A/L or full NVQ details, in addition to O/L.'];
             }
         }
 
@@ -231,6 +340,13 @@ class StudentApplicationController extends Controller {
             return ['Please type a correct email address.'];
         }
 
+        if (!$this->isValidSriLankaPhone($t('student_phone'))) {
+            return ['Phone must be a valid Sri Lanka number (e.g. 0771234567 or +94 77 123 4567).'];
+        }
+        if (!$this->isValidSriLankaPhone($t('student_whatsapp'))) {
+            return ['WhatsApp must be a valid Sri Lanka number (e.g. 0771234567 or +94 77 123 4567).'];
+        }
+
         $gender = $t('student_gender');
         if (!in_array($gender, ['Male', 'Female', 'Other'], true)) {
             return ['Please choose male, female, or other.'];
@@ -240,7 +356,7 @@ class StudentApplicationController extends Controller {
             return ['Please choose single or married.'];
         }
 
-        $titles = ['Mr', 'Ms', 'Mrs', 'Miss', 'Rev', 'Dr', 'Other'];
+        $titles = ['Mr', 'Miss', 'Mrs'];
         if (!in_array($t('student_title'), $titles, true)) {
             return ['Please choose a title from the list.'];
         }
@@ -282,10 +398,7 @@ class StudentApplicationController extends Controller {
             return ['You must be at least 16 years old to apply.'];
         }
 
-        $school = $level === '05' ? $this->isSchoolExamPathComplete($t) : true;
-        $nvq = $level === '05' ? $this->isNvqPathComplete($t) : true;
-
-        if ($level === '04' || $school) {
+        if ($level === '04') {
             $yo = (int) $t('ol_exam_year');
             if ($yo < 1990 || $yo > 2100) {
                 return ['O/L year must be between 1990 and 2100.'];
@@ -297,23 +410,51 @@ class StudentApplicationController extends Controller {
             for ($i = 1; $i <= 9; $i++) {
                 $s = sprintf('%02d', $i);
                 $m = $t('ol_subject_' . $s . '_marks');
-                if ($m === '' || !is_numeric($m) || (int) $m < 0 || (int) $m > 100) {
-                    return ['O/L marks must be numbers from 0 to 100 for every subject.'];
+                if ($m === '' || !$this->isValidExamResult($m)) {
+                    return ['O/L results: use a letter (A–F, S, or W, optional + or −) or a mark from 0 to 100 for every subject.'];
                 }
             }
             for ($i = 1; $i <= 3; $i++) {
                 $s = sprintf('%02d', $i);
                 $m = $t('al_subject_' . $s . '_marks');
-                if ($m === '' || !is_numeric($m) || (int) $m < 0 || (int) $m > 100) {
-                    return ['A/L marks must be numbers from 0 to 100 for every subject.'];
+                if ($m === '' || !$this->isValidExamResult($m)) {
+                    return ['A/L results: use a letter (A–F, S, or W, optional + or −) or a mark from 0 to 100 for every subject.'];
                 }
             }
-        }
-
-        if ($level === '04' || $nvq) {
             $yn = (int) $t('nvq_year_completed');
             if ($t('nvq_year_completed') === '' || $yn < 1900 || $yn > 2100) {
                 return ['NVQ year finished must be between 1900 and 2100.'];
+            }
+        } elseif ($level === '05') {
+            $yo = (int) $t('ol_exam_year');
+            if ($yo < 1990 || $yo > 2100) {
+                return ['O/L year must be between 1990 and 2100.'];
+            }
+            for ($i = 1; $i <= 9; $i++) {
+                $s = sprintf('%02d', $i);
+                $m = $t('ol_subject_' . $s . '_marks');
+                if ($m === '' || !$this->isValidExamResult($m)) {
+                    return ['O/L results: use a letter (A–F, S, or W, optional + or −) or a mark from 0 to 100 for every subject.'];
+                }
+            }
+            if ($this->isAlPathComplete($t)) {
+                $ya = (int) $t('al_exam_year');
+                if ($ya < 1990 || $ya > 2100) {
+                    return ['A/L year must be between 1990 and 2100.'];
+                }
+                for ($i = 1; $i <= 3; $i++) {
+                    $s = sprintf('%02d', $i);
+                    $m = $t('al_subject_' . $s . '_marks');
+                    if ($m === '' || !$this->isValidExamResult($m)) {
+                        return ['A/L results: use a letter (A–F, S, or W, optional + or −) or a mark from 0 to 100 for every subject.'];
+                    }
+                }
+            }
+            if ($this->isNvqPathComplete($t)) {
+                $yn = (int) $t('nvq_year_completed');
+                if ($t('nvq_year_completed') === '' || $yn < 1900 || $yn > 2100) {
+                    return ['NVQ year finished must be between 1900 and 2100.'];
+                }
             }
         }
 
@@ -339,6 +480,55 @@ class StudentApplicationController extends Controller {
 
     private function isValidNic(string $nic): bool {
         return (bool) preg_match('/^(\d{9}[VX]|\d{12})$/', $nic);
+    }
+
+    /**
+     * Sri Lanka NSN: 9 digits, first digit 1–9, after optional leading 0 or country code 94.
+     */
+    private function isValidSriLankaPhone(string $raw): bool {
+        $d = preg_replace('/\D+/', '', trim($raw));
+        if ($d === '') {
+            return false;
+        }
+        if (str_starts_with($d, '94') && strlen($d) > 2) {
+            $d = substr($d, 2);
+        } elseif (str_starts_with($d, '0') && strlen($d) > 1) {
+            $d = substr($d, 1);
+        }
+        return strlen($d) === 9 && (bool) preg_match('/^[1-9]\d{8}$/', $d);
+    }
+
+    /**
+     * O/L & A/L result: letter grade (A–F, S, W with optional +/−) or integer mark 0–100.
+     */
+    private function isValidExamResult(string $raw): bool {
+        $m = trim($raw);
+        if ($m === '') {
+            return false;
+        }
+        if ((bool) preg_match('/^[A-FSW][+-]?$/i', $m)) {
+            return true;
+        }
+        if (ctype_digit($m)) {
+            $n = (int) $m;
+            return $n >= 0 && $n <= 100;
+        }
+        return false;
+    }
+
+    /** @return string|null Normalized value for storage */
+    private function normalizedExamResult(string $raw): ?string {
+        $m = trim($raw);
+        if ($m === '') {
+            return null;
+        }
+        if ((bool) preg_match('/^[A-FSW][+-]?$/i', $m)) {
+            return strtoupper($m);
+        }
+        if (ctype_digit($m)) {
+            return (string) max(0, min(100, (int) $m));
+        }
+        return null;
     }
 
     /**
@@ -371,6 +561,11 @@ class StudentApplicationController extends Controller {
                 return null;
             }
             return (string) $y;
+        };
+
+        $examResultOrNull = function (string $key) use ($p) {
+            $v = (string) $p($key, '');
+            return $this->normalizedExamResult($v);
         };
 
         $data = [
@@ -409,12 +604,12 @@ class StudentApplicationController extends Controller {
         for ($i = 1; $i <= 9; $i++) {
             $s = sprintf('%02d', $i);
             $data['ol_subject_name_' . $s] = $p('ol_subject_name_' . $s) ?: null;
-            $data['ol_subject_' . $s . '_marks'] = $intOrNull('ol_subject_' . $s . '_marks');
+            $data['ol_subject_' . $s . '_marks'] = $examResultOrNull('ol_subject_' . $s . '_marks');
         }
         for ($i = 1; $i <= 3; $i++) {
             $s = sprintf('%02d', $i);
             $data['al_subject_name_' . $s] = $p('al_subject_name_' . $s) ?: null;
-            $data['al_subject_' . $s . '_marks'] = $intOrNull('al_subject_' . $s . '_marks');
+            $data['al_subject_' . $s . '_marks'] = $examResultOrNull('al_subject_' . $s . '_marks');
         }
 
         $nullFiles = [
@@ -665,7 +860,7 @@ class StudentApplicationController extends Controller {
     }
 
     /**
-     * Staff: list applications (DataTables).
+     * Staff (SAO, ADM, admin): list online applications.
      */
     public function adminIndex() {
         if (!isset($_SESSION['user_id'])) {
@@ -675,27 +870,24 @@ class StudentApplicationController extends Controller {
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         $uid = (int) $_SESSION['user_id'];
-        $role = $userModel->getUserRole($uid);
-        $allowed = $userModel->isSAO($uid) || $userModel->isAdminOrADM($uid);
-        if (!$allowed && !in_array($role, ['REG', 'DIR'], true)) {
-            $_SESSION['error'] = 'You cannot open this page.';
+        if (!$userModel->canViewOnlineStudentApplications($uid)) {
+            $_SESSION['error'] = 'You cannot open this page. Only Student Affairs (SAO) and Administrators (ADM) may access online applications.';
             $this->redirect('dashboard');
             return;
         }
 
         $model = $this->model('StudentApplicationModel');
-        $rows = $model->getAllForAdmin();
-
-        $this->view('student_application/admin_index', [
+        return $this->view('student_application/admin_index', [
             'title' => 'Online applications',
             'page' => 'student-applications',
-            'applications' => $rows,
+            'applications' => $model->getAllForAdmin(),
+            'dashboard_stats' => $model->getDashboardStats(),
             'use_public_layout' => false,
         ]);
     }
 
     /**
-     * Staff: view one application.
+     * Staff (SAO, ADM, admin): view one application (full row + documents).
      */
     public function adminView() {
         if (!isset($_SESSION['user_id'])) {
@@ -705,10 +897,8 @@ class StudentApplicationController extends Controller {
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         $uid = (int) $_SESSION['user_id'];
-        $role = $userModel->getUserRole($uid);
-        $allowed = $userModel->isSAO($uid) || $userModel->isAdminOrADM($uid);
-        if (!$allowed && !in_array($role, ['REG', 'DIR'], true)) {
-            $_SESSION['error'] = 'You cannot open this page.';
+        if (!$userModel->canViewOnlineStudentApplications($uid)) {
+            $_SESSION['error'] = 'You cannot open this page. Only Student Affairs (SAO) and Administrators (ADM) may access online applications.';
             $this->redirect('dashboard');
             return;
         }
@@ -726,10 +916,222 @@ class StudentApplicationController extends Controller {
             return;
         }
 
-        $this->view('student_application/admin_view', [
+        return $this->view('student_application/admin_view', [
             'title' => 'Application #' . $id,
             'page' => 'student-applications',
             'app' => $app,
+            'use_public_layout' => false,
         ]);
+    }
+
+    /**
+     * Staff (SAO, ADM, admin): download one uploaded document with Content-Disposition: attachment.
+     */
+    public function adminDownloadDocument(): void {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        if (!$userModel->canViewOnlineStudentApplications($uid)) {
+            http_response_code(403);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Forbidden';
+            exit;
+        }
+
+        $applicationId = (int) $this->get('id', 0);
+        $col = trim((string) $this->get('col', ''));
+        if ($applicationId < 1 || !in_array($col, self::STAFF_DOWNLOAD_DOCUMENT_COLUMNS, true)) {
+            http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Not found';
+            exit;
+        }
+
+        $model = $this->model('StudentApplicationModel');
+        $app = $model->findById($applicationId);
+        if (!$app) {
+            http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Not found';
+            exit;
+        }
+
+        $rel = isset($app[$col]) ? trim(str_replace('\\', '/', (string) $app[$col])) : '';
+        $relLower = strtolower($rel);
+        if ($rel === '' || strpos($rel, '..') !== false || !str_starts_with($relLower, 'uploads/student_applications/')) {
+            http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Not found';
+            exit;
+        }
+
+        $full = realpath(BASE_PATH . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel));
+        $uploadsRoot = realpath(BASE_PATH . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'student_applications');
+        if ($full === false || $uploadsRoot === false || !is_file($full)) {
+            http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Not found';
+            exit;
+        }
+        $uploadsPrefix = $uploadsRoot . DIRECTORY_SEPARATOR;
+        if (strpos($full, $uploadsPrefix) !== 0) {
+            http_response_code(403);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Forbidden';
+            exit;
+        }
+
+        $baseName = basename($full);
+        if ($baseName === '' || $baseName === '.' || $baseName === '..') {
+            http_response_code(404);
+            exit;
+        }
+
+        $ext = strtolower(pathinfo($baseName, PATHINFO_EXTENSION));
+        $mime = match ($ext) {
+            'pdf' => 'application/pdf',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            default => 'application/octet-stream',
+        };
+
+        $safeStem = preg_replace('/[^a-zA-Z0-9_-]+/', '_', pathinfo($baseName, PATHINFO_FILENAME)) ?: 'document';
+        $dispName = 'app' . $applicationId . '_' . $safeStem . ($ext !== '' ? '.' . $ext : '');
+
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: attachment; filename="' . str_replace('"', '', $dispName) . '"');
+        header('Content-Length: ' . (string) filesize($full));
+        header('Cache-Control: private, max-age=0');
+        header('Pragma: public');
+
+        readfile($full);
+        exit;
+    }
+
+    /**
+     * Staff: download all application fields as CSV (no upload paths / no document files).
+     */
+    public function adminExportApplicationData(): void {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        if (!$userModel->canViewOnlineStudentApplications($uid)) {
+            http_response_code(403);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Forbidden';
+            exit;
+        }
+
+        $applicationId = (int) $this->get('id', 0);
+        if ($applicationId < 1) {
+            http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Not found';
+            exit;
+        }
+
+        $model = $this->model('StudentApplicationModel');
+        $app = $model->findById($applicationId);
+        if (!$app) {
+            http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Not found';
+            exit;
+        }
+
+        $filename = 'application_' . $applicationId . '_data.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
+        header('Cache-Control: private, max-age=0');
+
+        echo "\xEF\xBB\xBF";
+
+        $out = fopen('php://output', 'w');
+        if ($out === false) {
+            http_response_code(500);
+            exit;
+        }
+        fputcsv($out, ['Field', 'Value']);
+        foreach (StudentApplicationModel::getStaffExportColumnOrder() as $col) {
+            $val = isset($app[$col]) ? (string) $app[$col] : '';
+            $val = str_replace(["\r\n", "\r", "\n"], ' | ', $val);
+            fputcsv($out, [$col, $val]);
+        }
+        fclose($out);
+        exit;
+    }
+
+    /**
+     * Staff: download application data as a one-page PDF summary (no document files / no upload paths).
+     */
+    public function adminExportApplicationPdf(): void {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        if (!$userModel->canViewOnlineStudentApplications($uid)) {
+            http_response_code(403);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Forbidden';
+            exit;
+        }
+
+        $applicationId = (int) $this->get('id', 0);
+        if ($applicationId < 1) {
+            http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Not found';
+            exit;
+        }
+
+        $model = $this->model('StudentApplicationModel');
+        $app = $model->findById($applicationId);
+        if (!$app) {
+            http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Not found';
+            exit;
+        }
+
+        require_once BASE_PATH . '/helpers/StudentApplicationSummaryPdf.php';
+
+        $level = trim((string) ($app['application_level'] ?? ''));
+        $title = 'Application #' . $applicationId . ($level !== '' ? ' (Level ' . $level . ')' : '');
+        $rows = [];
+        foreach (StudentApplicationModel::getStaffExportColumnOrder() as $col) {
+            $val = isset($app[$col]) ? (string) $app[$col] : '';
+            $val = str_replace(["\r\n", "\r", "\n"], ' | ', $val);
+            if ($col === 'created_at' && $val !== '') {
+                $ts = strtotime($val);
+                if ($ts) {
+                    $val = date('Y-m-d H:i:s', $ts);
+                }
+            }
+            $rows[] = [$col, $val];
+        }
+
+        $pdf = StudentApplicationSummaryPdf::build($title, $rows);
+        $filename = 'application_' . $applicationId . '_summary.pdf';
+
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
+        header('Content-Length: ' . (string) strlen($pdf));
+        header('Cache-Control: private, max-age=0');
+
+        echo $pdf;
+        exit;
     }
 }

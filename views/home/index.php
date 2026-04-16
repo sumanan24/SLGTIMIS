@@ -99,8 +99,13 @@
 
 Welcome to the SLGTI Management Information System. This system helps manage student records, courses, and institute activities in an easy and organized way, making daily work faster and more efficient.</p>
                 <?php if (!isset($_SESSION['user_id'])): ?>
-                    <div class="mt-2 d-flex justify-content-center gap-3 flex-wrap" style="position: relative; z-index: 1;">
-                        <a href="<?php echo APP_URL; ?>/login" class="btn px-4 py-2 shadow" style="background: #001f3f; border: none; color: #ffffff; font-size: 0.9rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0, 31, 63, 0.3); transition: all 0.3s ease;">
+                    <?php
+                    $h = static function (string $path): string {
+                        return htmlspecialchars(rtrim(APP_URL, '/') . $path, ENT_QUOTES, 'UTF-8');
+                    };
+                    ?>
+                    <div class="mt-2 d-flex justify-content-center" style="position: relative; z-index: 1;">
+                        <a href="<?php echo $h('/login'); ?>" class="btn px-4 py-2 shadow" style="background: #001f3f; border: none; color: #ffffff; font-size: 0.9rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0, 31, 63, 0.3); transition: all 0.3s ease;">
                             <i class="fas fa-sign-in-alt me-2"></i>Login to System
                         </a>
                     </div>

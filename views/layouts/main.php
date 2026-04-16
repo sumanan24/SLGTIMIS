@@ -91,7 +91,7 @@
                                 $hasInstructorDiaryReportAccess = in_array($userRole, ['HOD', 'DIR', 'DPA', 'DPI', 'REG', 'ADM']) || $isAdmin;
                                 // Staff device (Hikvision) menu: ADM/Admin full module; DIR, REG, FIN, ACC, HOD see dashboard + month only
                                 $canStaffDeviceAttendanceMenu = !$isSAO && ($isAdminOrADM || in_array($userRole, ['DIR', 'REG', 'FIN', 'ACC', 'HOD'], true));
-                                $canViewStudentApplications = $isSAO || $isAdminOrADM || in_array($userRole, ['REG', 'DIR'], true);
+                                $canViewStudentApplications = $userModel->canViewOnlineStudentApplications($_SESSION['user_id']);
                             }
                             ?>
                             
@@ -264,7 +264,6 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    
                                     <?php if ($isAdminOrADM && !$isHOD): ?>
                                     <li class="menu-divider-submenu"></li>
                                     <li>
