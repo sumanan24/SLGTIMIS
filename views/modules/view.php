@@ -16,6 +16,11 @@
                         <dd class="col-sm-8 fw-semibold"><?php echo htmlspecialchars($m['module_id'] ?? ''); ?></dd>
                         <dt class="col-sm-4 text-muted">Module Name</dt>
                         <dd class="col-sm-8"><?php echo htmlspecialchars($m['module_name'] ?? '—'); ?></dd>
+                        <dt class="col-sm-4 text-muted">Semester</dt>
+                        <dd class="col-sm-8"><?php
+                            $sem = isset($m['semester']) ? $m['semester'] : null;
+                            echo ($sem !== null && $sem !== '') ? 'Semester ' . (int)$sem : '—';
+                        ?></dd>
                         <dt class="col-sm-4 text-muted">Credit</dt>
                         <dd class="col-sm-8"><?php echo isset($m['credit']) && $m['credit'] !== '' && $m['credit'] !== null ? htmlspecialchars($m['credit']) : '—'; ?></dd>
                     </dl>

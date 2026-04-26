@@ -63,6 +63,7 @@
                                 <th class="fw-bold">Version</th>
                                 <th class="fw-bold">Module ID</th>
                                 <th class="fw-bold">Module Name</th>
+                                <th class="fw-bold">Semester</th>
                                 <th class="fw-bold">Credit</th>
                                 <th class="fw-bold text-end">Actions</th>
                             </tr>
@@ -76,6 +77,10 @@
                                     <td><span class="badge bg-secondary"><?php echo $ver === 0 ? 'Default' : $ver; ?></span></td>
                                     <td><span class="fw-semibold text-primary"><?php echo htmlspecialchars($m['module_id']); ?></span></td>
                                     <td><?php echo htmlspecialchars($m['module_name'] ?? '—'); ?></td>
+                                    <td><?php
+                                        $sem = isset($m['semester']) ? $m['semester'] : null;
+                                        echo ($sem !== null && $sem !== '') ? '<span class="badge bg-info text-dark">' . htmlspecialchars((string)(int)$sem) . '</span>' : '—';
+                                    ?></td>
                                     <td><?php echo isset($m['credit']) && $m['credit'] !== '' && $m['credit'] !== null ? htmlspecialchars($m['credit']) : '—'; ?></td>
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm" role="group">

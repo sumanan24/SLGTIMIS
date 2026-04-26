@@ -262,6 +262,24 @@ class Controller {
         
         return true;
     }
+
+    /**
+     * Exam module: EXAM, ADM, or system admin.
+     */
+    protected function checkExamsAccess() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        if (!$userModel->canAccessExamsModule($_SESSION['user_id'])) {
+            $_SESSION['error'] = 'Access denied. The Exam module is only available for Examination Office (EXAM) or Administrator (ADM).';
+            $this->redirect('dashboard');
+            return false;
+        }
+        return true;
+    }
     
     /**
      * Check if current logged-in user can manage room allocations (SAO or ADM)

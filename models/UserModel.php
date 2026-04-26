@@ -274,6 +274,17 @@ class UserModel extends Model {
     public function canViewOnlineStudentApplications($userId): bool {
         return $this->isSAO($userId) || $this->isAdminOrADM($userId);
     }
+
+    /**
+     * Exam module: examinations office (EXAM) or Administrator (ADM), plus system admin.
+     */
+    public function canAccessExamsModule($userId): bool {
+        if ($this->isAdmin($userId)) {
+            return true;
+        }
+        $role = $this->getUserRole($userId);
+        return in_array($role, ['EXAM', 'ADM'], true);
+    }
     
     /**
      * Check if user can access room allocations (SAO or ADM)

@@ -174,9 +174,7 @@ class AttendanceController extends Controller {
     public function bulkUpdate() {
         // Check authentication
         if (!isset($_SESSION['user_id'])) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
-            return;
+            $this->json(['success' => false, 'error' => 'Unauthorized'], 401);
         }
         
         // Check attendance access
@@ -188,15 +186,14 @@ class AttendanceController extends Controller {
         $hasAccess = in_array($userRole, $allowedRoles) || $isAdmin;
         
         if (!$hasAccess) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Access denied. Only HOD, IN1, IN2, and IN3 can update attendance.']);
-            return;
+            $this->json(
+                ['success' => false, 'error' => 'Access denied. Only HOD, IN1, IN2, and IN3 can update attendance.'],
+                403
+            );
         }
         
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
-            return;
+            $this->json(['success' => false, 'error' => 'Invalid request method'], 405);
         }
         
         // Get JSON input
@@ -222,19 +219,15 @@ class AttendanceController extends Controller {
             $lockStatus = $lockModel->getLockStatus($departmentId, $month);
             
             if ($lockStatus && $lockStatus['status'] === 'locked' && !$isAdmin) {
-                header('Content-Type: application/json');
-                echo json_encode([
+                $this->json([
                     'success' => false,
                     'error' => 'Attendance for this month has been locked and cannot be modified. Please contact administrator to unlock.'
-                ]);
-                return;
+                ], 423);
             }
         }
         
         if (empty($attendanceData)) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'No attendance data provided']);
-            return;
+            $this->json(['success' => false, 'error' => 'No attendance data provided'], 400);
         }
         
         // Process attendance data
@@ -271,9 +264,7 @@ class AttendanceController extends Controller {
         }
         
         if (empty($processedData)) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'No valid attendance records to process']);
-            return;
+            $this->json(['success' => false, 'error' => 'No valid attendance records to process'], 400);
         }
         
         // Bulk update using chunk method
@@ -288,27 +279,23 @@ class AttendanceController extends Controller {
             
             if ($result['errors'] > 0 && $result['success'] === 0) {
                 // All records failed
-                header('Content-Type: application/json');
-                echo json_encode([
+                $this->json([
                     'success' => false,
                     'error' => 'Failed to save attendance. Please check your database connection and try again.'
-                ]);
-                return;
+                ], 500);
             }
             
-            header('Content-Type: application/json');
-            echo json_encode([
+            $this->json([
                 'success' => true,
                 'message' => "Attendance updated successfully. {$result['success']} records processed." . ($result['errors'] > 0 ? " {$result['errors']} records failed." : ''),
                 'stats' => $result
             ]);
         } catch (Exception $e) {
-            header('Content-Type: application/json');
             error_log('Attendance bulk update error: ' . $e->getMessage());
-            echo json_encode([
+            $this->json([
                 'success' => false,
                 'error' => 'Database error: ' . $e->getMessage()
-            ]);
+            ], 500);
         }
     }
     
@@ -854,24 +841,18 @@ class AttendanceController extends Controller {
     public function syncHikvision() {
         // Check authentication
         if (!isset($_SESSION['user_id'])) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
-            return;
+            $this->json(['success' => false, 'error' => 'Unauthorized'], 401);
         }
         
         // Restrict SAO users
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         if ($userModel->isSAO($_SESSION['user_id'])) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Access denied. This section is not available for your role.']);
-            return;
+            $this->json(['success' => false, 'error' => 'Access denied. This section is not available for your role.'], 403);
         }
         
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
-            return;
+            $this->json(['success' => false, 'error' => 'Invalid request method'], 405);
         }
         
         try {
@@ -907,13 +888,11 @@ class AttendanceController extends Controller {
             $records = $hikvision->getAttendanceRecords($startTime, $endTime);
             
             if (empty($records)) {
-                header('Content-Type: application/json');
-                echo json_encode([
+                $this->json([
                     'success' => true,
                     'message' => 'No attendance records found for the specified date range',
                     'records' => 0
                 ]);
-                return;
             }
             
             // Get staff mapping (employee_no to staff_id)
@@ -939,8 +918,7 @@ class AttendanceController extends Controller {
             // Sync records
             $result = $staffAttendanceModel->syncFromHikvision($records, $staffMapping);
             
-            header('Content-Type: application/json');
-            echo json_encode([
+            $this->json([
                 'success' => true,
                 'message' => "Synced {$result['success']} records successfully" . 
                             ($result['errors'] > 0 ? ". {$result['errors']} errors occurred." : ''),
@@ -948,12 +926,11 @@ class AttendanceController extends Controller {
             ]);
             
         } catch (Exception $e) {
-            header('Content-Type: application/json');
             error_log('Hikvision sync error: ' . $e->getMessage());
-            echo json_encode([
+            $this->json([
                 'success' => false,
                 'error' => 'Sync failed: ' . $e->getMessage()
-            ]);
+            ], 500);
         }
     }
     
@@ -963,30 +940,24 @@ class AttendanceController extends Controller {
     public function getHikvisionReport() {
         // Check authentication
         if (!isset($_SESSION['user_id'])) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
-            return;
+            $this->json(['success' => false, 'error' => 'Unauthorized'], 401);
         }
         
         // Restrict SAO users
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         if ($userModel->isSAO($_SESSION['user_id'])) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Access denied. This section is not available for your role.']);
-            return;
+            $this->json(['success' => false, 'error' => 'Access denied. This section is not available for your role.'], 403);
         }
         
         try {
             // Get configuration
             $configFile = BASE_PATH . '/config/hikvision.php';
             if (!file_exists($configFile)) {
-                header('Content-Type: application/json');
-                echo json_encode([
+                $this->json([
                     'success' => false,
                     'error' => 'Hikvision configuration file not found. Please configure the device first.'
-                ]);
-                return;
+                ], 500);
             }
             
             $hikvisionConfig = require $configFile;
@@ -1020,16 +991,14 @@ class AttendanceController extends Controller {
                 $response['message'] = 'No attendance records found. Please check: 1) Error logs for API responses, 2) Date range matches device data, 3) Device connection status.';
             }
             
-            header('Content-Type: application/json');
-            echo json_encode($response);
+            $this->json($response);
             
         } catch (Exception $e) {
-            header('Content-Type: application/json');
             error_log('Hikvision report error: ' . $e->getMessage());
-            echo json_encode([
+            $this->json([
                 'success' => false,
                 'error' => 'Failed to get attendance report: ' . $e->getMessage()
-            ]);
+            ], 500);
         }
     }
     
@@ -1039,30 +1008,24 @@ class AttendanceController extends Controller {
     public function testHikvision() {
         // Check authentication
         if (!isset($_SESSION['user_id'])) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
-            return;
+            $this->json(['success' => false, 'error' => 'Unauthorized'], 401);
         }
         
         // Restrict SAO users
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         if ($userModel->isSAO($_SESSION['user_id'])) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Access denied. This section is not available for your role.']);
-            return;
+            $this->json(['success' => false, 'error' => 'Access denied. This section is not available for your role.'], 403);
         }
         
         try {
             // Get configuration
             $configFile = BASE_PATH . '/config/hikvision.php';
             if (!file_exists($configFile)) {
-                header('Content-Type: application/json');
-                echo json_encode([
+                $this->json([
                     'success' => false,
                     'error' => 'Hikvision configuration file not found. Please configure the device first.'
-                ]);
-                return;
+                ], 500);
             }
             
             $hikvisionConfig = require $configFile;
@@ -1074,16 +1037,14 @@ class AttendanceController extends Controller {
             // Test connection
             $result = $hikvision->testConnection();
             
-            header('Content-Type: application/json');
-            echo json_encode($result);
+            $this->json($result);
             
         } catch (Exception $e) {
-            header('Content-Type: application/json');
             error_log('Hikvision test error: ' . $e->getMessage());
-            echo json_encode([
+            $this->json([
                 'success' => false,
                 'error' => 'Connection test failed: ' . $e->getMessage()
-            ]);
+            ], 500);
         }
     }
     
@@ -1917,25 +1878,20 @@ class AttendanceController extends Controller {
     public function getGroupsByCourseAndYear() {
         // Check authentication
         if (!isset($_SESSION['user_id'])) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
-            return;
+            $this->json(['success' => false, 'error' => 'Unauthorized'], 401);
         }
         
         $courseId = $this->get('course_id', '');
         $academicYear = $this->get('academic_year', '');
         
         if (empty($courseId) || empty($academicYear)) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'groups' => []]);
-            return;
+            $this->json(['success' => true, 'groups' => []]);
         }
         
         $groupModel = $this->model('GroupModel');
         $groups = $groupModel->getGroupsByCourseAndYear($courseId, $academicYear);
         
-        header('Content-Type: application/json');
-        echo json_encode(['success' => true, 'groups' => $groups]);
+        $this->json(['success' => true, 'groups' => $groups]);
     }
 }
 

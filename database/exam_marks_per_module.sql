@@ -1,0 +1,12 @@
+-- SLGTI MIS — Per-module marks (legacy databases)
+--
+-- The application migrates the `marks` table automatically on first use
+-- (see ExamModel::ensureMarksModuleColumns()).
+--
+-- For a manual SQL migration on an old database, run statements equivalent to:
+--   1. ADD COLUMN module_id VARCHAR(50) NOT NULL DEFAULT '' AFTER exam_id
+--   2. ADD COLUMN marks_second DECIMAL(7,2) NULL AFTER marks
+--   3. DROP INDEX uq_marks_exam_student
+--   4. ADD UNIQUE uq_marks_exam_module_student (exam_id, module_id, student_id)
+--
+-- Adjust if columns/indexes already exist. Fresh installs should use database/exam_module.sql.

@@ -69,6 +69,7 @@
                             $hasGroupAccess = false;
                             $canStaffDeviceAttendanceMenu = false;
                             $canViewStudentApplications = false;
+                            $canAccessExamsModule = false;
                             if (isset($_SESSION['user_id'])) {
                                 require_once BASE_PATH . '/models/UserModel.php';
                                 $userModel = new UserModel();
@@ -92,6 +93,7 @@
                                 // Staff device (Hikvision) menu: ADM/Admin full module; DIR, REG, FIN, ACC, HOD see dashboard + month only
                                 $canStaffDeviceAttendanceMenu = !$isSAO && ($isAdminOrADM || in_array($userRole, ['DIR', 'REG', 'FIN', 'ACC', 'HOD'], true));
                                 $canViewStudentApplications = $userModel->canViewOnlineStudentApplications($_SESSION['user_id']);
+                                $canAccessExamsModule = $userModel->canAccessExamsModule($_SESSION['user_id']);
                             }
                             ?>
                             
@@ -101,6 +103,15 @@
                                     <span>Dashboard</span>
                                 </a>
                             </li>
+
+                            <?php if (!empty($canAccessExamsModule)): ?>
+                            <li>
+                                <a href="<?php echo APP_URL; ?>/exams" class="<?php echo (isset($page) && in_array($page, ['exams', 'exams-marks'], true)) ? 'active' : ''; ?>">
+                                    <i class="fas fa-file-signature"></i>
+                                    <span>Exams</span>
+                                </a>
+                            </li>
+                            <?php endif; ?>
                             
                             <?php if (!$isSAO): ?>
                             <!-- Deputy Principal Education Branch - Hidden for SAO -->

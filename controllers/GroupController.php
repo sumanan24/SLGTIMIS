@@ -407,30 +407,22 @@ class GroupController extends Controller {
     public function addStudents() {
         // Check authentication and access
         if (!$this->checkGroupAccess()) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
             return;
         }
         
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
-            return;
+            $this->json(['success' => false, 'error' => 'Invalid request method'], 405);
         }
         
         $groupId = $this->post('group_id', '');
         $studentIds = $this->post('student_ids', []);
         
-        if (empty($groupId)) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Group ID is required']);
-            return;
+        if ($groupId === '' || $groupId === null) {
+            $this->json(['success' => false, 'error' => 'Group ID is required'], 400);
         }
         
         if (empty($studentIds) || !is_array($studentIds)) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Please select at least one student']);
-            return;
+            $this->json(['success' => false, 'error' => 'Please select at least one student'], 400);
         }
         
         $groupModel = $this->model('GroupModel');
@@ -438,20 +430,15 @@ class GroupController extends Controller {
         // Check if user can access this group
         $departmentId = $this->getUserDepartment();
         if (!$groupModel->canAccessGroup($groupId, $departmentId)) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Access denied']);
-            return;
+            $this->json(['success' => false, 'error' => 'Access denied'], 403);
         }
         
         $result = $groupModel->addStudentsToGroup($groupId, $studentIds);
         
         if ($result) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'message' => 'Students added successfully']);
-        } else {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Failed to add students']);
+            $this->json(['success' => true, 'message' => 'Students added successfully']);
         }
+        $this->json(['success' => false, 'error' => 'Failed to add students'], 500);
     }
     
     /**
@@ -460,24 +447,18 @@ class GroupController extends Controller {
     public function removeStudent() {
         // Check authentication and access
         if (!$this->checkGroupAccess()) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
             return;
         }
         
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
-            return;
+            $this->json(['success' => false, 'error' => 'Invalid request method'], 405);
         }
         
         $groupId = $this->post('group_id', '');
         $studentId = $this->post('student_id', '');
         
-        if (empty($groupId) || empty($studentId)) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Group ID and Student ID are required']);
-            return;
+        if ($groupId === '' || $groupId === null || $studentId === '' || $studentId === null) {
+            $this->json(['success' => false, 'error' => 'Group ID and Student ID are required'], 400);
         }
         
         $groupModel = $this->model('GroupModel');
@@ -485,45 +466,53 @@ class GroupController extends Controller {
         // Check if user can access this group
         $departmentId = $this->getUserDepartment();
         if (!$groupModel->canAccessGroup($groupId, $departmentId)) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Access denied']);
-            return;
+            $this->json(['success' => false, 'error' => 'Access denied'], 403);
         }
         
         $result = $groupModel->removeStudentFromGroup($groupId, $studentId);
         
         if ($result) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'message' => 'Student removed successfully']);
-        } else {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Failed to remove student']);
+            $this->json(['success' => true, 'message' => 'Student removed successfully']);
         }
+        $this->json(['success' => false, 'error' => 'Failed to remove student'], 500);
     }
     
     /**
      * Get courses by department (AJAX)
      */
     public function getCoursesByDepartment() {
-        if (!isset($_SESSION['user_id'])) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
-            return;
+        header('Content-Type: application/json');
+        if (!$this->checkGroupAccess()) {
+            echo json_encode(['success' => false, 'error' => 'Access denied']);
+            exit;
         }
-        
-        $departmentId = $this->get('department_id', '');
-        
-        if (empty($departmentId)) {
-            header('Content-Type: application/json');
+
+        $departmentId = trim((string) $this->get('department_id', ''));
+        if ($departmentId === '') {
             echo json_encode(['success' => true, 'courses' => []]);
-            return;
+            exit;
         }
-        
+
+        // Department-restricted roles can only query their own department
+        $userDept = $this->getUserDepartment();
+        if ($userDept && $departmentId !== $userDept) {
+            echo json_encode(['success' => false, 'error' => 'Access denied']);
+            exit;
+        }
+
         $courseModel = $this->model('CourseModel');
         $courses = $courseModel->getCoursesWithDepartment(['department_id' => $departmentId]);
-        
-        header('Content-Type: application/json');
-        echo json_encode(['success' => true, 'courses' => $courses]);
+
+        // Return lean payload (id + name) for dropdown
+        $out = [];
+        foreach ($courses as $c) {
+            $out[] = [
+                'course_id' => (string) ($c['course_id'] ?? ''),
+                'course_name' => (string) ($c['course_name'] ?? $c['course_id'] ?? ''),
+            ];
+        }
+        echo json_encode(['success' => true, 'courses' => $out]);
+        exit;
     }
     
     /**
@@ -531,9 +520,7 @@ class GroupController extends Controller {
      */
     public function getAvailableStudents() {
         if (!isset($_SESSION['user_id'])) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
-            return;
+            $this->json(['success' => false, 'error' => 'Unauthorized'], 401);
         }
         
         $courseId = $this->get('course_id', '');
@@ -541,16 +528,13 @@ class GroupController extends Controller {
         $groupId = $this->get('group_id', '');
         
         if (empty($courseId) || empty($academicYear)) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'students' => []]);
-            return;
+            $this->json(['success' => true, 'students' => []]);
         }
         
         $groupModel = $this->model('GroupModel');
         $students = $groupModel->getAvailableStudents($courseId, $academicYear, $groupId ?: null);
         
-        header('Content-Type: application/json');
-        echo json_encode(['success' => true, 'students' => $students]);
+        $this->json(['success' => true, 'students' => $students]);
     }
 }
 

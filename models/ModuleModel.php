@@ -1,6 +1,6 @@
 <?php
 /**
- * Module Model - course modules (table `module`: course_id, course_version, module_id, module_name)
+ * Module Model - course modules (table `module`: course_id, course_version, module_id, module_name, credit, semester)
  * Uniqueness: (course_id, course_version, module_id). course_version = 0 when no versions.
  */
 
@@ -37,11 +37,25 @@ class ModuleModel extends Model {
     }
 
     /**
+     * Semester number (e.g. 1, 2) for organising modules — optional.
+     */
+    public function ensureModuleSemesterColumn() {
+        $this->ensureModuleCreditColumn();
+        $conn = $this->db->getConnection();
+        $res = $conn->query("SHOW COLUMNS FROM `{$this->table}` LIKE 'semester'");
+        if ($res && $res->num_rows > 0) {
+            return;
+        }
+        $conn->query("ALTER TABLE `{$this->table}` ADD COLUMN `semester` TINYINT UNSIGNED NULL DEFAULT NULL COMMENT 'Academic semester (e.g. 1, 2)' AFTER `credit`");
+    }
+
+    /**
      * Get module by course_id and module_id (and optional course_version for when column exists)
      */
     public function getByCourseAndModule($courseId, $moduleId, $courseVersion = null) {
         $this->ensureModuleVersionColumn();
         $this->ensureModuleCreditColumn();
+        $this->ensureModuleSemesterColumn();
         $sql = "SELECT m.*, c.course_name 
                 FROM `{$this->table}` m 
                 LEFT JOIN `course` c ON c.course_id = m.course_id 
@@ -71,6 +85,7 @@ class ModuleModel extends Model {
     public function getAllWithCourse($courseId = null, $courseVersion = null) {
         $this->ensureModuleVersionColumn();
         $this->ensureModuleCreditColumn();
+        $this->ensureModuleSemesterColumn();
         $sql = "SELECT m.*, c.course_name 
                 FROM `{$this->table}` m 
                 LEFT JOIN `course` c ON c.course_id = m.course_id 
@@ -87,7 +102,7 @@ class ModuleModel extends Model {
             $params[] = (int)$courseVersion;
             $types .= 'i';
         }
-        $sql .= " ORDER BY c.course_name, m.course_version, m.module_name, m.module_id";
+        $sql .= " ORDER BY c.course_name, m.course_version, m.semester, m.module_name, m.module_id";
         if (!empty($params)) {
             $stmt = $this->db->prepare($sql);
             if (!$stmt) {
@@ -109,12 +124,87 @@ class ModuleModel extends Model {
     }
 
     /**
+     * Get modules for a department (via course.department_id), optional filter by course_id.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getAllWithCourseByDepartment(string $departmentId, ?string $courseId = null): array {
+        $this->ensureModuleVersionColumn();
+        $this->ensureModuleCreditColumn();
+        $this->ensureModuleSemesterColumn();
+        $departmentId = trim($departmentId);
+        if ($departmentId === '') {
+            return [];
+        }
+
+        $sql = "SELECT m.*, c.course_name
+                FROM `{$this->table}` m
+                INNER JOIN `course` c ON c.course_id = m.course_id
+                WHERE c.department_id = ?";
+        $params = [$departmentId];
+        $types = 's';
+        if ($courseId !== null && trim($courseId) !== '') {
+            $sql .= " AND m.course_id = ?";
+            $params[] = trim($courseId);
+            $types .= 's';
+        }
+        $sql .= " ORDER BY c.course_name, m.course_version, m.semester, m.module_name, m.module_id";
+
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        $data = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $data[] = $row;
+            }
+        }
+        return $data;
+    }
+
+    /**
+     * Modules for a course in a given semester (uses `module.semester`).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getByCourseAndSemester(string $courseId, int $semester): array {
+        $this->ensureModuleVersionColumn();
+        $this->ensureModuleCreditColumn();
+        $this->ensureModuleSemesterColumn();
+        $sql = "SELECT m.*, c.course_name
+                FROM `{$this->table}` m
+                LEFT JOIN `course` c ON c.course_id = m.course_id
+                WHERE m.course_id = ? AND m.semester = ?
+                ORDER BY m.module_name ASC, m.module_id ASC";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param('si', $courseId, $semester);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $data = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $data[] = $row;
+            }
+        }
+        return $data;
+    }
+
+    /**
      * Create a module (course_id, course_version, module_id, module_name, credit optional)
      */
     public function createModule($data, &$sqlError = null) {
         $this->ensureModuleVersionColumn();
         $this->ensureModuleCreditColumn();
-        $columns = ['course_id', 'course_version', 'module_id', 'module_name', 'credit'];
+        $this->ensureModuleSemesterColumn();
+        $columns = ['course_id', 'course_version', 'module_id', 'module_name', 'credit', 'semester'];
         $filtered = [];
         foreach ($columns as $col) {
             if (!array_key_exists($col, $data)) {
@@ -127,6 +217,8 @@ class ModuleModel extends Model {
                 $filtered[$col] = (int)$data[$col];
             } elseif ($col === 'credit') {
                 $filtered[$col] = $data[$col] === '' || $data[$col] === null ? null : (float)$data[$col];
+            } elseif ($col === 'semester') {
+                $filtered[$col] = $data[$col] === '' || $data[$col] === null ? null : (int)$data[$col];
             } else {
                 $filtered[$col] = $data[$col];
             }
@@ -142,12 +234,13 @@ class ModuleModel extends Model {
     }
 
     /**
-     * Update module by course_id, course_version and module_id. Allowed fields: module_name, credit.
+     * Update module by course_id, course_version and module_id. Allowed fields: module_name, credit, semester.
      */
     public function updateModule($courseId, $moduleId, $courseVersion, $data, &$sqlError = null) {
         $this->ensureModuleVersionColumn();
         $this->ensureModuleCreditColumn();
-        $allowed = ['module_name', 'credit'];
+        $this->ensureModuleSemesterColumn();
+        $allowed = ['module_name', 'credit', 'semester'];
         $set = [];
         $values = [];
         $types = '';
@@ -159,6 +252,9 @@ class ModuleModel extends Model {
             if ($col === 'credit') {
                 $types .= 's';
                 $values[] = $val === '' || $val === null ? null : (float)$val;
+            } elseif ($col === 'semester') {
+                $types .= 's';
+                $values[] = $val === '' || $val === null ? null : (string)(int)$val;
             } else {
                 $types .= 's';
                 $values[] = $val;
@@ -195,6 +291,7 @@ class ModuleModel extends Model {
      */
     public function deleteByCourseAndModule($courseId, $moduleId, $courseVersion = null) {
         $this->ensureModuleVersionColumn();
+        $this->ensureModuleSemesterColumn();
         $sql = "DELETE FROM `{$this->table}` WHERE course_id = ? AND module_id = ?";
         $params = [$courseId, $moduleId];
         $types = 'ss';
@@ -219,6 +316,7 @@ class ModuleModel extends Model {
      */
     public function exists($courseId, $moduleId, $courseVersion = 0) {
         $this->ensureModuleVersionColumn();
+        $this->ensureModuleSemesterColumn();
         $v = $courseVersion === null ? 0 : (int)$courseVersion;
         return $this->getByCourseAndModule($courseId, $moduleId, $v) !== null;
     }

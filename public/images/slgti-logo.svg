@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 72" width="200" height="72">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a5f"/>
+      <stop offset="100%" style="stop-color:#0f2744"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="72" rx="4" fill="url(#g)"/>
+  <rect x="8" y="10" width="52" height="52" rx="3" fill="#ffffff" opacity="0.12"/>
+  <text x="36" y="46" fill="#fff" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" font-weight="bold" text-anchor="middle">S</text>
+  <text x="68" y="32" fill="#ffffff" font-family="DejaVu Sans,Arial,sans-serif" font-size="15" font-weight="bold">SLGTI</text>
+  <text x="68" y="48" fill="#a8c8e8" font-family="DejaVu Sans,Arial,sans-serif" font-size="9">Sri Lanka German</text>
+  <text x="68" y="59" fill="#a8c8e8" font-family="DejaVu Sans,Arial,sans-serif" font-size="9">Training Institute</text>
+</svg>

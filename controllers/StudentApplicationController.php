@@ -89,7 +89,8 @@ class StudentApplicationController extends Controller {
      */
     private function renderForm(string $level, array $errors, array $old, ?string $flashSuccess = null) {
         $title = $level === '04' ? 'Level 04 application' : 'Level 05 application';
-        return $this->view('student_application/form', [
+        $view = $level === '04' ? 'student_application/form_wizard' : 'student_application/form';
+        return $this->view($view, [
             'title' => $title,
             'use_public_layout' => true,
             'application_level' => $level,
