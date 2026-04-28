@@ -63,15 +63,24 @@ $course = (string) (($enrollment['course_name'] ?? '') ?: '');
         margin: 0 auto;
     }
     .id-card .pad { padding: var(--card-pad-y) var(--card-pad-x) 24px; }
-    .id-card .top-row { display: grid; grid-template-columns: 64px 1fr 150px; gap: 10px; align-items: center; }
-    .id-card .crest-box { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; }
+    .id-card .top-row { display: grid; grid-template-columns: 52px 1fr 96px; gap: 6px; align-items: start; }
+    .id-card .crest-box { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; }
     .id-card .crest-img { height: 100%; width: auto; max-width: 100%; object-fit: contain; display: block; }
-    .id-card .brand { text-align: center; }
+    .id-card .brand { text-align: center; margin-top: -4px; padding-right: 6px; }
     .id-card .brand .title { font-weight: 800; letter-spacing: .12em; font-size: 12px; color: var(--card-text); }
-    .id-card .brand .inst { font-weight: 900; font-size: 18px; margin-top: 2px; color: var(--card-text); line-height: 1.06; }
-    .id-card .brand .sub { margin-top: 2px; font-size: 10px; color: var(--card-sub); line-height: 1.25; }
-    .id-card .logo { text-align: right; }
-    .id-card .logo-img { height: 44px; width: auto; max-width: 150px; object-fit: contain; display: inline-block; }
+    .id-card .brand .inst {
+        font-weight: 900;
+        font-size: 17px;
+        margin-top: 0px;
+        color: var(--card-text);
+        line-height: 1.06;
+        white-space: nowrap;
+    }
+    .id-card .brand .sub { margin-top: 1px; font-size: 10px; color: var(--card-sub); line-height: 1.18; }
+    /* Keep SLGTI logo close to title text */
+    .id-card .logo { text-align: left; margin-left: 0; }
+    .id-card .logo-box { height: 52px; width: 96px; display: flex; align-items: flex-start; justify-content: flex-start; }
+    .id-card .logo-img { height: 28px; width: auto; max-width: 96px; object-fit: contain; display: block; }
 
     .id-card .content { display: grid; grid-template-columns: var(--photo-w) 1fr; gap: var(--content-gap); margin-top: 10px; align-items: start; }
     .id-card .content .info { padding-top: 2px; min-width: 0; }
@@ -136,6 +145,7 @@ $course = (string) (($enrollment['course_name'] ?? '') ?: '');
     .id-card .back p { margin: 0; font-size: 11.5px; color:var(--card-sub); line-height: 1.35; }
     .id-card .valid { margin-top: 10px; }
     .id-card .sig { margin-top: 14px; text-align: center; }
+    .id-card .sig img { max-height: 38px; max-width: 120px; object-fit: contain; display: inline-block; }
     .id-card .sig .line { height: 1px; background: #0f172a; opacity: .6; margin: 8px auto 6px; width: 70%; }
     .id-card .sig .role { font-weight: 800; color:#0f172a; }
     .id-card .backbar {
@@ -234,7 +244,9 @@ $course = (string) (($enrollment['course_name'] ?? '') ?: '');
                         <div class="sub">Ministry of Education, Higher Education and Vocational Education<br>Vocational Education Division</div>
                     </div>
                     <div class="logo">
+                        <div class="logo-box">
                         <img class="logo-img" src="<?php echo APP_URL; ?>/assets/img/logo.png" alt="SLGTI logo">
+                        </div>
                     </div>
                 </div>
 
@@ -285,7 +297,7 @@ $course = (string) (($enrollment['course_name'] ?? '') ?: '');
                             <p>Enroll Date: <?php echo $e($enrollDateDmy); ?><br>Expire Date: <?php echo $e($expiryDateDmy); ?></p>
                         </div>
                         <div class="sig">
-                            <div style="height: 38px;"></div>
+                            <img src="<?php echo APP_URL; ?>/assets/img/sign.png" alt="Principal signature">
                             <div class="line"></div>
                             <div class="role">Principal</div>
                         </div>

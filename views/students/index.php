@@ -257,9 +257,6 @@
                                             <a href="<?php echo APP_URL; ?>/students/id-card?student_id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-primary" title="Preview ID Card">
                                                 <i class="fas fa-id-card"></i>
                                             </a>
-                                            <a href="<?php echo APP_URL; ?>/students/id-card?student_id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-success" title="Open ID card and download PNG/JPG">
-                                                <i class="fas fa-download"></i>
-                                            </a>
                                             <?php endif; ?>
                                             <?php if (isset($canEdit) && $canEdit): ?>
                                             <a href="<?php echo APP_URL; ?>/students/edit?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-primary" title="Edit">

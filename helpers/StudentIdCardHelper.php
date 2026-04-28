@@ -80,8 +80,19 @@ final class StudentIdCardHelper
 
     public static function principalSignatureDataUri(): ?string
     {
-        $f = BASE_PATH . '/public/images/principal-signature.png';
-        return self::imageFileToDataUri($f);
+        $paths = [
+            // New preferred location (requested)
+            BASE_PATH . '/assets/img/sign.png',
+            // Backwards-compatible old location
+            BASE_PATH . '/public/images/principal-signature.png',
+        ];
+        foreach ($paths as $p) {
+            $uri = self::imageFileToDataUri($p);
+            if ($uri !== null) {
+                return $uri;
+            }
+        }
+        return null;
     }
 
     /**

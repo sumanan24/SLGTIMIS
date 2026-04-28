@@ -40,14 +40,14 @@ $course = (string) (($enrollment['course_name'] ?? '') ?: '');
 
     .top-row { display: table; width: 100%; table-layout: fixed; }
     .top-row > div { display: table-cell; vertical-align: middle; }
-    .cell-crest { width: 38pt; }
-    .cell-logo { width: 88pt; text-align: right; }
-    .crest img { width: 34pt; height: 34pt; }
-    .brand { text-align: center; }
+    .cell-crest { width: 36pt; }
+    .cell-logo { width: 70pt; text-align: left; }
+    .crest img { width: 28pt; height: 28pt; }
+    .brand { text-align: center; margin-top: -2pt; }
     .title { font-weight: 800; letter-spacing: .14em; font-size: 9pt; }
-    .inst { font-weight: 900; font-size: 13.6pt; margin-top: 2pt; line-height: 1.06; }
-    .sub { font-size: 7.2pt; color: #334155; margin-top: 2pt; line-height: 1.25; }
-    .logo img { height: 18pt; width: auto; }
+    .inst { font-weight: 900; font-size: 13.0pt; margin-top: 0.8pt; line-height: 1.06; white-space: nowrap; }
+    .sub { font-size: 7.2pt; color: #334155; margin-top: 1pt; line-height: 1.18; }
+    .logo img { height: 16pt; width: auto; max-width: 70pt; }
 
     .content { margin-top: 7pt; display: table; width: 100%; table-layout: fixed; }
     .content > div { display: table-cell; vertical-align: middle; }
