@@ -63,14 +63,15 @@ $course = (string) (($enrollment['course_name'] ?? '') ?: '');
         margin: 0 auto;
     }
     .id-card .pad { padding: var(--card-pad-y) var(--card-pad-x) 24px; }
-    .id-card .top-row { display: grid; grid-template-columns: 44px 1fr 118px; gap: 10px; align-items: center; }
-    .id-card .crest { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b, #ef4444); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .id-card .top-row { display: grid; grid-template-columns: 64px 1fr 150px; gap: 10px; align-items: center; }
+    .id-card .crest-box { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; }
+    .id-card .crest-img { height: 100%; width: auto; max-width: 100%; object-fit: contain; display: block; }
     .id-card .brand { text-align: center; }
     .id-card .brand .title { font-weight: 800; letter-spacing: .12em; font-size: 12px; color: var(--card-text); }
     .id-card .brand .inst { font-weight: 900; font-size: 18px; margin-top: 2px; color: var(--card-text); line-height: 1.06; }
     .id-card .brand .sub { margin-top: 2px; font-size: 10px; color: var(--card-sub); line-height: 1.25; }
-    .id-card .logo { text-align: right; font-weight: 900; color: #111827; font-size: 16px; line-height: 1.05; }
-    .id-card .logo small { display:block; font-weight: 800; letter-spacing: .08em; font-size: 8px; color: #ef4444; margin-top: 2px; }
+    .id-card .logo { text-align: right; }
+    .id-card .logo-img { height: 44px; width: auto; max-width: 150px; object-fit: contain; display: inline-block; }
 
     .id-card .content { display: grid; grid-template-columns: var(--photo-w) 1fr; gap: var(--content-gap); margin-top: 10px; align-items: start; }
     .id-card .content .info { padding-top: 2px; min-width: 0; }
@@ -224,13 +225,17 @@ $course = (string) (($enrollment['course_name'] ?? '') ?: '');
         <div class="id-card" id="idcardFront">
             <div class="pad">
                 <div class="top-row">
-                    <div class="crest">SL</div>
+                    <div class="crest-box">
+                        <img class="crest-img" src="<?php echo APP_URL; ?>/assets/img/slogo.png" alt="Ministry logo">
+                    </div>
                     <div class="brand">
                         <div class="title">STUDENT IDENTITY CARD</div>
                         <div class="inst">Sri Lanka German Training Institute</div>
                         <div class="sub">Ministry of Education, Higher Education and Vocational Education<br>Vocational Education Division</div>
                     </div>
-                    <div class="logo">SLGTI<small>Sri Lanka German Training Institute</small></div>
+                    <div class="logo">
+                        <img class="logo-img" src="<?php echo APP_URL; ?>/assets/img/logo.png" alt="SLGTI logo">
+                    </div>
                 </div>
 
                 <div class="content">
