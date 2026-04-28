@@ -58,4 +58,21 @@ class ExamPdfHelper {
         $dompdf->stream($safe, ['Attachment' => true]);
         exit;
     }
+
+    /**
+     * Render HTML to PDF bytes (no output/headers).
+     *
+     * @throws RuntimeException
+     */
+    public static function renderPdfBytes(string $html, $paper = 'A4', string $orientation = 'portrait'): string {
+        self::loadDompdf();
+        $options = new \Dompdf\Options();
+        $options->set('isRemoteEnabled', false);
+        $options->set('defaultFont', 'DejaVu Sans');
+        $dompdf = new \Dompdf\Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper($paper, $orientation);
+        $dompdf->render();
+        return (string) $dompdf->output();
+    }
 }

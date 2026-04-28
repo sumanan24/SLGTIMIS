@@ -267,6 +267,14 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                             <span>Students</span>
                                         </a>
                                     </li>
+                                    <?php if (!empty($isAdminOrADM) && ($userRole === 'ADM')): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/students/id-card-select" class="<?php echo (isset($page) && $page === 'students-id-card') ? 'active' : ''; ?>">
+                                            <i class="fas fa-id-card"></i>
+                                            <span>ID Card Print</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
                                     <?php if (!empty($canViewStudentApplications)): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/student-applications" class="<?php echo (isset($page) && $page === 'student-applications') ? 'active' : ''; ?>">
@@ -329,6 +337,16 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                     <?php endif; ?>
                                 </ul>
                             </li>
+
+                            <?php if (!empty($userRole) && $userRole === 'ADM'): ?>
+                            <!-- ID Card Print (ADM) - Main menu shortcut -->
+                            <li>
+                                <a href="<?php echo APP_URL; ?>/students/id-card-select" class="<?php echo (isset($page) && $page === 'students-id-card') ? 'active' : ''; ?>">
+                                    <i class="fas fa-id-card"></i>
+                                    <span>ID Card Print</span>
+                                </a>
+                            </li>
+                            <?php endif; ?>
                             
                             <!-- Attendance Management - Show if user has attendance access or report access -->
                             <?php if ($hasAttendanceAccess || $hasAttendanceReportAccess): ?>

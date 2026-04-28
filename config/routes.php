@@ -42,8 +42,12 @@ return [
     'students/upload-images' => 'StudentController@uploadImages',
     'students/export-excel' => 'StudentController@exportExcel',
     // Student ID card (ADM only)
+    'students/id-card-select' => 'StudentController@idCardSelect',
     'students/id-card' => 'StudentController@idCard',
     'students/id-card-download' => 'StudentController@idCardDownload',
+    'students/id-card-download-zip' => 'StudentController@idCardDownloadZip',
+    // Alias: download JPGs (front/back) as ZIP
+    'students/id-card-download-jpg' => 'StudentController@idCardDownloadZip',
     'staff' => 'StaffController@index',
     'staff/create' => 'StaffController@create',
     'staff/edit' => 'StaffController@edit',

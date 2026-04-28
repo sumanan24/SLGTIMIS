@@ -253,6 +253,14 @@
                                             <a href="<?php echo APP_URL; ?>/students/view?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-primary" title="View">
                                                 <i class="fas fa-eye"></i>
                                             </a>
+                                            <?php if (!empty($isADM)): ?>
+                                            <a href="<?php echo APP_URL; ?>/students/id-card?student_id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-primary" title="Preview ID Card">
+                                                <i class="fas fa-id-card"></i>
+                                            </a>
+                                            <a href="<?php echo APP_URL; ?>/students/id-card?student_id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-success" title="Open ID card and download PNG/JPG">
+                                                <i class="fas fa-download"></i>
+                                            </a>
+                                            <?php endif; ?>
                                             <?php if (isset($canEdit) && $canEdit): ?>
                                             <a href="<?php echo APP_URL; ?>/students/edit?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-primary" title="Edit">
                                                 <i class="fas fa-edit"></i>

@@ -1601,7 +1601,7 @@ class StudentController extends Controller {
      * ADM: preview student ID card (front + back).
      * URL: /students/id-card?student_id=YYYY/DEP/CODE001
      */
-    public function idCard(): void
+    public function idCard()
     {
         if (!$this->requireAdmOrAdmin('students')) {
             return;
@@ -1612,6 +1612,8 @@ class StudentController extends Controller {
             $this->redirect('students');
             return;
         }
+
+        $style = $this->idCardReadStyleOptionsFromRequest();
 
         $studentModel = $this->model('StudentModel');
         $student = $studentModel->find($studentId);
@@ -1649,10 +1651,35 @@ class StudentController extends Controller {
             'qrDataUri' => $qrDataUri,
             'enrollDateDmy' => date('d/m/Y', $enrollTs),
             'expiryDateDmy' => date('d/m/Y', $expiryTs),
+            // Keep PDF route for compatibility, but UI uses JPG download
             'downloadUrl' => APP_URL . '/students/id-card-download?student_id=' . rawurlencode($studentId),
+            'downloadZipUrl' => APP_URL . '/students/id-card-download-jpg?student_id=' . rawurlencode($studentId),
+            'style' => $style,
+            'jpgExportAvailable' => class_exists('Imagick') && class_exists('ZipArchive'),
+            'jpgExportMissing' => [
+                'imagick' => !class_exists('Imagick'),
+                'zip' => !class_exists('ZipArchive'),
+            ],
         ];
 
-        $this->view('students/id_card', $data);
+        return $this->view('students/id_card', $data);
+    }
+
+    /**
+     * ADM: menu entry page to start printing an ID card.
+     */
+    public function idCardSelect()
+    {
+        if (!$this->requireAdmOrAdmin('students')) {
+            return;
+        }
+
+        $data = [
+            'title' => 'ID Card Print',
+            'page' => 'students-id-card',
+        ];
+
+        return $this->view('students/id_card_select', $data);
     }
 
     /**
@@ -1690,6 +1717,8 @@ class StudentController extends Controller {
         if (!$enrollment) {
             $enrollment = $enrollmentModel->getLatestEnrollment($studentId);
         }
+
+        $style = $this->idCardReadStyleOptionsFromRequest();
 
         require_once BASE_PATH . '/helpers/StudentIdCardHelper.php';
         $verifyUrl = APP_URL . '/search_student.php?mode=id&q=' . rawurlencode($studentId);
@@ -1735,6 +1764,7 @@ class StudentController extends Controller {
             'enrollDateDmy' => date('d/m/Y', $enrollTs),
             'expiryDateDmy' => date('d/m/Y', $expiryTs),
             'e' => $e,
+            'style' => $style,
         ];
 
         extract($payload, EXTR_SKIP);
@@ -1752,6 +1782,217 @@ class StudentController extends Controller {
 
         $fn = 'student_id_' . preg_replace('/[^a-zA-Z0-9_-]+/', '_', $studentId) . '.pdf';
         ExamPdfHelper::streamHtml($html, $fn, $paper, 'portrait');
+    }
+
+    /**
+     * ADM: download ID card as JPEGs (front + back) zipped.
+     * Uses dompdf to render PDF bytes, then rasterizes via Imagick.
+     */
+    public function idCardDownloadZip(): void
+    {
+        if (!$this->requireAdmOrAdmin('students')) {
+            return;
+        }
+        $studentId = trim((string) $this->get('student_id', ''));
+        if ($studentId === '') {
+            $_SESSION['error'] = 'Student ID is required.';
+            $this->redirect('students');
+            return;
+        }
+
+        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
+        if (!ExamPdfHelper::dompdfAvailable()) {
+            $_SESSION['error'] = 'PDF engine not installed. Run: composer install.';
+            $this->redirect('students');
+            return;
+        }
+
+        if (!class_exists('Imagick')) {
+            $_SESSION['error'] = 'JPEG export requires Imagick (PHP extension) + Ghostscript. Please enable Imagick on the server.';
+            $this->redirect('students/id-card?student_id=' . rawurlencode($studentId));
+            return;
+        }
+        if (!class_exists('ZipArchive')) {
+            $_SESSION['error'] = 'ZIP export requires ZipArchive (PHP extension). Please enable it on the server.';
+            $this->redirect('students/id-card?student_id=' . rawurlencode($studentId));
+            return;
+        }
+
+        $studentModel = $this->model('StudentModel');
+        $student = $studentModel->find($studentId);
+        if (!$student) {
+            $_SESSION['error'] = 'Student not found.';
+            $this->redirect('students');
+            return;
+        }
+
+        $enrollmentModel = $this->model('StudentEnrollmentModel');
+        $enrollment = $enrollmentModel->getCurrentEnrollment($studentId);
+        if (!$enrollment) {
+            $enrollment = $enrollmentModel->getLatestEnrollment($studentId);
+        }
+
+        $style = $this->idCardReadStyleOptionsFromRequest();
+
+        require_once BASE_PATH . '/helpers/StudentIdCardHelper.php';
+        $verifyUrl = APP_URL . '/search_student.php?mode=id&q=' . rawurlencode($studentId);
+        $qrDataUri = StudentIdCardHelper::qrPngDataUri($verifyUrl, 520, 0);
+
+        $profileDataUri = null;
+        $localProfile = StudentIdCardHelper::resolveStudentProfileLocalPath($student);
+        if ($localProfile) {
+            $profileDataUri = StudentIdCardHelper::imageFileToDataUri($localProfile);
+        }
+
+        $enrollDate = (string) ($enrollment['student_enroll_date'] ?? '');
+        $enrollTs = $enrollDate !== '' ? strtotime($enrollDate) : false;
+        if ($enrollTs === false) {
+            $enrollTs = time();
+        }
+        $expiryTs = strtotime('+3 years', $enrollTs) ?: $enrollTs;
+
+        $logo = StudentIdCardHelper::slgtiLogoDataUri();
+        $crest = StudentIdCardHelper::crestDataUri();
+        $sig = StudentIdCardHelper::principalSignatureDataUri();
+
+        $e = static function ($v): string {
+            return htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
+        };
+
+        $viewPath = BASE_PATH . '/views/students/pdf/id_card.php';
+        $payload = [
+            'student' => $student,
+            'enrollment' => $enrollment,
+            'verifyUrl' => $verifyUrl,
+            'qrDataUri' => $qrDataUri,
+            'profileDataUri' => $profileDataUri,
+            'logoDataUri' => $logo,
+            'crestDataUri' => $crest,
+            'principalSigDataUri' => $sig,
+            'enrollDateDmy' => date('d/m/Y', $enrollTs),
+            'expiryDateDmy' => date('d/m/Y', $expiryTs),
+            'e' => $e,
+            'style' => $style,
+        ];
+
+        extract($payload, EXTR_SKIP);
+        ob_start();
+        include $viewPath;
+        $inner = (string) ob_get_clean();
+        $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Student ID Card</title></head><body>' . $inner . '</body></html>';
+
+        $mmToPt = 72 / 25.4;
+        $w = 85.6 * $mmToPt;
+        $h = 54.0 * $mmToPt;
+        $paper = [0, 0, $w, $h];
+
+        $pdfBytes = ExamPdfHelper::renderPdfBytes($html, $paper, 'portrait');
+
+        try {
+            $im = new Imagick();
+            $im->setResolution(300, 300);
+            $im->readImageBlob($pdfBytes);
+            $im->setImageFormat('jpeg');
+
+            // Collect 2 pages (front/back)
+            $jpgs = [];
+            $maxPages = min(2, $im->getNumberImages());
+            $im->setIteratorIndex(0);
+            for ($i = 0; $i < $maxPages; $i++) {
+                $im->setIteratorIndex($i);
+                /** @var Imagick $frame */
+                $frame = $im->getImage();
+                $frame->setImageFormat('jpeg');
+                $frame->setImageCompressionQuality(92);
+                $jpgs[] = $frame->getImageBlob();
+            }
+            $im->clear();
+            $im->destroy();
+
+            if (count($jpgs) < 2) {
+                throw new RuntimeException('Could not rasterize both pages.');
+            }
+
+            $zip = new ZipArchive();
+            $tmp = tempnam(sys_get_temp_dir(), 'idzip');
+            if ($tmp === false) {
+                throw new RuntimeException('Could not create temporary zip file.');
+            }
+            // Ensure .zip extension
+            $zipPath = $tmp . '.zip';
+            @rename($tmp, $zipPath);
+
+            if ($zip->open($zipPath, ZipArchive::CREATE) !== true) {
+                throw new RuntimeException('Could not create zip.');
+            }
+
+            $safe = preg_replace('/[^a-zA-Z0-9_-]+/', '_', $studentId) ?: 'student';
+            $zip->addFromString($safe . '_front.jpg', $jpgs[0]);
+            $zip->addFromString($safe . '_back.jpg', $jpgs[1]);
+            $zip->close();
+
+            $zipBytes = (string) file_get_contents($zipPath);
+            @unlink($zipPath);
+
+            $fn = 'student_id_' . $safe . '_jpg.zip';
+            header('Content-Type: application/zip');
+            header('Content-Disposition: attachment; filename="' . $fn . '"');
+            header('Content-Length: ' . (string) strlen($zipBytes));
+            header('Cache-Control: private, max-age=0');
+            header('Pragma: public');
+            echo $zipBytes;
+            exit;
+        } catch (Throwable $ex) {
+            $_SESSION['error'] = 'JPEG export failed: ' . $ex->getMessage();
+            $this->redirect('students/id-card?student_id=' . rawurlencode($studentId));
+            return;
+        }
+    }
+
+    /**
+     * Read style options from query string, with safe bounds.
+     *
+     * @return array{name:int,label:int,value:int,qr:int,pad:int,gap:int,stack:int,bar:int,photo_w:int,photo_h:int}
+     */
+    private function idCardReadStyleOptionsFromRequest(): array
+    {
+        $name = (int) $this->get('name_fs', 20);
+        $label = (int) $this->get('label_fs', 10);
+        $value = (int) $this->get('value_fs', 15);
+        $qr = (int) $this->get('qr_px', 176);
+
+        // spacing controls (px on preview; converted in PDF template)
+        $pad = (int) $this->get('pad_px', 16);     // card padding (x & y)
+        $gap = (int) $this->get('gap_px', 12);     // photo-to-text gap
+        $stack = (int) $this->get('stack_px', 3);  // spacing between rows
+        $bar = (int) $this->get('bar_px', 14);     // bottom bar offset
+        $photoW = (int) $this->get('photo_w_px', 124); // photo width
+        $photoH = (int) $this->get('photo_h_px', 124); // photo height
+
+        $name = max(14, min(26, $name));
+        $label = max(8, min(14, $label));
+        $value = max(10, min(18, $value));
+        $qr = max(140, min(220, $qr));
+
+        $pad = max(12, min(20, $pad));
+        $gap = max(8, min(16, $gap));
+        $stack = max(1, min(6, $stack));
+        $bar = max(10, min(18, $bar));
+        $photoW = max(90, min(150, $photoW));
+        $photoH = max(90, min(150, $photoH));
+
+        return [
+            'name' => $name,
+            'label' => $label,
+            'value' => $value,
+            'qr' => $qr,
+            'pad' => $pad,
+            'gap' => $gap,
+            'stack' => $stack,
+            'bar' => $bar,
+            'photo_w' => $photoW,
+            'photo_h' => $photoH,
+        ];
     }
     
     public function resetPassword() {
