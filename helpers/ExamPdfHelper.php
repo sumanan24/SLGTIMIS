@@ -42,7 +42,7 @@ class ExamPdfHelper {
      *
      * @throws RuntimeException
      */
-    public static function streamHtml(string $html, string $filename, string $paper = 'A4', string $orientation = 'portrait'): void {
+    public static function streamHtml(string $html, string $filename, $paper = 'A4', string $orientation = 'portrait'): void {
         self::loadDompdf();
         $options = new \Dompdf\Options();
         $options->set('isRemoteEnabled', false);

@@ -993,14 +993,19 @@ class StudentApplicationController extends Controller {
         }
 
         $ext = strtolower(pathinfo($baseName, PATHINFO_EXTENSION));
-        $mime = match ($ext) {
-            'pdf' => 'application/pdf',
-            'jpg', 'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'gif' => 'image/gif',
-            'webp' => 'image/webp',
-            default => 'application/octet-stream',
-        };
+        // Use if/elseif for PHP < 8.0 compatibility (no match expression).
+        $mime = 'application/octet-stream';
+        if ($ext === 'pdf') {
+            $mime = 'application/pdf';
+        } elseif ($ext === 'jpg' || $ext === 'jpeg') {
+            $mime = 'image/jpeg';
+        } elseif ($ext === 'png') {
+            $mime = 'image/png';
+        } elseif ($ext === 'gif') {
+            $mime = 'image/gif';
+        } elseif ($ext === 'webp') {
+            $mime = 'image/webp';
+        }
 
         $safeStem = preg_replace('/[^a-zA-Z0-9_-]+/', '_', pathinfo($baseName, PATHINFO_FILENAME)) ?: 'document';
         $dispName = 'app' . $applicationId . '_' . $safeStem . ($ext !== '' ? '.' . $ext : '');

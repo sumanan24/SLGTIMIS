@@ -4,6 +4,25 @@
  */
 
 class StudentController extends Controller {
+    private function requireAdmOrAdmin(string $redirect = 'students'): bool
+    {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $role = $userModel->getUserRole($_SESSION['user_id']);
+        $isADM = ($role === 'ADM');
+        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
+        if (!$isADM && !$isAdmin) {
+            $_SESSION['error'] = 'Access denied. Only ADM users can access this page.';
+            $this->redirect($redirect);
+            return false;
+        }
+        return true;
+    }
+
     private function containsNonEnglishChars($value) {
         if ($value === null) return false;
         $value = (string)$value;
@@ -318,7 +337,8 @@ class StudentController extends Controller {
                 'approvedAmount' => $approvedAmount,
                 'pendingAmount' => $pendingAmount
             ],
-            'canEdit' => $canEdit
+            'canEdit' => $canEdit,
+            'isADM' => $isADM
         ];
         
         return $this->view('students/view', $data);
@@ -1575,6 +1595,163 @@ class StudentController extends Controller {
 
         unset($_SESSION['error'], $_SESSION['message']);
         return $this->view('admin/deleted-students', $data);
+    }
+
+    /**
+     * ADM: preview student ID card (front + back).
+     * URL: /students/id-card?student_id=YYYY/DEP/CODE001
+     */
+    public function idCard(): void
+    {
+        if (!$this->requireAdmOrAdmin('students')) {
+            return;
+        }
+        $studentId = trim((string) $this->get('student_id', ''));
+        if ($studentId === '') {
+            $_SESSION['error'] = 'Student ID is required.';
+            $this->redirect('students');
+            return;
+        }
+
+        $studentModel = $this->model('StudentModel');
+        $student = $studentModel->find($studentId);
+        if (!$student) {
+            $_SESSION['error'] = 'Student not found.';
+            $this->redirect('students');
+            return;
+        }
+
+        $enrollmentModel = $this->model('StudentEnrollmentModel');
+        $enrollment = $enrollmentModel->getCurrentEnrollment($studentId);
+        if (!$enrollment) {
+            $enrollment = $enrollmentModel->getLatestEnrollment($studentId);
+        }
+
+        require_once BASE_PATH . '/helpers/StudentIdCardHelper.php';
+        $verifyUrl = APP_URL . '/search_student.php?mode=id&q=' . rawurlencode($studentId);
+        $qrDataUri = StudentIdCardHelper::qrPngDataUri($verifyUrl, 360, 0);
+
+        $profileImageUrl = $studentModel->getProfileImagePath($student);
+        $enrollDate = (string) ($enrollment['student_enroll_date'] ?? '');
+        $enrollTs = $enrollDate !== '' ? strtotime($enrollDate) : false;
+        if ($enrollTs === false) {
+            $enrollTs = time();
+        }
+        $expiryTs = strtotime('+3 years', $enrollTs) ?: $enrollTs;
+
+        $data = [
+            'title' => 'Student ID Card',
+            'page' => 'students',
+            'student' => $student,
+            'enrollment' => $enrollment,
+            'profileImageUrl' => $profileImageUrl,
+            'verifyUrl' => $verifyUrl,
+            'qrDataUri' => $qrDataUri,
+            'enrollDateDmy' => date('d/m/Y', $enrollTs),
+            'expiryDateDmy' => date('d/m/Y', $expiryTs),
+            'downloadUrl' => APP_URL . '/students/id-card-download?student_id=' . rawurlencode($studentId),
+        ];
+
+        $this->view('students/id_card', $data);
+    }
+
+    /**
+     * ADM: download ID card as a 2-page PDF (front then back), card-size.
+     */
+    public function idCardDownload(): void
+    {
+        if (!$this->requireAdmOrAdmin('students')) {
+            return;
+        }
+        $studentId = trim((string) $this->get('student_id', ''));
+        if ($studentId === '') {
+            $_SESSION['error'] = 'Student ID is required.';
+            $this->redirect('students');
+            return;
+        }
+
+        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
+        if (!ExamPdfHelper::dompdfAvailable()) {
+            $_SESSION['error'] = 'PDF engine not installed. Run: composer install.';
+            $this->redirect('students');
+            return;
+        }
+
+        $studentModel = $this->model('StudentModel');
+        $student = $studentModel->find($studentId);
+        if (!$student) {
+            $_SESSION['error'] = 'Student not found.';
+            $this->redirect('students');
+            return;
+        }
+
+        $enrollmentModel = $this->model('StudentEnrollmentModel');
+        $enrollment = $enrollmentModel->getCurrentEnrollment($studentId);
+        if (!$enrollment) {
+            $enrollment = $enrollmentModel->getLatestEnrollment($studentId);
+        }
+
+        require_once BASE_PATH . '/helpers/StudentIdCardHelper.php';
+        $verifyUrl = APP_URL . '/search_student.php?mode=id&q=' . rawurlencode($studentId);
+        $qrDataUri = StudentIdCardHelper::qrPngDataUri($verifyUrl, 520, 0);
+
+        $profileDataUri = null;
+        $localProfile = StudentIdCardHelper::resolveStudentProfileLocalPath($student);
+        if ($localProfile) {
+            $profileDataUri = StudentIdCardHelper::imageFileToDataUri($localProfile);
+        }
+
+        $enrollDate = (string) ($enrollment['student_enroll_date'] ?? '');
+        $enrollTs = $enrollDate !== '' ? strtotime($enrollDate) : false;
+        if ($enrollTs === false) {
+            $enrollTs = time();
+        }
+        $expiryTs = strtotime('+3 years', $enrollTs) ?: $enrollTs;
+
+        $viewPath = BASE_PATH . '/views/students/pdf/id_card.php';
+        if (!is_file($viewPath)) {
+            $_SESSION['error'] = 'ID card PDF template missing.';
+            $this->redirect('students');
+            return;
+        }
+
+        $logo = StudentIdCardHelper::slgtiLogoDataUri();
+        $crest = StudentIdCardHelper::crestDataUri();
+        $sig = StudentIdCardHelper::principalSignatureDataUri();
+
+        $e = static function ($v): string {
+            return htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
+        };
+
+        $payload = [
+            'student' => $student,
+            'enrollment' => $enrollment,
+            'verifyUrl' => $verifyUrl,
+            'qrDataUri' => $qrDataUri,
+            'profileDataUri' => $profileDataUri,
+            'logoDataUri' => $logo,
+            'crestDataUri' => $crest,
+            'principalSigDataUri' => $sig,
+            'enrollDateDmy' => date('d/m/Y', $enrollTs),
+            'expiryDateDmy' => date('d/m/Y', $expiryTs),
+            'e' => $e,
+        ];
+
+        extract($payload, EXTR_SKIP);
+        ob_start();
+        include $viewPath;
+        $inner = (string) ob_get_clean();
+
+        $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Student ID Card</title></head><body>' . $inner . '</body></html>';
+
+        // Card size: 85.6mm x 54mm in points (1mm = 72/25.4 pt)
+        $mmToPt = 72 / 25.4;
+        $w = 85.6 * $mmToPt;
+        $h = 54.0 * $mmToPt;
+        $paper = [0, 0, $w, $h];
+
+        $fn = 'student_id_' . preg_replace('/[^a-zA-Z0-9_-]+/', '_', $studentId) . '.pdf';
+        ExamPdfHelper::streamHtml($html, $fn, $paper, 'portrait');
     }
     
     public function resetPassword() {

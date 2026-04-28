@@ -933,6 +933,11 @@
                 Quick Actions
             </h3>
             <div class="cv-actions">
+                <?php if (!empty($isADM)): ?>
+                <a href="<?php echo APP_URL; ?>/students/id-card?student_id=<?php echo urlencode($student['student_id']); ?>" class="cv-btn cv-btn-outline">
+                    <i class="fas fa-id-card"></i>Student ID Card
+                </a>
+                <?php endif; ?>
                 <?php if (isset($canEdit) && $canEdit): ?>
                 <a href="<?php echo APP_URL; ?>/students/edit?id=<?php echo urlencode($student['student_id']); ?>" class="cv-btn cv-btn-primary">
                     <i class="fas fa-edit"></i>Edit Profile

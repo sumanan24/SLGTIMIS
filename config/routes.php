@@ -41,6 +41,9 @@ return [
     'students/import-images' => 'StudentController@importImages',
     'students/upload-images' => 'StudentController@uploadImages',
     'students/export-excel' => 'StudentController@exportExcel',
+    // Student ID card (ADM only)
+    'students/id-card' => 'StudentController@idCard',
+    'students/id-card-download' => 'StudentController@idCardDownload',
     'staff' => 'StaffController@index',
     'staff/create' => 'StaffController@create',
     'staff/edit' => 'StaffController@edit',
