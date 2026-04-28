@@ -32,13 +32,17 @@ final class StudentIdCardHelper
             return null;
         }
         $ext = strtolower((string) pathinfo($filePath, PATHINFO_EXTENSION));
-        $mime = match ($ext) {
-            'png' => 'image/png',
-            'jpg', 'jpeg' => 'image/jpeg',
-            'gif' => 'image/gif',
-            'svg' => 'image/svg+xml',
-            default => null,
-        };
+        // PHP < 8 compatibility: no match expression
+        $mime = null;
+        if ($ext === 'png') {
+            $mime = 'image/png';
+        } elseif ($ext === 'jpg' || $ext === 'jpeg') {
+            $mime = 'image/jpeg';
+        } elseif ($ext === 'gif') {
+            $mime = 'image/gif';
+        } elseif ($ext === 'svg') {
+            $mime = 'image/svg+xml';
+        }
         if ($mime === null) {
             return null;
         }
@@ -93,7 +97,8 @@ final class StudentIdCardHelper
         if ($rel === '') {
             return null;
         }
-        if (str_starts_with($rel, 'assets/')) {
+        // PHP < 8 compatibility: no str_starts_with
+        if (substr($rel, 0, 7) === 'assets/') {
             $rel = substr($rel, 7);
         }
         $candidate = BASE_PATH . '/assets/' . $rel;
