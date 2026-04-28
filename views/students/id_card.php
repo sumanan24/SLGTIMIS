@@ -2,7 +2,6 @@
 /** @var array $student */
 /** @var array|null $enrollment */
 /** @var string|null $profileImageUrl */
-/** @var string $qrDataUri */
 /** @var string $verifyUrl */
 /** @var string $enrollDateDmy */
 /** @var string $expiryDateDmy */
@@ -12,7 +11,6 @@
 $student = $student ?? [];
 $enrollment = $enrollment ?? null;
 $profileImageUrl = $profileImageUrl ?? null;
-$qrDataUri = (string) ($qrDataUri ?? '');
 $verifyUrl = (string) ($verifyUrl ?? '');
 $downloadUrl = (string) ($downloadUrl ?? '');
 $downloadZipUrl = (string) ($downloadZipUrl ?? '');
@@ -131,7 +129,8 @@ $course = (string) (($enrollment['course_name'] ?? '') ?: '');
     .id-card.back .pad { padding: var(--card-pad-y) var(--card-pad-x) 22px; }
     .id-card .back-grid { display: grid; grid-template-columns: 200px 1fr; gap: 14px; align-items: start; margin-top: 6px; }
     .id-card .scan-title { font-weight: 900; font-size: 24px; color: var(--card-text); line-height: 1.05; }
-    .id-card .qr { width: var(--qr-size); height: var(--qr-size); border-radius: 12px; border: 6px solid #fff; box-shadow: 0 10px 22px rgba(2, 6, 23, .12); background: #fff; display: block; }
+    .id-card .qr-canvas { width: var(--qr-size); height: var(--qr-size); border-radius: 12px; border: 6px solid #fff; box-shadow: 0 10px 22px rgba(2, 6, 23, .12); background: #fff; display: block; }
+    .id-card .qr-canvas canvas, .id-card .qr-canvas img { width: 100% !important; height: 100% !important; display: block; }
     .id-card .back h4 { margin: 0 0 6px; font-weight: 900; color:var(--card-muted); font-size: 14px; }
     .id-card .back p { margin: 0; font-size: 11.5px; color:var(--card-sub); line-height: 1.35; }
     .id-card .valid { margin-top: 10px; }
@@ -271,7 +270,7 @@ $course = (string) (($enrollment['course_name'] ?? '') ?: '');
                 <div class="back-grid">
                     <div>
                         <div class="scan-title">Scan to Verify</div>
-                        <img class="qr mt-2" src="<?php echo $e($qrDataUri); ?>" alt="QR">
+                        <div id="qrTarget" class="mt-2"></div>
                     </div>
                     <div class="back">
                         <h4>Instructions</h4>
@@ -354,6 +353,7 @@ $course = (string) (($enrollment['course_name'] ?? '') ?: '');
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" crossorigin="anonymous"></script>
 <script>
 (() => {
     const studentId = <?php echo json_encode($studentId, JSON_UNESCAPED_SLASHES); ?>;
@@ -362,10 +362,29 @@ $course = (string) (($enrollment['course_name'] ?? '') ?: '');
     const btnFront = document.getElementById('btnPngFront');
     const btnBack = document.getElementById('btnPngBack');
     const btnZip = document.getElementById('btnPngZip');
+    const verifyUrl = <?php echo json_encode($verifyUrl, JSON_UNESCAPED_SLASHES); ?>;
+    const qrTarget = document.getElementById('qrTarget');
 
     function safeName(s) {
         return String(s || 'student').replace(/[^a-zA-Z0-9_-]+/g, '_');
     }
+
+    let qr = null;
+    function renderQr() {
+        if (!qrTarget || !window.QRCode) return;
+        qrTarget.classList.add('qr-canvas');
+        qrTarget.innerHTML = '';
+        const size = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--qr-size')) || 176;
+        qr = new QRCode(qrTarget, {
+            text: verifyUrl,
+            width: size,
+            height: size,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.M
+        });
+    }
+    renderQr();
 
     async function capturePngBlob(el) {
         // Scale for better quality
@@ -419,6 +438,14 @@ $course = (string) (($enrollment['course_name'] ?? '') ?: '');
         const out = await zip.generateAsync({ type: 'blob' });
         downloadBlob(out, 'student_id_' + base + '_png.zip');
     }));
+
+    // Re-render QR when QR size slider changes
+    const ctlQr = document.getElementById('ctlQr');
+    if (ctlQr) {
+        ctlQr.addEventListener('change', () => {
+            setTimeout(renderQr, 0);
+        });
+    }
 })();
 </script>
 

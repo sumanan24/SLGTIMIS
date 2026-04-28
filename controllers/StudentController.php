@@ -1629,9 +1629,7 @@ class StudentController extends Controller {
             $enrollment = $enrollmentModel->getLatestEnrollment($studentId);
         }
 
-        require_once BASE_PATH . '/helpers/StudentIdCardHelper.php';
         $verifyUrl = APP_URL . '/search_student.php?mode=id&q=' . rawurlencode($studentId);
-        $qrDataUri = StudentIdCardHelper::qrPngDataUri($verifyUrl, 360, 0);
 
         $profileImageUrl = $studentModel->getProfileImagePath($student);
         $enrollDate = (string) ($enrollment['student_enroll_date'] ?? '');
@@ -1648,7 +1646,6 @@ class StudentController extends Controller {
             'enrollment' => $enrollment,
             'profileImageUrl' => $profileImageUrl,
             'verifyUrl' => $verifyUrl,
-            'qrDataUri' => $qrDataUri,
             'enrollDateDmy' => date('d/m/Y', $enrollTs),
             'expiryDateDmy' => date('d/m/Y', $expiryTs),
             // Keep PDF route for compatibility, but UI uses JPG download
