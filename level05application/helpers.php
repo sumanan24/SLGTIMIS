@@ -928,9 +928,27 @@ function l05_safe_delete_stored_upload(?string $relativePath): void {
  */
 function l05_process_uploads(string $nic, array $files, ?array $existingPaths = null): array {
     $nicFolder = l05_nic_folder_segment($nic);
-    $baseDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'student_applications' . DIRECTORY_SEPARATOR . $nicFolder;
+    $projectRoot = dirname(__DIR__);
+    $uploadsRoot = $projectRoot . DIRECTORY_SEPARATOR . 'uploads';
+    $studentAppsRoot = $uploadsRoot . DIRECTORY_SEPARATOR . 'student_applications';
+
+    // Ensure base folders exist (helps when production deploy misses writable uploads/ folder).
+    if (!is_dir($uploadsRoot) && !mkdir($uploadsRoot, 0755, true) && !is_dir($uploadsRoot)) {
+        throw new RuntimeException('Upload error: cannot create uploads folder.');
+    }
+    if (!is_dir($studentAppsRoot) && !mkdir($studentAppsRoot, 0755, true) && !is_dir($studentAppsRoot)) {
+        throw new RuntimeException('Upload error: cannot create uploads/student_applications folder.');
+    }
+    if (!is_writable($studentAppsRoot)) {
+        throw new RuntimeException('Upload error: uploads/student_applications is not writable by the server.');
+    }
+
+    $baseDir = $studentAppsRoot . DIRECTORY_SEPARATOR . $nicFolder;
     if (!is_dir($baseDir) && !mkdir($baseDir, 0755, true) && !is_dir($baseDir)) {
-        throw new RuntimeException('Could not create upload directory.');
+        throw new RuntimeException('Upload error: could not create upload directory for this NIC.');
+    }
+    if (!is_writable($baseDir)) {
+        throw new RuntimeException('Upload error: upload directory is not writable by the server.');
     }
 
     $relPrefix = 'uploads/student_applications/' . $nicFolder . '/';
