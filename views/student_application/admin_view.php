@@ -1,6 +1,8 @@
 <?php
 /** @var array<string, mixed> $app */
 $app = $app ?? [];
+/** @var bool $can_delete */
+$can_delete = (bool) ($can_delete ?? false);
 
 if (!class_exists('StudentApplicationModel', false)) {
     require_once BASE_PATH . '/models/StudentApplicationModel.php';
@@ -37,6 +39,7 @@ $docLabels = [
 $listUrl = rtrim(APP_URL, '/') . '/student-applications';
 $appId = (int) ($app['application_id'] ?? 0);
 $appLevel = (string) ($app['application_level'] ?? '');
+$_deleteAction = rtrim(APP_URL, '/') . '/student-applications/delete';
 
 $docMediaKind = static function (string $relativePath): string {
     $ext = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
@@ -116,6 +119,15 @@ $exportPdfUrl = rtrim(APP_URL, '/') . '/student-applications/export-pdf?id=' . $
             <a class="btn btn-outline-danger btn-sm" href="<?php echo $esc($exportPdfUrl); ?>" title="PDF summary: same fields as CSV (no uploads)">
                 <i class="fas fa-file-pdf me-1" aria-hidden="true"></i>Download PDF summary
             </a>
+            <?php if ($can_delete): ?>
+            <form method="post" action="<?php echo $esc($_deleteAction); ?>" class="d-inline"
+                  onsubmit="return confirm('Delete application #<?php echo $appId; ?>? This will also remove uploaded documents on the server.');">
+                <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
+                <button type="submit" class="btn btn-danger btn-sm">
+                    <i class="fas fa-trash me-1" aria-hidden="true"></i>Delete
+                </button>
+            </form>
+            <?php endif; ?>
         </div>
     </div>
     <div class="sa-view-heading">

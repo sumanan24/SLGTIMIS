@@ -41,6 +41,10 @@ class StudentApplicationModel extends Model {
         $this->ensureTable();
     }
 
+    protected function getPrimaryKey() {
+        return 'application_id';
+    }
+
     /**
      * Create table from database/student_applications.sql if missing.
      */
@@ -141,7 +145,7 @@ class StudentApplicationModel extends Model {
     }
 
     /**
-     * @return array{total: int, by_level: list<array{level: string, count: int}>, by_district: list<array{label: string, count: int}>, by_course: list<array{label: string, count: int}>}
+     * @return array{total: int, by_level: list<array{level: string, count: int}>, by_district: list<array{label: string, count: int}>, by_course: list<array{label: string, count: int}>, by_department: list<array{label: string, count: int}>}
      */
     public function getDashboardStats(): array {
         $this->ensureTable();
@@ -150,6 +154,7 @@ class StudentApplicationModel extends Model {
             'by_level' => [],
             'by_district' => [],
             'by_course' => [],
+            'by_department' => [],
         ];
         $t = $this->table;
         $res = $this->db->query("SELECT COUNT(*) AS `c` FROM `{$t}`");
@@ -189,7 +194,45 @@ class StudentApplicationModel extends Model {
                 ];
             }
         }
+
+        // Department-wise: map course_priority_1 to courses.course_name, then to departments.
+        // If there's no match, group as "(Not matched)".
+        $sqlDept = "SELECT COALESCE(NULLIF(TRIM(d.`department_name`), ''), '(Not matched)') AS `lbl`, COUNT(*) AS `cnt` "
+            . "FROM `{$t}` sa "
+            . "LEFT JOIN `course` c ON TRIM(c.`course_name`) = TRIM(sa.`course_priority_1`) "
+            . "LEFT JOIN `department` d ON d.`department_id` = c.`department_id` "
+            . "GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC LIMIT 40";
+        $res = $this->db->query($sqlDept);
+        if ($res) {
+            while ($row = $res->fetch_assoc()) {
+                $out['by_department'][] = [
+                    'label' => (string) ($row['lbl'] ?? ''),
+                    'count' => (int) ($row['cnt'] ?? 0),
+                ];
+            }
+        }
+
         return $out;
+    }
+
+    /**
+     * Staff export: all applications, using the staff export column order.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getAllForStaffExport(): array {
+        $this->ensureTable();
+        $cols = implode(', ', array_map(static fn (string $c): string => '`' . $c . '`', self::getStaffExportColumnOrder()));
+        $sql = 'SELECT ' . $cols . " FROM `{$this->table}` ORDER BY `created_at` DESC";
+        $res = $this->db->query($sql);
+        if (!$res) {
+            return [];
+        }
+        $rows = [];
+        while ($row = $res->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        return $rows;
     }
 
     public function updateDocumentPaths(int $applicationId, array $paths): bool {

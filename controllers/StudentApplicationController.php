@@ -23,6 +23,66 @@ class StudentApplicationController extends Controller {
     ];
 
     /**
+     * NIC folder segment (uploads/student_applications/{NIC}/) — digits + V/X only.
+     */
+    private function nicFolderSegment(string $nic): string {
+        $nic = strtoupper(preg_replace('/[^0-9VX]/', '', $nic));
+        return $nic !== '' ? $nic : 'unknown';
+    }
+
+    /**
+     * Recursively delete a directory only if it lives under uploads/student_applications/.
+     */
+    private function safeDeleteStudentApplicationUploadDir(string $nic): bool {
+        $root = realpath(BASE_PATH);
+        if ($root === false) {
+            return false;
+        }
+        $uploadsBase = realpath($root . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'student_applications');
+        if ($uploadsBase === false) {
+            // Nothing to delete if uploads root doesn't exist.
+            return true;
+        }
+
+        $seg = $this->nicFolderSegment($nic);
+        $target = $root . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'student_applications' . DIRECTORY_SEPARATOR . $seg;
+        $targetReal = realpath($target);
+        if ($targetReal === false) {
+            return true;
+        }
+
+        $uploadsPrefix = rtrim($uploadsBase, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        if (strpos($targetReal, $uploadsPrefix) !== 0) {
+            return false;
+        }
+        if (!is_dir($targetReal)) {
+            return true;
+        }
+
+        try {
+            $it = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($targetReal, FilesystemIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::CHILD_FIRST
+            );
+            foreach ($it as $fs) {
+                /** @var SplFileInfo $fs */
+                $p = $fs->getPathname();
+                if ($fs->isDir() && !$fs->isLink()) {
+                    @rmdir($p);
+                } else {
+                    @unlink($p);
+                }
+            }
+            @rmdir($targetReal);
+        } catch (Throwable $e) {
+            error_log('StudentApplicationController::safeDeleteStudentApplicationUploadDir: ' . $e->getMessage());
+            return false;
+        }
+
+        return !is_dir($targetReal);
+    }
+
+    /**
      * Signing key for public application form (no session storage).
      */
     private function studentApplicationCsrfKey(): string {
@@ -883,6 +943,7 @@ class StudentApplicationController extends Controller {
             'page' => 'student-applications',
             'applications' => $model->getAllForAdmin(),
             'dashboard_stats' => $model->getDashboardStats(),
+            'can_delete' => $userModel->isAdminOrADM($uid),
             'use_public_layout' => false,
         ]);
     }
@@ -921,8 +982,80 @@ class StudentApplicationController extends Controller {
             'title' => 'Application #' . $id,
             'page' => 'student-applications',
             'app' => $app,
+            'can_delete' => $userModel->isAdminOrADM($uid),
             'use_public_layout' => false,
         ]);
+    }
+
+    /**
+     * Staff (SAO, ADM, admin): delete an application and its uploaded NIC folder.
+     */
+    public function adminDelete(): void {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        if (!$userModel->isAdminOrADM($uid)) {
+            $_SESSION['error'] = 'Only Administrators (ADM) can delete applications.';
+            $this->redirect('dashboard');
+            return;
+        }
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            $this->redirect('student-applications');
+            return;
+        }
+
+        $id = (int) $this->post('application_id', 0);
+        if ($id < 1) {
+            $_SESSION['error'] = 'Invalid application.';
+            $this->redirect('student-applications');
+            return;
+        }
+
+        $model = $this->model('StudentApplicationModel');
+        $app = $model->findById($id);
+        if (!$app) {
+            $_SESSION['error'] = 'That application was not found.';
+            $this->redirect('student-applications');
+            return;
+        }
+
+        $ok = false;
+        try {
+            $ok = (bool) $model->delete($id);
+        } catch (Throwable $e) {
+            error_log('StudentApplicationController::adminDelete delete: ' . $e->getMessage());
+            $ok = false;
+        }
+
+        if (!$ok) {
+            $_SESSION['error'] = 'Could not delete the application.';
+            $this->redirect('student-applications/view?id=' . $id);
+            return;
+        }
+
+        $nic = (string) ($app['student_nic'] ?? '');
+        $filesOk = true;
+        if (trim($nic) !== '') {
+            $filesOk = $this->safeDeleteStudentApplicationUploadDir($nic);
+        }
+
+        $this->logActivity(
+            'DELETE',
+            'student_application',
+            (string) $id,
+            'Deleted online student application #' . $id . '.',
+            $app,
+            null
+        );
+
+        $_SESSION['message'] = $filesOk
+            ? 'Application #' . $id . ' deleted.'
+            : 'Application #' . $id . ' deleted, but some uploaded files could not be removed.';
+        $this->redirect('student-applications');
     }
 
     /**
@@ -1139,5 +1272,84 @@ class StudentApplicationController extends Controller {
 
         echo $pdf;
         exit;
+    }
+
+    /**
+     * Staff: download all applications as Excel (.xlsx) using staff export column order (no document paths).
+     */
+    public function adminExportExcel(): void {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        if (!$userModel->canViewOnlineStudentApplications($uid)) {
+            http_response_code(403);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Forbidden';
+            exit;
+        }
+
+        require_once BASE_PATH . '/vendor/autoload.php';
+
+        $model = $this->model('StudentApplicationModel');
+        $rows = $model->getAllForStaffExport();
+        $cols = StudentApplicationModel::getStaffExportColumnOrder();
+
+        try {
+            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Applications');
+
+            // Header row
+            $c = 1;
+            foreach ($cols as $colName) {
+                $sheet->setCellValueByColumnAndRow($c, 1, $colName);
+                $c++;
+            }
+            $sheet->freezePane('A2');
+
+            // Data rows
+            $r = 2;
+            foreach ($rows as $row) {
+                $c = 1;
+                foreach ($cols as $colName) {
+                    $val = isset($row[$colName]) ? (string) $row[$colName] : '';
+                    $val = str_replace(["\r\n", "\r", "\n"], ' | ', $val);
+                    $sheet->setCellValueExplicitByColumnAndRow(
+                        $c,
+                        $r,
+                        $val,
+                        \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+                    );
+                    $c++;
+                }
+                $r++;
+            }
+
+            // Simple formatting
+            $sheet->getStyle('1:1')->getFont()->setBold(true);
+            $sheet->setAutoFilter($sheet->calculateWorksheetDimension());
+            foreach (range(1, count($cols)) as $colIdx) {
+                $sheet->getColumnDimensionByColumn($colIdx)->setAutoSize(true);
+            }
+
+            $filename = 'student_applications_' . date('Y-m-d_H-i') . '.xlsx';
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
+            header('Cache-Control: private, max-age=0');
+
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save('php://output');
+            exit;
+        } catch (Throwable $e) {
+            error_log('StudentApplicationController::adminExportExcel: ' . $e->getMessage());
+            http_response_code(500);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Service unavailable';
+            exit;
+        }
     }
 }

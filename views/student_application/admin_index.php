@@ -1,8 +1,10 @@
 <?php
 /** @var list<array<string, mixed>> $applications */
 $applications = $applications ?? [];
-/** @var array{total: int, by_level: list<array{level: string, count: int}>, by_district: list<array{label: string, count: int}>, by_course: list<array{label: string, count: int}>} $dashboard_stats */
-$dashboard_stats = $dashboard_stats ?? ['total' => 0, 'by_level' => [], 'by_district' => [], 'by_course' => []];
+/** @var bool $can_delete */
+$can_delete = (bool) ($can_delete ?? false);
+/** @var array{total: int, by_level: list<array{level: string, count: int}>, by_district: list<array{label: string, count: int}>, by_course: list<array{label: string, count: int}>, by_department: list<array{label: string, count: int}>} $dashboard_stats */
+$dashboard_stats = $dashboard_stats ?? ['total' => 0, 'by_level' => [], 'by_district' => [], 'by_course' => [], 'by_department' => []];
 
 $esc = static function (string $s): string {
     return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
@@ -12,6 +14,7 @@ $appBase = rtrim(APP_URL, '/');
 $viewUrl = static function (int $id) use ($appBase, $esc): string {
     return $esc($appBase . '/student-applications/view?id=' . $id);
 };
+$deleteAction = $esc($appBase . '/student-applications/delete');
 
 $formatSubmitted = static function (?string $createdAt) use ($esc): array {
     if ($createdAt === null || trim($createdAt) === '') {
@@ -27,16 +30,21 @@ $total = (int) ($dashboard_stats['total'] ?? 0);
 $byLevel = $dashboard_stats['by_level'] ?? [];
 $byDistrict = $dashboard_stats['by_district'] ?? [];
 $byCourse = $dashboard_stats['by_course'] ?? [];
+$byDepartment = $dashboard_stats['by_department'] ?? [];
 $saAdminCss = htmlspecialchars(rtrim(APP_URL, '/') . '/assets/css/student-applications-admin.css', ENT_QUOTES, 'UTF-8');
+$exportExcelUrl = $esc(rtrim(APP_URL, '/') . '/student-applications/export-excel');
 ?>
 <link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=3">
 <div class="sa-admin-page container-fluid py-3">
     <header class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h1 class="h3 mb-0"><i class="fas fa-file-alt me-2 text-primary" aria-hidden="true"></i>Online applications</h1>
         <p class="small text-muted mb-0">Level 04 &amp; 05 · SAO / ADM</p>
+        <a class="btn btn-outline-success btn-sm" href="<?php echo $exportExcelUrl; ?>">
+            <i class="fas fa-file-excel me-1" aria-hidden="true"></i>Download Excel
+        </a>
     </header>
 
-    <div class="row g-3 mb-4 align-items-stretch">
+    <div class="row g-3 mb-3 align-items-stretch">
         <div class="col-md-4 col-lg-3 d-flex">
             <div class="card border-0 shadow-sm h-100 w-100 bg-primary bg-opacity-10">
                 <div class="card-body">
@@ -118,6 +126,38 @@ $saAdminCss = htmlspecialchars(rtrim(APP_URL, '/') . '/assets/css/student-applic
         </div>
     </div>
 
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-lg-6">
+            <section class="card border-0 shadow-sm h-100 w-100 d-flex flex-column" aria-labelledby="sa-dash-dept">
+                <div class="card-header py-2 fw-semibold small text-uppercase text-muted" id="sa-dash-dept">
+                    <i class="fas fa-building me-1 text-primary" aria-hidden="true"></i> By department (from 1st course choice)
+                </div>
+                <div class="card-body p-0 sa-dash-scroll flex-grow-1">
+                    <table class="table table-sm table-hover mb-0 small sa-dash-table">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th scope="col">Department</th>
+                                <th scope="col" class="text-end">Count</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($byDepartment === []): ?>
+                            <tr><td colspan="2" class="text-muted text-center py-3">No data yet</td></tr>
+                            <?php else: ?>
+                                <?php foreach ($byDepartment as $d): ?>
+                            <tr>
+                                <td class="text-break"><?php echo $esc((string) ($d['label'] ?? '')); ?></td>
+                                <td class="text-end fw-semibold"><?php echo (int) ($d['count'] ?? 0); ?></td>
+                            </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </div>
+
     <section class="card shadow-sm border-0" aria-labelledby="sa-apps-table-title">
         <div class="card-header border-0 bg-transparent pb-0 pt-3 px-3">
             <h2 class="h6 text-muted mb-0" id="sa-apps-table-title">All applications</h2>
@@ -153,7 +193,16 @@ $saAdminCss = htmlspecialchars(rtrim(APP_URL, '/') . '/assets/css/student-applic
                             <td><?php echo $esc((string) ($r['student_phone'] ?? '')); ?></td>
                             <td data-order="<?php echo $submitted['order']; ?>"><?php echo $submitted['display']; ?></td>
                             <td>
-                                <a class="btn btn-sm btn-outline-primary" href="<?php echo $viewUrl($id); ?>">View &amp; documents</a>
+                                <div class="d-flex flex-wrap gap-2 justify-content-end">
+                                    <a class="btn btn-sm btn-outline-primary" href="<?php echo $viewUrl($id); ?>">View</a>
+                                    <?php if ($can_delete): ?>
+                                    <form method="post" action="<?php echo $deleteAction; ?>" class="d-inline"
+                                          onsubmit="return confirm('Delete application #<?php echo $id; ?>? This will also remove uploaded documents on the server.');">
+                                        <input type="hidden" name="application_id" value="<?php echo $id; ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    </form>
+                                    <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                         <?php endforeach; ?>
