@@ -74,7 +74,11 @@ function l05_ensure_student_applications_table(mysqli $conn): void {
             $sql = trim(implode("\n", $kept));
             if ($sql !== '') {
                 try {
-                    $conn->query($sql);
+                    // Same pattern as StudentApplicationModel::ensureTable (handles multi-statement SQL reliably).
+                    $conn->multi_query($sql);
+                    while ($conn->more_results() && $conn->next_result()) {
+                        /* flush */
+                    }
                 } catch (Throwable $e) {
                     error_log('l05_ensure_student_applications_table CREATE: ' . $e->getMessage());
                 }
@@ -155,25 +159,6 @@ function l05_migrate_student_applications_schema(mysqli $conn): void {
         }
     } catch (Throwable $e) {
         error_log('l05_migrate_student_applications_schema: ' . $e->getMessage());
-    }
-}
-
-/**
- * Level 05 NIC and all wizard queries require `application_level`. If the table is an old version
- * and the DB user cannot ALTER, migration is skipped silently — fail here with a clear message.
- */
-function l05_require_student_applications_ready(mysqli $conn): void {
-    $r = $conn->query("SHOW COLUMNS FROM `student_applications` LIKE 'application_level'");
-    $ok = $r && $r->num_rows > 0;
-    if ($r) {
-        $r->free();
-    }
-    if (!$ok) {
-        throw new RuntimeException(
-            'Table `student_applications` exists but column `application_level` is missing. '
-            . 'Import `database/student_applications.sql` (or run the ALTER statements) as a database administrator, '
-            . 'or grant this MySQL user ALTER/CREATE on the application database.'
-        );
     }
 }
 

@@ -32,10 +32,8 @@ try {
     $row = l05_fetch_application_by_nic_level($conn, $nic, L05_APP_LEVEL);
 } catch (Throwable $e) {
     // Log the underlying cause server-side (connection, missing table/column, permissions, etc.)
-    $extra = '';
-    if ($e instanceof mysqli_sql_exception) {
-        $extra = ' (mysql_errno=' . (string) $e->getCode() . ')';
-    }
+    $code = (int) $e->getCode();
+    $extra = $code !== 0 ? ' (code=' . (string) $code . ')' : '';
     error_log('level05application/check_nic.php NIC verify failed' . $extra . ': ' . $e->getMessage());
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => 'Could not verify NIC. Check the database connection and that the table exists.']);

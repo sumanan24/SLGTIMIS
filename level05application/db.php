@@ -31,7 +31,6 @@ try {
     if (!$exists) {
         throw new RuntimeException("Table 'student_applications' does not exist (and could not be created).");
     }
-    l05_require_student_applications_ready($conn);
 } catch (Throwable $e) {
     error_log('level05application/db.php table check failed: ' . $e->getMessage());
     throw $e;
