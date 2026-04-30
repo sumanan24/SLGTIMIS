@@ -70,8 +70,9 @@ try {
     $row = l05_post_to_row($p, $mergedPaths);
     $row = l05_merge_post_row_with_existing($row, $existing);
 } catch (Throwable $e) {
+    error_log('wizard_save_progress invalid data: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Invalid data.']);
+    echo json_encode(['success' => false, 'message' => 'Invalid data: ' . $e->getMessage()]);
     exit;
 }
 

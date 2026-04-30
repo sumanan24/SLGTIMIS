@@ -31,8 +31,9 @@ foreach (L05_FILE_FIELDS as $dbCol) {
 try {
     $row = l05_post_to_row($p, $initialPaths);
 } catch (Throwable $e) {
+    error_log('level05application/insert invalid data: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Invalid data.']);
+    echo json_encode(['success' => false, 'message' => 'Invalid data: ' . $e->getMessage()]);
     exit;
 }
 

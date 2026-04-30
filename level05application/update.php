@@ -73,8 +73,9 @@ try {
 try {
     $row = l05_post_to_row($p, $mergedPaths);
 } catch (Throwable $e) {
+    error_log('level05application/update invalid data: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Invalid data.']);
+    echo json_encode(['success' => false, 'message' => 'Invalid data: ' . $e->getMessage()]);
     exit;
 }
 
