@@ -306,7 +306,8 @@ function l05_multipart_exceeded_post_max(): bool {
     return $max > 0 && $cl > $max;
 }
 
-function l05_value_empty_for_merge(mixed $v): bool {
+// PHP 7 compatibility: no `mixed` type-hint (PHP 8+).
+function l05_value_empty_for_merge($v): bool {
     if ($v === null) {
         return true;
     }
