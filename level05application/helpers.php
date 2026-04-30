@@ -66,7 +66,7 @@ function l05_ensure_student_applications_table(mysqli $conn): void {
             $kept = [];
             foreach ($lines as $line) {
                 $t = trim($line);
-                if ($t === '' || str_starts_with($t, '--')) {
+                if ($t === '' || strpos($t, '--') === 0) {
                     continue;
                 }
                 $kept[] = $line;
@@ -472,9 +472,9 @@ function l05_phone_valid(string $raw): bool {
     if ($d === '') {
         return false;
     }
-    if (str_starts_with($d, '94') && strlen($d) > 2) {
+    if (strpos($d, '94') === 0 && strlen($d) > 2) {
         $d = substr($d, 2);
-    } elseif (str_starts_with($d, '0') && strlen($d) > 1) {
+    } elseif (strpos($d, '0') === 0 && strlen($d) > 1) {
         $d = substr($d, 1);
     }
     return strlen($d) === 9 && (bool) preg_match('/^[1-9]\d{8}$/', $d);

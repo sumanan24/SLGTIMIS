@@ -33,7 +33,8 @@ if (!defined('APP_NAME')) {
     if ($docRoot !== false && $projRoot !== false) {
         $docNorm = rtrim(str_replace('\\', '/', $docRoot), '/');
         $projNorm = str_replace('\\', '/', $projRoot);
-        if ($docNorm !== '' && str_starts_with($projNorm, $docNorm)) {
+        // PHP 7 compatible (str_starts_with is PHP 8+).
+        if ($docNorm !== '' && strpos($projNorm, $docNorm) === 0) {
             $webBase = substr($projNorm, strlen($docNorm));
         }
     }
