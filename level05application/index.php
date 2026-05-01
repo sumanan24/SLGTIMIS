@@ -1310,7 +1310,9 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
       return true;
     }
     if (step === 7) {
-      if (recordFromDb && hadUploadedDocs) return true;
+      // New application: require all six documents.
+      // Updating an existing application: documents are optional (keep existing uploads).
+      if (recordFromDb) return true;
       var miss = false;
       Object.keys(PATH_KEYS).forEach(function (field) {
         var inp = $(field);
