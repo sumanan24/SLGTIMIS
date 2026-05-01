@@ -7,6 +7,8 @@ declare(strict_types=1);
 
 /** @var array<string, list<string>> $slProv */
 $slProv = require dirname(__DIR__) . '/config/sl_provinces_districts.php';
+/** @var array<string, string> $slDistrictPostal */
+$slDistrictPostal = require dirname(__DIR__) . '/config/sl_district_postal_codes.php';
 
 /** Web path to this folder, always ends with / (fixes relative fetch when URL omits trailing slash). */
 $l05ApiBase = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/') . '/';
@@ -27,6 +29,7 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
     <title>SLGTI NVQ Level 05 application - 2026</title>
     <script>window.L05_API_BASE = <?php echo json_encode($l05ApiBase, JSON_UNESCAPED_UNICODE); ?>;</script>
     <script>window.L05_MAIN_APP_BASE = <?php echo json_encode($l05MainAppBasePath, JSON_UNESCAPED_UNICODE); ?>;</script>
+    <script>window.L05_DISTRICT_ZIP = <?php echo json_encode($slDistrictPostal, JSON_UNESCAPED_UNICODE); ?>;</script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
     <style>
@@ -221,11 +224,6 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
                                     <div class="invalid-feedback">Required.</div>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label" for="student_zip_code">Postal / ZIP code <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="student_zip_code" name="student_zip_code" maxlength="20" required>
-                                    <div class="invalid-feedback">Required.</div>
-                                </div>
-                                <div class="col-md-4">
                                     <label class="form-label" for="student_province">Province <span class="text-danger">*</span></label>
                                     <select class="form-select" id="student_province" name="student_province" required>
                                         <option value="">Choose…</option>
@@ -240,6 +238,11 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
                                     <select class="form-select" id="student_district" name="student_district" required>
                                         <option value="">Choose province first…</option>
                                     </select>
+                                    <div class="invalid-feedback">Required.</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="student_zip_code">Postal / ZIP code <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="student_zip_code" name="student_zip_code" maxlength="20" required>
                                     <div class="invalid-feedback">Required.</div>
                                 </div>
                             </div>
@@ -1064,8 +1067,28 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
     }
   }
 
+  function syncZipFromDistrict(force) {
+    var dist = ($('student_district') && $('student_district').value) || '';
+    var zipEl = $('student_zip_code');
+    if (!zipEl) return;
+    var m = window.L05_DISTRICT_ZIP || {};
+    var z = dist && m[dist] ? String(m[dist]) : '';
+    if (!z) return;
+    if (force || String(zipEl.value || '').trim() === '') {
+      zipEl.value = z;
+    }
+  }
+
   if ($('student_province')) {
-    $('student_province').addEventListener('change', function () { syncDistricts(false); });
+    $('student_province').addEventListener('change', function () {
+      syncDistricts(false);
+      // Province changed; clear ZIP so district selection can fill a new default.
+      var zipEl = $('student_zip_code');
+      if (zipEl) zipEl.value = '';
+    });
+  }
+  if ($('student_district')) {
+    $('student_district').addEventListener('change', function () { syncZipFromDistrict(true); });
   }
 
   function syncNicContextBar() {
