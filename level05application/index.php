@@ -1009,7 +1009,19 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
     var bp = $('btnPrev');
     if (bn) bn.disabled = true;
     if (bp) bp.disabled = true;
+    // Build FormData but do NOT upload large files unless the user actually picked new ones.
+    // This keeps Next/Previous fast (especially on Step 7).
     var fd = new FormData(form);
+    try {
+      Object.keys(PATH_KEYS).forEach(function (field) {
+        var inp = $(field);
+        if (!inp || !inp.files) return;
+        if (inp.files.length === 0) {
+          // No new selection → don't send this field at all.
+          if (fd.delete) fd.delete(field);
+        }
+      });
+    } catch (e) {}
     augmentFormDataIdentity(fd);
     fetch(apiUrl('wizard_save_progress.php'), { method: 'POST', body: fd })
       .then(function (r) {
