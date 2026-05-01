@@ -5,6 +5,29 @@
  */
 declare(strict_types=1);
 
+// Always return valid JSON (avoid frontend "invalid response" when PHP warnings/fatals occur).
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+ob_start();
+register_shutdown_function(static function (): void {
+    $err = error_get_last();
+    if (!$err) {
+        return;
+    }
+    $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR];
+    if (!in_array($err['type'] ?? 0, $fatalTypes, true)) {
+        return;
+    }
+    // Clean any partial output and return JSON.
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    error_log('wizard_save_progress fatal: ' . ($err['message'] ?? 'fatal'));
+    echo json_encode(['success' => false, 'message' => 'Could not save progress.']);
+});
+
 require_once __DIR__ . '/db.php';
 
 header('Content-Type: application/json; charset=utf-8');

@@ -43,11 +43,14 @@ $_deleteAction = rtrim(APP_URL, '/') . '/student-applications/delete';
 
 $docMediaKind = static function (string $relativePath): string {
     $ext = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
-    return match ($ext) {
-        'jpg', 'jpeg', 'png', 'gif', 'webp' => 'image',
-        'pdf' => 'pdf',
-        default => 'other',
-    };
+    // PHP 7.4 compatibility (no match expression).
+    if ($ext === 'jpg' || $ext === 'jpeg' || $ext === 'png' || $ext === 'gif' || $ext === 'webp') {
+        return 'image';
+    }
+    if ($ext === 'pdf') {
+        return 'pdf';
+    }
+    return 'other';
 };
 
 $formatScalarCell = static function (string $column, string $raw, callable $esc): string {
