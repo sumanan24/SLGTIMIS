@@ -1180,6 +1180,18 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
     if (n === totalSteps) buildReview();
   }
 
+  // When an application already exists and looks fully submitted, show review-only mode.
+  function setReviewOnlyMode(on) {
+    var pills = $('stepPills');
+    var bn = $('btnNext');
+    var bp = $('btnPrev');
+    var bs = $('btnSubmit');
+    if (pills) pills.classList.toggle('d-none', !!on);
+    if (bn) bn.classList.toggle('d-none', !!on);
+    if (bp) bp.classList.toggle('d-none', !!on);
+    if (bs) bs.classList.add('d-none');
+  }
+
   function syncDocUi() {
     var newH = $('docHelpNew');
     var upH = $('docHelpUpdate');
@@ -1520,7 +1532,16 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
               applyPrefill(j.data);
               nicChecked = true;
               lockNic();
-              showStep(2);
+              // If documents are already uploaded, treat it as a submitted application:
+              // jump straight to Review (Step 8) and hide the rest.
+              if (hadUploadedDocs) {
+                showStep(totalSteps);
+                setReviewOnlyMode(true);
+                showAlert('This NIC already has a submitted Level 05 application. You can download the PDF from Review.', 'info');
+              } else {
+                setReviewOnlyMode(false);
+                showStep(2);
+              }
               return;
             }
             clearFormExceptNic();
