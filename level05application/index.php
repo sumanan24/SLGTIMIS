@@ -1115,13 +1115,46 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
     if (recordFromDb) {
       bar.classList.add('alert-warning');
       bar.innerHTML =
-        '<i class="fas fa-rotate me-2"></i><strong>Update.</strong> This NIC already has a Level 05 application. After edit, click the <strong>Next</strong> button.';
+        '<i class="fas fa-rotate me-2"></i><strong>Update.</strong> This NIC already has a Level 05 application. '
+        + 'Click <strong>Edit</strong> to change details, then click <strong>Next</strong>. '
+        + '<button type="button" class="btn btn-sm btn-outline-dark ms-2 py-0" id="btnEnableEdit">Edit</button>';
     } else {
       bar.classList.add('alert-info');
       bar.innerHTML =
         '<i class="fas fa-user-plus me-2"></i><strong>New application.</strong> Your NIC is saved. Complete all steps and upload every document before submitting.';
     }
   }
+
+  // When an existing application is loaded by NIC, start in view-only mode.
+  var l05EditEnabled = true;
+  function setFormEditable(editable) {
+    l05EditEnabled = !!editable;
+    if (!form) return;
+    form.querySelectorAll('input, select, textarea').forEach(function (el) {
+      if (!el || !el.name) return;
+      if (el.name === 'student_nic' || el.type === 'hidden') return;
+      // File inputs: disabling prevents selecting unless in edit mode.
+      if (el.type === 'file') {
+        el.disabled = !l05EditEnabled;
+        return;
+      }
+      // Use readOnly when possible; fall back to disabled for selects.
+      if (el.tagName === 'SELECT') {
+        el.disabled = !l05EditEnabled;
+      } else {
+        el.readOnly = !l05EditEnabled;
+      }
+      el.classList.toggle('bg-light', !l05EditEnabled);
+    });
+  }
+
+  document.addEventListener('click', function (ev) {
+    var t = ev && ev.target ? ev.target : null;
+    if (!t || !t.getAttribute) return;
+    if (t.getAttribute('id') !== 'btnEnableEdit') return;
+    setFormEditable(true);
+    showAlert('Editing enabled. Update fields and click Next to save.', 'info');
+  });
 
   function updatePills() {
     document.querySelectorAll('.step-pill').forEach(function (pill) {
@@ -1398,6 +1431,11 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
       }
     });
     l05RestoreCoursePreferences(data);
+
+    // Existing NIC → lock editing until user explicitly enables it.
+    if (data.application_id) {
+      setFormEditable(false);
+    }
   }
 
   function buildReview() {
