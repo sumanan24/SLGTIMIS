@@ -880,6 +880,48 @@ function l05_compress_upload_image_to_jpeg(string $tmpPath, string $destJpegPath
 }
 
 /**
+ * Convert first page of a PDF to a temporary JPEG (requires Imagick).
+ *
+ * @return string Path to temp .jpg file
+ */
+function l05_pdf_first_page_to_temp_jpeg(string $pdfPath): string {
+    if (!extension_loaded('imagick') || !class_exists('Imagick')) {
+        throw new RuntimeException('PDF compression is unavailable (Imagick not installed).');
+    }
+    $tmp = tempnam(sys_get_temp_dir(), 'l05pdf');
+    if ($tmp === false) {
+        throw new RuntimeException('Could not create temp file for PDF.');
+    }
+    @unlink($tmp);
+    $outJpg = $tmp . '.jpg';
+    try {
+        $im = new Imagick();
+        $im->setResolution(144, 144);
+        $im->readImage($pdfPath . '[0]');
+        if (method_exists($im, 'setImageBackgroundColor')) {
+            $im->setImageBackgroundColor(new ImagickPixel('white'));
+        }
+        if (defined('Imagick::ALPHACHANNEL_REMOVE')) {
+            $im->setImageAlphaChannel(Imagick::ALPHACHANNEL_REMOVE);
+        }
+        if (defined('Imagick::LAYERMETHOD_FLATTEN')) {
+            $im = $im->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
+        }
+        $im->setImageFormat('jpeg');
+        $im->setImageCompression(Imagick::COMPRESSION_JPEG);
+        $im->setImageCompressionQuality(82);
+        $im->writeImage($outJpg);
+        $im->clear();
+        $im->destroy();
+    } catch (Throwable $e) {
+        @unlink($outJpg);
+        error_log('l05_pdf_first_page_to_temp_jpeg: ' . $e->getMessage());
+        throw new RuntimeException('Could not read/convert this PDF.');
+    }
+    return $outJpg;
+}
+
+/**
  * Directory name under uploads/student_applications/ (NIC digits + V/X only).
  */
 function l05_nic_folder_segment(string $nic): string {
@@ -994,10 +1036,27 @@ function l05_process_uploads(string $nic, array $files, ?array $existingPaths = 
                 }
             }
         } else {
-            $safeFile = $baseName . '.pdf';
+            // PDF: try to compress by converting first page to JPEG (if Imagick exists).
+            // Falls back to storing the PDF if conversion/compression is not available.
+            $safeFile = $baseName . '.jpg';
             $full = $baseDir . DIRECTORY_SEPARATOR . $safeFile;
-            if (!move_uploaded_file($tmp, $full)) {
-                throw new RuntimeException('Could not save ' . $fieldName);
+            $done = false;
+            try {
+                $raster = l05_pdf_first_page_to_temp_jpeg($tmp);
+                try {
+                    $done = l05_compress_upload_image_to_jpeg($raster, $full);
+                } finally {
+                    @unlink($raster);
+                }
+            } catch (Throwable $e) {
+                $done = false;
+            }
+            if (!$done) {
+                $safeFile = $baseName . '.pdf';
+                $full = $baseDir . DIRECTORY_SEPARATOR . $safeFile;
+                if (!move_uploaded_file($tmp, $full)) {
+                    throw new RuntimeException('Could not save ' . $fieldName);
+                }
             }
         }
 
