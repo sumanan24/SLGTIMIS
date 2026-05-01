@@ -283,24 +283,25 @@ class StudentApplicationModel extends Model {
         if (preg_match('#^https?://#i', $s)) {
             return $s;
         }
-        if (str_starts_with($s, '//')) {
+        // PHP 7.4 compatibility: no str_starts_with().
+        if (strpos($s, '//') === 0) {
             $scheme = parse_url(APP_URL, PHP_URL_SCHEME) ?: 'http';
             return $scheme . ':' . $s;
         }
-        while (str_starts_with($s, './')) {
+        while (strpos($s, './') === 0) {
             $s = substr($s, 2);
         }
         if (preg_match('#(^|/)uploads/student_applications/(.+)$#i', $s, $m)) {
             $s = 'uploads/student_applications/' . $m[2];
         }
         $base = rtrim(APP_URL, '/');
-        if (str_starts_with($s, '/')) {
+        if (strpos($s, '/') === 0) {
             $parts = parse_url(APP_URL);
             if (!$parts || empty($parts['scheme']) || empty($parts['host'])) {
                 return $base . $s;
             }
             $pathPrefix = isset($parts['path']) ? rtrim(str_replace('\\', '/', (string) $parts['path']), '/') : '';
-            if ($pathPrefix !== '' && str_starts_with($s, '/uploads/') && !str_starts_with($s, $pathPrefix . '/')) {
+            if ($pathPrefix !== '' && strpos($s, '/uploads/') === 0 && strpos($s, $pathPrefix . '/') !== 0) {
                 $s = $pathPrefix . $s;
             }
             $auth = $parts['host'];
