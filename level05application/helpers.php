@@ -516,7 +516,8 @@ function l05_validate_application(array $p, array $files, bool $isUpdate, ?array
     $required = [
         'student_title', 'student_full_name', 'student_initial_name', 'student_gender', 'student_civil_status',
         'student_email', 'student_phone', 'student_whatsapp', 'student_dob',
-        'student_language', 'student_religion', 'student_blood_group',
+        'student_language', 'student_religion',
+        // blood group is optional
         'student_address', 'student_zip_code', 'student_district', 'student_province',
         'course_priority_1',
     ];
@@ -558,9 +559,12 @@ function l05_validate_application(array $p, array $files, bool $isUpdate, ?array
     if (!in_array((string) ($p['student_religion'] ?? ''), $rels, true)) {
         $errors[] = 'Invalid religion.';
     }
-    $bloods = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-    if (!in_array((string) ($p['student_blood_group'] ?? ''), $bloods, true)) {
-        $errors[] = 'Invalid blood group.';
+    $bloodRaw = trim((string) ($p['student_blood_group'] ?? ''));
+    if ($bloodRaw !== '') {
+        $bloods = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+        if (!in_array($bloodRaw, $bloods, true)) {
+            $errors[] = 'Invalid blood group.';
+        }
     }
 
     if (!l05_phone_valid((string) ($p['student_phone'] ?? ''))) {

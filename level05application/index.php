@@ -184,14 +184,14 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
                                     <div class="invalid-feedback">Required.</div>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label" for="student_blood_group">Blood group <span class="text-danger">*</span></label>
-                                    <select class="form-select" id="student_blood_group" name="student_blood_group" required>
+                                    <label class="form-label" for="student_blood_group">Blood group</label>
+                                    <select class="form-select" id="student_blood_group" name="student_blood_group">
                                         <option value="">Choose…</option>
                                         <?php foreach (['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as $bg) : ?>
                                         <option value="<?php echo $bg; ?>"><?php echo $bg; ?></option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <div class="invalid-feedback">Required.</div>
+                                    <div class="invalid-feedback">Invalid value.</div>
                                 </div>
                             </div>
                         </div>
@@ -1204,7 +1204,7 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
     }
     if (step === 2) {
       var ok = true;
-      ['student_title', 'student_full_name', 'student_initial_name', 'student_gender', 'student_civil_status', 'student_dob', 'student_language', 'student_religion', 'student_blood_group'].forEach(function (id) {
+      ['student_title', 'student_full_name', 'student_initial_name', 'student_gender', 'student_civil_status', 'student_dob', 'student_language', 'student_religion'].forEach(function (id) {
         var el = $(id);
         var v = (el.value || '').trim();
         el.classList.toggle('is-invalid', !v);
@@ -1333,6 +1333,14 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
       if (!el || el.type === 'file') return;
       el.value = data[k] == null ? '' : String(data[k]);
     });
+    // If the draft placeholder is still stored, show it as empty so the applicant must enter their real name.
+    // (The backend uses '(Pending)' for draft rows created at NIC step.)
+    try {
+      var fn = $('student_full_name');
+      if (fn && String(fn.value || '').trim() === '(Pending)') {
+        fn.value = '';
+      }
+    } catch (e) {}
     if (data.student_province) {
       syncDistricts(true);
       var dEl = $('student_district');
