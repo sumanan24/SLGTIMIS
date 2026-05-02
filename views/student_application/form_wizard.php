@@ -181,15 +181,6 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
                   <?php endforeach; ?>
                 </select>
               </div>
-              <div class="col-md-4">
-                <label class="form-label" for="student_blood_group">Blood group <?php echo $req; ?></label>
-                <select class="form-select" id="student_blood_group" name="student_blood_group" required>
-                  <option value="">Choose…</option>
-                  <?php foreach (['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as $bg): ?>
-                    <option value="<?php echo htmlspecialchars($bg, ENT_QUOTES, 'UTF-8'); ?>" <?php echo (($old['student_blood_group'] ?? '') === $bg) ? 'selected' : ''; ?>><?php echo htmlspecialchars($bg, ENT_QUOTES, 'UTF-8'); ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
             </div>
           </div>
 
@@ -249,7 +240,7 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
                 </span>
                 <div>
                   <div class="l05-exam-title">G.C.E. Ordinary Level (O/L) <?php echo $req; ?></div>
-                  <p class="l05-exam-sub mb-0">Required — index, year, and nine subjects with results</p>
+                  <p class="l05-exam-sub mb-0">Required — index, year, six core subjects, three basket subjects (one per category), and valid results</p>
                 </div>
               </div>
               <div class="card-body pt-0">
@@ -265,16 +256,15 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
                   </div>
                 </div>
                 <div class="l05-section-label">Subjects &amp; results</div>
-                <p class="small text-muted mb-3">Enter each subject name and grade or marks (A–F, S, W±, or 0–100).</p>
+                <p class="small text-muted mb-3">Slots 1–6: mandatory subjects; slots 7–9: one subject from each <strong>basket</strong> category. Pick each result (A–F, S, W±, or 0–100).</p>
                 <div class="row g-3">
-                  <?php for ($i = 1; $i <= 9; $i++): $s = sprintf('%02d', $i); ?>
-                    <div class="col-12 col-lg-6 col-xl-4">
-                      <div class="l05-subject-slot">
-                        <div class="l05-slot-label">O/L subject <?php echo (int) $i; ?> <?php echo $req; ?></div>
-                        <input type="text" class="form-control form-control-sm mb-2" id="ol_subject_name_<?php echo $s; ?>" name="ol_subject_name_<?php echo $s; ?>" maxlength="120" required value="<?php echo $v('ol_subject_name_' . $s); ?>" placeholder="Subject name">
-                        <input type="text" class="form-control form-control-sm" id="ol_subject_<?php echo $s; ?>_marks" name="ol_subject_<?php echo $s; ?>_marks" maxlength="10" required value="<?php echo $v('ol_subject_' . $s . '_marks'); ?>" placeholder="Grade / marks">
-                      </div>
-                    </div>
+                  <?php for ($i = 1; $i <= 9; $i++) : ?>
+                  <?php
+                  $variant = 'wizard';
+                  $extraAttr = ' required';
+                  $slotReqHtml = ' ' . $req;
+                  require __DIR__ . '/_ol_subject_slot.php';
+                  ?>
                   <?php endfor; ?>
                 </div>
               </div>
@@ -521,7 +511,7 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
     }
     if (step === 2) {
       var ok2 = true;
-      ['student_title','student_full_name','student_initial_name','student_gender','student_civil_status','student_dob','student_language','student_religion','student_blood_group'].forEach(function (id) {
+      ['student_title','student_full_name','student_initial_name','student_gender','student_civil_status','student_dob','student_language','student_religion'].forEach(function (id) {
         var el = $(id);
         var v = el ? String(el.value || '').trim() : '';
         markInvalid(el, !v);
@@ -675,7 +665,6 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
       ['Date of birth', 'student_dob'],
       ['Language', 'student_language'],
       ['Religion', 'student_religion'],
-      ['Blood group', 'student_blood_group'],
       ['Email', 'student_email'],
       ['Phone', 'student_phone'],
       ['WhatsApp', 'student_whatsapp'],

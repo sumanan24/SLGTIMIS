@@ -631,7 +631,7 @@ function l05_validate_application(array $p, array $files, bool $isUpdate, ?array
     $nvqAny = l05_nvq_any_filled($p);
 
     if (!$olOk) {
-        $errors[] = 'G.C.E. O/L is required: complete index, year, all nine subjects and results (A–F, S, W ± or 0–100).';
+        $errors[] = 'G.C.E. O/L is required: complete index, year, six core subjects, three basket subjects (one per category), and valid results (A–F, S, W± or 0–100).';
     }
     if ($alAny && !$alOk) {
         $errors[] = 'Either complete all G.C.E. A/L fields or clear them if you use NVQ only.';

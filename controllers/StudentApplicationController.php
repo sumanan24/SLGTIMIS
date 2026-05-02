@@ -351,7 +351,7 @@ class StudentApplicationController extends Controller {
         $requiredStrings = [
             'student_title', 'student_full_name', 'student_initial_name', 'student_gender', 'student_civil_status',
             'student_email', 'student_phone', 'student_whatsapp', 'student_nic', 'student_dob',
-            'student_language', 'student_religion', 'student_blood_group',
+            'student_language', 'student_religion',
             'student_address', 'student_zip_code', 'student_district', 'student_province',
         ];
         $requiredStrings[] = 'dept_pref_1';
@@ -372,7 +372,7 @@ class StudentApplicationController extends Controller {
             $alOk = $this->isAlPathComplete($t);
             $nvqOk = $this->isNvqPathComplete($t);
             if (!$olOk) {
-                return ['For Level 05: G.C.E. O/L is required (index, year, nine subjects and results).'];
+                return ['For Level 05: G.C.E. O/L is required: complete index, year, six core subjects, three basket subjects (one per category), and valid results (A–F, S, W± or 0–100).'];
             }
             if ($this->isAlAnyFilled($t) && !$alOk) {
                 return ['For Level 05: either complete all A/L fields or clear them if you use NVQ only.'];
@@ -429,9 +429,12 @@ class StudentApplicationController extends Controller {
         if (!in_array($t('student_religion'), $rels, true)) {
             return ['Please choose a religion from the list.'];
         }
-        $bloods = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-        if (!in_array($t('student_blood_group'), $bloods, true)) {
-            return ['Please choose a blood group from the list.'];
+        $bloodVal = $t('student_blood_group');
+        if ($bloodVal !== '') {
+            $bloods = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+            if (!in_array($bloodVal, $bloods, true)) {
+                return ['If you enter a blood group, choose a value from the list.'];
+            }
         }
 
         $map = $this->getProvinceDistrictMap();

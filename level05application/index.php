@@ -20,13 +20,23 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
 } else {
     $l05MainAppBasePath = rtrim($l05MainAppBasePath, '/');
 }
+/** Official institute website (header Home / brand). */
+$l05OfficialSiteUrl = 'https://slgti.ac.lk/';
+$l05StudentAppCssHref = ($l05MainAppBasePath === '' ? '' : $l05MainAppBasePath) . '/assets/css/student-application.css?v=12';
+$l05AlStreams = require dirname(__DIR__) . '/config/al_streams_sri_lanka.php';
+$l05AlSubjects = require dirname(__DIR__) . '/config/al_subjects_common.php';
+$l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SLGTI NVQ Level 05 application - 2026</title>
+    <title>SLGTI NVQ Level 05 application — 2026 — Sri Lanka German Training Institute</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars($l05StudentAppCssHref, ENT_QUOTES, 'UTF-8'); ?>">
     <script>window.L05_API_BASE = <?php echo json_encode($l05ApiBase, JSON_UNESCAPED_UNICODE); ?>;</script>
     <script>window.L05_MAIN_APP_BASE = <?php echo json_encode($l05MainAppBasePath, JSON_UNESCAPED_UNICODE); ?>;</script>
     <script>window.L05_DISTRICT_ZIP = <?php echo json_encode($slDistrictPostal, JSON_UNESCAPED_UNICODE); ?>;</script>
@@ -34,7 +44,8 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
     <style>
         :root { --wiz-brand: #0c4a6e; --wiz-accent: #0369a1; }
-        body { background: linear-gradient(160deg, #f0f9ff 0%, #e2e8f0 100%); min-height: 100vh; }
+        .l05-app-main.app-form-main { max-width: 1140px; }
+        .l05-site-header { position: relative; z-index: 2; }
         .wiz-card { border-radius: 16px; border: none; box-shadow: 0 12px 40px rgba(12, 74, 110, 0.12); }
         .wiz-header { border-bottom: 3px solid var(--wiz-accent); padding-bottom: 1rem; }
         .step-pills { display: flex; flex-wrap: wrap; gap: 0.35rem; justify-content: center; margin-bottom: 1.5rem; }
@@ -68,14 +79,34 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
         .l05-course-pref-card .l05-pref-badge { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #64748b; margin-bottom: 0.75rem; }
     </style>
 </head>
-<body>
-<div class="container py-4 py-md-5">
+<body class="public-app">
+<div class="app-form-bg" aria-hidden="true"></div>
+<div class="public-app-shell">
+<header class="l05-site-header border-bottom bg-white shadow-sm">
+    <div class="container-fluid px-3 px-lg-4 py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <a class="text-decoration-none text-dark fw-semibold d-inline-flex align-items-center" href="<?php echo htmlspecialchars($l05OfficialSiteUrl, ENT_QUOTES, 'UTF-8'); ?>" rel="noopener noreferrer">
+            <i class="fas fa-graduation-cap text-primary me-2" aria-hidden="true"></i><span class="d-none d-sm-inline">Sri Lanka German Training Institute</span><span class="d-inline d-sm-none">SLGTI</span>
+        </a>
+        <nav class="d-flex align-items-center gap-2 small" aria-label="Site">
+            <a href="<?php echo htmlspecialchars($l05OfficialSiteUrl, ENT_QUOTES, 'UTF-8'); ?>" class="text-muted text-decoration-none" rel="noopener noreferrer">Home</a>
+        </nav>
+    </div>
+</header>
+<main class="container-fluid px-2 px-sm-3 px-lg-4 app-form-main pt-3 pt-md-4 pb-2 l05-app-main">
+<div class="app-form-page">
+<div class="container py-3 py-md-4">
     <div class="row justify-content-center">
         <div class="col-12 col-xl-10">
             <div class="card wiz-card">
                 <div class="card-body p-4 p-md-5">
                     <div class="wiz-header mb-4">
-                        <h1 class="h3 mb-1 text-dark">SLGTI NVQ Level 05 application - 2026</h1>
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <div class="min-w-0">
+                                <div class="small text-muted fw-semibold">Sri Lanka German Training Institute · Apply online 2026</div>
+                                <h1 class="h3 mb-0 text-dark">SLGTI NVQ Level 05 application — 2026</h1>
+                            </div>
+                            <span class="badge text-bg-primary bg-opacity-75">Level 05</span>
+                        </div>
                     </div>
 
                     <div id="globalAlert" class="alert d-none" role="alert"></div>
@@ -186,16 +217,6 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
                                     </select>
                                     <div class="invalid-feedback">Required.</div>
                                 </div>
-                                <div class="col-md-4">
-                                    <label class="form-label" for="student_blood_group">Blood group</label>
-                                    <select class="form-select" id="student_blood_group" name="student_blood_group">
-                                        <option value="">Choose…</option>
-                                        <?php foreach (['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as $bg) : ?>
-                                        <option value="<?php echo $bg; ?>"><?php echo $bg; ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <div class="invalid-feedback">Invalid value.</div>
-                                </div>
                             </div>
                         </div>
 
@@ -260,7 +281,7 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
                                     </span>
                                     <div>
                                         <div class="l05-exam-title">G.C.E. Ordinary Level (O/L) <span class="text-danger">*</span></div>
-                                        <p class="l05-exam-sub mb-0">Required — index, year, and nine subjects with results</p>
+                                        <p class="l05-exam-sub mb-0">Required — index, year, six core subjects, three basket subjects (one per category), and valid results</p>
                                     </div>
                                 </div>
                                 <div class="card-body pt-0">
@@ -276,19 +297,17 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
                                         </div>
                                     </div>
                                     <div class="l05-section-label">Subjects &amp; results</div>
-                                    <p class="small text-muted mb-3">Enter each subject name and grade or marks (A–F, S, W±, or 0–100).</p>
+                                    <p class="small text-muted mb-3">Slots 1–6 are the six mandatory O/L subjects; slots 7–9 are <strong>basket</strong> subjects (pick one from each category list). Choose the result for each (letter grades A–F, S, W±, or numeric 0–100).</p>
                                     <div class="row g-3">
-                                        <?php for ($i = 1; $i <= 9; $i++) : $s = sprintf('%02d', $i); ?>
-                                        <div class="col-12 col-lg-6 col-xl-4">
-                                            <div class="l05-subject-slot">
-                                                <div class="l05-slot-label">O/L subject <?php echo $i; ?></div>
-                                                <label class="form-label visually-hidden" for="ol_subject_name_<?php echo $s; ?>">O/L subject <?php echo $i; ?> name</label>
-                                                <input type="text" class="form-control form-control-sm mb-2" id="ol_subject_name_<?php echo $s; ?>" name="ol_subject_name_<?php echo $s; ?>" maxlength="120" placeholder="Subject name">
-                                                <label class="form-label visually-hidden" for="ol_subject_<?php echo $s; ?>_marks">O/L subject <?php echo $i; ?> result</label>
-                                                <input type="text" class="form-control form-control-sm" id="ol_subject_<?php echo $s; ?>_marks" name="ol_subject_<?php echo $s; ?>_marks" maxlength="10" placeholder="Grade / marks">
-                                            </div>
-                                        </div>
-                                        <?php endfor; ?>
+                                        <?php
+                                        $old = [];
+                                        for ($i = 1; $i <= 9; $i++) :
+                                            $variant = 'l05';
+                                            $extraAttr = '';
+                                            $slotReqHtml = '';
+                                            require dirname(__DIR__) . '/views/student_application/_ol_subject_slot.php';
+                                        endfor;
+                                        ?>
                                     </div>
                                 </div>
                             </div>
@@ -316,20 +335,38 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label small fw-semibold text-secondary" for="al_stream">Stream</label>
-                                            <input type="text" class="form-control" id="al_stream" name="al_stream" maxlength="80" placeholder="e.g. Physical Science, Arts">
+                                            <select class="form-select" id="al_stream" name="al_stream">
+                                                <option value="">Choose…</option>
+                                                <?php foreach ($l05AlStreams as $st) : ?>
+                                                <option value="<?php echo htmlspecialchars($st, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($st, ENT_QUOTES, 'UTF-8'); ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
                                         </div>
                                     </div>
                                     <div class="l05-section-label">Subjects &amp; results</div>
-                                    <p class="small text-muted mb-3">Three subjects with grades or marks (A–F, S, W±, or 0–100).</p>
+                                    <p class="small text-muted mb-3">Choose each subject and result (A–F, S, W±, or 0–100).</p>
                                     <div class="row g-3">
                                         <?php for ($i = 1; $i <= 3; $i++) : $s = sprintf('%02d', $i); ?>
                                         <div class="col-md-4">
                                             <div class="l05-subject-slot">
                                                 <div class="l05-slot-label">A/L subject <?php echo $i; ?></div>
                                                 <label class="form-label visually-hidden" for="al_subject_name_<?php echo $s; ?>">A/L subject <?php echo $i; ?> name</label>
-                                                <input type="text" class="form-control form-control-sm mb-2" id="al_subject_name_<?php echo $s; ?>" name="al_subject_name_<?php echo $s; ?>" maxlength="120" placeholder="Subject name">
-                                                <label class="form-label visually-hidden" for="al_subject_name_<?php echo $s; ?>_marks">A/L subject <?php echo $i; ?> result</label>
-                                                <input type="text" class="form-control form-control-sm" id="al_subject_<?php echo $s; ?>_marks" name="al_subject_<?php echo $s; ?>_marks" maxlength="10" placeholder="Grade / marks">
+                                                <select class="form-select form-select-sm mb-2" id="al_subject_name_<?php echo $s; ?>" name="al_subject_name_<?php echo $s; ?>">
+                                                    <option value="">Choose subject…</option>
+                                                    <?php foreach ($l05AlSubjects as $asub) : ?>
+                                                    <option value="<?php echo htmlspecialchars($asub, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($asub, ENT_QUOTES, 'UTF-8'); ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <label class="form-label visually-hidden" for="al_subject_<?php echo $s; ?>_marks">A/L subject <?php echo $i; ?> result</label>
+                                                <select class="form-select form-select-sm" id="al_subject_<?php echo $s; ?>_marks" name="al_subject_<?php echo $s; ?>_marks">
+                                                    <option value="">Choose result…</option>
+                                                    <?php foreach ($l05GradeLetters as $g) : ?>
+                                                    <option value="<?php echo htmlspecialchars($g, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($g, ENT_QUOTES, 'UTF-8'); ?></option>
+                                                    <?php endforeach; ?>
+                                                    <?php for ($m = 0; $m <= 100; $m++) : $ms = (string) $m; ?>
+                                                    <option value="<?php echo htmlspecialchars($ms, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($ms, ENT_QUOTES, 'UTF-8'); ?></option>
+                                                    <?php endfor; ?>
+                                                </select>
                                             </div>
                                         </div>
                                         <?php endfor; ?>
@@ -345,7 +382,13 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
                             <div class="row g-3">
                                 <div class="col-md-3">
                                     <label class="form-label" for="nvq_level">NVQ level</label>
-                                    <input type="text" class="form-control" id="nvq_level" name="nvq_level" maxlength="50" placeholder="e.g. 4">
+                                    <select class="form-select" id="nvq_level" name="nvq_level">
+                                        <option value="">Choose…</option>
+                                        <?php foreach (['3', '4', '5', '6'] as $nvqLv) : ?>
+                                        <option value="<?php echo htmlspecialchars($nvqLv, ENT_QUOTES, 'UTF-8'); ?>">NVQ Level <?php echo htmlspecialchars($nvqLv, ENT_QUOTES, 'UTF-8'); ?></option>
+                                        <?php endforeach; ?>
+                                        <option value="Other">Other / not listed</option>
+                                    </select>
                                 </div>
                                 <div class="col-md-9">
                                     <label class="form-label" for="nvq_course_name">Course / qualification name</label>
@@ -460,6 +503,15 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
             </div>
         </div>
     </div>
+</div>
+</div>
+</main>
+<footer class="container-fluid px-3 app-form-footer text-center">
+    <div class="app-form-footer-inner py-4">
+        <p class="mb-1 app-form-footer-brand">Sri Lanka German Training Institute</p>
+        <p class="mb-0 app-form-footer-meta">Apply online 2026 · &copy; <?php echo date('Y'); ?></p>
+    </div>
+</footer>
 </div>
 
 <script id="slProvJson" type="application/json"><?php echo json_encode($slProv, JSON_UNESCAPED_UNICODE); ?></script>
@@ -884,8 +936,7 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
       ['Civil status', l05FieldText('student_civil_status')],
       ['Date of birth', l05FieldText('student_dob')],
       ['Language', l05FieldText('student_language')],
-      ['Religion', l05FieldText('student_religion')],
-      ['Blood group', l05FieldText('student_blood_group')]
+      ['Religion', l05FieldText('student_religion')]
     ]);
 
     addSection('2. Contact and address', [
@@ -1338,7 +1389,7 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
     }
     if (step === 4) {
       if (!olComplete()) {
-        showAlert('G.C.E. O/L is required: complete index, year, all nine subjects and valid results (A–F, S, W± or 0–100).');
+        showAlert('G.C.E. O/L is required: complete index, year, six core subjects, three basket subjects (one per category), and valid results (A–F, S, W± or 0–100).');
         return false;
       }
       if (!alKeysEmpty() && !alComplete()) {
@@ -1424,6 +1475,35 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
     l05ResetCoursePriorityFields();
   }
 
+  function l05EnsureSelectHasValue(selId, val) {
+    if (val == null) return;
+    var el = $(selId);
+    if (!el || el.tagName !== 'SELECT') return;
+    var s = String(val).trim();
+    if (s === '') return;
+    var i;
+    for (i = 0; i < el.options.length; i++) {
+      if (el.options[i].value === s) {
+        el.selectedIndex = i;
+        return;
+      }
+    }
+    var su = s.toUpperCase();
+    if (su !== s) {
+      for (i = 0; i < el.options.length; i++) {
+        if (el.options[i].value === su) {
+          el.selectedIndex = i;
+          return;
+        }
+      }
+    }
+    var opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    el.appendChild(opt);
+    el.value = s;
+  }
+
   function applyPrefill(data) {
     if (!data || typeof data !== 'object') return;
     Object.keys(data).forEach(function (k) {
@@ -1461,6 +1541,27 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
       }
     });
     l05RestoreCoursePreferences(data);
+
+    for (var pi = 1; pi <= 9; pi++) {
+      var ps = (pi < 10 ? '0' : '') + pi;
+      if (data['ol_subject_name_' + ps] != null) {
+        l05EnsureSelectHasValue('ol_subject_name_' + ps, data['ol_subject_name_' + ps]);
+      }
+      if (data['ol_subject_' + ps + '_marks'] != null) {
+        l05EnsureSelectHasValue('ol_subject_' + ps + '_marks', data['ol_subject_' + ps + '_marks']);
+      }
+    }
+    if (data.al_stream != null) l05EnsureSelectHasValue('al_stream', data.al_stream);
+    for (var aj = 1; aj <= 3; aj++) {
+      var at = '0' + aj;
+      if (data['al_subject_name_' + at] != null) {
+        l05EnsureSelectHasValue('al_subject_name_' + at, data['al_subject_name_' + at]);
+      }
+      if (data['al_subject_' + at + '_marks'] != null) {
+        l05EnsureSelectHasValue('al_subject_' + at + '_marks', data['al_subject_' + at + '_marks']);
+      }
+    }
+    if (data.nvq_level != null) l05EnsureSelectHasValue('nvq_level', data.nvq_level);
 
     // Existing NIC → lock editing until user explicitly enables it.
     if (data.application_id) {

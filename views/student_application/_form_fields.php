@@ -111,15 +111,6 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-12 col-sm-6 col-md-4">
-                <label class="form-label" for="student_blood_group">Blood group <?php echo $req; ?></label>
-                <select name="student_blood_group" id="student_blood_group" class="form-select form-select-sm" required>
-                    <option value="">Choose…</option>
-                    <?php foreach (['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as $opt): ?>
-                    <option value="<?php echo htmlspecialchars($opt, ENT_QUOTES, 'UTF-8'); ?>" <?php echo (($old['student_blood_group'] ?? '') === $opt) ? 'selected' : ''; ?>><?php echo htmlspecialchars($opt, ENT_QUOTES, 'UTF-8'); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
         </div>
     </div>
 </div>
@@ -213,6 +204,7 @@ $dbNvqHint = ($application_level ?? '04') === '05' ? '5' : '4';
 <div class="card shadow-sm border-0 mb-4">
     <div class="card-body">
         <div class="app-form-section-title"><i class="fas fa-certificate me-2"></i>O/L exam</div>
+        <p class="small text-muted mb-3">Subject boxes 1–6 list the six core O/L subjects; boxes 7–9 list <strong>basket</strong> options (category I, II, III) — choose one from each list.</p>
         <div class="row app-form-grid g-3 mb-3">
             <div class="col-12 col-sm-6 col-md-4">
                 <label class="form-label" for="ol_index_number">Index number <?php echo $req; ?></label>
@@ -224,21 +216,13 @@ $dbNvqHint = ($application_level ?? '04') === '05' ? '5' : '4';
             </div>
         </div>
         <div class="row g-2 g-lg-3 app-exam-subjects-grid">
-                <?php for ($i = 1; $i <= 9; $i++): $s = sprintf('%02d', $i); ?>
-                <div class="col-12 col-lg-6">
-                    <div class="app-ol-row app-exam-subj-cell h-100">
-                        <div class="app-subject-block">
-                            <div class="app-subj-title"><?php echo htmlspecialchars($subjectOrdinalEn($i), ENT_QUOTES, 'UTF-8'); ?> subject <?php echo $req; ?></div>
-                            <div class="app-subj-fields">
-                                <input type="text" name="ol_subject_name_<?php echo $s; ?>" id="ol_subject_name_<?php echo $s; ?>" class="form-control form-control-sm app-subj-name app-exam-input-compact" maxlength="100" value="<?php echo $v('ol_subject_name_' . $s); ?>" aria-label="O/L <?php echo htmlspecialchars($subjectOrdinalEn($i), ENT_QUOTES, 'UTF-8'); ?> subject name"<?php echo $olFieldAttr; ?>>
-                                <div class="app-subj-mark-group">
-                                    <label class="form-label app-subj-mark-label mb-0" for="ol_subject_<?php echo $s; ?>_marks">Result</label>
-                                    <input type="text" name="ol_subject_<?php echo $s; ?>_marks" id="ol_subject_<?php echo $s; ?>_marks" class="form-control form-control-sm app-mark-input app-exam-input-compact" maxlength="10" placeholder="A, B, C… or 0–100" value="<?php echo $v('ol_subject_' . $s . '_marks'); ?>" aria-label="O/L <?php echo htmlspecialchars($subjectOrdinalEn($i), ENT_QUOTES, 'UTF-8'); ?> subject result"<?php echo $olFieldAttr; ?>>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <?php for ($i = 1; $i <= 9; $i++) : ?>
+                <?php
+                $variant = 'form';
+                $extraAttr = $olFieldAttr;
+                $slotReqHtml = ' ' . $req;
+                require __DIR__ . '/_ol_subject_slot.php';
+                ?>
                 <?php endfor; ?>
         </div>
     </div>
