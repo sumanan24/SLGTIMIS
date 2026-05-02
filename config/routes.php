@@ -204,6 +204,8 @@ return [
     'student-application/api/courses' => 'StudentApplicationController@apiCourses',
     'student-applications' => 'StudentApplicationController@adminIndex',
     'student-applications/view' => 'StudentApplicationController@adminView',
+    'student-applications/approve' => 'StudentApplicationController@adminApprove',
+    'student-applications/reject' => 'StudentApplicationController@adminReject',
     'student-applications/download-document' => 'StudentApplicationController@adminDownloadDocument',
     'student-applications/export-data' => 'StudentApplicationController@adminExportApplicationData',
     'student-applications/export-pdf' => 'StudentApplicationController@adminExportApplicationPdf',

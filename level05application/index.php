@@ -538,14 +538,26 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
     departments.forEach(function (d) {
       var o = document.createElement('option');
       o.value = d.department_id || '';
-      o.textContent = (d.department_name || '') + ' (' + (d.department_id || '') + ')';
+      o.textContent = (d.department_name || '').trim();
       sel.appendChild(o);
     });
   }
 
+  /** Match public student_application form: store course name only; support old "id — name" saves. */
+  function l05CourseNameFromLegacyStored(stored) {
+    if (!stored) return '';
+    var s = String(stored).trim();
+    var em = '\u2014';
+    var sep = ' ' + em + ' ';
+    var i = s.indexOf(sep);
+    if (i !== -1) return s.substring(i + sep.length).trim();
+    i = s.indexOf(' — ');
+    if (i !== -1) return s.substring(i + 3).trim();
+    return s;
+  }
+
   function l05CourseOptionValue(c) {
-    var label = (c.course_id || '') + ' — ' + (c.course_name || '');
-    return label.substring(0, 150);
+    return ((c.course_name || '').trim()).substring(0, 150);
   }
 
   function l05FillCourseSelect(sel, courses, selectedValue) {
@@ -555,11 +567,16 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
     z.value = '';
     z.textContent = 'Choose course…';
     sel.appendChild(z);
+    var wantValue = selectedValue ? String(selectedValue).trim() : '';
+    if (wantValue) {
+      var legacy = l05CourseNameFromLegacyStored(wantValue);
+      if (legacy && legacy !== wantValue) wantValue = legacy.substring(0, 150);
+    }
     (courses || []).forEach(function (c) {
       var o = document.createElement('option');
       o.value = l05CourseOptionValue(c);
-      o.textContent = (c.course_name || '') + ' (' + (c.course_id || '') + ')';
-      if (selectedValue && selectedValue === o.value) o.selected = true;
+      o.textContent = (c.course_name || '').trim();
+      if (wantValue && wantValue === o.value) o.selected = true;
       sel.appendChild(o);
     });
     if (selectedValue && sel.value !== selectedValue) {
@@ -654,6 +671,7 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
 
   function l05FindDeptForCourseValue(want, depts) {
     if (!want || !depts || depts.length === 0) return Promise.resolve(null);
+    want = l05CourseNameFromLegacyStored(want) || want;
     var tasks = depts.map(function (d) {
       return l05LoadCoursesForDept(d.department_id).then(function (courses) {
         return { d: d, courses: courses };

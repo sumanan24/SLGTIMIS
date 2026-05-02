@@ -80,9 +80,13 @@ CREATE TABLE IF NOT EXISTS `student_applications` (
     `nvq_certificate_path`     VARCHAR(255) DEFAULT NULL,
     `bank_receipt_path`        VARCHAR(255) DEFAULT NULL,
 
+    /* Workflow */
+    `status`                  ENUM('new','approved','rejected') NOT NULL DEFAULT 'new' COMMENT 'Application workflow status',
+
     `created_at`               TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     UNIQUE KEY `uq_nic_level` (`student_nic`, `application_level`),
     UNIQUE KEY `uq_email_level` (`student_email`, `application_level`),
-    KEY `idx_level_created` (`application_level`, `created_at`)
+    KEY `idx_level_created` (`application_level`, `created_at`),
+    KEY `idx_status_created` (`status`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

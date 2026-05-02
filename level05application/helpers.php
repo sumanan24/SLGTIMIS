@@ -157,6 +157,33 @@ function l05_migrate_student_applications_schema(mysqli $conn): void {
                 error_log('l05_migrate: add ' . $keyName . ': ' . $e->getMessage());
             }
         }
+
+        // Add workflow status column if missing (default 'new').
+        try {
+            $col = $conn->query("SHOW COLUMNS FROM `student_applications` LIKE 'status'");
+            $has = $col && $col->num_rows > 0;
+            if ($col) {
+                $col->free();
+            }
+            if (!$has) {
+                $conn->query("ALTER TABLE `student_applications` ADD COLUMN `status` ENUM('new','approved') NOT NULL DEFAULT 'new' AFTER `bank_receipt_path`");
+            }
+        } catch (Throwable $e) {
+            error_log('l05_migrate: add status: ' . $e->getMessage());
+        }
+
+        // Add index for status + created_at if missing.
+        try {
+            $ix = $conn->query("SHOW INDEX FROM `student_applications` WHERE Key_name = 'idx_status_created'");
+            if ($ix && $ix->num_rows === 0) {
+                $ix->free();
+                $conn->query("ALTER TABLE `student_applications` ADD KEY `idx_status_created` (`status`, `created_at`)");
+            } elseif ($ix) {
+                $ix->free();
+            }
+        } catch (Throwable $e) {
+            error_log('l05_migrate: add idx_status_created: ' . $e->getMessage());
+        }
     } catch (Throwable $e) {
         error_log('l05_migrate_student_applications_schema: ' . $e->getMessage());
     }

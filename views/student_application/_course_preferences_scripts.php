@@ -25,18 +25,36 @@
     return (j && j.success && Array.isArray(j.courses)) ? j.courses : [];
   }
 
+  /** Older saves used "course_id — course_name"; new saves use course name only. */
+  function courseNameFromLegacyStored(stored) {
+    if (!stored) return '';
+    var s = String(stored).trim();
+    var em = '\u2014';
+    var sep = ' ' + em + ' ';
+    var i = s.indexOf(sep);
+    if (i !== -1) return s.substring(i + sep.length).trim();
+    i = s.indexOf(' — ');
+    if (i !== -1) return s.substring(i + 3).trim();
+    return s;
+  }
+
   function fillCourseSelect(sel, courses, selectedValue) {
     sel.innerHTML = '';
     const opt0 = document.createElement('option');
     opt0.value = '';
     opt0.textContent = 'Choose course…';
     sel.appendChild(opt0);
+    var wantValue = selectedValue ? String(selectedValue).trim() : '';
+    if (wantValue) {
+      var fromLegacy = courseNameFromLegacyStored(wantValue);
+      if (fromLegacy && fromLegacy !== wantValue) wantValue = fromLegacy.substring(0, 150);
+    }
     courses.forEach(function (c) {
       const opt = document.createElement('option');
-      const label = c.course_id + ' — ' + (c.course_name || '');
-      opt.value = label.substring(0, 150);
-      opt.textContent = (c.course_name || '') + ' (' + (c.course_id || '') + ')';
-      if (selectedValue && selectedValue === opt.value) opt.selected = true;
+      const name = (c.course_name || '').trim();
+      opt.value = name.substring(0, 150);
+      opt.textContent = name;
+      if (wantValue && wantValue === opt.value) opt.selected = true;
       sel.appendChild(opt);
     });
   }
@@ -62,7 +80,7 @@
           depts.forEach(function (d) {
             var opt = document.createElement('option');
             opt.value = d.department_id || '';
-            opt.textContent = (d.department_name || '') + ' (' + (d.department_id || '') + ')';
+            opt.textContent = (d.department_name || '').trim();
             deptSel.appendChild(opt);
           });
         }

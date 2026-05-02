@@ -12,12 +12,12 @@ $esc = static function (string $s): string {
     return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 };
 
-/** Same order as `StudentApplicationModel::APPLICATION_DETAIL_SELECT`. */
+/** Detail grid order; course rows use resolved `department_*` / `course_*` from `StudentApplicationModel::enrichApplicationForStaffExport`. */
 $detailColumns = [
-    'application_id', 'application_level', 'student_title', 'student_full_name', 'student_initial_name',
+    'application_id', 'application_level', 'status', 'student_title', 'student_full_name', 'student_initial_name',
     'student_gender', 'student_civil_status', 'student_email', 'student_phone', 'student_whatsapp', 'student_nic', 'student_dob',
     'student_language', 'student_religion', 'student_blood_group', 'student_address', 'student_zip_code', 'student_district', 'student_province',
-    'course_priority_1', 'course_priority_2', 'course_priority_3', 'ol_index_number', 'ol_exam_year',
+    'department_1', 'department_2', 'department_3', 'course_1', 'course_2', 'course_3', 'ol_index_number', 'ol_exam_year',
     'ol_subject_name_01', 'ol_subject_01_marks', 'ol_subject_name_02', 'ol_subject_02_marks', 'ol_subject_name_03', 'ol_subject_03_marks',
     'ol_subject_name_04', 'ol_subject_04_marks', 'ol_subject_name_05', 'ol_subject_05_marks', 'ol_subject_name_06', 'ol_subject_06_marks',
     'ol_subject_name_07', 'ol_subject_07_marks', 'ol_subject_name_08', 'ol_subject_08_marks', 'ol_subject_name_09', 'ol_subject_09_marks',
@@ -36,10 +36,12 @@ $docLabels = [
     'bank_receipt_path' => 'Bank receipt',
 ];
 
-$listUrl = rtrim(APP_URL, '/') . '/student-applications';
+$listUrl = rtrim(APP_URL, '/') . '/student-applications?tab=new';
 $appId = (int) ($app['application_id'] ?? 0);
 $appLevel = (string) ($app['application_level'] ?? '');
 $_deleteAction = rtrim(APP_URL, '/') . '/student-applications/delete';
+$approveAction = rtrim(APP_URL, '/') . '/student-applications/approve';
+$rejectAction = rtrim(APP_URL, '/') . '/student-applications/reject';
 
 $docMediaKind = static function (string $relativePath): string {
     $ext = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
@@ -86,15 +88,6 @@ $renderDocumentCell = static function (string $relativePath, string $title, call
         <div class="sa-doc-actions">
             <?php if ($url): ?>
             <a class="btn btn-sm btn-outline-primary" href="<?php echo $esc($url); ?>" target="_blank" rel="noopener">Open</a>
-            <?php if ($kind === 'image' || $kind === 'pdf'): ?>
-            <button type="button" class="btn btn-sm btn-outline-secondary"
-                data-bs-toggle="modal" data-bs-target="#saDocReviewModal"
-                data-doc-url="<?php echo $esc($url); ?>"
-                data-doc-type="<?php echo $esc($kind); ?>"
-                data-doc-title="<?php echo $esc($title); ?>">
-                Review
-            </button>
-            <?php endif; ?>
             <a class="btn btn-sm btn-outline-success" href="<?php echo $esc($downloadHref); ?>">
                 <i class="fas fa-download me-1" aria-hidden="true"></i>Download
             </a>
@@ -110,7 +103,7 @@ $saAdminCss = htmlspecialchars(rtrim(APP_URL, '/') . '/assets/css/student-applic
 $exportDataUrl = rtrim(APP_URL, '/') . '/student-applications/export-data?id=' . $appId;
 $exportPdfUrl = rtrim(APP_URL, '/') . '/student-applications/export-pdf?id=' . $appId;
 ?>
-<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=3">
+<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=6">
 <div class="sa-admin-page sa-admin-view container-fluid py-3">
     <div class="sa-view-toolbar">
         <a href="<?php echo $esc($listUrl); ?>" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>All applications</a>
@@ -122,6 +115,29 @@ $exportPdfUrl = rtrim(APP_URL, '/') . '/student-applications/export-pdf?id=' . $
             <a class="btn btn-outline-danger btn-sm" href="<?php echo $esc($exportPdfUrl); ?>" title="PDF summary: same fields as CSV (no uploads)">
                 <i class="fas fa-file-pdf me-1" aria-hidden="true"></i>Download PDF summary
             </a>
+            <?php
+                $st = strtolower(trim((string) ($app['status'] ?? 'new')));
+            ?>
+            <?php if ($st === 'new'): ?>
+            <form method="post" action="<?php echo $esc($approveAction); ?>" class="d-inline"
+                  onsubmit="return confirm('Approve application #<?php echo $appId; ?>?');">
+                <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="fas fa-check me-1" aria-hidden="true"></i>Approve
+                </button>
+            </form>
+            <form method="post" action="<?php echo $esc($rejectAction); ?>" class="d-inline"
+                  onsubmit="return confirm('Reject application #<?php echo $appId; ?>?');">
+                <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
+                <button type="submit" class="btn btn-outline-warning btn-sm">
+                    <i class="fas fa-times me-1" aria-hidden="true"></i>Reject
+                </button>
+            </form>
+            <?php elseif ($st === 'approved'): ?>
+            <span class="badge bg-success align-self-center">Approved</span>
+            <?php elseif ($st === 'rejected'): ?>
+            <span class="badge bg-danger align-self-center">Rejected</span>
+            <?php endif; ?>
             <?php if ($can_delete): ?>
             <form method="post" action="<?php echo $esc($_deleteAction); ?>" class="d-inline"
                   onsubmit="return confirm('Delete application #<?php echo $appId; ?>? This will also remove uploaded documents on the server.');">
@@ -141,7 +157,7 @@ $exportPdfUrl = rtrim(APP_URL, '/') . '/student-applications/export-pdf?id=' . $
     <div class="card shadow-sm border-primary border-opacity-25 sa-view-card">
         <div class="card-header fw-semibold d-flex flex-wrap justify-content-between align-items-center gap-2">
             <span><i class="fas fa-table me-2"></i>Application record</span>
-            <span class="small fw-normal text-muted">Columns match <code class="small">student_applications</code></span>
+            <span class="small fw-normal text-muted">Course preferences: department name and course name (course code is not shown).</span>
         </div>
         <div class="card-body small p-0">
             <div class="table-responsive">
@@ -183,73 +199,3 @@ $exportPdfUrl = rtrim(APP_URL, '/') . '/student-applications/export-pdf?id=' . $
         </div>
     </div>
 </div>
-
-<div class="modal fade" id="saDocReviewModal" tabindex="-1" aria-labelledby="saDocReviewTitle" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="saDocReviewTitle">Document</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-0 bg-dark bg-opacity-10 text-center">
-                <img id="saDocReviewImg" src="" alt="" class="img-fluid d-none p-2" style="max-height:85vh;">
-                <iframe id="saDocReviewIframe" title="Document preview" class="d-none w-100 bg-white" style="min-height:80vh;border:0;"></iframe>
-                <p id="saDocReviewFallback" class="d-none p-4 text-muted mb-0">Use <strong>Open in new tab</strong> to view this file.</p>
-            </div>
-            <div class="modal-footer">
-                <a id="saDocReviewOpen" href="#" target="_blank" rel="noopener" class="btn btn-primary">Open in new tab</a>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-(function () {
-  document.addEventListener('DOMContentLoaded', function () {
-    var modalEl = document.getElementById('saDocReviewModal');
-    if (!modalEl || typeof bootstrap === 'undefined') return;
-
-    function hideAll() {
-      var img = document.getElementById('saDocReviewImg');
-      var ifr = document.getElementById('saDocReviewIframe');
-      var fb = document.getElementById('saDocReviewFallback');
-      if (img) { img.classList.add('d-none'); img.removeAttribute('src'); }
-      if (ifr) { ifr.classList.add('d-none'); ifr.removeAttribute('src'); }
-      if (fb) fb.classList.add('d-none');
-    }
-
-    modalEl.addEventListener('show.bs.modal', function (ev) {
-      var btn = ev.relatedTarget;
-      if (!btn || !btn.getAttribute) return;
-      var url = btn.getAttribute('data-doc-url') || '';
-      var typ = btn.getAttribute('data-doc-type') || '';
-      var title = btn.getAttribute('data-doc-title') || 'Document';
-      var titleEl = document.getElementById('saDocReviewTitle');
-      if (titleEl) titleEl.textContent = title;
-      var openA = document.getElementById('saDocReviewOpen');
-      if (openA) openA.href = url;
-      hideAll();
-      var img = document.getElementById('saDocReviewImg');
-      var ifr = document.getElementById('saDocReviewIframe');
-      var fb = document.getElementById('saDocReviewFallback');
-      if (typ === 'image' && img) {
-        img.src = url;
-        img.classList.remove('d-none');
-      } else if (typ === 'pdf' && ifr) {
-        ifr.src = url;
-        ifr.classList.remove('d-none');
-      } else if (fb) {
-        fb.classList.remove('d-none');
-      }
-    });
-
-    modalEl.addEventListener('hidden.bs.modal', function () {
-      var img = document.getElementById('saDocReviewImg');
-      var ifr = document.getElementById('saDocReviewIframe');
-      if (img) img.removeAttribute('src');
-      if (ifr) ifr.removeAttribute('src');
-    });
-  });
-})();
-</script>

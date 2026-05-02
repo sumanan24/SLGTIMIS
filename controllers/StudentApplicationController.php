@@ -681,6 +681,7 @@ class StudentApplicationController extends Controller {
             'nvq_certificate_path' => null,
             'bank_receipt_path' => null,
         ];
+        $data['status'] = 'new';
         return array_merge($data, $nullFiles);
     }
 
@@ -783,7 +784,7 @@ class StudentApplicationController extends Controller {
             $im->setResolution(144, 144);
             $im->readImage($pdfPath . '[0]');
             if (method_exists($im, 'setImageBackgroundColor')) {
-                $im->setImageBackgroundColor(new ImagickPixel('white'));
+                $im->setImageBackgroundColor(new \ImagickPixel('white'));
             }
             if (defined('Imagick::ALPHACHANNEL_REMOVE')) {
                 $im->setImageAlphaChannel(Imagick::ALPHACHANNEL_REMOVE);
@@ -938,11 +939,98 @@ class StudentApplicationController extends Controller {
         }
 
         $model = $this->model('StudentApplicationModel');
+        $levelRaw = trim((string) $this->get('level', ''));
+        $filterLevel = in_array($levelRaw, ['04', '05'], true) ? $levelRaw : null;
+        $tabRaw = strtolower(trim((string) $this->get('tab', '')));
+        $activeTab = in_array($tabRaw, ['approved', 'rejected'], true) ? $tabRaw : 'new';
+
+        $deptRaw = trim((string) $this->get('dept', ''));
+        $courseRaw = trim((string) $this->get('course', ''));
+        $filterDeptId = null;
+        $filterCourseId = null;
+        if ($deptRaw !== '') {
+            $deptModel = $this->model('DepartmentModel');
+            $drow = $deptModel->find($deptRaw);
+            if (!empty($drow['department_id'])) {
+                $filterDeptId = (string) $drow['department_id'];
+            }
+        }
+        if ($courseRaw !== '') {
+            $courseModel = $this->model('CourseModel');
+            $crow = $courseModel->find($courseRaw);
+            if (!empty($crow['course_id'])) {
+                $filterCourseId = (string) $crow['course_id'];
+                if ($filterDeptId !== null && (string) ($crow['department_id'] ?? '') !== $filterDeptId) {
+                    $filterCourseId = null;
+                }
+            }
+        }
+
+        $viewRaw = strtolower(trim((string) $this->get('view', '')));
+        $activeView = $viewRaw === 'dashboard' ? 'dashboard' : 'table';
+
+        $perPage = 20;
+        $dashboardStats = $model->getDashboardStats($filterLevel, $filterDeptId, $filterCourseId);
+
+        if ($activeView === 'table') {
+            $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId);
+            $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId);
+            $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId);
+            $maxPageNew = max(1, (int) ceil($countNew / $perPage));
+            $maxPageApproved = max(1, (int) ceil($countApproved / $perPage));
+            $maxPageRejected = max(1, (int) ceil($countRejected / $perPage));
+            $pageNew = max(1, min((int) $this->get('pn', 1), $maxPageNew));
+            $pageApproved = max(1, min((int) $this->get('pa', 1), $maxPageApproved));
+            $pageRejected = max(1, min((int) $this->get('pr', 1), $maxPageRejected));
+
+            $applicationsNew = $activeTab === 'new'
+                ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId)
+                : [];
+            $applicationsApproved = $activeTab === 'approved'
+                ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId)
+                : [];
+            $applicationsRejected = $activeTab === 'rejected'
+                ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId)
+                : [];
+        } else {
+            $countNew = 0;
+            $countApproved = 0;
+            $countRejected = 0;
+            $maxPageNew = 1;
+            $maxPageApproved = 1;
+            $maxPageRejected = 1;
+            $pageNew = 1;
+            $pageApproved = 1;
+            $pageRejected = 1;
+            $applicationsNew = [];
+            $applicationsApproved = [];
+            $applicationsRejected = [];
+        }
+
         return $this->view('student_application/admin_index', [
             'title' => 'Online applications',
             'page' => 'student-applications',
-            'applications' => $model->getAllForAdmin(),
-            'dashboard_stats' => $model->getDashboardStats(),
+            'filter_level' => $filterLevel,
+            'filter_department_id' => $filterDeptId,
+            'filter_course_id' => $filterCourseId,
+            'filter_departments' => $model->getAdminFilterDepartments($filterLevel),
+            'filter_courses' => $model->getAdminFilterCourses($filterLevel, $filterDeptId),
+            'active_view' => $activeView,
+            'active_tab' => $activeTab,
+            'per_page' => $perPage,
+            'page_new' => $pageNew,
+            'page_approved' => $pageApproved,
+            'page_rejected' => $pageRejected,
+            'count_new' => $countNew,
+            'count_approved' => $countApproved,
+            'count_rejected' => $countRejected,
+            'max_page_new' => $maxPageNew,
+            'max_page_approved' => $maxPageApproved,
+            'max_page_rejected' => $maxPageRejected,
+            'applications_new' => $applicationsNew,
+            'applications_approved' => $applicationsApproved,
+            'applications_rejected' => $applicationsRejected,
+            'dashboard_stats' => $dashboardStats,
             'can_delete' => $userModel->isAdminOrADM($uid),
             'use_public_layout' => false,
         ]);
@@ -977,6 +1065,8 @@ class StudentApplicationController extends Controller {
             $this->redirect('student-applications');
             return;
         }
+
+        $app = $model->enrichApplicationForStaffExport($app);
 
         return $this->view('student_application/admin_view', [
             'title' => 'Application #' . $id,
@@ -1056,6 +1146,117 @@ class StudentApplicationController extends Controller {
             ? 'Application #' . $id . ' deleted.'
             : 'Application #' . $id . ' deleted, but some uploaded files could not be removed.';
         $this->redirect('student-applications');
+    }
+
+    /**
+     * Staff (SAO, ADM, admin): approve an application (status = approved).
+     */
+    public function adminApprove(): void {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        if (!$userModel->canViewOnlineStudentApplications($uid)) {
+            $_SESSION['error'] = 'You cannot open this page.';
+            $this->redirect('dashboard');
+            return;
+        }
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            $this->redirect('student-applications');
+            return;
+        }
+
+        $id = (int) $this->post('application_id', 0);
+        if ($id < 1) {
+            $_SESSION['error'] = 'Invalid application.';
+            $this->redirect('student-applications');
+            return;
+        }
+
+        $model = $this->model('StudentApplicationModel');
+        $app = $model->findById($id);
+        if (!$app) {
+            $_SESSION['error'] = 'That application was not found.';
+            $this->redirect('student-applications');
+            return;
+        }
+
+        $ok = false;
+        try {
+            $ok = $model->setStatus($id, 'approved');
+        } catch (Throwable $e) {
+            error_log('StudentApplicationController::adminApprove: ' . $e->getMessage());
+            $ok = false;
+        }
+
+        if ($ok) {
+            $_SESSION['message'] = 'Application #' . $id . ' approved.';
+        } else {
+            $_SESSION['error'] = 'Could not approve application.';
+        }
+        $this->redirect('student-applications/view?id=' . $id);
+    }
+
+    /**
+     * Staff (SAO, ADM, admin): reject an application (status = rejected; only from new).
+     */
+    public function adminReject(): void {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        if (!$userModel->canViewOnlineStudentApplications($uid)) {
+            $_SESSION['error'] = 'You cannot open this page.';
+            $this->redirect('dashboard');
+            return;
+        }
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            $this->redirect('student-applications');
+            return;
+        }
+
+        $id = (int) $this->post('application_id', 0);
+        if ($id < 1) {
+            $_SESSION['error'] = 'Invalid application.';
+            $this->redirect('student-applications');
+            return;
+        }
+
+        $model = $this->model('StudentApplicationModel');
+        $app = $model->findById($id);
+        if (!$app) {
+            $_SESSION['error'] = 'That application was not found.';
+            $this->redirect('student-applications');
+            return;
+        }
+
+        $st = strtolower(trim((string) ($app['status'] ?? '')));
+        if ($st !== 'new') {
+            $_SESSION['error'] = 'Only new applications can be rejected.';
+            $this->redirect('student-applications/view?id=' . $id);
+            return;
+        }
+
+        $ok = false;
+        try {
+            $ok = $model->setStatus($id, 'rejected');
+        } catch (Throwable $e) {
+            error_log('StudentApplicationController::adminReject: ' . $e->getMessage());
+            $ok = false;
+        }
+
+        if ($ok) {
+            $_SESSION['message'] = 'Application #' . $id . ' rejected.';
+        } else {
+            $_SESSION['error'] = 'Could not reject application.';
+        }
+        $this->redirect('student-applications/view?id=' . $id);
     }
 
     /**
@@ -1188,6 +1389,8 @@ class StudentApplicationController extends Controller {
             exit;
         }
 
+        $app = $model->enrichApplicationForStaffExport($app);
+
         $filename = 'application_' . $applicationId . '_data.csv';
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
@@ -1245,6 +1448,8 @@ class StudentApplicationController extends Controller {
             exit;
         }
 
+        $app = $model->enrichApplicationForStaffExport($app);
+
         require_once BASE_PATH . '/helpers/StudentApplicationSummaryPdf.php';
 
         $level = trim((string) ($app['application_level'] ?? ''));
@@ -1295,18 +1500,62 @@ class StudentApplicationController extends Controller {
         require_once BASE_PATH . '/vendor/autoload.php';
 
         $model = $this->model('StudentApplicationModel');
-        $rows = $model->getAllForStaffExport();
+        $statusParam = strtolower(trim((string) $this->get('status', '')));
+        $exportStatus = in_array($statusParam, ['new', 'approved', 'rejected'], true) ? $statusParam : null;
+        $levelRaw = trim((string) $this->get('level', ''));
+        $exportLevel = in_array($levelRaw, ['04', '05'], true) ? $levelRaw : null;
+        $deptRaw = trim((string) $this->get('dept', ''));
+        $courseRaw = trim((string) $this->get('course', ''));
+        $exportDeptId = null;
+        $exportCourseId = null;
+        if ($deptRaw !== '') {
+            $deptModel = $this->model('DepartmentModel');
+            $drow = $deptModel->find($deptRaw);
+            if (!empty($drow['department_id'])) {
+                $exportDeptId = (string) $drow['department_id'];
+            }
+        }
+        if ($courseRaw !== '') {
+            $courseModel = $this->model('CourseModel');
+            $crow = $courseModel->find($courseRaw);
+            if (!empty($crow['course_id'])) {
+                $exportCourseId = (string) $crow['course_id'];
+                if ($exportDeptId !== null && (string) ($crow['department_id'] ?? '') !== $exportDeptId) {
+                    $exportCourseId = null;
+                }
+            }
+        }
+        $rows = $model->getAllForStaffExport($exportStatus, $exportLevel, $exportDeptId, $exportCourseId);
         $cols = StudentApplicationModel::getStaffExportColumnOrder();
 
         try {
             $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
-            $sheet->setTitle('Applications');
+            $sheetTitle = 'Applications';
+            if ($exportStatus === 'new') {
+                $sheetTitle = 'New';
+            } elseif ($exportStatus === 'approved') {
+                $sheetTitle = 'Approved';
+            } elseif ($exportStatus === 'rejected') {
+                $sheetTitle = 'Rejected';
+            }
+            if ($exportLevel !== null) {
+                $sheetTitle .= ' L' . $exportLevel;
+            }
+            if ($exportDeptId !== null) {
+                $sheetTitle .= ' Dept';
+            }
+            if ($exportCourseId !== null) {
+                $sheetTitle .= ' Course';
+            }
+            $sheetTitle = substr(preg_replace('/[^A-Za-z0-9 _-]/', '', $sheetTitle), 0, 31) ?: 'Applications';
+            $sheet->setTitle($sheetTitle);
 
-            // Header row
+            // Header row (PhpSpreadsheet 2.x: use A1 coordinates, not removed ByColumnAndRow APIs)
             $c = 1;
             foreach ($cols as $colName) {
-                $sheet->setCellValueByColumnAndRow($c, 1, $colName);
+                $coord = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c) . '1';
+                $sheet->setCellValue($coord, $colName);
                 $c++;
             }
             $sheet->freezePane('A2');
@@ -1318,9 +1567,9 @@ class StudentApplicationController extends Controller {
                 foreach ($cols as $colName) {
                     $val = isset($row[$colName]) ? (string) $row[$colName] : '';
                     $val = str_replace(["\r\n", "\r", "\n"], ' | ', $val);
-                    $sheet->setCellValueExplicitByColumnAndRow(
-                        $c,
-                        $r,
+                    $coord = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c) . $r;
+                    $sheet->setCellValueExplicit(
+                        $coord,
                         $val,
                         \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
                     );
@@ -1336,7 +1585,20 @@ class StudentApplicationController extends Controller {
                 $sheet->getColumnDimensionByColumn($colIdx)->setAutoSize(true);
             }
 
-            $filename = 'student_applications_' . date('Y-m-d_H-i') . '.xlsx';
+            $parts = ['student_applications', date('Y-m-d_H-i')];
+            if ($exportStatus !== null) {
+                $parts[] = $exportStatus;
+            }
+            if ($exportLevel !== null) {
+                $parts[] = 'level' . $exportLevel;
+            }
+            if ($exportDeptId !== null) {
+                $parts[] = 'dept' . preg_replace('/[^A-Za-z0-9_-]+/', '_', $exportDeptId);
+            }
+            if ($exportCourseId !== null) {
+                $parts[] = 'course' . preg_replace('/[^A-Za-z0-9_-]+/', '_', $exportCourseId);
+            }
+            $filename = implode('_', $parts) . '.xlsx';
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
             header('Cache-Control: private, max-age=0');
