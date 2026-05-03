@@ -110,7 +110,7 @@
                                 <a href="<?php echo APP_URL; ?>/attendance" class="btn btn-outline-secondary">
                                     <i class="fas fa-redo me-1"></i>Reset
                                 </a>
-                                <button type="button" class="btn btn-success" id="attendanceMonthSheetExcelBtn" title="Weekdays only; 4 slots per day in a 2×2 square (2 cols × 2 rows)">
+                                <button type="button" class="btn btn-success" id="attendanceMonthSheetExcelBtn">
                                     <i class="fas fa-file-excel me-1"></i>Download month sheet (Excel)
                                 </button>
                             </div>

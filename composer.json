@@ -2,10 +2,10 @@
     "name": "slgti/mis",
     "description": "SLGTI MIS",
     "require": {
-        "php": ">=8.0",
+        "php": ">=7.4 <9.0",
         "dompdf/dompdf": "^3.0",
-        "phpoffice/phpspreadsheet": "^2.1",
-        "endroid/qr-code": "4.8"
+        "phpoffice/phpspreadsheet": "^1.29.0",
+        "endroid/qr-code": "^4.5.2"
     },
     "config": {
         "optimize-autoloader": true

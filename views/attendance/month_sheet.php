@@ -21,16 +21,6 @@
                         </div>
                     <?php endif; ?>
 
-                    <p class="text-muted small mb-3">
-                        Download a blank sheet: weekdays only (no Saturday/Sunday). Each day uses a 2×2 block (two columns × two rows) for four slot marks.
-                        Columns: row number, student ID, initials only (no full name), NIC — merged vertically with the two slot rows.
-                        <?php if (!empty($lockDepartmentSelection)): ?>
-                            <span class="d-block mt-1"><strong>Department:</strong> your own department only.</span>
-                        <?php else: ?>
-                            <span class="d-block mt-1"><strong>Department:</strong> you may select any department.</span>
-                        <?php endif; ?>
-                    </p>
-
                     <form method="GET" action="<?php echo APP_URL; ?>/attendance/month-sheet" id="monthSheetFilterForm" class="mb-4">
                         <div class="row g-3">
                             <?php

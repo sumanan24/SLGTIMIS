@@ -1554,7 +1554,7 @@ class StudentApplicationController extends Controller {
             $sheetTitle = substr(preg_replace('/[^A-Za-z0-9 _-]/', '', $sheetTitle), 0, 31) ?: 'Applications';
             $sheet->setTitle($sheetTitle);
 
-            // Header row (PhpSpreadsheet 2.x: use A1 coordinates, not removed ByColumnAndRow APIs)
+            // Header row (A1-style coordinates; PhpSpreadsheet 1.x / 2.x)
             $c = 1;
             foreach ($cols as $colName) {
                 $coord = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c) . '1';
@@ -1585,7 +1585,8 @@ class StudentApplicationController extends Controller {
             $sheet->getStyle('1:1')->getFont()->setBold(true);
             $sheet->setAutoFilter($sheet->calculateWorksheetDimension());
             foreach (range(1, count($cols)) as $colIdx) {
-                $sheet->getColumnDimensionByColumn($colIdx)->setAutoSize(true);
+                $letter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIdx);
+                $sheet->getColumnDimension($letter)->setAutoSize(true);
             }
 
             $parts = ['student_applications', date('Y-m-d_H-i')];

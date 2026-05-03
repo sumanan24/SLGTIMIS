@@ -1101,7 +1101,8 @@ class AttendanceController extends Controller {
         $sheet->getColumnDimension('C')->setWidth(18);
         $sheet->getColumnDimension('D')->setWidth(16);
         for ($ci = 5; $ci <= $lastColIndex; $ci++) {
-            $sheet->getColumnDimensionByColumn($ci)->setWidth(5);
+            $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($ci);
+            $sheet->getColumnDimension($colLetter)->setWidth(5);
         }
         
         $sheet->freezePane('E5');
