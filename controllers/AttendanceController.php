@@ -59,6 +59,10 @@ class AttendanceController extends Controller {
         $academicYear = $this->get('academic_year', '');
         $month = $this->get('month', date('Y-m'));
         $group = $this->get('group', '');
+        $studentStatus = $this->get('student_status', 'active');
+        if (!in_array($studentStatus, ['active', 'all'], true)) {
+            $studentStatus = 'active';
+        }
         
         // Get filter options - only show user's department if department-restricted
         if ($userDepartmentId) {
@@ -97,6 +101,7 @@ class AttendanceController extends Controller {
             if (!empty($group)) {
                 $filters['group_id'] = $group;
             }
+            $filters['student_status'] = $studentStatus;
             
             $students = $attendanceModel->getStudentsForAttendance($filters);
             
@@ -164,6 +169,7 @@ class AttendanceController extends Controller {
             'selectedAcademicYear' => $academicYear,
             'selectedMonth' => $month,
             'selectedGroup' => $group,
+            'selectedStudentStatus' => $studentStatus,
             'isMonthLocked' => $isMonthLocked,
             'isAdmin' => $isAdmin,
             'lockStatus' => $lockStatus,
@@ -868,6 +874,10 @@ class AttendanceController extends Controller {
         $academicYear = $this->get('academic_year', '');
         $month = $this->get('month', date('Y-m'));
         $group = $this->get('group', '');
+        $studentStatus = $this->get('student_status', 'active');
+        if (!in_array($studentStatus, ['active', 'all'], true)) {
+            $studentStatus = 'active';
+        }
         
         if ($userDepartmentId) {
             $dept = $departmentModel->getById($userDepartmentId);
@@ -900,6 +910,7 @@ class AttendanceController extends Controller {
             'selectedAcademicYear' => $academicYear,
             'selectedMonth' => $month,
             'selectedGroup' => $group,
+            'selectedStudentStatus' => $studentStatus,
             'error' => $_SESSION['error'] ?? null,
             'message' => $_SESSION['message'] ?? null,
             'lockDepartmentSelection' => $this->isDepartmentRestricted(),
@@ -941,6 +952,10 @@ class AttendanceController extends Controller {
         $academicYear = trim((string) $this->get('academic_year', ''));
         $month = trim((string) $this->get('month', date('Y-m')));
         $group = trim((string) $this->get('group', ''));
+        $studentStatus = trim((string) $this->get('student_status', 'active'));
+        if (!in_array($studentStatus, ['active', 'all'], true)) {
+            $studentStatus = 'active';
+        }
         
         if ($departmentId === '' || $courseId === '' || $academicYear === '' || $month === '') {
             $_SESSION['error'] = 'Department, Course, Academic Year, and Month are required.';
@@ -950,6 +965,7 @@ class AttendanceController extends Controller {
                 'academic_year' => $academicYear,
                 'month' => $month,
                 'group' => $group,
+                'student_status' => $studentStatus,
             ]));
             return;
         }
@@ -969,16 +985,18 @@ class AttendanceController extends Controller {
         if ($group !== '') {
             $filters['group_id'] = $group;
         }
+        $filters['student_status'] = $studentStatus;
         
         $students = $attendanceModel->getStudentsForAttendance($filters);
         if (empty($students)) {
-            $_SESSION['error'] = 'No active students found for the selected filters.';
+            $_SESSION['error'] = 'No students found for the selected filters.';
             $this->redirect('attendance/month-sheet?' . http_build_query([
                 'department_id' => $departmentId,
                 'course_id' => $courseId,
                 'academic_year' => $academicYear,
                 'month' => $month,
                 'group' => $group,
+                'student_status' => $studentStatus,
             ]));
             return;
         }
@@ -992,6 +1010,7 @@ class AttendanceController extends Controller {
                 'academic_year' => $academicYear,
                 'month' => $month,
                 'group' => $group,
+                'student_status' => $studentStatus,
             ]));
             return;
         }
@@ -1008,6 +1027,7 @@ class AttendanceController extends Controller {
                 'academic_year' => $academicYear,
                 'month' => $month,
                 'group' => $group,
+                'student_status' => $studentStatus,
             ]));
             return;
         }

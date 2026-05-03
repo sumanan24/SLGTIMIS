@@ -11,8 +11,8 @@ class AttendanceModel extends Model {
     }
     
     /**
-     * Get students for attendance by filters (active students only: student_status active,
-     * enrollment Following; when group_id is set, group_students and groups must be active).
+     * Get students for attendance by filters.
+     * Optional $filters['student_status']: 'active' (default) = student_status Active only; 'all' = any student_status (still Following enrollment).
      */
     public function getStudentsForAttendance($filters = []) {
         $sql = "SELECT DISTINCT s.student_id, s.student_fullname, s.student_ininame, s.student_nic, se.course_id, c.course_name, d.department_name
@@ -21,13 +21,16 @@ class AttendanceModel extends Model {
                 INNER JOIN `course` c ON se.course_id = c.course_id
                 INNER JOIN `department` d ON c.department_id = d.department_id";
         
-        // If group filter is provided, join active group membership and active group only
+        // If group filter is provided, join with group_students table
         if (!empty($filters['group_id'])) {
             $sql .= " INNER JOIN `group_students` gs ON s.student_id = gs.student_id AND gs.status = 'active'";
-            $sql .= " INNER JOIN `groups` g ON g.id = gs.group_id AND g.status = 'active'";
         }
         
-        $sql .= " WHERE LOWER(TRIM(se.student_enroll_status)) = 'following' AND LOWER(TRIM(s.student_status)) = 'active'";
+        $sql .= " WHERE se.student_enroll_status = 'Following'";
+        $statusScope = isset($filters['student_status']) ? (string) $filters['student_status'] : 'active';
+        if ($statusScope !== 'all') {
+            $sql .= " AND s.student_status = 'Active'";
+        }
         
         $params = [];
         $types = '';
