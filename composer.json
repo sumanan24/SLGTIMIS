@@ -10,5 +10,8 @@
     "config": {
         "optimize-autoloader": true,
         "platform-check": false
+    },
+    "suggest": {
+        "ext-zip": "Required for PhpSpreadsheet to write .xlsx files (e.g. month attendance register export)."
     }
 }

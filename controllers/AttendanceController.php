@@ -1001,8 +1001,8 @@ class AttendanceController extends Controller {
             AttendanceRegisterExportXlsx::stream($students, $workingDays, $month, $courseId, $group);
         } catch (Throwable $e) {
             error_log('exportMonthSheet native xlsx: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
-            $_SESSION['error'] = 'Could not build the Excel file. Check the server error log for exportMonthSheet / AttendanceRegisterExportXlsx. '
-                . 'Deploy helpers/StoredZipWriter.php together with AttendanceRegisterExportXlsx.php.';
+            $_SESSION['error'] = 'Could not build the Excel file. Check the server error log for exportMonthSheet. '
+                . 'Ensure composer install has been run (phpoffice/phpspreadsheet) and the PHP zip extension is enabled for Excel export.';
             $this->redirect('attendance/month-sheet?' . http_build_query([
                 'department_id' => $departmentId,
                 'course_id' => $courseId,
