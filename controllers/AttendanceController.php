@@ -914,6 +914,7 @@ class AttendanceController extends Controller {
      * Excel (.xlsx): index, student ID, name with initials, NIC; weekdays only;
      * four slots per day in a 2×2 block (two columns × two rows) per weekday.
      * Name column shows student_ininame only (no full name); # / ID / initials / NIC merged across the two data rows.
+     * Uses native OOXML writer (no PhpSpreadsheet) so PHP 7.4 servers work without vendor PHP 8 syntax.
      */
     public function exportMonthSheet() {
         if (!isset($_SESSION['user_id'])) {
@@ -995,140 +996,21 @@ class AttendanceController extends Controller {
             return;
         }
         
-        $autoload = BASE_PATH . '/vendor/autoload.php';
-        if (!is_readable($autoload)) {
-            $_SESSION['error'] = 'Excel export is not available (Composer packages missing).';
-            $this->redirect('attendance/month-sheet');
+        require_once BASE_PATH . '/helpers/AttendanceMonthSheetXlsxNative.php';
+        try {
+            AttendanceMonthSheetXlsxNative::stream($students, $calendarDays, $month, $courseId, $group);
+        } catch (Throwable $e) {
+            error_log('exportMonthSheet native xlsx: ' . $e->getMessage());
+            $_SESSION['error'] = 'Could not build the Excel file. Ensure the PHP zip extension is enabled.';
+            $this->redirect('attendance/month-sheet?' . http_build_query([
+                'department_id' => $departmentId,
+                'course_id' => $courseId,
+                'academic_year' => $academicYear,
+                'month' => $month,
+                'group' => $group,
+            ]));
             return;
         }
-        require_once $autoload;
-        
-        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
-        $title = strtoupper(date('M-y', strtotime($month . '-01')));
-        $sheet->setTitle(substr(preg_replace('/[^A-Za-z0-9 _-]/', '', $title), 0, 31) ?: 'Attendance');
-        
-        // Two columns per weekday; each day’s four slots are a 2×2 square (rows 3–4 in header; 2 rows per student).
-        $lastColIndex = 4 + count($calendarDays) * 2;
-        $lastColLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($lastColIndex);
-        
-        $sheet->mergeCells('A1:' . $lastColLetter . '1');
-        $sheet->setCellValue('A1', $title);
-        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
-        $sheet->getStyle('A1')->getAlignment()
-            ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)
-            ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
-        $sheet->getRowDimension(1)->setRowHeight(22);
-        
-        $sheet->mergeCells('A2:A4');
-        $sheet->setCellValue('A2', '#');
-        $sheet->mergeCells('B2:B4');
-        $sheet->setCellValue('B2', 'Student ID');
-        $sheet->mergeCells('C2:C4');
-        $sheet->setCellValue('C2', 'Name with Initials');
-        $sheet->mergeCells('D2:D4');
-        $sheet->setCellValue('D2', 'NIC');
-        
-        $col = 5;
-        foreach ($calendarDays as $dayInfo) {
-            $c0 = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
-            $c1 = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col + 1);
-            $sheet->mergeCells($c0 . '2:' . $c1 . '2');
-            $dayNum = (string) ((int) $dayInfo['day']);
-            $sheet->setCellValue($c0 . '2', $dayNum);
-            $sheet->setCellValue($c0 . '3', '1');
-            $sheet->setCellValue($c1 . '3', '2');
-            $sheet->setCellValue($c0 . '4', '3');
-            $sheet->setCellValue($c1 . '4', '4');
-            $col += 2;
-        }
-        
-        $headerStyle = [
-            'font' => ['bold' => true],
-            'alignment' => [
-                'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
-                'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
-            ],
-        ];
-        $sheet->getStyle('A2:' . $lastColLetter . '4')->applyFromArray($headerStyle);
-        
-        $row = 5;
-        $idx = 1;
-        foreach ($students as $stu) {
-            $r2 = $row + 1;
-            // Merge # / ID / initials / NIC across both rows (like earlier). Name column: initials only (no full name).
-            $sheet->mergeCells('A' . $row . ':A' . $r2);
-            $sheet->setCellValue('A' . $row, $idx);
-            $sheet->mergeCells('B' . $row . ':B' . $r2);
-            $sheet->setCellValueExplicit(
-                'B' . $row,
-                (string) ($stu['student_id'] ?? ''),
-                \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
-            );
-            $sheet->mergeCells('C' . $row . ':C' . $r2);
-            $initialsOnly = trim((string) ($stu['student_ininame'] ?? ''));
-            $sheet->setCellValue('C' . $row, $initialsOnly);
-            $sheet->mergeCells('D' . $row . ':D' . $r2);
-            $sheet->setCellValueExplicit(
-                'D' . $row,
-                (string) ($stu['student_nic'] ?? ''),
-                \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
-            );
-            $col = 5;
-            foreach ($calendarDays as $_d) {
-                $c0 = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
-                $c1 = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col + 1);
-                $sheet->setCellValue($c0 . $row, '');
-                $sheet->setCellValue($c1 . $row, '');
-                $sheet->setCellValue($c0 . $r2, '');
-                $sheet->setCellValue($c1 . $r2, '');
-                $col += 2;
-            }
-            $sheet->getStyle('A' . $row . ':D' . $r2)->getAlignment()
-                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER)
-                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
-            $sheet->getStyle('A' . $row)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('C' . $row . ':C' . $r2)->getAlignment()->setWrapText(false);
-            $sheet->getRowDimension($row)->setRowHeight(18);
-            $sheet->getRowDimension($r2)->setRowHeight(18);
-            $idx++;
-            $row += 2;
-        }
-        $lastRow = $row - 1;
-        
-        $sheet->getColumnDimension('A')->setWidth(5);
-        $sheet->getColumnDimension('B')->setWidth(18);
-        $sheet->getColumnDimension('C')->setWidth(18);
-        $sheet->getColumnDimension('D')->setWidth(16);
-        for ($ci = 5; $ci <= $lastColIndex; $ci++) {
-            $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($ci);
-            $sheet->getColumnDimension($colLetter)->setWidth(5);
-        }
-        
-        $sheet->freezePane('E5');
-        
-        $borderStyle = [
-            'borders' => [
-                'allBorders' => [
-                    'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
-                    'color' => ['rgb' => '000000'],
-                ],
-            ],
-        ];
-        $sheet->getStyle('A1:' . $lastColLetter . $lastRow)->applyFromArray($borderStyle);
-        
-        $filename = 'attendance_sheet_' . str_replace('-', '_', $month) . '_' . preg_replace('/[^A-Za-z0-9_-]+/', '_', $courseId);
-        if ($group !== '') {
-            $filename .= '_group' . preg_replace('/[^A-Za-z0-9_-]+/', '_', $group);
-        }
-        $filename .= '.xlsx';
-        
-        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
-        header('Cache-Control: private, max-age=0');
-        
-        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-        $writer->save('php://output');
         exit();
     }
     
