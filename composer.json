@@ -8,6 +8,7 @@
         "endroid/qr-code": "^4.5.2"
     },
     "config": {
-        "optimize-autoloader": true
+        "optimize-autoloader": true,
+        "platform-check": false
     }
 }
