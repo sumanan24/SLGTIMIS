@@ -3,7 +3,7 @@
         <div class="col-12">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-success text-white">
-                    <h5 class="mb-0 fw-bold"><i class="fas fa-file-excel me-2"></i>Month Attendance Sheet (Excel)</h5>
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-file-excel me-2"></i>Month attendance register (Excel)</h5>
                 </div>
                 <div class="card-body">
                     <?php if (isset($error)): ?>
@@ -94,14 +94,6 @@
                                             </option>
                                         <?php endforeach; ?>
                                     <?php endif; ?>
-                                </select>
-                            </div>
-
-                            <div class="col-md-3">
-                                <label for="student_status" class="form-label fw-semibold">Student status</label>
-                                <select class="form-select" id="student_status" name="student_status">
-                                    <option value="active" <?php echo (($selectedStudentStatus ?? 'active') === 'active') ? 'selected' : ''; ?>>Active only</option>
-                                    <option value="all" <?php echo (($selectedStudentStatus ?? '') === 'all') ? 'selected' : ''; ?>>All statuses</option>
                                 </select>
                             </div>
                         </div>
@@ -219,8 +211,6 @@ document.addEventListener('DOMContentLoaded', function() {
             month: month
         });
         if (group) params.set('group', group);
-        const stEl = document.getElementById('student_status');
-        if (stEl && stEl.value) params.set('student_status', stEl.value);
         window.location.href = appBase + '/attendance/export-month-sheet?' + params.toString();
     });
 });

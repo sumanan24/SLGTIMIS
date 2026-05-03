@@ -11,24 +11,24 @@ class AttendanceModel extends Model {
     }
     
     /**
-     * Get students for attendance by filters.
-     * Optional $filters['student_status']: 'active' (default) = student_status Active only; 'all' = any student_status (still Following enrollment).
+     * Get students for attendance by filters (Following enrollment).
+     * Default: Active students only. Set $filters['all_student_statuses'] => true for register export (any student_status).
      */
     public function getStudentsForAttendance($filters = []) {
-        $sql = "SELECT DISTINCT s.student_id, s.student_fullname, s.student_ininame, s.student_nic, se.course_id, c.course_name, d.department_name
+        $sql = "SELECT DISTINCT s.student_id, s.student_fullname, s.student_ininame, s.student_nic,
+                COALESCE(NULLIF(TRIM(s.student_fullname), ''), NULLIF(TRIM(s.student_ininame), ''), s.student_id) AS export_name,
+                se.course_id, c.course_name, d.department_name
                 FROM `student` s
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
                 INNER JOIN `course` c ON se.course_id = c.course_id
                 INNER JOIN `department` d ON c.department_id = d.department_id";
         
-        // If group filter is provided, join with group_students table
         if (!empty($filters['group_id'])) {
-            $sql .= " INNER JOIN `group_students` gs ON s.student_id = gs.student_id AND gs.status = 'active'";
+            $sql .= " INNER JOIN `group_students` gs ON s.student_id = gs.student_id";
         }
         
         $sql .= " WHERE se.student_enroll_status = 'Following'";
-        $statusScope = isset($filters['student_status']) ? (string) $filters['student_status'] : 'active';
-        if ($statusScope !== 'all') {
+        if (empty($filters['all_student_statuses'])) {
             $sql .= " AND s.student_status = 'Active'";
         }
         
@@ -55,7 +55,7 @@ class AttendanceModel extends Model {
         
         if (!empty($filters['group_id'])) {
             $sql .= " AND gs.group_id = ?";
-            $params[] = $filters['group_id'];
+            $params[] = (int) $filters['group_id'];
             $types .= 'i';
         }
         
@@ -63,17 +63,45 @@ class AttendanceModel extends Model {
         
         if (!empty($params)) {
             $stmt = $this->db->prepare($sql);
-            $stmt->bind_param($types, ...$params);
-            $stmt->execute();
+            if (!$stmt) {
+                error_log('AttendanceModel::getStudentsForAttendance prepare failed: ' . $this->db->getConnection()->error);
+                return [];
+            }
+            $bind = [];
+            $bind[] = &$types;
+            foreach ($params as $k => $_v) {
+                $bind[] = &$params[$k];
+            }
+            if (!call_user_func_array([$stmt, 'bind_param'], $bind)) {
+                error_log('AttendanceModel::getStudentsForAttendance bind_param failed: ' . $stmt->error);
+                return [];
+            }
+            if (!$stmt->execute()) {
+                error_log('AttendanceModel::getStudentsForAttendance execute failed: ' . $stmt->error);
+                return [];
+            }
             $result = $stmt->get_result();
+            if ($result === false) {
+                error_log('AttendanceModel::getStudentsForAttendance get_result failed (mysqlnd required): ' . $stmt->error);
+                return [];
+            }
         } else {
             $result = $this->db->query($sql);
+            if ($result === false) {
+                error_log('AttendanceModel::getStudentsForAttendance query failed: ' . $this->db->getConnection()->error);
+                return [];
+            }
         }
         
         $data = [];
         if ($result && $result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
-                $data[] = $row;
+                // Normalise keys (some drivers / settings vary case) for views & exports.
+                $norm = [];
+                foreach ($row as $k => $v) {
+                    $norm[is_string($k) ? strtolower($k) : $k] = $v;
+                }
+                $data[] = $norm;
             }
         }
         

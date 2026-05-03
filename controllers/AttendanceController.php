@@ -59,10 +59,6 @@ class AttendanceController extends Controller {
         $academicYear = $this->get('academic_year', '');
         $month = $this->get('month', date('Y-m'));
         $group = $this->get('group', '');
-        $studentStatus = $this->get('student_status', 'active');
-        if (!in_array($studentStatus, ['active', 'all'], true)) {
-            $studentStatus = 'active';
-        }
         
         // Get filter options - only show user's department if department-restricted
         if ($userDepartmentId) {
@@ -101,7 +97,6 @@ class AttendanceController extends Controller {
             if (!empty($group)) {
                 $filters['group_id'] = $group;
             }
-            $filters['student_status'] = $studentStatus;
             
             $students = $attendanceModel->getStudentsForAttendance($filters);
             
@@ -169,7 +164,6 @@ class AttendanceController extends Controller {
             'selectedAcademicYear' => $academicYear,
             'selectedMonth' => $month,
             'selectedGroup' => $group,
-            'selectedStudentStatus' => $studentStatus,
             'isMonthLocked' => $isMonthLocked,
             'isAdmin' => $isAdmin,
             'lockStatus' => $lockStatus,
@@ -874,10 +868,6 @@ class AttendanceController extends Controller {
         $academicYear = $this->get('academic_year', '');
         $month = $this->get('month', date('Y-m'));
         $group = $this->get('group', '');
-        $studentStatus = $this->get('student_status', 'active');
-        if (!in_array($studentStatus, ['active', 'all'], true)) {
-            $studentStatus = 'active';
-        }
         
         if ($userDepartmentId) {
             $dept = $departmentModel->getById($userDepartmentId);
@@ -899,7 +889,7 @@ class AttendanceController extends Controller {
         }
         
         $data = [
-            'title' => 'Month Attendance Sheet (Excel)',
+            'title' => 'Month attendance register (Excel)',
             'page' => 'attendance-month-sheet',
             'departments' => $departments,
             'courses' => $courses,
@@ -910,7 +900,6 @@ class AttendanceController extends Controller {
             'selectedAcademicYear' => $academicYear,
             'selectedMonth' => $month,
             'selectedGroup' => $group,
-            'selectedStudentStatus' => $studentStatus,
             'error' => $_SESSION['error'] ?? null,
             'message' => $_SESSION['message'] ?? null,
             'lockDepartmentSelection' => $this->isDepartmentRestricted(),
@@ -922,10 +911,8 @@ class AttendanceController extends Controller {
     }
     
     /**
-     * Excel (.xlsx): index, student ID, name with initials, NIC; weekdays only;
-     * four slots per day in a 2×2 block (two columns × two rows) per weekday.
-     * Name column shows student_ininame only (no full name); # / ID / initials / NIC merged across the two data rows.
-     * Uses native OOXML writer (no PhpSpreadsheet) so PHP 7.4 servers work without vendor PHP 8 syntax.
+     * Excel (.xlsx): register with #, Reg. No., Name, NIC and one column per weekday
+     * (Saturdays, Sundays, and Sri Lanka public holidays excluded). Native OOXML, PHP 7.4–safe.
      */
     public function exportMonthSheet() {
         if (!isset($_SESSION['user_id'])) {
@@ -952,10 +939,6 @@ class AttendanceController extends Controller {
         $academicYear = trim((string) $this->get('academic_year', ''));
         $month = trim((string) $this->get('month', date('Y-m')));
         $group = trim((string) $this->get('group', ''));
-        $studentStatus = trim((string) $this->get('student_status', 'active'));
-        if (!in_array($studentStatus, ['active', 'all'], true)) {
-            $studentStatus = 'active';
-        }
         
         if ($departmentId === '' || $courseId === '' || $academicYear === '' || $month === '') {
             $_SESSION['error'] = 'Department, Course, Academic Year, and Month are required.';
@@ -965,7 +948,6 @@ class AttendanceController extends Controller {
                 'academic_year' => $academicYear,
                 'month' => $month,
                 'group' => $group,
-                'student_status' => $studentStatus,
             ]));
             return;
         }
@@ -981,11 +963,11 @@ class AttendanceController extends Controller {
             'department_id' => $departmentId,
             'course_id' => $courseId,
             'academic_year' => $academicYear,
+            'all_student_statuses' => true,
         ];
         if ($group !== '') {
             $filters['group_id'] = $group;
         }
-        $filters['student_status'] = $studentStatus;
         
         $students = $attendanceModel->getStudentsForAttendance($filters);
         if (empty($students)) {
@@ -996,28 +978,27 @@ class AttendanceController extends Controller {
                 'academic_year' => $academicYear,
                 'month' => $month,
                 'group' => $group,
-                'student_status' => $studentStatus,
             ]));
             return;
         }
         
-        $calendarDays = $this->generateCalendarDays($month);
-        if (empty($calendarDays)) {
-            $_SESSION['error'] = 'No weekdays in the selected month.';
+        require_once BASE_PATH . '/helpers/SriLankaPublicHolidays.php';
+        $workingDays = SriLankaPublicHolidays::weekdayTeachingDaysInMonth($month);
+        if (empty($workingDays)) {
+            $_SESSION['error'] = 'No teaching weekdays in the selected month (all weekdays may be public holidays), or invalid month.';
             $this->redirect('attendance/month-sheet?' . http_build_query([
                 'department_id' => $departmentId,
                 'course_id' => $courseId,
                 'academic_year' => $academicYear,
                 'month' => $month,
                 'group' => $group,
-                'student_status' => $studentStatus,
             ]));
             return;
         }
         
-        require_once BASE_PATH . '/helpers/AttendanceMonthSheetXlsxNative.php';
+        require_once BASE_PATH . '/helpers/AttendanceRegisterExportXlsx.php';
         try {
-            AttendanceMonthSheetXlsxNative::stream($students, $calendarDays, $month, $courseId, $group);
+            AttendanceRegisterExportXlsx::stream($students, $workingDays, $month, $courseId, $group);
         } catch (Throwable $e) {
             error_log('exportMonthSheet native xlsx: ' . $e->getMessage());
             $_SESSION['error'] = 'Could not build the Excel file. Ensure the PHP zip extension is enabled.';
@@ -1027,7 +1008,6 @@ class AttendanceController extends Controller {
                 'academic_year' => $academicYear,
                 'month' => $month,
                 'group' => $group,
-                'student_status' => $studentStatus,
             ]));
             return;
         }

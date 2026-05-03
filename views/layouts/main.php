@@ -373,7 +373,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/attendance/month-sheet" class="<?php echo (isset($page) && $page === 'attendance-month-sheet') ? 'active' : ''; ?>">
                                             <i class="fas fa-file-excel"></i>
-                                            <span>Month sheet (Excel)</span>
+                                            <span>Month register (Excel)</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>

@@ -18,6 +18,7 @@ $v = static function (string $key, string $default = '') use ($old): string {
 $actionUrl = rtrim(APP_URL, '/') . '/level' . htmlspecialchars($application_level, ENT_QUOTES, 'UTF-8') . 'application';
 $levelLabel = $application_level === '04' ? 'Level 04' : 'Level 05';
 $req = '<span class="text-danger fw-bold" aria-hidden="true">*</span>';
+$isLevel05 = (($application_level ?? '04') === '05');
 ?>
 <?php if (!empty($flash_success)): ?>
 <div class="alert app-form-alert app-form-alert-success mb-4"><?php echo htmlspecialchars($flash_success, ENT_QUOTES, 'UTF-8'); ?></div>
@@ -38,8 +39,17 @@ $req = '<span class="text-danger fw-bold" aria-hidden="true">*</span>';
             <div class="flex-grow-1 min-w-0">
                 <p class="app-form-hero-kicker mb-2">Sri Lanka German Training Institute · Apply online 2026</p>
                 <h1 class="app-form-hero-title mb-2">Online application</h1>
-                <?php if (($application_level ?? '04') === '05'): ?>
-                <p class="app-form-hero-text mb-0">Fill in <strong>all</strong> boxes about you, your address, and your first course. Upload <strong>all</strong> files. For Level 05 exams: <strong>O/L is required</strong>; then provide <strong>either</strong> full A/L <strong>or</strong> full NVQ (not both incomplete). You can use English. You do <strong>not</strong> need a password or login.</p>
+                <?php if ($isLevel05): ?>
+                <div class="app-form-hero-text mb-0">
+                    <div class="app-form-notes-title mb-2">Notes</div>
+                    <ul class="app-form-notes-list mb-0">
+                        <li>Fill in <strong>all</strong> boxes about you, your address, and your <strong>first</strong> course.</li>
+                        <li>Upload <strong>all</strong> files.</li>
+                        <li>For exams: write <strong>all</strong> O/L and A/L details, <strong>or</strong> write <strong>all</strong> NVQ details, <strong>or</strong> both.</li>
+                        <li>You can use English.</li>
+                        <li>You do <strong>not</strong> need a password or login.</li>
+                    </ul>
+                </div>
                 <?php else: ?>
                 <p class="app-form-hero-text mb-0">Fill in <strong>every</strong> box and upload <strong>every</strong> file. You can use English. You do <strong>not</strong> need a password or login.</p>
                 <?php endif; ?>
@@ -54,7 +64,7 @@ $req = '<span class="text-danger fw-bold" aria-hidden="true">*</span>';
 
     <?php require __DIR__ . '/_form_fields.php'; ?>
 
-    <div class="card app-form-actions-card border-0 mb-5">
+    <div class="card app-form-actions-card border-0 mb-5" id="section-submit">
         <div class="card-body p-4 d-flex flex-column flex-sm-row flex-wrap gap-3 align-items-stretch align-items-sm-center justify-content-between">
             <button type="submit" class="btn app-form-btn-submit btn-lg px-4 order-1 order-sm-0">
                 <i class="fas fa-paper-plane me-2"></i>Send application
@@ -73,4 +83,3 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
 </script>
 <?php require __DIR__ . '/_address_province_scripts.php'; ?>
 <?php require __DIR__ . '/_course_preferences_scripts.php'; ?>
-<?php require __DIR__ . '/_contact_validation_scripts.php'; ?>
