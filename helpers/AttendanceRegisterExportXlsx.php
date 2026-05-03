@@ -12,7 +12,11 @@ class AttendanceRegisterExportXlsx {
      * @param array<int,array<string,mixed>>  $workingDays
      */
     public static function stream(array $students, array $workingDays, string $month, string $courseId, string $group): void {
-        require_once __DIR__ . '/StoredZipWriter.php';
+        $storedZip = __DIR__ . DIRECTORY_SEPARATOR . 'StoredZipWriter.php';
+        if (!is_readable($storedZip)) {
+            throw new RuntimeException('StoredZipWriter.php is missing from helpers; redeploy the full helpers folder.');
+        }
+        require_once $storedZip;
 
         while (ob_get_level() > 0) {
             ob_end_clean();
@@ -25,11 +29,20 @@ class AttendanceRegisterExportXlsx {
         }
 
         $libErr = libxml_use_internal_errors(true);
-        $xmlOk = @simplexml_load_string($sheetXml);
+        $parseFlags = LIBXML_NONET;
+        if (defined('LIBXML_PARSEHUGE')) {
+            $parseFlags |= LIBXML_PARSEHUGE;
+        }
+        $xmlOk = @simplexml_load_string($sheetXml, 'SimpleXMLElement', $parseFlags);
+        $libxmlErrors = libxml_get_errors();
         libxml_clear_errors();
         libxml_use_internal_errors($libErr);
         if ($xmlOk === false) {
-            error_log('AttendanceRegisterExportXlsx: sheet1.xml failed libxml parse');
+            $msgs = [];
+            foreach ($libxmlErrors as $err) {
+                $msgs[] = trim($err->message) . ' (line ' . (int) $err->line . ')';
+            }
+            error_log('AttendanceRegisterExportXlsx: sheet1.xml libxml ' . ($msgs !== [] ? implode('; ', $msgs) : '(no detail)'));
             throw new RuntimeException('Worksheet XML failed validation.');
         }
 
@@ -71,10 +84,7 @@ class AttendanceRegisterExportXlsx {
             . '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
             . 'xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>SLGTI-SIS</dc:creator></cp:coreProperties>';
 
-        $tmp = tempnam(sys_get_temp_dir(), 'slg');
-        if ($tmp === false) {
-            throw new RuntimeException('Could not create temp file.');
-        }
+        $tmp = self::createTempExportPath();
 
         $entries = [
             '[Content_Types].xml' => $contentTypes,
@@ -349,7 +359,11 @@ class AttendanceRegisterExportXlsx {
             $flags |= ENT_SUBSTITUTE;
         }
         $h = htmlspecialchars($s, $flags, 'UTF-8');
-        return ($h === false) ? '' : $h;
+        if ($h === false || $h === '') {
+            return '';
+        }
+        $stripped = @preg_replace('/[\x{FFFE}\x{FFFF}]/u', '', $h);
+        return is_string($stripped) ? $stripped : $h;
     }
 
     /** Cell text inside &lt;t&gt; */
@@ -366,6 +380,62 @@ class AttendanceRegisterExportXlsx {
             $flags |= ENT_SUBSTITUTE;
         }
         $h = htmlspecialchars($s, $flags, 'UTF-8');
-        return ($h === false) ? '' : $h;
+        if ($h === false) {
+            return '';
+        }
+        // Strip code points illegal in XML 1.0 (Excel/libxml are strict).
+        if ($h !== '') {
+            $stripped = @preg_replace('/[\x{FFFE}\x{FFFF}]/u', '', $h);
+            if (is_string($stripped)) {
+                $h = $stripped;
+            }
+        }
+        return $h;
+    }
+
+    /**
+     * Prefer system temp; fall back to project tmp/ or uploads/_tmp_xlsx/ when open_basedir
+     * or permissions block the default (common on shared hosting).
+     */
+    private static function createTempExportPath(): string {
+        $dirs = [];
+        $sys = sys_get_temp_dir();
+        if ($sys !== '' && $sys !== '.') {
+            $dirs[] = $sys;
+        }
+        $projectRoot = dirname(__DIR__);
+        $dirs[] = $projectRoot . DIRECTORY_SEPARATOR . 'tmp';
+        if (defined('BASE_PATH')) {
+            $bp = rtrim((string) BASE_PATH, '/\\');
+            if ($bp !== '' && $bp !== $projectRoot) {
+                $dirs[] = $bp . DIRECTORY_SEPARATOR . 'tmp';
+            }
+        }
+        $uploads = $projectRoot . DIRECTORY_SEPARATOR . 'uploads';
+        if (is_dir($uploads)) {
+            $dirs[] = $uploads . DIRECTORY_SEPARATOR . '_tmp_xlsx';
+        }
+        $ut = ini_get('upload_tmp_dir');
+        if (is_string($ut) && $ut !== '') {
+            $dirs[] = $ut;
+        }
+        $dirs = array_values(array_unique(array_filter($dirs)));
+
+        foreach ($dirs as $dir) {
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0775, true);
+            }
+            if (!is_dir($dir) || !is_writable($dir)) {
+                continue;
+            }
+            $path = @tempnam($dir, 'slgx_');
+            if ($path !== false && is_writable($path)) {
+                return $path;
+            }
+        }
+
+        error_log('AttendanceRegisterExportXlsx: no writable temp dir; tried: ' . implode(', ', $dirs)
+            . '; open_basedir=' . (string) ini_get('open_basedir'));
+        throw new RuntimeException('Excel export: no writable temp directory. Create a writable folder tmp/ under the site root or fix PHP temp/open_basedir.');
     }
 }

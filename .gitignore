@@ -1,2 +1,6 @@
 # Local logs
 error.log
+
+# Excel export temp (created at runtime if needed)
+/tmp/
+/uploads/_tmp_xlsx/
