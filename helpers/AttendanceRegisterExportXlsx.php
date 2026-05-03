@@ -1,8 +1,8 @@
 <?php
 /**
- * Month attendance register as .xlsx (native OOXML, ZipArchive).
+ * Month attendance register as .xlsx (native OOXML; zip via StoredZipWriter, no ext-zip required).
  * Layout: row 1 merged title (month + course + group); rows 2–4 headers with
- * # / Reg No / Name / NIC merged vertically; each teaching weekday shows date only (Y-m-d)
+ * # / Reg No / Name / NIC merged vertically; each teaching weekday shows day-of-month only
  * over two columns with slots 1–4 in a 2×2 grid (day-of-month only, no year/month text); two data rows per student with a 2×2
  * empty block per day for marks. SL public holidays excluded upstream (SriLankaPublicHolidays).
  */
@@ -12,9 +12,7 @@ class AttendanceRegisterExportXlsx {
      * @param array<int,array<string,mixed>>  $workingDays
      */
     public static function stream(array $students, array $workingDays, string $month, string $courseId, string $group): void {
-        if (!class_exists('ZipArchive')) {
-            throw new RuntimeException('PHP zip extension (ZipArchive) is required.');
-        }
+        require_once __DIR__ . '/StoredZipWriter.php';
 
         while (ob_get_level() > 0) {
             ob_end_clean();
@@ -77,24 +75,23 @@ class AttendanceRegisterExportXlsx {
         if ($tmp === false) {
             throw new RuntimeException('Could not create temp file.');
         }
-        $zip = new ZipArchive();
-        if ($zip->open($tmp, ZipArchive::OVERWRITE | ZipArchive::CREATE) !== true) {
-            @unlink($tmp);
-            throw new RuntimeException('Could not open zip temp file.');
-        }
 
-        $zip->addFromString('[Content_Types].xml', $contentTypes);
-        $zip->addFromString('_rels/.rels', $rootRels);
-        $zip->addFromString('docProps/app.xml', $appXml);
-        $zip->addFromString('docProps/core.xml', $coreXml);
-        $zip->addFromString('xl/workbook.xml', $workbookXml);
-        $zip->addFromString('xl/_rels/workbook.xml.rels', $workbookRels);
-        $zip->addFromString('xl/styles.xml', $stylesXml);
-        $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
+        $entries = [
+            '[Content_Types].xml' => $contentTypes,
+            '_rels/.rels' => $rootRels,
+            'docProps/app.xml' => $appXml,
+            'docProps/core.xml' => $coreXml,
+            'xl/workbook.xml' => $workbookXml,
+            'xl/_rels/workbook.xml.rels' => $workbookRels,
+            'xl/styles.xml' => $stylesXml,
+            'xl/worksheets/sheet1.xml' => $sheetXml,
+        ];
 
-        if (!$zip->close()) {
+        try {
+            StoredZipWriter::writeFile($tmp, $entries);
+        } catch (Throwable $e) {
             @unlink($tmp);
-            throw new RuntimeException('Zip close failed.');
+            throw $e;
         }
 
         $size = @filesize($tmp);

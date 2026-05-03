@@ -1001,7 +1001,7 @@ class AttendanceController extends Controller {
             AttendanceRegisterExportXlsx::stream($students, $workingDays, $month, $courseId, $group);
         } catch (Throwable $e) {
             error_log('exportMonthSheet native xlsx: ' . $e->getMessage());
-            $_SESSION['error'] = 'Could not build the Excel file. Ensure the PHP zip extension is enabled.';
+            $_SESSION['error'] = 'Could not build the Excel file. Check the server error log; if the log mentions ZipArchive or zip, enable the PHP zip extension in php.ini.';
             $this->redirect('attendance/month-sheet?' . http_build_query([
                 'department_id' => $departmentId,
                 'course_id' => $courseId,
