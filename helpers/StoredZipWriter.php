@@ -5,15 +5,15 @@
  */
 class StoredZipWriter {
     /**
-     * @param array<string,string> $entries Zip entry path (use forward slashes) => raw file contents
+     * @param resource $fh Writable binary stream (e.g. fopen('php://memory','r+b') or file handle)
+     * @param array<string,string> $entries Zip entry path (forward slashes) => raw file contents
      */
-    public static function writeFile(string $outPath, array $entries): void {
+    public static function writeStream($fh, array $entries): void {
+        if (!is_resource($fh)) {
+            throw new InvalidArgumentException('StoredZipWriter: invalid stream resource.');
+        }
         if ($entries === []) {
             throw new InvalidArgumentException('StoredZipWriter: no entries.');
-        }
-        $fh = fopen($outPath, 'wb');
-        if ($fh === false) {
-            throw new RuntimeException('StoredZipWriter: could not open output file for writing.');
         }
 
         $central = '';
@@ -47,11 +47,9 @@ class StoredZipWriter {
 
             $localHeaderOffset = $offset;
             if (fwrite($fh, $local) !== strlen($local)) {
-                fclose($fh);
                 throw new RuntimeException('StoredZipWriter: write failed (local header).');
             }
             if ($unc > 0 && fwrite($fh, $body) !== $unc) {
-                fclose($fh);
                 throw new RuntimeException('StoredZipWriter: write failed (payload).');
             }
             $offset += strlen($local) + $unc;
@@ -80,13 +78,11 @@ class StoredZipWriter {
         $cdOffset = $offset;
         $cdSize = strlen($central);
         if (fwrite($fh, $central) !== $cdSize) {
-            fclose($fh);
             throw new RuntimeException('StoredZipWriter: write failed (central directory).');
         }
 
         $n = count($entries);
         if ($n > 0xffff) {
-            fclose($fh);
             throw new RuntimeException('StoredZipWriter: too many entries.');
         }
 
@@ -99,9 +95,22 @@ class StoredZipWriter {
         $end .= pack('V', $cdOffset);
         $end .= pack('v', 0);
         if (fwrite($fh, $end) !== strlen($end)) {
-            fclose($fh);
             throw new RuntimeException('StoredZipWriter: write failed (end record).');
         }
-        fclose($fh);
+    }
+
+    /**
+     * @param array<string,string> $entries Zip entry path (use forward slashes) => raw file contents
+     */
+    public static function writeFile(string $outPath, array $entries): void {
+        $fh = fopen($outPath, 'wb');
+        if ($fh === false) {
+            throw new RuntimeException('StoredZipWriter: could not open output file for writing.');
+        }
+        try {
+            self::writeStream($fh, $entries);
+        } finally {
+            fclose($fh);
+        }
     }
 }

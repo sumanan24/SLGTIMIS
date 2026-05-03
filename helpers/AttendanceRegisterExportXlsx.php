@@ -84,8 +84,6 @@ class AttendanceRegisterExportXlsx {
             . '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
             . 'xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>SLGTI-SIS</dc:creator></cp:coreProperties>';
 
-        $tmp = self::createTempExportPath();
-
         $entries = [
             '[Content_Types].xml' => $contentTypes,
             '_rels/.rels' => $rootRels,
@@ -97,17 +95,19 @@ class AttendanceRegisterExportXlsx {
             'xl/worksheets/sheet1.xml' => $sheetXml,
         ];
 
-        try {
-            StoredZipWriter::writeFile($tmp, $entries);
-        } catch (Throwable $e) {
-            @unlink($tmp);
-            throw $e;
+        $mem = fopen('php://memory', 'r+b');
+        if ($mem === false) {
+            throw new RuntimeException('Excel export: could not open in-memory buffer.');
         }
-
-        $size = @filesize($tmp);
-        if ($size === false || $size < 200) {
-            @unlink($tmp);
-            throw new RuntimeException('Output file too small.');
+        try {
+            StoredZipWriter::writeStream($mem, $entries);
+            rewind($mem);
+            $binary = stream_get_contents($mem);
+        } finally {
+            fclose($mem);
+        }
+        if ($binary === false || strlen($binary) < 200) {
+            throw new RuntimeException('Excel export: generated file too small.');
         }
 
         $filename = 'attendance_sheet_' . str_replace('-', '_', $month) . '_' . preg_replace('/[^A-Za-z0-9_-]+/', '_', $courseId);
@@ -119,10 +119,9 @@ class AttendanceRegisterExportXlsx {
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
         header('Cache-Control: private, max-age=0, must-revalidate');
-        header('Content-Length: ' . $size);
+        header('Content-Length: ' . (string) strlen($binary));
 
-        readfile($tmp);
-        @unlink($tmp);
+        echo $binary;
     }
 
     /**
@@ -391,51 +390,5 @@ class AttendanceRegisterExportXlsx {
             }
         }
         return $h;
-    }
-
-    /**
-     * Prefer system temp; fall back to project tmp/ or uploads/_tmp_xlsx/ when open_basedir
-     * or permissions block the default (common on shared hosting).
-     */
-    private static function createTempExportPath(): string {
-        $dirs = [];
-        $sys = sys_get_temp_dir();
-        if ($sys !== '' && $sys !== '.') {
-            $dirs[] = $sys;
-        }
-        $projectRoot = dirname(__DIR__);
-        $dirs[] = $projectRoot . DIRECTORY_SEPARATOR . 'tmp';
-        if (defined('BASE_PATH')) {
-            $bp = rtrim((string) BASE_PATH, '/\\');
-            if ($bp !== '' && $bp !== $projectRoot) {
-                $dirs[] = $bp . DIRECTORY_SEPARATOR . 'tmp';
-            }
-        }
-        $uploads = $projectRoot . DIRECTORY_SEPARATOR . 'uploads';
-        if (is_dir($uploads)) {
-            $dirs[] = $uploads . DIRECTORY_SEPARATOR . '_tmp_xlsx';
-        }
-        $ut = ini_get('upload_tmp_dir');
-        if (is_string($ut) && $ut !== '') {
-            $dirs[] = $ut;
-        }
-        $dirs = array_values(array_unique(array_filter($dirs)));
-
-        foreach ($dirs as $dir) {
-            if (!is_dir($dir)) {
-                @mkdir($dir, 0775, true);
-            }
-            if (!is_dir($dir) || !is_writable($dir)) {
-                continue;
-            }
-            $path = @tempnam($dir, 'slgx_');
-            if ($path !== false && is_writable($path)) {
-                return $path;
-            }
-        }
-
-        error_log('AttendanceRegisterExportXlsx: no writable temp dir; tried: ' . implode(', ', $dirs)
-            . '; open_basedir=' . (string) ini_get('open_basedir'));
-        throw new RuntimeException('Excel export: no writable temp directory. Create a writable folder tmp/ under the site root or fix PHP temp/open_basedir.');
     }
 }
