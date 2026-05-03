@@ -84,6 +84,8 @@
                                 $hasAttendanceAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3']) || $isAdmin;
                                 // Attendance report access: DIR, DPI, DPA, REG, FIN, ACC, SAO, HOD, IN1, IN2, IN3, ADM, and Admin
                                 $hasAttendanceReportAccess = in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'HOD', 'IN1', 'IN2', 'IN3', 'ADM']) || $isAdmin;
+                                // Blank month attendance Excel (weekdays, 4 slots): ADM, HOD, IN1–IN3, Admin
+                                $hasMonthAttendanceSheetAccess = in_array($userRole, ['ADM', 'HOD', 'IN1', 'IN2', 'IN3'], true) || $isAdmin;
                                 // Groups access: HOD, IN1, IN2, IN3, ADM, and Admin
                                 $hasGroupAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'ADM']) || $isAdmin;
                                 // Instructor diary access: teaching staff, HOD, DIR/DPA/DPI/REG, ADM, and Admin
@@ -351,18 +353,27 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                             <!-- Attendance Management - Show if user has attendance access or report access -->
                             <?php if ($hasAttendanceAccess || $hasAttendanceReportAccess): ?>
                             <?php $staffDevicePages = ['staff-attendance-device', 'staff-attendance-device-list', 'staff-attendance-device-daily', 'staff-attendance-device-month', 'staff-attendance-device-sync']; ?>
-                            <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, array_merge(['attendance', 'attendance-report'], $staffDevicePages), true)) ? 'active' : ''; ?>">
+                            <?php $attendanceSubPages = array_merge(['attendance', 'attendance-report', 'attendance-month-sheet'], $staffDevicePages); ?>
+                            <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, $attendanceSubPages, true)) ? 'active' : ''; ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-calendar-check"></i>
                                     <span>Attendance</span>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
-                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, array_merge(['attendance', 'attendance-report'], $staffDevicePages), true)) ? 'display: block;' : ''; ?>">
+                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, $attendanceSubPages, true)) ? 'display: block;' : ''; ?>">
                                     <?php if ($hasAttendanceAccess): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/attendance" class="<?php echo (isset($page) && $page === 'attendance') ? 'active' : ''; ?>">
                                             <i class="fas fa-calendar-alt"></i>
                                             <span>Student Attendance</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
+                                    <?php if (!empty($hasMonthAttendanceSheetAccess)): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/attendance/month-sheet" class="<?php echo (isset($page) && $page === 'attendance-month-sheet') ? 'active' : ''; ?>">
+                                            <i class="fas fa-file-excel"></i>
+                                            <span>Month sheet (Excel)</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>

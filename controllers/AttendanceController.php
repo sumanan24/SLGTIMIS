@@ -43,11 +43,18 @@ class AttendanceController extends Controller {
         $studentModel = $this->model('StudentModel');
         $attendanceModel = $this->model('AttendanceModel');
         
-        // Get user's department if user is HOD, IN1, IN2, or IN3
+        // HOD / IN1–IN3: own department only; ADM / admin: any department
         $userDepartmentId = $this->getUserDepartment();
-        
-        // Get filter parameters - use user's department if department-restricted user
-        $departmentId = $userDepartmentId ? $userDepartmentId : $this->get('department_id', '');
+        if ($this->isDepartmentRestricted()) {
+            if ($userDepartmentId === null || $userDepartmentId === '') {
+                $_SESSION['error'] = 'Your account has no department assigned. Please contact the administrator.';
+                $this->redirect('dashboard');
+                return;
+            }
+            $departmentId = trim((string) $userDepartmentId);
+        } else {
+            $departmentId = $this->get('department_id', '');
+        }
         $courseId = $this->get('course_id', '');
         $academicYear = $this->get('academic_year', '');
         $month = $this->get('month', date('Y-m'));
@@ -161,7 +168,9 @@ class AttendanceController extends Controller {
             'isAdmin' => $isAdmin,
             'lockStatus' => $lockStatus,
             'error' => $_SESSION['error'] ?? null,
-            'message' => $_SESSION['message'] ?? null
+            'message' => $_SESSION['message'] ?? null,
+            'lockDepartmentSelection' => $this->isDepartmentRestricted(),
+            'forcedDepartmentId' => $this->isDepartmentRestricted() ? (string) $userDepartmentId : '',
         ];
         
         unset($_SESSION['error'], $_SESSION['message']);
@@ -319,6 +328,31 @@ class AttendanceController extends Controller {
         
         if (!$hasAccess) {
             $_SESSION['error'] = 'Access denied. Only authorized roles can view attendance reports.';
+            $this->redirect('dashboard');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * ADM (all departments) and system admin; HOD / IN1–IN3 own department only. Weekday month grid, 4 slots per day.
+     */
+    private function checkMonthAttendanceSheetAccess() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $userRole = $userModel->getUserRole($_SESSION['user_id']);
+        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
+        $allowedRoles = ['ADM', 'HOD', 'IN1', 'IN2', 'IN3'];
+        $hasAccess = in_array($userRole, $allowedRoles, true) || $isAdmin;
+        
+        if (!$hasAccess) {
+            $_SESSION['error'] = 'Access denied. Only ADM, HOD, IN1, IN2, IN3, or administrator can download the month attendance sheet.';
             $this->redirect('dashboard');
             return false;
         }
@@ -803,6 +837,297 @@ class AttendanceController extends Controller {
         }
         
         fclose($output);
+        exit();
+    }
+    
+    /**
+     * Form to download blank weekday month sheet (Excel, 4 slots per day).
+     */
+    public function monthSheet() {
+        if (!$this->checkMonthAttendanceSheetAccess()) {
+            return;
+        }
+        
+        $departmentModel = $this->model('DepartmentModel');
+        $courseModel = $this->model('CourseModel');
+        $studentModel = $this->model('StudentModel');
+        
+        // HOD / IN1–IN3: own department only; ADM / admin: all departments
+        $userDepartmentId = $this->getUserDepartment();
+        if ($this->isDepartmentRestricted()) {
+            if ($userDepartmentId === null || $userDepartmentId === '') {
+                $_SESSION['error'] = 'Your account has no department assigned. Please contact the administrator.';
+                $this->redirect('dashboard');
+                return;
+            }
+            $departmentId = trim((string) $userDepartmentId);
+        } else {
+            $departmentId = $this->get('department_id', '');
+        }
+        $courseId = $this->get('course_id', '');
+        $academicYear = $this->get('academic_year', '');
+        $month = $this->get('month', date('Y-m'));
+        $group = $this->get('group', '');
+        
+        if ($userDepartmentId) {
+            $dept = $departmentModel->getById($userDepartmentId);
+            $departments = $dept ? [$dept] : [];
+        } else {
+            $departments = $departmentModel->getAll();
+        }
+        $academicYears = $studentModel->getAcademicYears();
+        
+        $courses = [];
+        if (!empty($departmentId)) {
+            $courses = $courseModel->getCoursesWithDepartment(['department_id' => $departmentId]);
+        }
+        
+        $groups = [];
+        if (!empty($courseId) && !empty($academicYear)) {
+            $groupModel = $this->model('GroupModel');
+            $groups = $groupModel->getGroupsByCourseAndYear($courseId, $academicYear);
+        }
+        
+        $data = [
+            'title' => 'Month Attendance Sheet (Excel)',
+            'page' => 'attendance-month-sheet',
+            'departments' => $departments,
+            'courses' => $courses,
+            'academicYears' => $academicYears,
+            'groups' => $groups,
+            'selectedDepartment' => $departmentId,
+            'selectedCourse' => $courseId,
+            'selectedAcademicYear' => $academicYear,
+            'selectedMonth' => $month,
+            'selectedGroup' => $group,
+            'error' => $_SESSION['error'] ?? null,
+            'message' => $_SESSION['message'] ?? null,
+            'lockDepartmentSelection' => $this->isDepartmentRestricted(),
+            'forcedDepartmentId' => $this->isDepartmentRestricted() ? (string) $userDepartmentId : '',
+        ];
+        
+        unset($_SESSION['error'], $_SESSION['message']);
+        return $this->view('attendance/month_sheet', $data);
+    }
+    
+    /**
+     * Excel (.xlsx): index, student ID, name with initials, NIC; weekdays only;
+     * four slots per day in a 2×2 block (two columns × two rows) per weekday.
+     * Name column shows student_ininame only (no full name); # / ID / initials / NIC merged across the two data rows.
+     */
+    public function exportMonthSheet() {
+        if (!isset($_SESSION['user_id'])) {
+            $_SESSION['error'] = 'Unauthorized. Please login to continue.';
+            $this->redirect('login');
+            return;
+        }
+        if (!$this->checkMonthAttendanceSheetAccess()) {
+            return;
+        }
+        
+        $userDepartmentId = $this->getUserDepartment();
+        if ($this->isDepartmentRestricted()) {
+            if ($userDepartmentId === null || $userDepartmentId === '') {
+                $_SESSION['error'] = 'Your account has no department assigned. Please contact the administrator.';
+                $this->redirect('dashboard');
+                return;
+            }
+            $departmentId = trim((string) $userDepartmentId);
+        } else {
+            $departmentId = trim((string) $this->get('department_id', ''));
+        }
+        $courseId = trim((string) $this->get('course_id', ''));
+        $academicYear = trim((string) $this->get('academic_year', ''));
+        $month = trim((string) $this->get('month', date('Y-m')));
+        $group = trim((string) $this->get('group', ''));
+        
+        if ($departmentId === '' || $courseId === '' || $academicYear === '' || $month === '') {
+            $_SESSION['error'] = 'Department, Course, Academic Year, and Month are required.';
+            $this->redirect('attendance/month-sheet?' . http_build_query([
+                'department_id' => $departmentId,
+                'course_id' => $courseId,
+                'academic_year' => $academicYear,
+                'month' => $month,
+                'group' => $group,
+            ]));
+            return;
+        }
+        
+        if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
+            $_SESSION['error'] = 'Invalid month format.';
+            $this->redirect('attendance/month-sheet');
+            return;
+        }
+        
+        $attendanceModel = $this->model('AttendanceModel');
+        $filters = [
+            'department_id' => $departmentId,
+            'course_id' => $courseId,
+            'academic_year' => $academicYear,
+        ];
+        if ($group !== '') {
+            $filters['group_id'] = $group;
+        }
+        
+        $students = $attendanceModel->getStudentsForAttendance($filters);
+        if (empty($students)) {
+            $_SESSION['error'] = 'No active students found for the selected filters.';
+            $this->redirect('attendance/month-sheet?' . http_build_query([
+                'department_id' => $departmentId,
+                'course_id' => $courseId,
+                'academic_year' => $academicYear,
+                'month' => $month,
+                'group' => $group,
+            ]));
+            return;
+        }
+        
+        $calendarDays = $this->generateCalendarDays($month);
+        if (empty($calendarDays)) {
+            $_SESSION['error'] = 'No weekdays in the selected month.';
+            $this->redirect('attendance/month-sheet?' . http_build_query([
+                'department_id' => $departmentId,
+                'course_id' => $courseId,
+                'academic_year' => $academicYear,
+                'month' => $month,
+                'group' => $group,
+            ]));
+            return;
+        }
+        
+        $autoload = BASE_PATH . '/vendor/autoload.php';
+        if (!is_readable($autoload)) {
+            $_SESSION['error'] = 'Excel export is not available (Composer packages missing).';
+            $this->redirect('attendance/month-sheet');
+            return;
+        }
+        require_once $autoload;
+        
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $title = strtoupper(date('M-y', strtotime($month . '-01')));
+        $sheet->setTitle(substr(preg_replace('/[^A-Za-z0-9 _-]/', '', $title), 0, 31) ?: 'Attendance');
+        
+        // Two columns per weekday; each day’s four slots are a 2×2 square (rows 3–4 in header; 2 rows per student).
+        $lastColIndex = 4 + count($calendarDays) * 2;
+        $lastColLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($lastColIndex);
+        
+        $sheet->mergeCells('A1:' . $lastColLetter . '1');
+        $sheet->setCellValue('A1', $title);
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+        $sheet->getStyle('A1')->getAlignment()
+            ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)
+            ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+        $sheet->getRowDimension(1)->setRowHeight(22);
+        
+        $sheet->mergeCells('A2:A4');
+        $sheet->setCellValue('A2', '#');
+        $sheet->mergeCells('B2:B4');
+        $sheet->setCellValue('B2', 'Student ID');
+        $sheet->mergeCells('C2:C4');
+        $sheet->setCellValue('C2', 'Name with Initials');
+        $sheet->mergeCells('D2:D4');
+        $sheet->setCellValue('D2', 'NIC');
+        
+        $col = 5;
+        foreach ($calendarDays as $dayInfo) {
+            $c0 = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
+            $c1 = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col + 1);
+            $sheet->mergeCells($c0 . '2:' . $c1 . '2');
+            $dayNum = (string) ((int) $dayInfo['day']);
+            $sheet->setCellValue($c0 . '2', $dayNum);
+            $sheet->setCellValue($c0 . '3', '1');
+            $sheet->setCellValue($c1 . '3', '2');
+            $sheet->setCellValue($c0 . '4', '3');
+            $sheet->setCellValue($c1 . '4', '4');
+            $col += 2;
+        }
+        
+        $headerStyle = [
+            'font' => ['bold' => true],
+            'alignment' => [
+                'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+                'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
+            ],
+        ];
+        $sheet->getStyle('A2:' . $lastColLetter . '4')->applyFromArray($headerStyle);
+        
+        $row = 5;
+        $idx = 1;
+        foreach ($students as $stu) {
+            $r2 = $row + 1;
+            // Merge # / ID / initials / NIC across both rows (like earlier). Name column: initials only (no full name).
+            $sheet->mergeCells('A' . $row . ':A' . $r2);
+            $sheet->setCellValue('A' . $row, $idx);
+            $sheet->mergeCells('B' . $row . ':B' . $r2);
+            $sheet->setCellValueExplicit(
+                'B' . $row,
+                (string) ($stu['student_id'] ?? ''),
+                \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+            );
+            $sheet->mergeCells('C' . $row . ':C' . $r2);
+            $initialsOnly = trim((string) ($stu['student_ininame'] ?? ''));
+            $sheet->setCellValue('C' . $row, $initialsOnly);
+            $sheet->mergeCells('D' . $row . ':D' . $r2);
+            $sheet->setCellValueExplicit(
+                'D' . $row,
+                (string) ($stu['student_nic'] ?? ''),
+                \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+            );
+            $col = 5;
+            foreach ($calendarDays as $_d) {
+                $c0 = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
+                $c1 = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col + 1);
+                $sheet->setCellValue($c0 . $row, '');
+                $sheet->setCellValue($c1 . $row, '');
+                $sheet->setCellValue($c0 . $r2, '');
+                $sheet->setCellValue($c1 . $r2, '');
+                $col += 2;
+            }
+            $sheet->getStyle('A' . $row . ':D' . $r2)->getAlignment()
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER)
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle('A' . $row)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('C' . $row . ':C' . $r2)->getAlignment()->setWrapText(false);
+            $sheet->getRowDimension($row)->setRowHeight(18);
+            $sheet->getRowDimension($r2)->setRowHeight(18);
+            $idx++;
+            $row += 2;
+        }
+        $lastRow = $row - 1;
+        
+        $sheet->getColumnDimension('A')->setWidth(5);
+        $sheet->getColumnDimension('B')->setWidth(18);
+        $sheet->getColumnDimension('C')->setWidth(18);
+        $sheet->getColumnDimension('D')->setWidth(16);
+        for ($ci = 5; $ci <= $lastColIndex; $ci++) {
+            $sheet->getColumnDimensionByColumn($ci)->setWidth(5);
+        }
+        
+        $sheet->freezePane('E5');
+        
+        $borderStyle = [
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    'color' => ['rgb' => '000000'],
+                ],
+            ],
+        ];
+        $sheet->getStyle('A1:' . $lastColLetter . $lastRow)->applyFromArray($borderStyle);
+        
+        $filename = 'attendance_sheet_' . str_replace('-', '_', $month) . '_' . preg_replace('/[^A-Za-z0-9_-]+/', '_', $courseId);
+        if ($group !== '') {
+            $filename .= '_group' . preg_replace('/[^A-Za-z0-9_-]+/', '_', $group);
+        }
+        $filename .= '.xlsx';
+        
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
+        header('Cache-Control: private, max-age=0');
+        
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
         exit();
     }
     

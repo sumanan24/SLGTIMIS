@@ -78,6 +78,8 @@ return [
     'attendance/bulk-update' => 'AttendanceController@bulkUpdate',
     'attendance/report' => 'AttendanceController@report',
     'attendance/export-report' => 'AttendanceController@exportReport',
+    'attendance/month-sheet' => 'AttendanceController@monthSheet',
+    'attendance/export-month-sheet' => 'AttendanceController@exportMonthSheet',
     'attendance/lock-month' => 'AttendanceController@lockMonth',
     'attendance/unlock-month' => 'AttendanceController@unlockMonth',
     'attendance/staff' => 'AttendanceController@staffAttendance',

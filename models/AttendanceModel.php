@@ -14,7 +14,7 @@ class AttendanceModel extends Model {
      * Get students for attendance by filters
      */
     public function getStudentsForAttendance($filters = []) {
-        $sql = "SELECT DISTINCT s.student_id, s.student_fullname, s.student_ininame, se.course_id, c.course_name, d.department_name
+        $sql = "SELECT DISTINCT s.student_id, s.student_fullname, s.student_ininame, s.student_nic, se.course_id, c.course_name, d.department_name
                 FROM `student` s
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
                 INNER JOIN `course` c ON se.course_id = c.course_id

@@ -25,20 +25,12 @@
                     <!-- Filters -->
                     <form method="GET" action="<?php echo APP_URL; ?>/attendance" id="filterForm" class="mb-4">
                         <div class="row g-3">
-                            <?php 
-                            // Get HOD's department if user is HOD
-                            $isHODAtt = false;
-                            $hodDeptIdAtt = '';
-                            if (isset($_SESSION['user_id'])) {
-                                require_once BASE_PATH . '/models/UserModel.php';
-                                $userModelAtt = new UserModel();
-                                $isHODAtt = $userModelAtt->isHOD($_SESSION['user_id']);
-                                if ($isHODAtt) {
-                                    $hodDeptIdAtt = $userModelAtt->getHODDepartment($_SESSION['user_id']);
-                                }
-                            }
+                            <?php
+                            // HOD / IN1–IN3: department fixed to own dept; ADM: choose any department
+                            $lockDepartmentSelection = !empty($lockDepartmentSelection);
+                            $forcedDepartmentId = isset($forcedDepartmentId) ? (string) $forcedDepartmentId : '';
                             ?>
-                            <?php if (!$isHODAtt): ?>
+                            <?php if (!$lockDepartmentSelection): ?>
                             <div class="col-md-3">
                                 <label for="department_id" class="form-label fw-semibold">Department <span class="text-danger">*</span></label>
                                 <select class="form-select" id="department_id" name="department_id" required>
@@ -54,7 +46,7 @@
                                 </select>
                             </div>
                             <?php else: ?>
-                                <input type="hidden" name="department_id" id="department_id" value="<?php echo htmlspecialchars($hodDeptIdAtt); ?>">
+                                <input type="hidden" name="department_id" id="department_id" value="<?php echo htmlspecialchars($forcedDepartmentId); ?>">
                             <?php endif; ?>
                             
                             <div class="col-md-3">
@@ -111,13 +103,16 @@
                         </div>
                         
                         <div class="row mt-3">
-                            <div class="col-12">
+                            <div class="col-12 d-flex flex-wrap gap-2">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-search me-1"></i>Load Students
                                 </button>
                                 <a href="<?php echo APP_URL; ?>/attendance" class="btn btn-outline-secondary">
                                     <i class="fas fa-redo me-1"></i>Reset
                                 </a>
+                                <button type="button" class="btn btn-success" id="attendanceMonthSheetExcelBtn" title="Weekdays only; 4 slots per day in a 2×2 square (2 cols × 2 rows)">
+                                    <i class="fas fa-file-excel me-1"></i>Download month sheet (Excel)
+                                </button>
                             </div>
                         </div>
                     </form>
@@ -310,6 +305,29 @@ document.addEventListener('DOMContentLoaded', function() {
     const courseSelect = document.getElementById('course_id');
     const academicYearSelect = document.getElementById('academic_year');
     const groupSelect = document.getElementById('group');
+    const monthInputEl = document.getElementById('month');
+    const appBaseAtt = <?php echo json_encode(rtrim(APP_URL, '/')); ?>;
+
+    document.getElementById('attendanceMonthSheetExcelBtn')?.addEventListener('click', function() {
+        const deptEl = document.getElementById('department_id');
+        const departmentId = deptEl ? deptEl.value : '';
+        const courseId = courseSelect ? courseSelect.value : '';
+        const academicYear = academicYearSelect ? academicYearSelect.value : '';
+        const month = monthInputEl ? monthInputEl.value : '';
+        const group = groupSelect ? groupSelect.value : '';
+        if (!departmentId || !courseId || !academicYear || !month) {
+            alert('Please select Department, Course, Academic Year, and Month.');
+            return;
+        }
+        const params = new URLSearchParams({
+            department_id: departmentId,
+            course_id: courseId,
+            academic_year: academicYear,
+            month: month
+        });
+        if (group) params.set('group', group);
+        window.location.href = appBaseAtt + '/attendance/export-month-sheet?' + params.toString();
+    });
     
     // Function to load groups
     function loadGroups() {
