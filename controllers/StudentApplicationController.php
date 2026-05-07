@@ -1594,13 +1594,15 @@ class StudentApplicationController extends Controller {
             }
         }
 
-        // PhpSpreadsheet XLSX export requires common XML/ZIP extensions.
+        // PhpSpreadsheet XLSX export requires common XML/ZIP extensions (+ mbstring/iconv on many builds).
         $needs = [
             'zip' => extension_loaded('zip') && class_exists('ZipArchive'),
             'xmlwriter' => extension_loaded('xmlwriter'),
             'dom' => extension_loaded('dom'),
             'simplexml' => extension_loaded('simplexml'),
             'xml' => extension_loaded('xml'),
+            'mbstring' => extension_loaded('mbstring') && function_exists('mb_strlen'),
+            'iconv' => extension_loaded('iconv') && function_exists('iconv'),
         ];
         foreach ($needs as $ok) {
             if (!$ok) {
