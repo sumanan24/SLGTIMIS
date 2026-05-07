@@ -32,48 +32,49 @@ require_once __DIR__ . '/db.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Use POST.']);
+/** Ensure response body is pure JSON (strip BOM/whitespace/warnings). */
+$jsonOut = static function (array $payload, int $status = 200): void {
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
+    }
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     exit;
+};
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $jsonOut(['success' => false, 'message' => 'Use POST.'], 405);
 }
 
 $p = $_POST;
 
 if (empty($p) && l05_multipart_exceeded_post_max()) {
-    http_response_code(413);
-    echo json_encode([
+    $jsonOut([
         'success' => false,
         'message' => 'Total upload size exceeds PHP post_max_size. Use smaller files (max 5 MB each) or increase post_max_size and upload_max_filesize in php.ini (e.g. WAMP: PHP menu → php.ini).',
-    ]);
-    exit;
+    ], 413);
 }
 
 $appId = (int) ($p['application_id'] ?? 0);
 $nic = nic_normalize((string) ($p['student_nic'] ?? ''));
 
 if ($appId < 1 || !nic_valid($nic)) {
-    http_response_code(422);
     $hint = empty($p)
         ? ' No form data was received — often caused by uploads exceeding server limits.'
         : '';
-    echo json_encode(['success' => false, 'message' => 'Invalid application or NIC.' . $hint]);
-    exit;
+    $jsonOut(['success' => false, 'message' => 'Invalid application or NIC.' . $hint], 422);
 }
 
 $level = L05_APP_LEVEL;
 try {
     $existing = l05_fetch_application_by_id_nic_level($conn, $appId, $nic, $level);
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database error.']);
-    exit;
+    $jsonOut(['success' => false, 'message' => 'Database error.'], 500);
 }
 
 if (!$existing) {
-    http_response_code(404);
-    echo json_encode(['success' => false, 'message' => 'Application not found.']);
-    exit;
+    $jsonOut(['success' => false, 'message' => 'Application not found.'], 404);
 }
 
 $existingPaths = [];
@@ -84,9 +85,7 @@ foreach (L05_FILE_FIELDS as $_fieldName => $dbCol) {
 try {
     $mergedPaths = l05_process_uploads($nic, $_FILES, $existingPaths);
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Upload error: ' . $e->getMessage()]);
-    exit;
+    $jsonOut(['success' => false, 'message' => 'Upload error: ' . $e->getMessage()], 500);
 }
 
 try {
@@ -94,17 +93,13 @@ try {
     $row = l05_merge_post_row_with_existing($row, $existing);
 } catch (Throwable $e) {
     error_log('wizard_save_progress invalid data: ' . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Invalid data: ' . $e->getMessage()]);
-    exit;
+    $jsonOut(['success' => false, 'message' => 'Invalid data: ' . $e->getMessage()], 500);
 }
 
 try {
     l05_execute_application_update($conn, $appId, $nic, $level, $row);
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Could not save progress.']);
-    exit;
+    $jsonOut(['success' => false, 'message' => 'Could not save progress.'], 500);
 }
 
 $pathsOut = [];
@@ -112,8 +107,8 @@ foreach (L05_FILE_FIELDS as $_fieldName => $dbCol) {
     $pathsOut[$dbCol] = $row[$dbCol] ?? null;
 }
 
-echo json_encode([
+$jsonOut([
     'success' => true,
     'application_id' => $appId,
     'paths' => $pathsOut,
-], JSON_UNESCAPED_UNICODE);
+], 200);
