@@ -1510,7 +1510,41 @@ class StudentApplicationController extends Controller {
             exit;
         }
 
-        require_once BASE_PATH . '/vendor/autoload.php';
+        // PhpSpreadsheet has several PHP extension requirements; if any are missing,
+        // export as an Excel-readable HTML table (.xls) instead of failing.
+        $xlsFallback = static function (array $rows, array $cols, ?string $exportStatus): void {
+            $filename = 'student_applications_' . date('Y-m-d_H-i') . '_' . ($exportStatus ?: 'all') . '.xls';
+            header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
+            header('Cache-Control: private, max-age=0');
+            echo "\xEF\xBB\xBF";
+            $esc = static function (string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); };
+            echo "<table border=\"1\">\n<thead><tr>";
+            foreach ($cols as $h) {
+                echo '<th>' . $esc((string) $h) . '</th>';
+            }
+            echo "</tr></thead>\n<tbody>\n";
+            foreach ($rows as $row) {
+                echo "<tr>";
+                foreach ($cols as $colName) {
+                    $v = isset($row[$colName]) ? (string) $row[$colName] : '';
+                    echo '<td style="mso-number-format:\'\@\';">' . $esc($v) . '</td>';
+                }
+                echo "</tr>\n";
+            }
+            echo "</tbody></table>";
+            exit;
+        };
+
+        try {
+            require_once BASE_PATH . '/vendor/autoload.php';
+        } catch (Throwable $e) {
+            error_log('StudentApplicationController::adminExportExcel autoload: ' . $e->getMessage());
+            // Autoloader missing → fallback.
+            $model = $this->model('StudentApplicationModel');
+            $rows = $model->getAllForStaffExport(null, null, null, null);
+            $xlsFallback($rows, StudentApplicationModel::getStaffExportColumnOrder(), null);
+        }
 
         $model = $this->model('StudentApplicationModel');
         $statusParam = strtolower(trim((string) $this->get('status', '')));
@@ -1560,36 +1594,18 @@ class StudentApplicationController extends Controller {
             }
         }
 
-        // PhpSpreadsheet XLSX writer requires ZIP support (php-zip). On PHP 7.4 installs without ZIP,
-        // fall back to an HTML-table Excel download (.xls) which opens in Excel without extra extensions.
-        $zipOk = extension_loaded('zip') && class_exists('ZipArchive');
-        if (!$zipOk) {
-            $filename = 'student_applications_' . date('Y-m-d_H-i') . '_' . ($exportStatus ?: 'all') . '.xls';
-            header('Content-Type: application/vnd.ms-excel; charset=utf-8');
-            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
-            header('Cache-Control: private, max-age=0');
-            echo "\xEF\xBB\xBF";
-
-            $esc = static function (string $s): string {
-                return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
-            };
-
-            echo "<table border=\"1\">\n<thead><tr>";
-            foreach ($cols as $h) {
-                echo '<th>' . $esc((string) $h) . '</th>';
+        // PhpSpreadsheet XLSX export requires common XML/ZIP extensions.
+        $needs = [
+            'zip' => extension_loaded('zip') && class_exists('ZipArchive'),
+            'xmlwriter' => extension_loaded('xmlwriter'),
+            'dom' => extension_loaded('dom'),
+            'simplexml' => extension_loaded('simplexml'),
+            'xml' => extension_loaded('xml'),
+        ];
+        foreach ($needs as $ok) {
+            if (!$ok) {
+                $xlsFallback($rows, $cols, $exportStatus);
             }
-            echo "</tr></thead>\n<tbody>\n";
-            foreach ($rows as $row) {
-                echo "<tr>";
-                foreach ($cols as $colName) {
-                    $v = isset($row[$colName]) ? (string) $row[$colName] : '';
-                    // Keep as text to preserve leading zeros etc.
-                    echo '<td style="mso-number-format:\'\@\';">' . $esc($v) . '</td>';
-                }
-                echo "</tr>\n";
-            }
-            echo "</tbody></table>";
-            exit;
         }
 
         try {
