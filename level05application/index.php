@@ -272,7 +272,7 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                         <!-- Step 4 O/L A/L -->
                         <div class="wiz-pane" data-step="4">
                             <h2 class="h5 mb-2">Step 4 — School qualifications</h2>
-                            <p class="text-muted small mb-4"><strong>G.C.E. O/L is required</strong> (first card). <strong>Either</strong> complete the A/L card <strong>or</strong> leave it blank and complete NVQ in the next step. Do not leave A/L partly filled.</p>
+                            <p class="text-muted small mb-4"><strong>Either</strong> complete the O/L and A/L cards, <strong>or</strong> leave them blank and complete NVQ in the next step. Do not leave A/L partly filled.</p>
 
                             <div class="card l05-exam-card ol shadow-sm mb-4">
                                 <div class="card-header py-3 d-flex align-items-start gap-3">
@@ -280,24 +280,24 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                                         <i class="fas fa-book-open" aria-hidden="true"></i>
                                     </span>
                                     <div>
-                                        <div class="l05-exam-title">G.C.E. Ordinary Level (O/L) <span class="text-danger">*</span></div>
-                                        <p class="l05-exam-sub mb-0">Required — index, year, six core subjects, three basket subjects (one per category), and valid results</p>
+                                        <div class="l05-exam-title">G.C.E. Ordinary Level (O/L)</div>
+                                        <p class="l05-exam-sub mb-0">Optional — complete only if you apply with school qualifications</p>
                                     </div>
                                 </div>
                                 <div class="card-body pt-0">
                                     <div class="l05-section-label">Examination details</div>
                                     <div class="row g-3 mb-4">
                                         <div class="col-md-6">
-                                            <label class="form-label small fw-semibold text-secondary" for="ol_index_number">Index number <span class="text-danger">*</span></label>
+                                            <label class="form-label small fw-semibold text-secondary" for="ol_index_number">Index number</label>
                                             <input type="text" class="form-control" id="ol_index_number" name="ol_index_number" maxlength="50" placeholder="O/L index">
                                         </div>
                                         <div class="col-md-6">
-                                            <label class="form-label small fw-semibold text-secondary" for="ol_exam_year">Year of examination <span class="text-danger">*</span></label>
+                                            <label class="form-label small fw-semibold text-secondary" for="ol_exam_year">Year of examination</label>
                                             <input type="number" class="form-control" id="ol_exam_year" name="ol_exam_year" min="1990" max="2100" step="1" placeholder="e.g. 2019">
                                         </div>
                                     </div>
                                     <div class="l05-section-label">Subjects &amp; results</div>
-                                    <p class="small text-muted mb-3">Slots 1–6 are the six mandatory O/L subjects; slots 7–9 are <strong>basket</strong> subjects (pick one from each category list). Choose the result for each (letter grades A–F, S, W±, or numeric 0–100).</p>
+                                    <p class="small text-muted mb-3">Slots 1–6 are the six mandatory O/L subjects; slots 7–9 are <strong>basket</strong> subjects (pick one from each category list). Choose the result for each (letter grades A–F, S, W±).</p>
                                     <div class="row g-3">
                                         <?php
                                         $old = [];
@@ -344,7 +344,7 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                                         </div>
                                     </div>
                                     <div class="l05-section-label">Subjects &amp; results</div>
-                                    <p class="small text-muted mb-3">Choose each subject and result (A–F, S, W±, or 0–100).</p>
+                                    <p class="small text-muted mb-3">Choose each subject and result (A–F, S, W±).</p>
                                     <div class="row g-3">
                                         <?php for ($i = 1; $i <= 3; $i++) : $s = sprintf('%02d', $i); ?>
                                         <div class="col-md-4">
@@ -363,9 +363,6 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                                                     <?php foreach ($l05GradeLetters as $g) : ?>
                                                     <option value="<?php echo htmlspecialchars($g, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($g, ENT_QUOTES, 'UTF-8'); ?></option>
                                                     <?php endforeach; ?>
-                                                    <?php for ($m = 0; $m <= 100; $m++) : $ms = (string) $m; ?>
-                                                    <option value="<?php echo htmlspecialchars($ms, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($ms, ENT_QUOTES, 'UTF-8'); ?></option>
-                                                    <?php endfor; ?>
                                                 </select>
                                             </div>
                                         </div>
@@ -384,10 +381,7 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                                     <label class="form-label" for="nvq_level">NVQ level</label>
                                     <select class="form-select" id="nvq_level" name="nvq_level">
                                         <option value="">Choose…</option>
-                                        <?php foreach (['3', '4', '5', '6'] as $nvqLv) : ?>
-                                        <option value="<?php echo htmlspecialchars($nvqLv, ENT_QUOTES, 'UTF-8'); ?>">NVQ Level <?php echo htmlspecialchars($nvqLv, ENT_QUOTES, 'UTF-8'); ?></option>
-                                        <?php endforeach; ?>
-                                        <option value="Other">Other / not listed</option>
+                                        <option value="4">NVQ Level 4</option>
                                     </select>
                                 </div>
                                 <div class="col-md-9">
@@ -438,7 +432,7 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                         <!-- Step 7 Documents -->
                         <div class="wiz-pane" data-step="7">
                             <h2 class="h5 mb-3">Step 7 — Documents</h2>
-                            <p class="text-muted small" id="docHelpNew">Upload all six files (PDF, JPG, or PNG, max 5 MB each). JPG/PNG scans are automatically compressed to about 100 KB and stored as JPEG; PDFs are kept as uploaded.</p>
+                            <p class="text-muted small" id="docHelpNew">Upload required documents (PDF, JPG, or PNG, max 5 MB each). JPG/PNG scans are automatically compressed to about 100 KB and stored as JPEG; PDFs are kept as uploaded.</p>
                             <p class="text-muted small d-none" id="docHelpUpdate">Updating: leave a file empty to keep the existing upload. Replace by choosing a new file.</p>
                             <div class="row g-3">
                                 <?php
@@ -450,6 +444,7 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                                     'nvq_certificate' => 'NVQ certificate',
                                     'bank_receipt' => 'Bank receipt',
                                 ];
+                                $requiredDocs = ['nic_document' => true, 'birth_certificate' => true, 'bank_receipt' => true];
                                 $docPathKeys = [
                                     'nic_document' => 'nic_document_path',
                                     'birth_certificate' => 'birth_certificate_path',
@@ -460,9 +455,10 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                                 ];
                                 foreach ($docs as $fname => $label) :
                                     $pk = $docPathKeys[$fname];
+                                    $isReq = !empty($requiredDocs[$fname]);
                                 ?>
                                 <div class="col-md-6">
-                                    <label class="form-label" for="<?php echo htmlspecialchars($fname, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?> <span class="text-danger doc-req">*</span></label>
+                                    <label class="form-label" for="<?php echo htmlspecialchars($fname, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?><?php echo $isReq ? ' <span class="text-danger doc-req">*</span>' : ''; ?></label>
                                     <input type="file" class="form-control" id="<?php echo htmlspecialchars($fname, ENT_QUOTES, 'UTF-8'); ?>" name="<?php echo htmlspecialchars($fname, ENT_QUOTES, 'UTF-8'); ?>" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
                                     <div class="form-text existing-hint" data-path-key="<?php echo htmlspecialchars($pk, ENT_QUOTES, 'UTF-8'); ?>"></div>
                                 </div>
@@ -817,10 +813,6 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
     var m = String(raw || '').trim();
     if (!m) return false;
     if (/^[A-FSW][+-]?$/i.test(m)) return true;
-    if (/^\d+$/.test(m)) {
-      var n = parseInt(m, 10);
-      return n >= 0 && n <= 100;
-    }
     return false;
   }
 
@@ -1388,10 +1380,7 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
       return ok;
     }
     if (step === 4) {
-      if (!olComplete()) {
-        showAlert('G.C.E. O/L is required: complete index, year, six core subjects, three basket subjects (one per category), and valid results (A–F, S, W± or 0–100).');
-        return false;
-      }
+      // O/L is optional for NVQ applicants. Do not block on O/L at this step.
       if (!alKeysEmpty() && !alComplete()) {
         showAlert('Either complete all A/L fields (index, year, stream, three subjects and results) or clear every A/L field if you will use NVQ instead.');
         return false;
@@ -1403,8 +1392,10 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
         showAlert('Either complete all four NVQ fields with a valid year or clear them if you completed A/L in the previous step.');
         return false;
       }
-      if (!alComplete() && !nvqComplete()) {
-        showAlert('Provide either full G.C.E. A/L (previous step) or full NVQ details here — in addition to O/L.');
+      // Submit rule: either NVQ-only, or full school qualifications (O/L + A/L), or both.
+      var schoolOk = olComplete() && alComplete();
+      if (!nvqComplete() && !schoolOk) {
+        showAlert('Provide either full NVQ details, or complete both O/L and A/L.');
         return false;
       }
       return true;
@@ -1436,15 +1427,15 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
       return true;
     }
     if (step === 7) {
-      // New application: require all six documents.
+      // New application: require NIC, Birth certificate, Bank receipt.
       // Updating an existing application: documents are optional (keep existing uploads).
       if (recordFromDb) return true;
       var miss = false;
-      Object.keys(PATH_KEYS).forEach(function (field) {
+      ['nic_document', 'birth_certificate', 'bank_receipt'].forEach(function (field) {
         var inp = $(field);
         if (!inp || !inp.files || inp.files.length === 0) miss = true;
       });
-      if (miss) showAlert('Please choose all six document files.');
+      if (miss) showAlert('Please choose NIC copy, Birth certificate, and Bank receipt.');
       return !miss;
     }
     return true;
@@ -1481,6 +1472,7 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
     if (!el || el.tagName !== 'SELECT') return;
     var s = String(val).trim();
     if (s === '') return;
+    if (/_marks$/.test(selId) && !/^[A-FSW][+-]?$/i.test(s)) return;
     var i;
     for (i = 0; i < el.options.length; i++) {
       if (el.options[i].value === s) {

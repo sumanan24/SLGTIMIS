@@ -428,6 +428,26 @@ function l05_ol_complete(array $p): bool {
 }
 
 /**
+ * True if any G.C.E. O/L field is non-empty (used to reject partial O/L).
+ *
+ * @param array<string, mixed> $p
+ */
+function l05_ol_any_filled(array $p): bool {
+    $keys = ['ol_index_number', 'ol_exam_year'];
+    for ($i = 1; $i <= 9; $i++) {
+        $s = sprintf('%02d', $i);
+        $keys[] = 'ol_subject_name_' . $s;
+        $keys[] = 'ol_subject_' . $s . '_marks';
+    }
+    foreach ($keys as $k) {
+        if (trim((string) ($p[$k] ?? '')) !== '') {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * @param array<string, mixed> $p POST trimmed values
  */
 function l05_al_complete(array $p): bool {
@@ -509,7 +529,7 @@ function l05_phone_valid(string $raw): bool {
 }
 
 /**
- * O/L or A/L result: letter A–F/S/W ± or digits 0–100.
+ * O/L or A/L result: letter A–F/S/W ±.
  */
 function l05_exam_result_valid(string $raw): bool {
     $m = trim($raw);
@@ -518,10 +538,6 @@ function l05_exam_result_valid(string $raw): bool {
     }
     if ((bool) preg_match('/^[A-FSW][+-]?$/i', $m)) {
         return true;
-    }
-    if (ctype_digit($m)) {
-        $n = (int) $m;
-        return $n >= 0 && $n <= 100;
     }
     return false;
 }
@@ -630,19 +646,18 @@ function l05_validate_application(array $p, array $files, bool $isUpdate, ?array
     $alAny = l05_al_any_filled($p);
     $nvqAny = l05_nvq_any_filled($p);
 
-    if (!$olOk) {
-        $errors[] = 'G.C.E. O/L is required: complete index, year, six core subjects, three basket subjects (one per category), and valid results (A–F, S, W± or 0–100).';
-    }
+    // For Level 05: NVQ is sufficient (O/L can be empty/partial).
     if ($alAny && !$alOk) {
         $errors[] = 'Either complete all G.C.E. A/L fields or clear them if you use NVQ only.';
     }
     if ($nvqAny && !$nvqOk) {
         $errors[] = 'Either complete all NVQ fields or clear them if you use A/L only.';
     }
-    if ($olOk && !$alOk && !$nvqOk) {
-        $errors[] = 'Provide either full G.C.E. A/L details or full NVQ details in addition to O/L.';
+    if (!$nvqOk && !($olOk && $alOk)) {
+        $errors[] = 'Provide either full NVQ details, or complete both O/L and A/L.';
     }
 
+    // Only validate O/L details when applicant completes the entire O/L block (optional).
     if ($olOk) {
         $yo = (int) ($p['ol_exam_year'] ?? 0);
         if ($yo < 1990 || $yo > 2100) {
@@ -651,7 +666,7 @@ function l05_validate_application(array $p, array $files, bool $isUpdate, ?array
         for ($i = 1; $i <= 9; $i++) {
             $s = sprintf('%02d', $i);
             if (!l05_exam_result_valid((string) ($p['ol_subject_' . $s . '_marks'] ?? ''))) {
-                $errors[] = 'O/L results must be valid (A–F, S, W ± or 0–100) for every subject.';
+                $errors[] = 'O/L results must be valid letter grades (A–F, S, W±) for every subject.';
                 break;
             }
         }
@@ -665,7 +680,7 @@ function l05_validate_application(array $p, array $files, bool $isUpdate, ?array
         for ($i = 1; $i <= 3; $i++) {
             $s = sprintf('%02d', $i);
             if (!l05_exam_result_valid((string) ($p['al_subject_' . $s . '_marks'] ?? ''))) {
-                $errors[] = 'A/L results must be valid (A–F, S, W ± or 0–100) for every subject.';
+                $errors[] = 'A/L results must be valid letter grades (A–F, S, W±) for every subject.';
                 break;
             }
         }
@@ -678,19 +693,25 @@ function l05_validate_application(array $p, array $files, bool $isUpdate, ?array
         }
     }
 
-    $requireEveryDocumentFile = !$isUpdate;
+    // For Level 05: only these documents are required for a new application.
+    $requiredDocs = ['nic_document', 'birth_certificate', 'bank_receipt'];
+    $requireRequiredDocs = !$isUpdate;
     if ($isUpdate && $existingDocumentPaths !== null) {
-        $requireEveryDocumentFile = true;
+        // If any document exists already, treat uploads as optional (user can keep existing).
+        $requireRequiredDocs = true;
         foreach (L05_FILE_FIELDS as $_fn => $dbCol) {
             if (trim((string) ($existingDocumentPaths[$dbCol] ?? '')) !== '') {
-                $requireEveryDocumentFile = false;
+                $requireRequiredDocs = false;
                 break;
             }
         }
     }
 
     foreach (L05_FILE_FIELDS as $fieldName => $_dbCol) {
-        if (!$requireEveryDocumentFile) {
+        $isRequired = in_array($fieldName, $requiredDocs, true);
+        $mustHave = $requireRequiredDocs && $isRequired;
+
+        if (!$mustHave) {
             if (!empty($files[$fieldName]['tmp_name']) && is_uploaded_file((string) $files[$fieldName]['tmp_name'])) {
                 if (($files[$fieldName]['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
                     $errors[] = 'A file failed to upload.';
@@ -703,8 +724,9 @@ function l05_validate_application(array $p, array $files, bool $isUpdate, ?array
             }
             continue;
         }
+
         if (empty($files[$fieldName]['tmp_name']) || !is_uploaded_file((string) $files[$fieldName]['tmp_name'])) {
-            $errors[] = 'Please upload all required documents.';
+            $errors[] = 'Please upload NIC copy, Birth certificate, and Bank receipt.';
             break;
         }
         if (($files[$fieldName]['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
@@ -800,10 +822,7 @@ function l05_normalize_exam_result(string $raw): ?string {
     if ((bool) preg_match('/^[A-FSW][+-]?$/i', $raw)) {
         return strtoupper($raw);
     }
-    if (ctype_digit($raw)) {
-        return (string) max(0, min(100, (int) $raw));
-    }
-    return $raw;
+    return null;
 }
 
 /**

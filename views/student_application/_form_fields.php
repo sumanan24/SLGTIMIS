@@ -285,7 +285,16 @@ $dbNvqHint = ($application_level ?? '04') === '05' ? '5' : '4';
         <div class="row app-form-grid g-3">
                 <div class="col-12 col-sm-6 col-md-3">
                     <label class="form-label" for="nvq_level">NVQ level <?php echo $isLevel05 ? '' : $req; ?></label>
-                    <input type="text" name="nvq_level" id="nvq_level" class="form-control form-control-sm" maxlength="20" value="<?php echo $v('nvq_level'); ?>"<?php echo $examAttr; ?>>
+                    <?php if ($isLevel05): ?>
+                    <select name="nvq_level" id="nvq_level" class="form-select form-select-sm"<?php echo $examAttr; ?>>
+                        <option value="">Choose…</option>
+                        <option value="4" <?php echo (($old['nvq_level'] ?? '') === '4') ? 'selected' : ''; ?>>NVQ Level 4</option>
+                    </select>
+                    <?php else: ?>
+                    <select name="nvq_level" id="nvq_level" class="form-select form-select-sm" required>
+                        <option value="3" <?php echo (($old['nvq_level'] ?? '') === '3') ? 'selected' : ''; ?>>NVQ Level 3</option>
+                    </select>
+                    <?php endif; ?>
                 </div>
                 <div class="col-12 col-md-5">
                     <label class="form-label" for="nvq_course_name">Course <?php echo $isLevel05 ? '' : $req; ?></label>

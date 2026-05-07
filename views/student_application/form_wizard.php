@@ -256,7 +256,7 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
                   </div>
                 </div>
                 <div class="l05-section-label">Subjects &amp; results</div>
-                <p class="small text-muted mb-3">Slots 1–6: mandatory subjects; slots 7–9: one subject from each <strong>basket</strong> category. Pick each result (A–F, S, W±, or 0–100).</p>
+                <p class="small text-muted mb-3">Slots 1–6: mandatory subjects; slots 7–9: one subject from each <strong>basket</strong> category. Pick each result (A–F, S, W±).</p>
                 <div class="row g-3">
                   <?php for ($i = 1; $i <= 9; $i++) : ?>
                   <?php
@@ -297,7 +297,7 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
                   </div>
                 </div>
                 <div class="l05-section-label">Subjects &amp; results</div>
-                <p class="small text-muted mb-3">Three subjects with grades or marks (A–F, S, W±, or 0–100).</p>
+                <p class="small text-muted mb-3">Three subjects with grades (A–F, S, W±).</p>
                 <div class="row g-3">
                   <?php for ($i = 1; $i <= 3; $i++): $s = sprintf('%02d', $i); ?>
                     <div class="col-md-4">
@@ -320,7 +320,9 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
             <div class="row g-3">
               <div class="col-md-3">
                 <label class="form-label" for="nvq_level">NVQ level <?php echo $req; ?></label>
-                <input type="text" class="form-control" id="nvq_level" name="nvq_level" maxlength="50" required value="<?php echo $v('nvq_level'); ?>" placeholder="e.g. 4">
+                <select class="form-select" id="nvq_level" name="nvq_level" required>
+                  <option value="3" <?php echo (($old['nvq_level'] ?? '') === '3') ? 'selected' : ''; ?>>NVQ Level 3</option>
+                </select>
               </div>
               <div class="col-md-9">
                 <label class="form-label" for="nvq_course_name">Course / qualification name <?php echo $req; ?></label>
@@ -464,12 +466,7 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
   function examResultOk(raw) {
     var m = String(raw || '').trim();
     if (!m) return false;
-    if (/^[A-FSW][+-]?$/i.test(m)) return true;
-    if (/^\d+$/.test(m)) {
-      var n = parseInt(m, 10);
-      return n >= 0 && n <= 100;
-    }
-    return false;
+    return /^[A-FSW][+-]?$/i.test(m);
   }
 
   function updatePills() {
@@ -570,7 +567,7 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
       for (var o2 = 1; o2 <= 9; o2++) {
         var os2 = (o2 < 10 ? '0' : '') + o2;
         if (!examResultOk($('ol_subject_' + os2 + '_marks').value)) {
-          showAlert('O/L results: use a letter (A–F, S, W±) or a mark from 0 to 100 for every subject.');
+          showAlert('O/L results: use a letter grade (A–F, S, W±) for every subject.');
           markInvalid($('ol_subject_' + os2 + '_marks'), true);
           return false;
         }
@@ -578,7 +575,7 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
       for (var a2 = 1; a2 <= 3; a2++) {
         var as2 = (a2 < 10 ? '0' : '') + a2;
         if (!examResultOk($('al_subject_' + as2 + '_marks').value)) {
-          showAlert('A/L results: use a letter (A–F, S, W±) or a mark from 0 to 100 for every subject.');
+          showAlert('A/L results: use a letter grade (A–F, S, W±) for every subject.');
           markInvalid($('al_subject_' + as2 + '_marks'), true);
           return false;
         }

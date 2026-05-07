@@ -271,6 +271,18 @@ class StudentApplicationController extends Controller {
     /**
      * @param callable(string): string $t
      */
+    private function isOlAnyFilled(callable $t): bool {
+        foreach ($this->olExamFieldKeys() as $k) {
+            if ($t($k) !== '') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param callable(string): string $t
+     */
     private function isAlPathComplete(callable $t): bool {
         foreach ($this->alExamFieldKeys() as $k) {
             if ($t($k) === '') {
@@ -371,17 +383,14 @@ class StudentApplicationController extends Controller {
             $olOk = $this->isOlPathComplete($t);
             $alOk = $this->isAlPathComplete($t);
             $nvqOk = $this->isNvqPathComplete($t);
-            if (!$olOk) {
-                return ['For Level 05: G.C.E. O/L is required: complete index, year, six core subjects, three basket subjects (one per category), and valid results (A–F, S, W± or 0–100).'];
-            }
             if ($this->isAlAnyFilled($t) && !$alOk) {
                 return ['For Level 05: either complete all A/L fields or clear them if you use NVQ only.'];
             }
             if ($this->isNvqAnyFilled($t) && !$nvqOk) {
                 return ['For Level 05: either complete all NVQ fields or clear them if you use A/L only.'];
             }
-            if (!$alOk && !$nvqOk) {
-                return ['For Level 05: provide either full A/L or full NVQ details, in addition to O/L.'];
+            if (!$nvqOk && !($olOk && $alOk)) {
+                return ['For Level 05: provide either full NVQ details, or complete both O/L and A/L.'];
             }
         }
 
@@ -475,14 +484,14 @@ class StudentApplicationController extends Controller {
                 $s = sprintf('%02d', $i);
                 $m = $t('ol_subject_' . $s . '_marks');
                 if ($m === '' || !$this->isValidExamResult($m)) {
-                    return ['O/L results: use a letter (A–F, S, or W, optional + or −) or a mark from 0 to 100 for every subject.'];
+                    return ['O/L results: use a letter grade (A–F, S, W±) for every subject.'];
                 }
             }
             for ($i = 1; $i <= 3; $i++) {
                 $s = sprintf('%02d', $i);
                 $m = $t('al_subject_' . $s . '_marks');
                 if ($m === '' || !$this->isValidExamResult($m)) {
-                    return ['A/L results: use a letter (A–F, S, or W, optional + or −) or a mark from 0 to 100 for every subject.'];
+                    return ['A/L results: use a letter grade (A–F, S, W±) for every subject.'];
                 }
             }
             $yn = (int) $t('nvq_year_completed');
@@ -490,15 +499,18 @@ class StudentApplicationController extends Controller {
                 return ['NVQ year finished must be between 1900 and 2100.'];
             }
         } elseif ($level === '05') {
-            $yo = (int) $t('ol_exam_year');
-            if ($yo < 1990 || $yo > 2100) {
-                return ['O/L year must be between 1990 and 2100.'];
-            }
-            for ($i = 1; $i <= 9; $i++) {
-                $s = sprintf('%02d', $i);
-                $m = $t('ol_subject_' . $s . '_marks');
-                if ($m === '' || !$this->isValidExamResult($m)) {
-                    return ['O/L results: use a letter (A–F, S, or W, optional + or −) or a mark from 0 to 100 for every subject.'];
+            // NVQ-complete applicants do not need O/L. Only validate O/L if they fully completed it.
+            if (!$this->isNvqPathComplete($t) && $this->isOlPathComplete($t)) {
+                $yo = (int) $t('ol_exam_year');
+                if ($yo < 1990 || $yo > 2100) {
+                    return ['O/L year must be between 1990 and 2100.'];
+                }
+                for ($i = 1; $i <= 9; $i++) {
+                    $s = sprintf('%02d', $i);
+                    $m = $t('ol_subject_' . $s . '_marks');
+                    if ($m === '' || !$this->isValidExamResult($m)) {
+                        return ['O/L results: use a letter grade (A–F, S, W±) for every subject.'];
+                    }
                 }
             }
             if ($this->isAlPathComplete($t)) {
@@ -510,7 +522,7 @@ class StudentApplicationController extends Controller {
                     $s = sprintf('%02d', $i);
                     $m = $t('al_subject_' . $s . '_marks');
                     if ($m === '' || !$this->isValidExamResult($m)) {
-                        return ['A/L results: use a letter (A–F, S, or W, optional + or −) or a mark from 0 to 100 for every subject.'];
+                        return ['A/L results: use a letter grade (A–F, S, W±) for every subject.'];
                     }
                 }
             }
@@ -563,7 +575,7 @@ class StudentApplicationController extends Controller {
     }
 
     /**
-     * O/L & A/L result: letter grade (A–F, S, W with optional +/−) or integer mark 0–100.
+     * O/L & A/L result: letter grade (A–F, S, W with optional +/−).
      */
     private function isValidExamResult(string $raw): bool {
         $m = trim($raw);
@@ -572,10 +584,6 @@ class StudentApplicationController extends Controller {
         }
         if ((bool) preg_match('/^[A-FSW][+-]?$/i', $m)) {
             return true;
-        }
-        if (ctype_digit($m)) {
-            $n = (int) $m;
-            return $n >= 0 && $n <= 100;
         }
         return false;
     }
@@ -588,9 +596,6 @@ class StudentApplicationController extends Controller {
         }
         if ((bool) preg_match('/^[A-FSW][+-]?$/i', $m)) {
             return strtoupper($m);
-        }
-        if (ctype_digit($m)) {
-            return (string) max(0, min(100, (int) $m));
         }
         return null;
     }

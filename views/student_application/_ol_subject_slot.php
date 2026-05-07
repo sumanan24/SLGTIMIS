@@ -50,9 +50,6 @@ if ($variant === 'form') {
                                         <?php foreach ($gradeLetters as $g) : ?>
                                         <option value="<?php echo htmlspecialchars($g, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $rawRes === $g ? ' selected' : ''; ?>><?php echo htmlspecialchars($g, ENT_QUOTES, 'UTF-8'); ?></option>
                                         <?php endforeach; ?>
-                                        <?php for ($m = 0; $m <= 100; $m++) : $ms = (string) $m; ?>
-                                        <option value="<?php echo htmlspecialchars($ms, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $rawRes === $ms ? ' selected' : ''; ?>><?php echo htmlspecialchars($ms, ENT_QUOTES, 'UTF-8'); ?></option>
-                                        <?php endfor; ?>
                                     </select>
                                 </div>
                             </div>
@@ -81,9 +78,6 @@ if ($variant === 'form') {
                                                     <?php foreach ($gradeLetters as $g) : ?>
                                                     <option value="<?php echo htmlspecialchars($g, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $rawRes === $g ? ' selected' : ''; ?>><?php echo htmlspecialchars($g, ENT_QUOTES, 'UTF-8'); ?></option>
                                                     <?php endforeach; ?>
-                                                    <?php for ($m = 0; $m <= 100; $m++) : $ms = (string) $m; ?>
-                                                    <option value="<?php echo htmlspecialchars($ms, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $rawRes === $ms ? ' selected' : ''; ?>><?php echo htmlspecialchars($ms, ENT_QUOTES, 'UTF-8'); ?></option>
-                                                    <?php endfor; ?>
                                                 </select>
                                             </div>
                                         </div>
