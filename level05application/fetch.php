@@ -4,8 +4,6 @@
  */
 declare(strict_types=1);
 
-require_once __DIR__ . '/db.php';
-
 header('Content-Type: application/json; charset=utf-8');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -22,6 +20,7 @@ if ($nic === '' || !nic_valid($nic)) {
 }
 
 try {
+    require_once __DIR__ . '/db.php';
     $row = l05_fetch_application_by_nic_level($conn, $nic, L05_APP_LEVEL);
 } catch (Throwable $e) {
     http_response_code(500);

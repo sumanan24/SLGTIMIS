@@ -1021,8 +1021,13 @@ class StudentApplicationController extends Controller {
             'filter_level' => $filterLevel,
             'filter_department_id' => $filterDeptId,
             'filter_course_id' => $filterCourseId,
-            'filter_departments' => $model->getAdminFilterDepartments($filterLevel),
-            'filter_courses' => $model->getAdminFilterCourses($filterLevel, $filterDeptId),
+            // Filter dropdowns: load full catalogue (not just values used by applications).
+            'filter_departments' => $this->model('DepartmentModel')->getAll(),
+            'filter_courses' => $this->model('CourseModel')->getCoursesWithDepartment([
+                'department_id' => $filterDeptId,
+                // application_level 04/05 corresponds to course_nvq_level 4/5
+                'nvq_level' => $filterLevel === '04' ? '4' : ($filterLevel === '05' ? '5' : null),
+            ]),
             'active_view' => $activeView,
             'active_tab' => $activeTab,
             'per_page' => $perPage,
@@ -1534,7 +1539,58 @@ class StudentApplicationController extends Controller {
             }
         }
         $rows = $model->getAllForStaffExport($exportStatus, $exportLevel, $exportDeptId, $exportCourseId);
-        $cols = StudentApplicationModel::getStaffExportColumnOrder();
+        $allCols = StudentApplicationModel::getStaffExportColumnOrder();
+        $colsParam = trim((string) $this->get('cols', ''));
+        $cols = $allCols;
+        if ($colsParam !== '') {
+            $want = array_values(array_filter(array_map('trim', explode(',', $colsParam)), static function ($s) {
+                return $s !== '';
+            }));
+            if ($want !== []) {
+                $allow = array_fill_keys($allCols, true);
+                $picked = [];
+                foreach ($want as $c) {
+                    if (isset($allow[$c])) {
+                        $picked[] = $c;
+                    }
+                }
+                if ($picked !== []) {
+                    $cols = $picked;
+                }
+            }
+        }
+
+        // PhpSpreadsheet XLSX writer requires ZIP support (php-zip). On PHP 7.4 installs without ZIP,
+        // fall back to an HTML-table Excel download (.xls) which opens in Excel without extra extensions.
+        $zipOk = extension_loaded('zip') && class_exists('ZipArchive');
+        if (!$zipOk) {
+            $filename = 'student_applications_' . date('Y-m-d_H-i') . '_' . ($exportStatus ?: 'all') . '.xls';
+            header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
+            header('Cache-Control: private, max-age=0');
+            echo "\xEF\xBB\xBF";
+
+            $esc = static function (string $s): string {
+                return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+            };
+
+            echo "<table border=\"1\">\n<thead><tr>";
+            foreach ($cols as $h) {
+                echo '<th>' . $esc((string) $h) . '</th>';
+            }
+            echo "</tr></thead>\n<tbody>\n";
+            foreach ($rows as $row) {
+                echo "<tr>";
+                foreach ($cols as $colName) {
+                    $v = isset($row[$colName]) ? (string) $row[$colName] : '';
+                    // Keep as text to preserve leading zeros etc.
+                    echo '<td style="mso-number-format:\'\@\';">' . $esc($v) . '</td>';
+                }
+                echo "</tr>\n";
+            }
+            echo "</tbody></table>";
+            exit;
+        }
 
         try {
             $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();

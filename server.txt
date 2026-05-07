@@ -1,0 +1,41 @@
+server {
+    server_name sis.slgti.ac.lk;
+
+    root /var/www/sis;
+    index index.php index.html index.htm;
+
+    access_log /var/log/nginx/sis.access.log;
+    error_log /var/log/nginx/sis.error.log;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;  # Replace with your PHP version
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/sis.slgti.ac.lk/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/sis.slgti.ac.lk/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+}
+
+server {
+    if ($host = sis.slgti.ac.lk) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+    client_max_body_size 51M;
+    listen 80;
+    server_name sis.slgti.ac.lk;
+                                     

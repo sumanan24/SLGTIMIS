@@ -6,10 +6,7 @@ declare(strict_types=1);
 
 $configPath = dirname(__DIR__) . '/config/database.php';
 if (!is_file($configPath)) {
-    http_response_code(500);
-    header('Content-Type: text/plain; charset=utf-8');
-    echo 'Configuration missing. Expected: config/database.php';
-    exit;
+    throw new RuntimeException('Configuration missing. Expected: config/database.php');
 }
 
 require_once $configPath;

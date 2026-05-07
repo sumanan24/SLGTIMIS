@@ -5,13 +5,20 @@
  */
 declare(strict_types=1);
 
-require_once __DIR__ . '/db.php';
-
 header('Content-Type: application/json; charset=utf-8');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Use POST.']);
+    exit;
+}
+
+try {
+    require_once __DIR__ . '/db.php';
+} catch (Throwable $e) {
+    error_log('level05application/insert_draft db load failed: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Server database configuration error.']);
     exit;
 }
 

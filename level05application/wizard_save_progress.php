@@ -28,8 +28,6 @@ register_shutdown_function(static function (): void {
     echo json_encode(['success' => false, 'message' => 'Could not save progress.']);
 });
 
-require_once __DIR__ . '/db.php';
-
 header('Content-Type: application/json; charset=utf-8');
 
 /** Ensure response body is pure JSON (strip BOM/whitespace/warnings). */
@@ -42,6 +40,13 @@ $jsonOut = static function (array $payload, int $status = 200): void {
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     exit;
 };
+
+try {
+    require_once __DIR__ . '/db.php';
+} catch (Throwable $e) {
+    error_log('wizard_save_progress db load failed: ' . $e->getMessage());
+    $jsonOut(['success' => false, 'message' => 'Server database configuration error.'], 500);
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     $jsonOut(['success' => false, 'message' => 'Use POST.'], 405);
