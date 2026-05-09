@@ -29,6 +29,12 @@ if ($nic === '' || !nic_valid($nic)) {
 
 try {
     require_once __DIR__ . '/db.php';
+    $blockMsg = l05_other_level_application_blocks($conn, $nic, L05_APP_LEVEL);
+    if ($blockMsg !== null) {
+        http_response_code(422);
+        echo json_encode(['status' => 'error', 'message' => $blockMsg]);
+        exit;
+    }
     $row = l05_fetch_application_by_nic_level($conn, $nic, L05_APP_LEVEL);
 } catch (Throwable $e) {
     // Log the underlying cause server-side (connection, missing table/column, permissions, etc.)

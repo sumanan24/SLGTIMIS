@@ -126,6 +126,16 @@ class StudentApplicationModel extends Model {
             } elseif ($ix) {
                 $ix->free();
             }
+
+            // Same as /level05application/: NIC and email are unique per `application_level` (04 vs 05), not globally.
+            // Level 04 hits this model only; without this call, older DBs may keep a single-column NIC unique.
+            $helperPath = BASE_PATH . DIRECTORY_SEPARATOR . 'level05application' . DIRECTORY_SEPARATOR . 'helpers.php';
+            if (is_readable($helperPath)) {
+                require_once $helperPath;
+                if (function_exists('l05_migrate_student_applications_schema')) {
+                    l05_migrate_student_applications_schema($conn);
+                }
+            }
         } catch (Throwable $e) {
             error_log('StudentApplicationModel::migrateSchema: ' . $e->getMessage());
         }
@@ -465,6 +475,31 @@ class StudentApplicationModel extends Model {
     }
 
     /**
+     * Public lookup for one application by NIC and NVQ level (04 / 05).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findByNicAndLevel(string $nic, string $level): ?array {
+        $this->ensureTable();
+        $this->migrateSchema();
+        $nic = strtoupper(preg_replace('/\s+|-|_/', '', trim($nic)));
+        if (!preg_match('/^(\d{9}[VX]|\d{12})$/', $nic) || !in_array($level, ['04', '05'], true)) {
+            return null;
+        }
+        $sql = 'SELECT ' . self::APPLICATION_DETAIL_SELECT . " FROM `{$this->table}` WHERE `student_nic` = ? AND `application_level` = ? LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return null;
+        }
+        $stmt->bind_param('ss', $nic, $level);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result ? $result->fetch_assoc() : null;
+        $stmt->close();
+        return $row ?: null;
+    }
+
+    /**
      * Space + Unicode em dash + space — same as legacy public form stored value `course_id + sep + course_name`.
      */
     private static function legacyCourseIdNameSeparator(): string {
@@ -537,23 +572,23 @@ class StudentApplicationModel extends Model {
     /**
      * Resolve department + course name from stored `course_priority_N` (course name only, or legacy "id — name").
      *
-     * @return array{department_name: string, course_name: string}
+     * @return array{department_id: string, department_name: string, course_name: string}
      */
     public function resolveCourseDepartmentForPreference(?string $stored): array {
         $this->ensureTable();
         $stored = trim((string) $stored);
         if ($stored === '') {
-            return ['department_name' => '', 'course_name' => ''];
+            return ['department_id' => '', 'department_name' => '', 'course_name' => ''];
         }
         $sep = self::legacyCourseIdNameSeparator();
-        $sql = 'SELECT c.`course_name`, d.`department_name` FROM `course` c '
+        $sql = 'SELECT c.`department_id`, c.`course_name`, d.`department_name` FROM `course` c '
             . 'LEFT JOIN `department` d ON d.`department_id` = c.`department_id` '
             . 'WHERE ' . self::sqlTrimUtf8mb4('c', 'course_name') . ' = ' . self::sqlTrimBoundUtf8mb4() . ' '
             . 'OR ' . self::sqlLegacyCourseRowConcatBound('c') . ' = ' . self::sqlTrimBoundUtf8mb4() . ' '
             . 'LIMIT 1';
         $stmt = $this->db->prepare($sql);
         if (!$stmt) {
-            return ['department_name' => '', 'course_name' => self::displayCourseNameFromStoredPreference($stored)];
+            return ['department_id' => '', 'department_name' => '', 'course_name' => self::displayCourseNameFromStoredPreference($stored)];
         }
         $stmt->bind_param('sss', $stored, $sep, $stored);
         $stmt->execute();
@@ -561,13 +596,18 @@ class StudentApplicationModel extends Model {
         $row = $res ? $res->fetch_assoc() : null;
         $stmt->close();
         if ($row) {
+            $did = trim((string) ($row['department_id'] ?? ''));
             $cn = trim((string) ($row['course_name'] ?? ''));
             $dn = trim((string) ($row['department_name'] ?? ''));
-            if ($cn !== '' || $dn !== '') {
-                return ['department_name' => $dn, 'course_name' => $cn !== '' ? $cn : self::displayCourseNameFromStoredPreference($stored)];
+            if ($cn !== '' || $dn !== '' || $did !== '') {
+                return [
+                    'department_id' => $did,
+                    'department_name' => $dn,
+                    'course_name' => $cn !== '' ? $cn : self::displayCourseNameFromStoredPreference($stored),
+                ];
             }
         }
-        return ['department_name' => '', 'course_name' => self::displayCourseNameFromStoredPreference($stored)];
+        return ['department_id' => '', 'department_name' => '', 'course_name' => self::displayCourseNameFromStoredPreference($stored)];
     }
 
     /**

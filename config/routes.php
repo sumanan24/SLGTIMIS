@@ -202,6 +202,7 @@ return [
 
     // Public student applications — no login (Level 05 uses /level05application/ procedural wizard folder)
     'level04application' => 'StudentApplicationController@level04',
+    'student-application/api/check-application' => 'StudentApplicationController@apiCheckApplication',
     'student-application/api/departments' => 'StudentApplicationController@apiDepartments',
     'student-application/api/courses' => 'StudentApplicationController@apiCourses',
     'student-applications' => 'StudentApplicationController@adminIndex',

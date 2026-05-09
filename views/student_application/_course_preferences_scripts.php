@@ -110,5 +110,25 @@
       });
     });
   });
+
+  window.appCoursePrefsRestore = function (data) {
+    if (!data || typeof data !== 'object') return;
+    prefRows.forEach(function (n) {
+      var deptSel = document.getElementById('dept_pref_' + n);
+      var courseSel = document.getElementById('course_priority_' + n);
+      if (!deptSel || !courseSel) return;
+      var oldDept = data['dept_pref_' + n] || '';
+      var oldCourse = data['course_priority_' + n] || '';
+      if (oldDept) {
+        deptSel.value = oldDept;
+        loadCourses(oldDept).then(function (courses) {
+          fillCourseSelect(courseSel, courses, oldCourse);
+        });
+      } else {
+        deptSel.value = '';
+        courseSel.innerHTML = '<option value="">Choose department first…</option>';
+      }
+    });
+  };
 })();
 </script>

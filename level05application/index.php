@@ -22,7 +22,7 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
 }
 /** Official institute website (header Home / brand). */
 $l05OfficialSiteUrl = 'https://slgti.ac.lk/';
-$l05StudentAppCssHref = ($l05MainAppBasePath === '' ? '' : $l05MainAppBasePath) . '/assets/css/student-application.css?v=12';
+$l05StudentAppCssHref = ($l05MainAppBasePath === '' ? '' : $l05MainAppBasePath) . '/assets/css/student-application.css?v=13';
 $l05AlStreams = require dirname(__DIR__) . '/config/al_streams_sri_lanka.php';
 $l05AlSubjects = require dirname(__DIR__) . '/config/al_subjects_common.php';
 $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
@@ -44,7 +44,6 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
     <style>
         :root { --wiz-brand: #0c4a6e; --wiz-accent: #0369a1; }
-        .l05-app-main.app-form-main { max-width: 1140px; }
         .l05-site-header { position: relative; z-index: 2; }
         .wiz-card { border-radius: 16px; border: none; box-shadow: 0 12px 40px rgba(12, 74, 110, 0.12); }
         .wiz-header { border-bottom: 3px solid var(--wiz-accent); padding-bottom: 1rem; }
@@ -502,8 +501,8 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
 </div>
 </div>
 </main>
-<footer class="container-fluid px-3 app-form-footer text-center">
-    <div class="app-form-footer-inner py-4">
+<footer class="container-fluid px-2 px-sm-3 px-lg-4 app-form-footer text-center">
+    <div class="app-form-footer-inner py-3 py-md-4">
         <p class="mb-1 app-form-footer-brand">Sri Lanka German Training Institute</p>
         <p class="mb-0 app-form-footer-meta">Apply online 2026 · &copy; <?php echo date('Y'); ?></p>
     </div>

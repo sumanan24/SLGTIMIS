@@ -105,36 +105,43 @@ function l05_migrate_student_applications_schema(mysqli $conn): void {
         $tbl->free();
 
         $col = $conn->query("SHOW COLUMNS FROM `student_applications` LIKE 'application_level'");
-        if ($col && $col->num_rows > 0) {
-            $col->free();
-            return;
-        }
+        $hasAppLevel = $col && $col->num_rows > 0;
         if ($col) {
             $col->free();
         }
 
-        try {
-            $conn->query(
-                "ALTER TABLE `student_applications` ADD COLUMN `application_level` ENUM('04','05') NOT NULL DEFAULT '05' "
-                . "COMMENT 'NVQ Level applied for' AFTER `application_id`"
-            );
-        } catch (Throwable $e) {
-            error_log('l05_migrate: add application_level: ' . $e->getMessage());
-            return;
+        if (!$hasAppLevel) {
+            try {
+                $conn->query(
+                    "ALTER TABLE `student_applications` ADD COLUMN `application_level` ENUM('04','05') NOT NULL DEFAULT '05' "
+                    . "COMMENT 'NVQ Level applied for' AFTER `application_id`"
+                );
+            } catch (Throwable $e) {
+                error_log('l05_migrate: add application_level: ' . $e->getMessage());
+                return;
+            }
         }
 
-        foreach (['student_nic', 'student_email'] as $idx) {
-            try {
-                $idxEsc = str_replace('`', '``', $idx);
-                $ix = $conn->query("SHOW INDEX FROM `student_applications` WHERE Key_name = '" . $conn->real_escape_string($idx) . "'");
-                if ($ix && $ix->num_rows > 0) {
-                    $ix->free();
-                    $conn->query("ALTER TABLE `student_applications` DROP INDEX `" . $idxEsc . "`");
-                } elseif ($ix) {
-                    $ix->free();
+        // NIC/email unique per application level (04 vs 05). Drop legacy single-column uniques if they block `uq_*`.
+        $ixNicLevel = $conn->query("SHOW INDEX FROM `student_applications` WHERE Key_name = 'uq_nic_level'");
+        $hasNicLevel = $ixNicLevel && $ixNicLevel->num_rows > 0;
+        if ($ixNicLevel) {
+            $ixNicLevel->free();
+        }
+        if (!$hasNicLevel) {
+            foreach (['student_nic', 'student_email'] as $idx) {
+                try {
+                    $idxEsc = str_replace('`', '``', $idx);
+                    $ix = $conn->query("SHOW INDEX FROM `student_applications` WHERE Key_name = '" . $conn->real_escape_string($idx) . "'");
+                    if ($ix && $ix->num_rows > 0) {
+                        $ix->free();
+                        $conn->query("ALTER TABLE `student_applications` DROP INDEX `" . $idxEsc . "`");
+                    } elseif ($ix) {
+                        $ix->free();
+                    }
+                } catch (Throwable $e) {
+                    error_log('l05_migrate: drop index ' . $idx . ': ' . $e->getMessage());
                 }
-            } catch (Throwable $e) {
-                error_log('l05_migrate: drop index ' . $idx . ': ' . $e->getMessage());
             }
         }
 
@@ -278,6 +285,27 @@ function l05_fetch_application_by_nic_level(mysqli $conn, string $nic, string $l
     $row = $res->fetch_assoc();
     $res->free();
     return $row ?: null;
+}
+
+/**
+ * NIC cannot be used for the intended level (04 or 05) when the other level already has an application row.
+ *
+ * @return string|null User-facing error message, or null if allowed.
+ */
+function l05_other_level_application_blocks(mysqli $conn, string $nic, string $intendedLevel): ?string {
+    $nic = nic_normalize($nic);
+    if (!nic_valid($nic) || !l05_application_level_valid($intendedLevel)) {
+        return null;
+    }
+    $other = $intendedLevel === '04' ? '05' : '04';
+    $r = l05_fetch_application_by_nic_level($conn, $nic, $other);
+    if (!$r) {
+        return null;
+    }
+    if ($intendedLevel === '05') {
+        return 'This NIC already has a Level 04 application. You cannot apply for Level 05 with the same NIC.';
+    }
+    return 'This NIC already has a Level 05 application. You cannot use the Level 04 online application with the same NIC.';
 }
 
 /**

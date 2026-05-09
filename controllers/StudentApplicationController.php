@@ -144,6 +144,40 @@ class StudentApplicationController extends Controller {
     }
 
     /**
+     * On validation/upload errors while updating, merge stored document paths into `old` so the wizard can show "Current file" hints.
+     *
+     * @param array<string, mixed> $post
+     * @return array<string, mixed>
+     */
+    private function oldPostWithStudentApplicationDocPaths(string $level, array $post): array {
+        $aid = (int) ($post['application_id'] ?? 0);
+        if ($aid < 1) {
+            return $post;
+        }
+        $model = $this->model('StudentApplicationModel');
+        $row = $model->findById($aid);
+        if (!$row || trim((string) ($row['application_level'] ?? '')) !== $level) {
+            return $post;
+        }
+        $postedNic = $this->normalizeNic((string) ($post['student_nic'] ?? ''));
+        if (trim((string) ($row['student_nic'] ?? '')) !== $postedNic) {
+            return $post;
+        }
+        $out = $post;
+        $st = trim((string) ($row['status'] ?? ''));
+        if ($st !== '') {
+            $out['application_workflow_status'] = $st;
+        }
+        foreach (StudentApplicationModel::DOCUMENT_PATH_COLUMNS as $col) {
+            $v = trim((string) ($row[$col] ?? ''));
+            if ($v !== '') {
+                $out[$col] = $v;
+            }
+        }
+        return $out;
+    }
+
+    /**
      * @param list<string> $errors
      * @param array<string, mixed> $old
      */
@@ -174,48 +208,99 @@ class StudentApplicationController extends Controller {
             return $this->renderForm($level, ['Form level does not match. Please open the form again from the website.'], $_POST, null);
         }
 
-        $errors = $this->validateApplication($level);
-        if (!empty($errors)) {
-            return $this->renderForm($level, $errors, $_POST, null);
+        $model = $this->model('StudentApplicationModel');
+        $postedNicBlock = $this->normalizeNic((string) $this->post('student_nic', ''));
+        if ($this->isValidNic($postedNicBlock)) {
+            $cross = $this->studentApplicationNicBlockedByOtherLevel($model, $postedNicBlock, $level);
+            if ($cross !== null) {
+                return $this->renderForm($level, [$cross], $this->oldPostWithStudentApplicationDocPaths($level, $_POST), null);
+            }
+        }
+        $appId = (int) $this->post('application_id', 0);
+        $existingDocPaths = null;
+        $targetId = 0;
+
+        if ($appId > 0) {
+            $existing = $model->findById($appId);
+            if (!$existing) {
+                return $this->renderForm($level, ['We could not find that application. Please start again from step 1.'], $_POST, null);
+            }
+            if (trim((string) ($existing['application_level'] ?? '')) !== $level) {
+                return $this->renderForm($level, ['This form does not match the saved application level. Open the correct application link.'], $_POST, null);
+            }
+            $postedNic = $this->normalizeNic((string) $this->post('student_nic', ''));
+            if (trim((string) ($existing['student_nic'] ?? '')) !== $postedNic) {
+                return $this->renderForm($level, ['The NIC does not match this application record.'], $_POST, null);
+            }
+            $existingDocPaths = [];
+            foreach (StudentApplicationModel::DOCUMENT_PATH_COLUMNS as $col) {
+                $existingDocPaths[$col] = trim((string) ($existing[$col] ?? ''));
+            }
+            $targetId = $appId;
         }
 
-        $row = $this->buildRowFromPost($level);
-        $model = $this->model('StudentApplicationModel');
-        $sqlErr = null;
-        $newId = $model->insertApplication($row, $sqlErr);
+        $errors = $this->validateApplication($level, $existingDocPaths);
+        if (!empty($errors)) {
+            return $this->renderForm($level, $errors, $this->oldPostWithStudentApplicationDocPaths($level, $_POST), null);
+        }
 
-        if ($newId === false) {
-            $msg = 'We could not save your form. ';
-            if ($sqlErr && (stripos($sqlErr, 'Duplicate') !== false || stripos($sqlErr, 'uq_') !== false)) {
-                $msg .= 'You already sent an application with this ID card or email for this level.';
-            } else {
-                $msg .= 'Please try again or phone the institute.';
+        $row = $this->buildRowFromPost($level, $existingDocPaths !== null);
+        $sqlErr = null;
+
+        if ($targetId > 0) {
+            $ok = $model->update($targetId, $row, $sqlErr);
+            if (!$ok) {
+                $msg = 'We could not update your form. ';
+                if ($sqlErr && (stripos($sqlErr, 'Duplicate') !== false || stripos($sqlErr, 'uq_') !== false)) {
+                    $msg .= 'Another application may already use this email for this level.';
+                } else {
+                    $msg .= 'Please try again or phone the institute.';
+                }
+                if ($sqlErr) {
+                    error_log('StudentApplication update: ' . $sqlErr);
+                }
+                return $this->renderForm($level, [$msg], $this->oldPostWithStudentApplicationDocPaths($level, $_POST), null);
             }
-            if ($sqlErr) {
-                error_log('StudentApplication insert: ' . $sqlErr);
+        } else {
+            $newId = $model->insertApplication($row, $sqlErr);
+            if ($newId === false) {
+                $msg = 'We could not save your form. ';
+                if ($sqlErr && (stripos($sqlErr, 'Duplicate') !== false || stripos($sqlErr, 'uq_') !== false)) {
+                    $msg .= 'You already sent an application with this ID card or email for this level. Use the same NIC on step 1 to load and edit it.';
+                } else {
+                    $msg .= 'Please try again or phone the institute.';
+                }
+                if ($sqlErr) {
+                    error_log('StudentApplication insert: ' . $sqlErr);
+                }
+                return $this->renderForm($level, [$msg], $this->oldPostWithStudentApplicationDocPaths($level, $_POST), null);
             }
-            return $this->renderForm($level, [$msg], $_POST, null);
+            $targetId = (int) $newId;
         }
 
         $paths = [];
         try {
             $nic = $this->normalizeNic((string) $this->post('student_nic', ''));
-            $paths = $this->collectUploads((int) $newId, $nic);
+            $paths = $this->collectUploads($targetId, $nic, $level, $existingDocPaths);
         } catch (Exception $e) {
-            return $this->renderForm($level, ['Upload problem: ' . $e->getMessage()], $_POST, null);
+            return $this->renderForm($level, ['Upload problem: ' . $e->getMessage()], $this->oldPostWithStudentApplicationDocPaths($level, $_POST), null);
         }
 
         if (!empty($paths)) {
-            $model->updateDocumentPaths((int) $newId, $paths);
+            $model->updateDocumentPaths($targetId, $paths);
         }
 
-        $_SESSION['flash_student_application_ok'] = 'Thank you. We received your application. Your reference number is #' . (int) $newId . '.';
+        if ($appId > 0) {
+            $_SESSION['flash_student_application_ok'] = 'Your Level ' . $level . ' application #' . $targetId . ' was updated successfully.';
+        } else {
+            $_SESSION['flash_student_application_ok'] = 'Thank you. We received your application. Your reference number is #' . $targetId . '.';
+        }
         header('Location: ' . rtrim(APP_URL, '/') . '/level' . $level . 'application?submitted=1', true, 303);
         exit;
     }
 
     /**
-     * Field keys for full G.C.E. O/L + A/L examination blocks (Level 04 — all required).
+     * Field keys for full G.C.E. O/L + A/L examination blocks (used for completeness checks when a path is started).
      *
      * @return list<string>
      */
@@ -353,9 +438,25 @@ class StudentApplicationController extends Controller {
     }
 
     /**
+     * DB path column for a multipart file field name.
+     */
+    private function studentApplicationUploadColumnForField(string $fileKey): ?string {
+        static $map = [
+            'nic_document' => 'nic_document_path',
+            'birth_certificate' => 'birth_certificate_path',
+            'ol_certificate' => 'ol_certificate_path',
+            'al_certificate' => 'al_certificate_path',
+            'nvq_certificate' => 'nvq_certificate_path',
+            'bank_receipt' => 'bank_receipt_path',
+        ];
+        return $map[$fileKey] ?? null;
+    }
+
+    /**
+     * @param array<string, string>|null $existingDocPaths DB column => relative path (non-empty = already stored)
      * @return list<string>
      */
-    private function validateApplication(string $level): array {
+    private function validateApplication(string $level, ?array $existingDocPaths = null): array {
         $t = function (string $key): string {
             return trim((string) $this->post($key, ''));
         };
@@ -368,10 +469,6 @@ class StudentApplicationController extends Controller {
         ];
         $requiredStrings[] = 'dept_pref_1';
         $requiredStrings[] = 'course_priority_1';
-
-        if ($level === '04') {
-            $requiredStrings = array_merge($requiredStrings, $this->schoolExamFieldKeys(), $this->nvqFieldKeys());
-        }
 
         foreach ($requiredStrings as $key) {
             if ($t($key) === '') {
@@ -472,31 +569,36 @@ class StudentApplicationController extends Controller {
         }
 
         if ($level === '04') {
-            $yo = (int) $t('ol_exam_year');
-            if ($yo < 1990 || $yo > 2100) {
-                return ['O/L year must be between 1990 and 2100.'];
+            // Level 04: no A/L on this form — require full O/L and/or full NVQ (at least one).
+            $olOk = $this->isOlPathComplete($t);
+            $nvqOk = $this->isNvqPathComplete($t);
+            if ($this->isOlAnyFilled($t) && !$olOk) {
+                return ['For Level 04: either complete all O/L fields or clear the O/L section.'];
             }
-            $ya = (int) $t('al_exam_year');
-            if ($ya < 1990 || $ya > 2100) {
-                return ['A/L year must be between 1990 and 2100.'];
+            if ($this->isNvqAnyFilled($t) && !$nvqOk) {
+                return ['For Level 04: either complete all NVQ fields or clear them if you use O/L only.'];
             }
-            for ($i = 1; $i <= 9; $i++) {
-                $s = sprintf('%02d', $i);
-                $m = $t('ol_subject_' . $s . '_marks');
-                if ($m === '' || !$this->isValidExamResult($m)) {
-                    return ['O/L results: use a letter grade (A–F, S, W±) for every subject.'];
+            if (!$olOk && !$nvqOk) {
+                return ['For Level 04: provide either complete O/L details or complete NVQ details (or both).'];
+            }
+            if ($olOk) {
+                $yo = (int) $t('ol_exam_year');
+                if ($yo < 1990 || $yo > 2100) {
+                    return ['O/L year must be between 1990 and 2100.'];
+                }
+                for ($i = 1; $i <= 9; $i++) {
+                    $s = sprintf('%02d', $i);
+                    $m = $t('ol_subject_' . $s . '_marks');
+                    if ($m === '' || !$this->isValidExamResult($m)) {
+                        return ['O/L results: use a letter grade (A–F, S, W±) for every subject.'];
+                    }
                 }
             }
-            for ($i = 1; $i <= 3; $i++) {
-                $s = sprintf('%02d', $i);
-                $m = $t('al_subject_' . $s . '_marks');
-                if ($m === '' || !$this->isValidExamResult($m)) {
-                    return ['A/L results: use a letter grade (A–F, S, W±) for every subject.'];
+            if ($nvqOk) {
+                $yn = (int) $t('nvq_year_completed');
+                if ($t('nvq_year_completed') === '' || $yn < 1900 || $yn > 2100) {
+                    return ['NVQ year finished must be between 1900 and 2100.'];
                 }
-            }
-            $yn = (int) $t('nvq_year_completed');
-            if ($t('nvq_year_completed') === '' || $yn < 1900 || $yn > 2100) {
-                return ['NVQ year finished must be between 1900 and 2100.'];
             }
         } elseif ($level === '05') {
             // NVQ-complete applicants do not need O/L. Only validate O/L if they fully completed it.
@@ -534,15 +636,25 @@ class StudentApplicationController extends Controller {
             }
         }
 
-        $fileFields = [
-            'nic_document', 'birth_certificate', 'ol_certificate', 'al_certificate', 'nvq_certificate', 'bank_receipt',
-        ];
-        foreach ($fileFields as $fk) {
-            if (empty($_FILES[$fk]['tmp_name']) || !is_uploaded_file($_FILES[$fk]['tmp_name'])) {
-                return ['Please upload every file in the upload section.'];
+        $fileFields = ['nic_document', 'birth_certificate', 'bank_receipt'];
+        if ($level === '05') {
+            $fileFields = ['nic_document', 'birth_certificate', 'ol_certificate', 'al_certificate', 'nvq_certificate', 'bank_receipt'];
+        } else {
+            if ($this->isOlPathComplete($t)) {
+                $fileFields[] = 'ol_certificate';
             }
-            if (($_FILES[$fk]['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-                return ['A file did not upload. Please try again with PDF or picture files.'];
+            if ($this->isNvqPathComplete($t)) {
+                $fileFields[] = 'nvq_certificate';
+            }
+        }
+        foreach ($fileFields as $fk) {
+            $col = $this->studentApplicationUploadColumnForField($fk);
+            $hasExisting = $existingDocPaths !== null && $col !== null && trim((string) ($existingDocPaths[$col] ?? '')) !== '';
+            if ($hasExisting && !$this->isSuccessfulClientUpload($fk)) {
+                continue;
+            }
+            if (!$this->isSuccessfulClientUpload($fk)) {
+                return [$this->studentApplicationUploadMessage($fk)];
             }
         }
 
@@ -603,7 +715,7 @@ class StudentApplicationController extends Controller {
     /**
      * @return array<string, string|null>
      */
-    private function buildRowFromPost(string $level): array {
+    private function buildRowFromPost(string $level, bool $forUpdate = false): array {
         $p = function (string $key, $default = null) {
             $v = $this->post($key, '');
             if ($v === null || $v === '') {
@@ -689,24 +801,78 @@ class StudentApplicationController extends Controller {
             'nvq_certificate_path' => null,
             'bank_receipt_path' => null,
         ];
+        if ($forUpdate) {
+            unset($data['application_level']);
+            return $data;
+        }
         $data['status'] = 'new';
         return array_merge($data, $nullFiles);
     }
 
     /**
+     * Flatten application row for JSON (wizard NIC check / prefill).
+     *
+     * @param array<string, mixed> $row
      * @return array<string, string>
      */
-    private function collectUploads(int $applicationId, string $nic): array {
+    private function studentApplicationRowForApiJson(StudentApplicationModel $model, array $row): array {
+        $out = [];
+        foreach ($row as $k => $v) {
+            if ($v === null) {
+                $out[$k] = '';
+            } elseif (is_scalar($v)) {
+                $out[$k] = (string) $v;
+            } else {
+                $out[$k] = '';
+            }
+        }
+        for ($n = 1; $n <= 3; $n++) {
+            $cp = trim((string) ($row['course_priority_' . $n] ?? ''));
+            $deptId = '';
+            if ($cp !== '') {
+                $r = $model->resolveCourseDepartmentForPreference($cp);
+                $deptId = trim((string) ($r['department_id'] ?? ''));
+            }
+            $out['dept_pref_' . $n] = $deptId;
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<string, string>|null $existingDocPaths DB column => stored relative path (for updates: keep path when no new file)
+     * @return array<string, string>
+     */
+    private function collectUploads(int $applicationId, string $nic, string $level, ?array $existingDocPaths = null): array {
+        $t = function (string $key): string {
+            return trim((string) $this->post($key, ''));
+        };
         $map = [
             'nic_document' => 'nic_document_path',
             'birth_certificate' => 'birth_certificate_path',
-            'ol_certificate' => 'ol_certificate_path',
-            'al_certificate' => 'al_certificate_path',
-            'nvq_certificate' => 'nvq_certificate_path',
             'bank_receipt' => 'bank_receipt_path',
         ];
+        if ($level === '05') {
+            $map['ol_certificate'] = 'ol_certificate_path';
+            $map['al_certificate'] = 'al_certificate_path';
+            $map['nvq_certificate'] = 'nvq_certificate_path';
+        } else {
+            if ($this->isOlPathComplete($t)) {
+                $map['ol_certificate'] = 'ol_certificate_path';
+            }
+            if ($this->isNvqPathComplete($t)) {
+                $map['nvq_certificate'] = 'nvq_certificate_path';
+            }
+        }
         $out = [];
         foreach ($map as $fileKey => $dbCol) {
+            if (!$this->isSuccessfulClientUpload($fileKey)) {
+                $prev = ($existingDocPaths !== null && isset($existingDocPaths[$dbCol])) ? trim((string) $existingDocPaths[$dbCol]) : '';
+                if ($prev !== '') {
+                    $out[$dbCol] = $prev;
+                    continue;
+                }
+                throw new Exception('Missing or invalid upload: ' . $fileKey);
+            }
             $path = $this->handleUpload($fileKey, $applicationId, $fileKey, $nic);
             if ($path === null) {
                 throw new Exception('Missing or invalid upload: ' . $fileKey);
@@ -716,11 +882,61 @@ class StudentApplicationController extends Controller {
         return $out;
     }
 
-    private function handleUpload(string $fieldName, int $applicationId, string $documentKey, string $nic): ?string {
-        if (empty($_FILES[$fieldName]['tmp_name']) || !is_uploaded_file($_FILES[$fieldName]['tmp_name'])) {
-            return null;
+    /**
+     * True when PHP accepted an upload for this input (multipart file field).
+     * Some Windows/WAMP setups report UPLOAD_ERR_OK but is_uploaded_file() is false; allow readable temp file.
+     */
+    private function isSuccessfulClientUpload(string $fieldName): bool {
+        if (!isset($_FILES[$fieldName]) || !is_array($_FILES[$fieldName])) {
+            return false;
         }
-        if (($_FILES[$fieldName]['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        if ((int) ($_FILES[$fieldName]['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            return false;
+        }
+        $tmp = (string) ($_FILES[$fieldName]['tmp_name'] ?? '');
+        if ($tmp === '') {
+            return false;
+        }
+        if (is_uploaded_file($tmp)) {
+            return true;
+        }
+        return is_file($tmp) && is_readable($tmp);
+    }
+
+    /**
+     * User-facing message when a required document upload is missing or failed.
+     */
+    private function studentApplicationUploadMessage(string $fieldName): string {
+        $names = [
+            'nic_document' => 'NIC copy',
+            'birth_certificate' => 'Birth certificate',
+            'ol_certificate' => 'O/L certificate',
+            'al_certificate' => 'A/L certificate',
+            'nvq_certificate' => 'NVQ certificate',
+            'bank_receipt' => 'Bank payment slip',
+        ];
+        $label = $names[$fieldName] ?? $fieldName;
+        if (!isset($_FILES[$fieldName]) || !is_array($_FILES[$fieldName])) {
+            return 'Missing upload for ' . $label . '. Please attach it on the Documents step.';
+        }
+        $e = (int) ($_FILES[$fieldName]['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($e === UPLOAD_ERR_NO_FILE) {
+            return 'Please attach your ' . $label . ' (Documents step).';
+        }
+        if ($e === UPLOAD_ERR_INI_SIZE || $e === UPLOAD_ERR_FORM_SIZE) {
+            return $label . ' is too large. Each file must be 5 MB or smaller.';
+        }
+        if ($e === UPLOAD_ERR_PARTIAL) {
+            return $label . ' did not finish uploading. Please try again.';
+        }
+        if ($e !== UPLOAD_ERR_OK) {
+            return 'Could not read ' . $label . ' (upload error ' . $e . '). Please try again or use JPG/PNG.';
+        }
+        return 'The server could not accept ' . $label . '. Please try another PDF, JPG, or PNG.';
+    }
+
+    private function handleUpload(string $fieldName, int $applicationId, string $documentKey, string $nic): ?string {
+        if (!$this->isSuccessfulClientUpload($fieldName)) {
             return null;
         }
         $size = (int) ($_FILES[$fieldName]['size'] ?? 0);
@@ -739,20 +955,35 @@ class StudentApplicationController extends Controller {
             }
         }
         $base = $this->uploadBasename($documentKey, $nic);
-        $safe = $base . '.jpg';
-        $full = $dir . DIRECTORY_SEPARATOR . $safe;
         $tmp = (string) $_FILES[$fieldName]['tmp_name'];
 
         if ($ext === 'pdf') {
-            $raster = $this->pdfFirstPageToTempJpeg($tmp);
-            try {
-                $this->compressRasterToJpegUnderLimit($raster, $full);
-            } finally {
-                @unlink($raster);
+            if (extension_loaded('imagick') && class_exists('Imagick')) {
+                try {
+                    $raster = $this->pdfFirstPageToTempJpeg($tmp);
+                    try {
+                        $safe = $base . '.jpg';
+                        $full = $dir . DIRECTORY_SEPARATOR . $safe;
+                        $this->compressRasterToJpegUnderLimit($raster, $full);
+                        return 'uploads/student_applications/' . $applicationId . '/' . $safe;
+                    } finally {
+                        @unlink($raster);
+                    }
+                } catch (Throwable $e) {
+                    error_log('StudentApplication PDF to JPEG: ' . $e->getMessage());
+                }
             }
-        } else {
-            $this->compressRasterToJpegUnderLimit($tmp, $full);
+            $safe = $base . '.pdf';
+            $full = $dir . DIRECTORY_SEPARATOR . $safe;
+            if (!@move_uploaded_file($tmp, $full) && !@copy($tmp, $full)) {
+                throw new Exception('Could not save PDF. Check that uploads/student_applications is writable.');
+            }
+            return 'uploads/student_applications/' . $applicationId . '/' . $safe;
         }
+
+        $safe = $base . '.jpg';
+        $full = $dir . DIRECTORY_SEPARATOR . $safe;
+        $this->compressRasterToJpegUnderLimit($tmp, $full);
 
         return 'uploads/student_applications/' . $applicationId . '/' . $safe;
     }
@@ -877,6 +1108,78 @@ class StudentApplicationController extends Controller {
         }
         imagedestroy($srcImg);
         throw new Exception('Could not compress this file under 100 KB. Please upload a smaller or simpler scan.');
+    }
+
+    /**
+     * One NIC may not have both Level 04 and Level 05 applications.
+     */
+    private function studentApplicationNicBlockedByOtherLevel(StudentApplicationModel $model, string $nic, string $level): ?string {
+        if (!in_array($level, ['04', '05'], true)) {
+            return null;
+        }
+        $other = $level === '04' ? '05' : '04';
+        $row = $model->findByNicAndLevel($nic, $other);
+        if ($row === null) {
+            return null;
+        }
+        if ($level === '05') {
+            return 'This NIC already has a Level 04 application. You cannot apply for Level 05 with the same NIC.';
+        }
+        return 'This NIC already has a Level 05 application. You cannot use the Level 04 online application with the same NIC.';
+    }
+
+    /**
+     * Public JSON: lookup existing application by NIC + level (same idea as level05application/check_nic.php).
+     * POST JSON: { "nic": "…", "application_level": "04" } — level defaults to "04".
+     */
+    public function apiCheckApplication(): void {
+        header('Content-Type: application/json; charset=utf-8');
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['status' => 'error', 'message' => 'Use POST.']);
+            exit;
+        }
+        $input = json_decode((string) file_get_contents('php://input'), true);
+        if (!is_array($input)) {
+            $input = [];
+        }
+        $nic = $this->normalizeNic((string) ($input['nic'] ?? ''));
+        $level = trim((string) ($input['application_level'] ?? ''));
+        if ($level === '') {
+            $level = '04';
+        }
+        if (!$this->isValidNic($nic)) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'Enter a valid NIC (9 digits + V or X, or 12 digits).']);
+            exit;
+        }
+        if (!in_array($level, ['04', '05'], true)) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'Invalid application level.']);
+            exit;
+        }
+        try {
+            $model = $this->model('StudentApplicationModel');
+            $blockMsg = $this->studentApplicationNicBlockedByOtherLevel($model, $nic, $level);
+            if ($blockMsg !== null) {
+                http_response_code(422);
+                echo json_encode(['status' => 'error', 'message' => $blockMsg]);
+                exit;
+            }
+            $row = $model->findByNicAndLevel($nic, $level);
+        } catch (Throwable $e) {
+            error_log('apiCheckApplication: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'Could not verify NIC.']);
+            exit;
+        }
+        if ($row) {
+            $data = $this->studentApplicationRowForApiJson($model, $row);
+            echo json_encode(['status' => 'exists', 'data' => $data], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        echo json_encode(['status' => 'new']);
+        exit;
     }
 
     /**

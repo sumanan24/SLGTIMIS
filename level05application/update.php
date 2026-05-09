@@ -59,6 +59,19 @@ if (!$existing) {
     exit;
 }
 
+try {
+    $blockMsg = l05_other_level_application_blocks($conn, $nic, L05_APP_LEVEL);
+    if ($blockMsg !== null) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => $blockMsg]);
+        exit;
+    }
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Could not verify NIC against existing applications.']);
+    exit;
+}
+
 $existingPaths = [];
 foreach (L05_FILE_FIELDS as $_fieldName => $dbCol) {
     $existingPaths[$dbCol] = $existing[$dbCol] ?? null;

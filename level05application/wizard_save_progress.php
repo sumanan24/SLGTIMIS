@@ -82,6 +82,15 @@ if (!$existing) {
     $jsonOut(['success' => false, 'message' => 'Application not found.'], 404);
 }
 
+try {
+    $blockMsg = l05_other_level_application_blocks($conn, $nic, $level);
+    if ($blockMsg !== null) {
+        $jsonOut(['success' => false, 'message' => $blockMsg], 422);
+    }
+} catch (Throwable $e) {
+    $jsonOut(['success' => false, 'message' => 'Could not verify NIC against existing applications.'], 500);
+}
+
 $existingPaths = [];
 foreach (L05_FILE_FIELDS as $_fieldName => $dbCol) {
     $existingPaths[$dbCol] = $existing[$dbCol] ?? null;
