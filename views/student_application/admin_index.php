@@ -160,14 +160,14 @@ $chartDistrictRaw = $byDistrict;
 usort($chartDistrictRaw, static function (array $a, array $b): int {
     return ((int) ($b['count'] ?? 0)) <=> ((int) ($a['count'] ?? 0));
 });
-$chartDistrict = $saDashCapRows($chartDistrictRaw, 10);
-$chartCourse = $saDashCapRows($byCourse, 10);
-$chartDepartment = $saDashCapRows($byDepartment, 10);
+$chartDistrict = $saDashCapRows($chartDistrictRaw, 40);
+$chartCourse = $saDashCapRows($byCourse, 40);
+$chartDepartment = $saDashCapRows($byDepartment, 40);
 $chartGenderRaw = $byGender;
 usort($chartGenderRaw, static function (array $a, array $b): int {
     return ((int) ($b['count'] ?? 0)) <=> ((int) ($a['count'] ?? 0));
 });
-$chartGender = $saDashCapRows($chartGenderRaw, 10);
+$chartGender = $saDashCapRows($chartGenderRaw, 40);
 
 $filterContextSuffix = '';
 $ctxParts = [];
@@ -281,7 +281,7 @@ $renderAppTable = static function (
     <?php
 };
 ?>
-<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=16">
+<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=18">
 <div class="sa-admin-page sa-student-apps-index container-fluid py-3 px-lg-4<?php echo $active_view === 'dashboard' ? ' sa-page-dashboard' : ''; ?>">
     <header class="sa-apps-page-header mb-4 pb-2 border-bottom<?php echo $active_view === 'dashboard' ? ' sa-apps-page-header--dash' : ''; ?>">
         <h1 class="h4 mb-0 fw-semibold text-dark"><i class="fas fa-file-alt me-2 text-primary" aria-hidden="true"></i>Online applications</h1>
@@ -409,7 +409,6 @@ $renderAppTable = static function (
         </div>
         <div class="card-body sa-apps-card-body pt-0 px-0 pb-3">
             <?php if ($active_view === 'dashboard'): ?>
-            <p class="small text-muted mb-2 sa-dash-hint">Same layout for every block: <strong>category</strong>, <strong>count</strong>, and a <strong>relative bar</strong> (within that block, largest = full width). Open <strong>Application table</strong> to review each application.</p>
             <?php
             $renderDashBreakdownTable = static function (
                 string $headingId,

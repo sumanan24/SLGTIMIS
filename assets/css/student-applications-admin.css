@@ -476,29 +476,24 @@
     white-space: nowrap;
 }
 
-/* ——— Application dashboard (graphs, single-screen layout) ——— */
+/* ——— Application dashboard: one stacked list, full rows, page scroll only ——— */
 .sa-page-dashboard.sa-student-apps-index {
     padding-top: 0.4rem !important;
     padding-bottom: 0.4rem !important;
-    max-height: calc(100dvh - 64px);
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    box-sizing: border-box;
+    display: block;
+    max-height: none;
 }
 
 .sa-page-dashboard .sa-apps-page-header {
     margin-bottom: 0.45rem !important;
     padding-bottom: 0.35rem !important;
-    flex-shrink: 0;
 }
 
 .sa-page-dashboard .sa-apps-card {
     display: flex;
     flex-direction: column;
-    flex: 1 1 auto;
-    min-height: 0;
     max-height: none;
+    min-height: 0;
 }
 
 .sa-page-dashboard .sa-apps-card > .card-header {
@@ -506,26 +501,19 @@
 }
 
 .sa-page-dashboard .sa-apps-card-body {
-    flex: 1 1 auto;
+    flex: none;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
     display: flex;
     flex-direction: column;
-    padding: 0.4rem 0.65rem 0.5rem !important;
-}
-
-.sa-page-dashboard .sa-dash-hint {
-    flex-shrink: 0;
-    margin-bottom: 0.35rem !important;
-    line-height: 1.35;
+    padding: 0.4rem 0.65rem 0.75rem !important;
 }
 
 .sa-dashboard-root {
-    flex: 1 1 auto;
-    min-height: 0;
+    flex: none;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.65rem;
 }
 
 .sa-dashboard-empty {
@@ -702,10 +690,10 @@
 }
 
 .sa-dash-panel-body {
-    flex: 1 1 auto;
+    flex: none;
     min-height: 0;
-    overflow: auto;
-    max-height: min(260px, 34vh);
+    overflow: visible;
+    max-height: none;
 }
 
 .sa-page-dashboard .sa-dash-table {
@@ -738,11 +726,17 @@
 .sa-dash-th-count,
 .sa-dash-td-count {
     width: 4.5rem;
+    white-space: nowrap;
 }
 
 .sa-dash-th-bar,
 .sa-dash-td-bar {
     width: auto;
+    min-width: 7.5rem;
+}
+
+.sa-dash-th-bar {
+    white-space: nowrap;
 }
 
 .sa-dash-td-label {
@@ -794,52 +788,19 @@
 }
 
 .sa-dashboard-row-charts {
-    flex: 1 1 auto;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
     min-height: 0;
-    display: grid;
-    gap: 0.5rem;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
 }
 
-@media (min-width: 1200px) {
-    .sa-dashboard-row-charts {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        grid-template-rows: minmax(0, 1fr);
-    }
+.sa-dashboard-row-charts .sa-dash-panel {
+    width: 100%;
 }
 
-@media (max-width: 991.98px) {
-    .sa-page-dashboard.sa-student-apps-index {
-        max-height: none;
-        display: block;
-    }
-
-    .sa-page-dashboard .sa-apps-card {
-        flex: none;
-        min-height: 0;
-    }
-
-    .sa-page-dashboard .sa-apps-card-body {
-        max-height: none;
-        overflow: visible;
-    }
-
+@media (max-width: 767.98px) {
     .sa-dashboard-row-kpi {
         grid-template-columns: 1fr;
-    }
-
-    .sa-dash-panel-body {
-        max-height: min(320px, 45vh);
-    }
-
-    .sa-dashboard-row-charts {
-        grid-template-columns: 1fr;
-        grid-template-rows: none;
-        min-height: 0;
-    }
-
-    .sa-dashboard-row-charts .sa-dash-panel {
-        min-height: 0;
     }
 }
