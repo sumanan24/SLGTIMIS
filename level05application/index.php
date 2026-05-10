@@ -22,10 +22,14 @@ if ($l05MainAppBasePath === '/' || $l05MainAppBasePath === '\\' || $l05MainAppBa
 }
 /** Official institute website (header Home / brand). */
 $l05OfficialSiteUrl = 'https://slgti.ac.lk/';
-$l05StudentAppCssHref = ($l05MainAppBasePath === '' ? '' : $l05MainAppBasePath) . '/assets/css/student-application.css?v=13';
+$l05StudentAppCssHref = ($l05MainAppBasePath === '' ? '' : $l05MainAppBasePath) . '/assets/css/student-application.css?v=14';
 $l05AlStreams = require dirname(__DIR__) . '/config/al_streams_sri_lanka.php';
 $l05AlSubjects = require dirname(__DIR__) . '/config/al_subjects_common.php';
-$l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
+/** A/L subject results — same allowed letters as O/L (A, B, C, S, W). */
+$l05GradeLetters = ['A', 'B', 'C', 'S', 'W'];
+$l05Today = new DateTimeImmutable('today');
+$l05DobMax = $l05Today->modify('-16 years')->format('Y-m-d');
+$l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -137,7 +141,7 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                         <!-- Step 1 -->
                         <div class="wiz-pane show" data-step="1">
                             <h2 class="h5 mb-3">Step 1</h2>
-                            <p class="text-muted small">Enter your National Identity Card number and click <strong>Next</strong>.</p>
+                            <p class="text-muted small">Enter your National Identity Card number and click <strong>Next</strong>. If you already applied, your details will load so you can review or edit and submit again.</p>
                             <div class="row g-3">
                                 <div class="col-12 col-md-8">
                                     <label for="student_nic" class="form-label">NIC <span class="text-danger">*</span></label>
@@ -192,8 +196,12 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label" for="student_dob">Date of birth <span class="text-danger">*</span></label>
-                                    <input type="date" class="form-control" id="student_dob" name="student_dob" required>
-                                    <div class="invalid-feedback">Required.</div>
+                                    <input type="date" class="form-control" id="student_dob" name="student_dob" required
+                                        min="<?php echo htmlspecialchars($l05DobMin, ENT_QUOTES, 'UTF-8'); ?>"
+                                        max="<?php echo htmlspecialchars($l05DobMax, ENT_QUOTES, 'UTF-8'); ?>"
+                                        title="You must be at least 16 years old.">
+                                    <div class="form-text">Applicants must be at least 16 years old.</div>
+                                    <div class="invalid-feedback">Enter your date of birth (you must be at least 16).</div>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label" for="student_language">Language <span class="text-danger">*</span></label>
@@ -271,7 +279,7 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                         <!-- Step 4 O/L A/L -->
                         <div class="wiz-pane" data-step="4">
                             <h2 class="h5 mb-2">Step 4 — School qualifications</h2>
-                            <p class="text-muted small mb-4"><strong>Either</strong> complete the O/L and A/L cards, <strong>or</strong> leave them blank and complete NVQ in the next step. Do not leave A/L partly filled.</p>
+                            <p class="text-muted small mb-4"><strong>A/L</strong> can qualify you without NVQ when fully completed. O/L is optional but must be finished or cleared if you start it. Do not leave A/L partly filled; rules are checked in step&nbsp;5.</p>
 
                             <div class="card l05-exam-card ol shadow-sm mb-4">
                                 <div class="card-header py-3 d-flex align-items-start gap-3">
@@ -292,11 +300,10 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label small fw-semibold text-secondary" for="ol_exam_year">Year of examination</label>
-                                            <input type="number" class="form-control" id="ol_exam_year" name="ol_exam_year" min="1990" max="2100" step="1" placeholder="e.g. 2019">
+                                            <input type="text" class="form-control" id="ol_exam_year" name="ol_exam_year" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" autocomplete="off" placeholder="e.g. 2019" title="4-digit year">
                                         </div>
                                     </div>
                                     <div class="l05-section-label">Subjects &amp; results</div>
-                                    <p class="small text-muted mb-3">Slots 1–6 are the six mandatory O/L subjects; slots 7–9 are <strong>basket</strong> subjects (pick one from each category list). Choose the result for each (letter grades A–F, S, W±).</p>
                                     <div class="row g-3">
                                         <?php
                                         $old = [];
@@ -330,12 +337,12 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label small fw-semibold text-secondary" for="al_exam_year">Year of examination</label>
-                                            <input type="number" class="form-control" id="al_exam_year" name="al_exam_year" min="1990" max="2100" step="1" placeholder="e.g. 2022">
+                                            <input type="text" class="form-control" id="al_exam_year" name="al_exam_year" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" autocomplete="off" placeholder="e.g. 2022" title="4-digit year">
                                         </div>
                                         <div class="col-md-4">
-                                            <label class="form-label small fw-semibold text-secondary" for="al_stream">Stream</label>
-                                            <select class="form-select" id="al_stream" name="al_stream">
-                                                <option value="">Choose…</option>
+                                            <label class="form-label small fw-semibold text-secondary" for="al_stream">G.C.E. A/L stream (Sri Lanka)</label>
+                                            <select class="form-select" id="al_stream" name="al_stream" aria-label="G.C.E. Advanced Level stream — Sri Lanka national categories">
+                                                <option value="">Choose stream…</option>
                                                 <?php foreach ($l05AlStreams as $st) : ?>
                                                 <option value="<?php echo htmlspecialchars($st, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($st, ENT_QUOTES, 'UTF-8'); ?></option>
                                                 <?php endforeach; ?>
@@ -343,7 +350,7 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                                         </div>
                                     </div>
                                     <div class="l05-section-label">Subjects &amp; results</div>
-                                    <p class="small text-muted mb-3">Choose each subject and result (A–F, S, W±).</p>
+                                    <p class="small text-muted mb-3">Choose each subject and result (<strong>A</strong>, <strong>B</strong>, <strong>C</strong>, <strong>S</strong>, or <strong>W</strong>).</p>
                                     <div class="row g-3">
                                         <?php for ($i = 1; $i <= 3; $i++) : $s = sprintf('%02d', $i); ?>
                                         <div class="col-md-4">
@@ -374,12 +381,12 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
                         <!-- Step 5 NVQ -->
                         <div class="wiz-pane" data-step="5">
                             <h2 class="h5 mb-3">Step 5 — NVQ</h2>
-                            <p class="text-muted small">After O/L, you must provide <strong>either</strong> full A/L (previous step) <strong>or</strong> all four NVQ fields below. Leave NVQ blank only if A/L is fully completed.</p>
+                            <p class="text-muted small">If you already have <strong>NVQ Level 4</strong>, enter it here. If you <strong>completed G.C.E. A/L</strong> in the step above, choose <strong>None</strong> — you do not need an NVQ for this application.</p>
                             <div class="row g-3">
                                 <div class="col-md-3">
-                                    <label class="form-label" for="nvq_level">NVQ level</label>
+                                    <label class="form-label" for="nvq_level">Your NVQ qualification</label>
                                     <select class="form-select" id="nvq_level" name="nvq_level">
-                                        <option value="">Choose…</option>
+                                        <option value="">None — not declaring NVQ (e.g. qualified with G.C.E. A/L)</option>
                                         <option value="4">NVQ Level 4</option>
                                     </select>
                                 </div>
@@ -808,11 +815,10 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
     return d.length === 9 && /^[1-9]\d{8}$/.test(d);
   }
 
-  function examResultOk(raw) {
-    var m = String(raw || '').trim();
-    if (!m) return false;
-    if (/^[A-FSW][+-]?$/i.test(m)) return true;
-    return false;
+  /** G.C.E. O/L and A/L (Level 05): A, B, C, S, or W — matches result dropdowns. */
+  function olResultOk(raw) {
+    var m = String(raw || '').trim().toUpperCase();
+    return m === 'A' || m === 'B' || m === 'C' || m === 'S' || m === 'W';
   }
 
   function escapeHtml(t) {
@@ -838,7 +844,10 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
       if (/^(Choose|Loading|No departments)/i.test(tx)) return '';
       return tx;
     }
-    if (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type !== 'file' && el.type !== 'hidden')) {
+    if (el.tagName === 'INPUT' && el.type === 'hidden') {
+      return String(el.value || '').trim();
+    }
+    if (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type !== 'file')) {
       return String(el.value || '').trim();
     }
     return '';
@@ -954,7 +963,7 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
     var alRows = [
       ['A/L index number', l05FieldText('al_index_number')],
       ['A/L examination year', l05FieldText('al_exam_year')],
-      ['A/L stream', l05FieldText('al_stream')]
+      ['G.C.E. A/L stream (Sri Lanka)', l05FieldText('al_stream')]
     ];
     for (var aj = 1; aj <= 3; aj++) {
       var as = '0' + aj;
@@ -1278,10 +1287,30 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
     }
     for (var oi = 1; oi <= 9; oi++) {
       var os = (oi < 10 ? '0' : '') + oi;
-      if (!examResultOk($('ol_subject_' + os + '_marks').value)) return false;
+      if (!olResultOk($('ol_subject_' + os + '_marks').value)) return false;
     }
     var yo = parseInt($('ol_exam_year').value, 10);
     return !isNaN(yo) && yo >= 1990 && yo <= 2100;
+  }
+
+  /** True when no user-entered O/L data (fixed slots 1–6 always post hidden subject names). */
+  function olKeysEmpty() {
+    var idx = $('ol_index_number');
+    var yr = $('ol_exam_year');
+    if (idx && String(idx.value || '').trim() !== '') return false;
+    if (yr && String(yr.value || '').trim() !== '') return false;
+    var i;
+    for (i = 1; i <= 9; i++) {
+      var s = (i < 10 ? '0' : '') + i;
+      var mk = $('ol_subject_' + s + '_marks');
+      if (mk && String(mk.value || '').trim() !== '') return false;
+    }
+    for (var j = 7; j <= 9; j++) {
+      var bs = '0' + j;
+      var sn = $('ol_subject_name_' + bs);
+      if (sn && String(sn.value || '').trim() !== '') return false;
+    }
+    return true;
   }
 
   function alKeysEmpty() {
@@ -1310,7 +1339,7 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
     }
     for (var ai = 1; ai <= 3; ai++) {
       var as = '0' + ai;
-      if (!examResultOk($('al_subject_' + as + '_marks').value)) return false;
+      if (!olResultOk($('al_subject_' + as + '_marks').value)) return false;
     }
     var ya = parseInt($('al_exam_year').value, 10);
     return !isNaN(ya) && ya >= 1990 && ya <= 2100;
@@ -1325,6 +1354,8 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
 
   function nvqComplete() {
     if (nvqKeysEmpty()) return false;
+    var lvl = String($('nvq_level').value || '').trim();
+    if (lvl !== '4') return false;
     var ok = ['nvq_level', 'nvq_course_name', 'nvq_institute_name', 'nvq_year_completed'].every(function (id) {
       var el = $(id);
       return el && String(el.value || '').trim() !== '';
@@ -1332,6 +1363,16 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
     if (!ok) return false;
     var yn = parseInt($('nvq_year_completed').value, 10);
     return !isNaN(yn) && yn >= 1900 && yn <= 2100;
+  }
+
+  /** Birth date on/before “today minus 16 years” (matches HTML max and server validation). */
+  function l05DobAtLeast16(ymd) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
+    var p = ymd.split('-');
+    var birth = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+    var now = new Date();
+    var cut = new Date(now.getFullYear() - 16, now.getMonth(), now.getDate());
+    return birth.getTime() <= cut.getTime();
   }
 
   function validateStep(step) {
@@ -1347,8 +1388,12 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
       ['student_title', 'student_full_name', 'student_initial_name', 'student_gender', 'student_civil_status', 'student_dob', 'student_language', 'student_religion'].forEach(function (id) {
         var el = $(id);
         var v = (el.value || '').trim();
-        el.classList.toggle('is-invalid', !v);
-        if (!v) ok = false;
+        var fieldOk = !!v;
+        if (id === 'student_dob' && v) {
+          fieldOk = l05DobAtLeast16(v);
+        }
+        el.classList.toggle('is-invalid', !fieldOk);
+        if (!fieldOk) ok = false;
       });
       return ok;
     }
@@ -1379,22 +1424,32 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
       return ok;
     }
     if (step === 4) {
-      // O/L is optional for NVQ applicants. Do not block on O/L at this step.
+      // Do not validate partial O/L here — browser number spinners can set a year without intent; NVQ-only users leave O/L blank.
+      // Partial O/L / A/L vs NVQ is enforced in step 5 (and on submit).
       if (!alKeysEmpty() && !alComplete()) {
-        showAlert('Either complete all A/L fields (index, year, stream, three subjects and results) or clear every A/L field if you will use NVQ instead.');
+        showAlert('Either complete all A/L fields (index, year, Sri Lanka G.C.E. A/L stream, three subjects and results) or clear every A/L field if you will use NVQ instead.');
         return false;
       }
       return true;
     }
     if (step === 5) {
-      if (!nvqKeysEmpty() && !nvqComplete()) {
-        showAlert('Either complete all four NVQ fields with a valid year or clear them if you completed A/L in the previous step.');
+      // Partial O/L matters only if A/L is not complete (full A/L satisfies school path without NVQ).
+      if (!olKeysEmpty() && !olComplete() && !alComplete()) {
+        showAlert('Either complete all O/L fields (index, year, all subject results, basket subjects) or clear index, year, results, and basket subjects if you will use NVQ instead.');
         return false;
       }
-      // Submit rule: either NVQ-only, or full school qualifications (O/L + A/L), or both.
-      var schoolOk = olComplete() && alComplete();
+      if (!alKeysEmpty() && !alComplete()) {
+        showAlert('Either complete all A/L fields (index, year, Sri Lanka G.C.E. A/L stream, three subjects and results) or clear every A/L field if you will use NVQ instead.');
+        return false;
+      }
+      if (!nvqKeysEmpty() && !nvqComplete()) {
+        showAlert('Either choose NVQ Level 4 and complete course, institute, and year, or clear all NVQ fields (None) if you completed G.C.E. A/L.');
+        return false;
+      }
+      // Submit rule: full NVQ Level 4, or full G.C.E. A/L (O/L optional). NVQ not required when A/L is complete.
+      var schoolOk = alComplete();
       if (!nvqComplete() && !schoolOk) {
-        showAlert('Provide either full NVQ details, or complete both O/L and A/L.');
+        showAlert('Complete G.C.E. A/L in full, or provide full NVQ Level 4 (course, institute, year). NVQ is not required when A/L is complete.');
         return false;
       }
       return true;
@@ -1459,6 +1514,9 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
       if (el.type === 'file') { el.value = ''; return; }
       el.value = '';
     });
+    form.querySelectorAll('input[type="hidden"][data-fixed-subject]').forEach(function (el) {
+      el.value = el.getAttribute('data-fixed-subject') || '';
+    });
     $('application_id').value = '';
     clearFileHints();
     syncDistricts(false);
@@ -1468,10 +1526,21 @@ $l05GradeLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'S', 'W', 'W+', 'W-'];
   function l05EnsureSelectHasValue(selId, val) {
     if (val == null) return;
     var el = $(selId);
-    if (!el || el.tagName !== 'SELECT') return;
+    if (!el) return;
+    if (el.tagName === 'INPUT' && el.type === 'hidden') {
+      el.value = String(val).trim();
+      return;
+    }
+    if (el.tagName !== 'SELECT') return;
     var s = String(val).trim();
     if (s === '') return;
-    if (/_marks$/.test(selId) && !/^[A-FSW][+-]?$/i.test(s)) return;
+    if (/_marks$/.test(selId)) {
+      if (/^(ol|al)_subject_\d{2}_marks$/i.test(selId)) {
+        if (!/^[ABCSW]$/i.test(s)) return;
+      } else if (!/^[A-FSW][+-]?$/i.test(s)) {
+        return;
+      }
+    }
     var i;
     for (i = 0; i < el.options.length; i++) {
       if (el.options[i].value === s) {

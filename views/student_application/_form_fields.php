@@ -196,7 +196,7 @@ $dbNvqHint = ($application_level ?? '04') === '05' ? '5' : '4';
 </div>
 
 <?php if ($isLevel05): ?>
-<div class="alert app-form-info-banner small mb-4"><strong>Level 05:</strong> Fill <strong>all</strong> O/L and <strong>all</strong> A/L boxes, <strong>or</strong> fill <strong>all</strong> NVQ boxes, <strong>or</strong> both. Do not leave both empty.</div>
+<div class="alert app-form-info-banner small mb-4"><strong>Level 05:</strong> Complete <strong>G.C.E. A/L</strong> in full <strong>or</strong> complete <strong>NVQ Level 4</strong> (course, institute, year). O/L is optional. NVQ is not required when A/L is complete.</div>
 <?php endif; ?>
 
 <!-- O/L -->
@@ -214,22 +214,15 @@ $dbNvqHint = ($application_level ?? '04') === '05' ? '5' : '4';
             </div>
         </div>
         <div class="row g-2 g-lg-3 app-exam-subjects-grid">
-                <?php for ($i = 1; $i <= 9; $i++): $s = sprintf('%02d', $i); ?>
-                <div class="col-12 col-lg-6">
-                    <div class="app-ol-row app-exam-subj-cell h-100">
-                        <div class="app-subject-block">
-                            <div class="app-subj-title">Subject <?php echo $s; ?> <?php echo $isLevel05 ? '' : $req; ?></div>
-                            <div class="app-subj-fields">
-                                <input type="text" name="ol_subject_name_<?php echo $s; ?>" id="ol_subject_name_<?php echo $s; ?>" class="form-control form-control-sm app-subj-name app-exam-input-compact" maxlength="100" value="<?php echo $v('ol_subject_name_' . $s); ?>" aria-label="O/L Subject <?php echo $s; ?>"<?php echo $examAttr; ?>>
-                                <div class="app-subj-mark-group">
-                                    <label class="form-label app-subj-mark-label mb-0" for="ol_subject_<?php echo $s; ?>_marks">Mark</label>
-                                    <input type="number" name="ol_subject_<?php echo $s; ?>_marks" id="ol_subject_<?php echo $s; ?>_marks" class="form-control form-control-sm app-mark-input app-exam-input-compact" min="0" max="100" value="<?php echo $v('ol_subject_' . $s . '_marks'); ?>"<?php echo $examAttr; ?>>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <?php endfor; ?>
+                <?php
+                for ($fi = 1; $fi <= 9; $fi++) :
+                    $i = $fi;
+                    $variant = 'form';
+                    $extraAttr = $examAttr;
+                    $slotReqHtml = $isLevel05 ? '' : $req;
+                    require __DIR__ . '/_ol_subject_slot.php';
+                endfor;
+                ?>
         </div>
     </div>
 </div>
@@ -278,7 +271,7 @@ $dbNvqHint = ($application_level ?? '04') === '05' ? '5' : '4';
     <div class="card-body">
         <div class="app-form-section-title"><i class="fas fa-tools me-2"></i>NVQ</div>
         <?php if ($isLevel05): ?>
-        <p class="small text-muted mb-3">Use this part <strong>only</strong> if you apply with an NVQ (not with O/L + A/L above).</p>
+        <p class="small text-muted mb-3">Use this part <strong>only</strong> if you apply with an NVQ (not with completed G.C.E. A/L above).</p>
         <?php else: ?>
         <p class="small text-muted mb-3">If you have no NVQ yet, type <strong>N/A</strong> in the text boxes. For year, you can type <strong>2000</strong>.</p>
         <?php endif; ?>
@@ -287,7 +280,7 @@ $dbNvqHint = ($application_level ?? '04') === '05' ? '5' : '4';
                     <label class="form-label" for="nvq_level">NVQ level <?php echo $isLevel05 ? '' : $req; ?></label>
                     <?php if ($isLevel05): ?>
                     <select name="nvq_level" id="nvq_level" class="form-select form-select-sm"<?php echo $examAttr; ?>>
-                        <option value="">Choose…</option>
+                        <option value="">None — not declaring NVQ</option>
                         <option value="4" <?php echo (($old['nvq_level'] ?? '') === '4') ? 'selected' : ''; ?>>NVQ Level 4</option>
                     </select>
                     <?php else: ?>

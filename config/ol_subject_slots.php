@@ -1,9 +1,9 @@
 <?php
 /**
- * G.C.E. O/L (Sri Lanka) — nine examination slots: six mandatory “main” subjects
- * and three optional “basket” subjects (one from each category).
+ * G.C.E. O/L (Sri Lanka) — nine slots: six fixed main subjects (grade only in UI)
+ * and three basket subjects (dropdown + grade).
  *
- * @return array<string, array{label: string, subjects: list<string>}>
+ * @return array<string, array{label?: string, fixed_subject?: string, subjects?: list<string>}>
  */
 declare(strict_types=1);
 
@@ -12,60 +12,36 @@ $other = 'Other (see details on O/L certificate)';
 return [
     '01' => [
         'label' => 'Religion',
-        'subjects' => [
-            'Buddhism',
-            'Christianity',
-            'Roman Catholicism',
-            'Islam',
-            'Hinduism',
-            $other,
-        ],
+        'fixed_subject' => 'Religion',
     ],
     '02' => [
-        'label' => 'First language & literature',
-        'subjects' => [
-            'Sinhala Language & Literature',
-            'Tamil Language & Literature',
-            $other,
-        ],
+        'label' => 'Sinhala / Tamil Language & Literature',
+        'fixed_subject' => 'Sinhala / Tamil Language & Literature',
     ],
     '03' => [
-        'label' => 'English language',
-        'subjects' => [
-            'English Language',
-            $other,
-        ],
+        'label' => 'English Language',
+        'fixed_subject' => 'English Language',
     ],
     '04' => [
         'label' => 'Mathematics',
-        'subjects' => [
-            'Mathematics',
-            $other,
-        ],
+        'fixed_subject' => 'Mathematics',
     ],
     '05' => [
-        'label' => 'Science',
-        'subjects' => [
-            'Science',
-            $other,
-        ],
+        'label' => 'History',
+        'fixed_subject' => 'History',
     ],
     '06' => [
-        'label' => 'History',
-        'subjects' => [
-            'History',
-            $other,
-        ],
+        'label' => 'Science',
+        'fixed_subject' => 'Science',
     ],
     '07' => [
-        'label' => 'Basket I — choose one subject from this category',
+        'label' => 'Basket 1 — choose one subject',
         'subjects' => [
             'Business & Accounting Studies',
             'Geography',
             'Civic Education',
             'Entrepreneurship Studies',
-            'Second Language (Sinhala)',
-            'Second Language (Tamil)',
+            'Second Language (Sinhala/Tamil)',
             'Pali',
             'Sanskrit',
             'French',
@@ -73,53 +49,37 @@ return [
             'Hindi',
             'Japanese',
             'Arabic',
-            'Chinese',
             'Korean',
+            'Chinese',
             'Russian',
             $other,
         ],
     ],
     '08' => [
-        'label' => 'Basket II — choose one subject from this category',
+        'label' => 'Basket 2 — choose one subject',
         'subjects' => [
-            'Eastern Music',
-            'Western Music',
-            'Carnatic Music',
-            'Oriental Dancing',
-            'Bharatha Natya',
+            'Music',
             'Art',
-            'English Literature',
-            'Appreciation of Sinhala Literary Texts',
-            'Appreciation of Tamil Literary Texts',
-            'Appreciation of Arabic Literary Texts',
-            'Drama and Theatre (Sinhala)',
-            'Drama and Theatre (Tamil)',
-            'Drama and Theatre (English)',
+            'Dancing',
+            'Literature',
+            'Drama & Theatre',
             $other,
         ],
     ],
     '09' => [
-        'label' => 'Basket III — choose one subject from this category',
+        'label' => 'Basket 3 — choose one subject',
         'subjects' => [
-            'Information & Communication Technology',
+            'ICT',
             'Agriculture & Food Technology',
-            'Aquatic Bio-resources Technology',
+            'Aquatic Bio-resource Technology',
             'Arts & Crafts',
             'Home Economics',
-            'Health Science',
             'Health & Physical Education',
             'Communication & Media Studies',
-            'Media Studies',
             'Design & Construction Technology',
             'Design & Mechanical Technology',
             'Design, Electrical & Electronic Technology',
-            'Electronic Writing & Shorthand (Sinhala)',
-            'Electronic Writing & Shorthand (Tamil)',
-            'Electronic Writing & Shorthand (English)',
-            'Engineering Technology',
-            'Bio-systems Technology',
-            'Science for Technology',
-            'Agriculture',
+            'Electronic Writing & Shorthand',
             $other,
         ],
     ],

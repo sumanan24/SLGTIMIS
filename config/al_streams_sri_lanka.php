@@ -1,14 +1,15 @@
 <?php
-/** Common G.C.E. A/L (Sri Lanka) stream names for application forms. */
+/**
+ * G.C.E. Advanced Level — Sri Lanka stream options (application form).
+ *
+ * @return list<string>
+ */
 declare(strict_types=1);
 
 return [
-    'Physical Science',
-    'Biological Science',
-    'Commerce',
-    'Arts',
-    'Technology',
-    'Engineering Technology',
-    'Common (General)',
-    'Other (see A/L certificate)',
+    'Biology Stream',
+    'Physical Science Stream',
+    'Commerce Stream',
+    'Arts Stream',
+    'Technology Stream',
 ];

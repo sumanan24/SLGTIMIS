@@ -33,6 +33,16 @@ body.public-app {
     padding-bottom: 0;
 }
 
+/* Sticky footer: pin footer to viewport bottom when content is shorter than the screen */
+.public-app-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
+    position: relative;
+    z-index: 1;
+}
+
 .app-form-bg {
     position: fixed;
     inset: 0;
@@ -46,6 +56,7 @@ body.public-app {
 .app-form-main {
     position: relative;
     z-index: 1;
+    flex: 1 1 auto;
     max-width: var(--app-content-max);
     margin-left: auto;
     margin-right: auto;

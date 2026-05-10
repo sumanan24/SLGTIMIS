@@ -354,11 +354,23 @@ class StudentApplicationController extends Controller {
     }
 
     /**
+     * True if the applicant started the O/L block. Fixed slots 1–6 always post hidden subject names — ignore those.
+     *
      * @param callable(string): string $t
      */
     private function isOlAnyFilled(callable $t): bool {
-        foreach ($this->olExamFieldKeys() as $k) {
-            if ($t($k) !== '') {
+        if ($t('ol_index_number') !== '' || $t('ol_exam_year') !== '') {
+            return true;
+        }
+        for ($i = 1; $i <= 9; $i++) {
+            $s = sprintf('%02d', $i);
+            if ($t('ol_subject_' . $s . '_marks') !== '') {
+                return true;
+            }
+        }
+        for ($i = 7; $i <= 9; $i++) {
+            $s = sprintf('%02d', $i);
+            if ($t('ol_subject_name_' . $s) !== '') {
                 return true;
             }
         }
@@ -402,10 +414,19 @@ class StudentApplicationController extends Controller {
     }
 
     /**
+     * Full NVQ path: Level 05 allows NVQ Level 4 only (+ course, institute, year). Level 04 uses Level 3 on the form.
+     *
      * @param callable(string): string $t
      */
-    private function isNvqPathComplete(callable $t): bool {
-        foreach ($this->nvqFieldKeys() as $k) {
+    private function isNvqPathComplete(callable $t, string $applicationLevel): bool {
+        $lvl = trim($t('nvq_level'));
+        $allowed = $applicationLevel === '05'
+            ? ['4']
+            : ['3', '4', '5'];
+        if ($lvl === '' || !in_array($lvl, $allowed, true)) {
+            return false;
+        }
+        foreach (['nvq_course_name', 'nvq_institute_name', 'nvq_year_completed'] as $k) {
             if ($t($k) === '') {
                 return false;
             }
@@ -477,17 +498,24 @@ class StudentApplicationController extends Controller {
         }
 
         if ($level === '05') {
+            $nvqLvlEarly = $t('nvq_level');
+            if ($nvqLvlEarly !== '' && $nvqLvlEarly !== '4') {
+                return ['NVQ level must be NVQ Level 4 only, or None (empty).'];
+            }
             $olOk = $this->isOlPathComplete($t);
             $alOk = $this->isAlPathComplete($t);
-            $nvqOk = $this->isNvqPathComplete($t);
+            $nvqOk = $this->isNvqPathComplete($t, $level);
+            if ($this->isOlAnyFilled($t) && !$olOk && !$alOk) {
+                return ['For Level 05: either complete all O/L fields or clear index, year, results, and basket subjects if you use NVQ only.'];
+            }
             if ($this->isAlAnyFilled($t) && !$alOk) {
                 return ['For Level 05: either complete all A/L fields or clear them if you use NVQ only.'];
             }
             if ($this->isNvqAnyFilled($t) && !$nvqOk) {
-                return ['For Level 05: either complete all NVQ fields or clear them if you use A/L only.'];
+                return ['For Level 05: either complete all NVQ fields or clear them if you declare school qualifications (complete G.C.E. A/L) instead.'];
             }
-            if (!$nvqOk && !($olOk && $alOk)) {
-                return ['For Level 05: provide either full NVQ details, or complete both O/L and A/L.'];
+            if (!$nvqOk && !$alOk) {
+                return ['For Level 05: complete G.C.E. A/L in full, or provide full NVQ Level 4 (course, institute, year). NVQ is not required when A/L is complete.'];
             }
         }
 
@@ -571,7 +599,7 @@ class StudentApplicationController extends Controller {
         if ($level === '04') {
             // Level 04: no A/L on this form — require full O/L and/or full NVQ (at least one).
             $olOk = $this->isOlPathComplete($t);
-            $nvqOk = $this->isNvqPathComplete($t);
+            $nvqOk = $this->isNvqPathComplete($t, $level);
             if ($this->isOlAnyFilled($t) && !$olOk) {
                 return ['For Level 04: either complete all O/L fields or clear the O/L section.'];
             }
@@ -589,8 +617,8 @@ class StudentApplicationController extends Controller {
                 for ($i = 1; $i <= 9; $i++) {
                     $s = sprintf('%02d', $i);
                     $m = $t('ol_subject_' . $s . '_marks');
-                    if ($m === '' || !$this->isValidExamResult($m)) {
-                        return ['O/L results: use a letter grade (A–F, S, W±) for every subject.'];
+                    if ($m === '' || !$this->isValidOlExamResult($m)) {
+                        return ['O/L results: choose A, B, C, S, or W for every subject.'];
                     }
                 }
             }
@@ -602,7 +630,7 @@ class StudentApplicationController extends Controller {
             }
         } elseif ($level === '05') {
             // NVQ-complete applicants do not need O/L. Only validate O/L if they fully completed it.
-            if (!$this->isNvqPathComplete($t) && $this->isOlPathComplete($t)) {
+            if (!$this->isNvqPathComplete($t, $level) && $this->isOlPathComplete($t)) {
                 $yo = (int) $t('ol_exam_year');
                 if ($yo < 1990 || $yo > 2100) {
                     return ['O/L year must be between 1990 and 2100.'];
@@ -610,8 +638,8 @@ class StudentApplicationController extends Controller {
                 for ($i = 1; $i <= 9; $i++) {
                     $s = sprintf('%02d', $i);
                     $m = $t('ol_subject_' . $s . '_marks');
-                    if ($m === '' || !$this->isValidExamResult($m)) {
-                        return ['O/L results: use a letter grade (A–F, S, W±) for every subject.'];
+                    if ($m === '' || !$this->isValidOlExamResult($m)) {
+                        return ['O/L results: choose A, B, C, S, or W for every subject.'];
                     }
                 }
             }
@@ -623,12 +651,12 @@ class StudentApplicationController extends Controller {
                 for ($i = 1; $i <= 3; $i++) {
                     $s = sprintf('%02d', $i);
                     $m = $t('al_subject_' . $s . '_marks');
-                    if ($m === '' || !$this->isValidExamResult($m)) {
-                        return ['A/L results: use a letter grade (A–F, S, W±) for every subject.'];
+                    if ($m === '' || !$this->isValidOlExamResult($m)) {
+                        return ['A/L results: choose A, B, C, S, or W for every subject.'];
                     }
                 }
             }
-            if ($this->isNvqPathComplete($t)) {
+            if ($this->isNvqPathComplete($t, $level)) {
                 $yn = (int) $t('nvq_year_completed');
                 if ($t('nvq_year_completed') === '' || $yn < 1900 || $yn > 2100) {
                     return ['NVQ year finished must be between 1900 and 2100.'];
@@ -643,7 +671,7 @@ class StudentApplicationController extends Controller {
             if ($this->isOlPathComplete($t)) {
                 $fileFields[] = 'ol_certificate';
             }
-            if ($this->isNvqPathComplete($t)) {
+            if ($this->isNvqPathComplete($t, $level)) {
                 $fileFields[] = 'nvq_certificate';
             }
         }
@@ -687,6 +715,14 @@ class StudentApplicationController extends Controller {
     }
 
     /**
+     * School exam result for Level 05 O/L and A/L: A, B, C, S, or W only.
+     */
+    private function isValidOlExamResult(string $raw): bool {
+        $m = strtoupper(trim($raw));
+        return in_array($m, ['A', 'B', 'C', 'S', 'W'], true);
+    }
+
+    /**
      * O/L & A/L result: letter grade (A–F, S, W with optional +/−).
      */
     private function isValidExamResult(string $raw): bool {
@@ -698,6 +734,12 @@ class StudentApplicationController extends Controller {
             return true;
         }
         return false;
+    }
+
+    /** @return string|null Normalized O/L or Level 05 A/L grade (A–W only) for storage */
+    private function normalizedOlExamResult(string $raw): ?string {
+        $m = strtoupper(trim($raw));
+        return $this->isValidOlExamResult($raw) ? $m : null;
     }
 
     /** @return string|null Normalized value for storage */
@@ -749,6 +791,11 @@ class StudentApplicationController extends Controller {
             return $this->normalizedExamResult($v);
         };
 
+        $olExamResultOrNull = function (string $key) use ($p) {
+            $v = (string) $p($key, '');
+            return $this->normalizedOlExamResult($v);
+        };
+
         $data = [
             'application_level' => $level,
             'student_title' => $p('student_title') ?: null,
@@ -785,12 +832,12 @@ class StudentApplicationController extends Controller {
         for ($i = 1; $i <= 9; $i++) {
             $s = sprintf('%02d', $i);
             $data['ol_subject_name_' . $s] = $p('ol_subject_name_' . $s) ?: null;
-            $data['ol_subject_' . $s . '_marks'] = $examResultOrNull('ol_subject_' . $s . '_marks');
+            $data['ol_subject_' . $s . '_marks'] = $olExamResultOrNull('ol_subject_' . $s . '_marks');
         }
         for ($i = 1; $i <= 3; $i++) {
             $s = sprintf('%02d', $i);
             $data['al_subject_name_' . $s] = $p('al_subject_name_' . $s) ?: null;
-            $data['al_subject_' . $s . '_marks'] = $examResultOrNull('al_subject_' . $s . '_marks');
+            $data['al_subject_' . $s . '_marks'] = $olExamResultOrNull('al_subject_' . $s . '_marks');
         }
 
         $nullFiles = [
@@ -859,7 +906,7 @@ class StudentApplicationController extends Controller {
             if ($this->isOlPathComplete($t)) {
                 $map['ol_certificate'] = 'ol_certificate_path';
             }
-            if ($this->isNvqPathComplete($t)) {
+            if ($this->isNvqPathComplete($t, $level)) {
                 $map['nvq_certificate'] = 'nvq_certificate_path';
             }
         }

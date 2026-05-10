@@ -242,7 +242,7 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
                 </span>
                 <div>
                   <div class="l05-exam-title">G.C.E. Ordinary Level (O/L)</div>
-                  <p class="l05-exam-sub mb-0">Index, year, all nine subjects and results (A–F, S, W±), or leave the whole section blank if you apply with NVQ only.</p>
+                  <p class="l05-exam-sub mb-0">Index, year, main subjects (grades) and three basket subject choices, or leave the whole section blank if you apply with NVQ only.</p>
                 </div>
               </div>
               <div class="card-body pt-0">
@@ -258,7 +258,6 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
                   </div>
                 </div>
                 <div class="l05-section-label">Subjects &amp; results</div>
-                <p class="small text-muted mb-3">Slots 1–6: core subjects; slots 7–9: one per basket.</p>
                 <div class="row g-3">
                   <?php for ($i = 1; $i <= 9; $i++) : ?>
                   <?php
@@ -426,6 +425,31 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
 
   function $(id) { return document.getElementById(id); }
 
+  function l04EnsureSelectValue(selId, val) {
+    if (val == null) return;
+    var el = $(selId);
+    if (!el) return;
+    if (el.tagName === 'INPUT' && el.type === 'hidden') {
+      el.value = String(val).trim();
+      return;
+    }
+    if (el.tagName !== 'SELECT') return;
+    var s = String(val).trim();
+    if (s === '') return;
+    var i;
+    for (i = 0; i < el.options.length; i++) {
+      if (el.options[i].value === s) {
+        el.selectedIndex = i;
+        return;
+      }
+    }
+    var opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    el.appendChild(opt);
+    el.value = s;
+  }
+
   function inputVal(id) {
     var el = $(id);
     return el ? String(el.value || '').trim() : '';
@@ -502,6 +526,11 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
     var m = String(raw || '').trim();
     if (!m) return false;
     return /^[A-FSW][+-]?$/i.test(m);
+  }
+
+  function olResultOk(raw) {
+    var m = String(raw || '').trim().toUpperCase();
+    return m === 'A' || m === 'B' || m === 'C' || m === 'S' || m === 'W';
   }
 
   function lockNic() {
@@ -681,6 +710,13 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
       var fn = $('student_full_name');
       if (fn && String(fn.value || '').trim() === '(Pending)') fn.value = '';
     } catch (e1) {}
+    for (var oi = 1; oi <= 9; oi++) {
+      var os = (oi < 10 ? '0' : '') + oi;
+      var nameKey = 'ol_subject_name_' + os;
+      var markKey = 'ol_subject_' + os + '_marks';
+      if (data[nameKey] != null) l04EnsureSelectValue(nameKey, data[nameKey]);
+      if (data[markKey] != null) l04EnsureSelectValue(markKey, data[markKey]);
+    }
     $('application_id').value = data.application_id ? String(data.application_id) : '';
     clearFileHints();
     Object.keys(PATH_FIELD_TO_COL).forEach(function (field) {
@@ -790,8 +826,8 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
         for (var o2 = 1; o2 <= 9; o2++) {
           var os2 = (o2 < 10 ? '0' : '') + o2;
           var mel = $('ol_subject_' + os2 + '_marks');
-          if (!mel || !examResultOk(mel.value)) {
-            showAlert('O/L results: use a letter grade (A–F, S, W±) for every subject.');
+          if (!mel || !olResultOk(mel.value)) {
+            showAlert('O/L results: choose A, B, C, S, or W for every subject.');
             if (mel) markInvalid(mel, true);
             return false;
           }
@@ -899,7 +935,10 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
       if (/^(Choose|Loading|No departments)/i.test(tx)) return '';
       return tx;
     }
-    if (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type !== 'file' && el.type !== 'hidden')) {
+    if (el.tagName === 'INPUT' && el.type === 'hidden') {
+      return String(el.value || '').trim();
+    }
+    if (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type !== 'file')) {
       return String(el.value || '').trim();
     }
     return '';

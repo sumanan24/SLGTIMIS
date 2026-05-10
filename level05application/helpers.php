@@ -456,19 +456,27 @@ function l05_ol_complete(array $p): bool {
 }
 
 /**
- * True if any G.C.E. O/L field is non-empty (used to reject partial O/L).
+ * True if the applicant started the O/L block (used to reject partial O/L).
+ * Slots 1–6 always post a hidden fixed subject name — those must NOT count as “filled”.
  *
  * @param array<string, mixed> $p
  */
 function l05_ol_any_filled(array $p): bool {
-    $keys = ['ol_index_number', 'ol_exam_year'];
+    if (trim((string) ($p['ol_index_number'] ?? '')) !== '') {
+        return true;
+    }
+    if (trim((string) ($p['ol_exam_year'] ?? '')) !== '') {
+        return true;
+    }
     for ($i = 1; $i <= 9; $i++) {
         $s = sprintf('%02d', $i);
-        $keys[] = 'ol_subject_name_' . $s;
-        $keys[] = 'ol_subject_' . $s . '_marks';
+        if (trim((string) ($p['ol_subject_' . $s . '_marks'] ?? '')) !== '') {
+            return true;
+        }
     }
-    foreach ($keys as $k) {
-        if (trim((string) ($p[$k] ?? '')) !== '') {
+    for ($i = 7; $i <= 9; $i++) {
+        $s = sprintf('%02d', $i);
+        if (trim((string) ($p['ol_subject_name_' . $s] ?? '')) !== '') {
             return true;
         }
     }
@@ -532,7 +540,11 @@ function l05_nvq_any_filled(array $p): bool {
  * @param array<string, mixed> $p
  */
 function l05_nvq_complete(array $p): bool {
-    foreach (['nvq_level', 'nvq_course_name', 'nvq_institute_name', 'nvq_year_completed'] as $k) {
+    $lvl = trim((string) ($p['nvq_level'] ?? ''));
+    if ($lvl === '' || $lvl !== '4') {
+        return false;
+    }
+    foreach (['nvq_course_name', 'nvq_institute_name', 'nvq_year_completed'] as $k) {
         if (trim((string) ($p[$k] ?? '')) === '') {
             return false;
         }
@@ -557,7 +569,16 @@ function l05_phone_valid(string $raw): bool {
 }
 
 /**
- * O/L or A/L result: letter A–F/S/W ±.
+ * G.C.E. O/L and Level 05 A/L result: A, B, C, S, or W only.
+ */
+function l05_ol_marks_valid(string $raw): bool
+{
+    $m = strtoupper(trim($raw));
+    return in_array($m, ['A', 'B', 'C', 'S', 'W'], true);
+}
+
+/**
+ * G.C.E. A/L-style result: letter A–F/S/W ± (also used where full grade scale applies).
  */
 function l05_exam_result_valid(string $raw): bool {
     $m = trim($raw);
@@ -671,18 +692,27 @@ function l05_validate_application(array $p, array $files, bool $isUpdate, ?array
     $olOk = l05_ol_complete($p);
     $alOk = l05_al_complete($p);
     $nvqOk = l05_nvq_complete($p);
+    $olAny = l05_ol_any_filled($p);
     $alAny = l05_al_any_filled($p);
     $nvqAny = l05_nvq_any_filled($p);
 
-    // For Level 05: NVQ is sufficient (O/L can be empty/partial).
+    $nvqLvlRaw = trim((string) ($p['nvq_level'] ?? ''));
+    if ($nvqLvlRaw !== '' && $nvqLvlRaw !== '4') {
+        $errors[] = 'NVQ level must be NVQ Level 4 only, or None (empty).';
+    }
+
+    // For Level 05: full A/L alone satisfies school qualifications (NVQ not required). Partial O/L is only a problem if A/L is not complete.
+    if ($olAny && !$olOk && !$alOk) {
+        $errors[] = 'Either complete all G.C.E. O/L fields or clear index, year, results, and basket subjects if you use NVQ only.';
+    }
     if ($alAny && !$alOk) {
         $errors[] = 'Either complete all G.C.E. A/L fields or clear them if you use NVQ only.';
     }
     if ($nvqAny && !$nvqOk) {
-        $errors[] = 'Either complete all NVQ fields or clear them if you use A/L only.';
+        $errors[] = 'Either complete all NVQ fields or clear them if you declare school qualifications (complete G.C.E. A/L) instead.';
     }
-    if (!$nvqOk && !($olOk && $alOk)) {
-        $errors[] = 'Provide either full NVQ details, or complete both O/L and A/L.';
+    if (!$nvqOk && !$alOk) {
+        $errors[] = 'Complete G.C.E. A/L in full, or provide full NVQ Level 4 details (course, institute, year). NVQ is not required when A/L is complete.';
     }
 
     // Only validate O/L details when applicant completes the entire O/L block (optional).
@@ -693,8 +723,8 @@ function l05_validate_application(array $p, array $files, bool $isUpdate, ?array
         }
         for ($i = 1; $i <= 9; $i++) {
             $s = sprintf('%02d', $i);
-            if (!l05_exam_result_valid((string) ($p['ol_subject_' . $s . '_marks'] ?? ''))) {
-                $errors[] = 'O/L results must be valid letter grades (A–F, S, W±) for every subject.';
+            if (!l05_ol_marks_valid((string) ($p['ol_subject_' . $s . '_marks'] ?? ''))) {
+                $errors[] = 'O/L results must be A, B, C, S, or W for every subject.';
                 break;
             }
         }
@@ -707,8 +737,8 @@ function l05_validate_application(array $p, array $files, bool $isUpdate, ?array
         }
         for ($i = 1; $i <= 3; $i++) {
             $s = sprintf('%02d', $i);
-            if (!l05_exam_result_valid((string) ($p['al_subject_' . $s . '_marks'] ?? ''))) {
-                $errors[] = 'A/L results must be valid letter grades (A–F, S, W±) for every subject.';
+            if (!l05_ol_marks_valid((string) ($p['al_subject_' . $s . '_marks'] ?? ''))) {
+                $errors[] = 'A/L results must be A, B, C, S, or W for every subject.';
                 break;
             }
         }
@@ -815,12 +845,12 @@ function l05_post_to_row(array $p, array $paths): array {
     for ($i = 1; $i <= 9; $i++) {
         $s = sprintf('%02d', $i);
         $row['ol_subject_name_' . $s] = trim((string) ($p['ol_subject_name_' . $s] ?? '')) ?: null;
-        $row['ol_subject_' . $s . '_marks'] = l05_normalize_exam_result((string) ($p['ol_subject_' . $s . '_marks'] ?? ''));
+        $row['ol_subject_' . $s . '_marks'] = l05_normalize_ol_exam_result((string) ($p['ol_subject_' . $s . '_marks'] ?? ''));
     }
     for ($i = 1; $i <= 3; $i++) {
         $s = sprintf('%02d', $i);
         $row['al_subject_name_' . $s] = trim((string) ($p['al_subject_name_' . $s] ?? '')) ?: null;
-        $row['al_subject_' . $s . '_marks'] = l05_normalize_exam_result((string) ($p['al_subject_' . $s . '_marks'] ?? ''));
+        $row['al_subject_' . $s . '_marks'] = l05_normalize_ol_exam_result((string) ($p['al_subject_' . $s . '_marks'] ?? ''));
     }
 
     foreach (L05_FILE_FIELDS as $fileKey => $dbCol) {
@@ -840,6 +870,18 @@ function l05_year_or_null(string $raw): ?string {
         return null;
     }
     return (string) $y;
+}
+
+function l05_normalize_ol_exam_result(string $raw): ?string
+{
+    $raw = trim($raw);
+    if ($raw === '') {
+        return null;
+    }
+    if (l05_ol_marks_valid($raw)) {
+        return strtoupper($raw);
+    }
+    return null;
 }
 
 function l05_normalize_exam_result(string $raw): ?string {
