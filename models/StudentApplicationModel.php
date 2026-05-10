@@ -52,14 +52,44 @@ class StudentApplicationModel extends Model {
     }
 
     /**
-     * True once the applicant has started the form beyond the NIC-only draft (visible to SAO lists).
-     * ADM / system admin may still open drafts via direct URL.
+     * True once the applicant has started the form beyond the NIC-only draft.
+     * SAO/RSA lists also require NIC copy and birth certificate uploads ({@see self::hasNicAndBirthCertificateUploaded}).
+     * ADM / system admin may still open any row via direct URL.
      *
      * @param array<string, mixed> $app Row from `student_applications`
      */
     public static function isSubmittedForStaffReview(array $app): bool {
         $name = trim((string) ($app['student_full_name'] ?? ''));
         return $name !== '' && $name !== self::DRAFT_FULL_NAME_PLACEHOLDER;
+    }
+
+    /**
+     * Both required identity documents uploaded (staff list uses the same rule for SAO/RSA).
+     *
+     * @param array<string, mixed> $app Row from `student_applications`
+     */
+    public static function hasNicAndBirthCertificateUploaded(array $app): bool {
+        $nic = trim((string) ($app['nic_document_path'] ?? ''));
+        $birth = trim((string) ($app['birth_certificate_path'] ?? ''));
+        return $nic !== '' && $birth !== '';
+    }
+
+    /**
+     * SQL predicate: not NIC-only draft and both `nic_document_path` / `birth_certificate_path` non-empty.
+     *
+     * @param string|null $tableAlias `sa` or null for bare column names (no alias)
+     */
+    private static function sqlStaffAffairsListPredicate(?string $tableAlias): string {
+        $col = static function (string $name) use ($tableAlias): string {
+            if ($tableAlias === null || $tableAlias === '') {
+                return '`' . $name . '`';
+            }
+            return '`' . $tableAlias . '`.`' . $name . '`';
+        };
+        $ph = addslashes(self::DRAFT_FULL_NAME_PLACEHOLDER);
+        return 'TRIM(' . $col('student_full_name') . ") <> '' AND " . $col('student_full_name') . " <> '{$ph}'"
+            . ' AND TRIM(IFNULL(' . $col('nic_document_path') . ", '')) <> ''"
+            . ' AND TRIM(IFNULL(' . $col('birth_certificate_path') . ", '')) <> ''";
     }
 
     /**
@@ -273,7 +303,7 @@ class StudentApplicationModel extends Model {
             $params[] = $p;
         }
         if ($onlySubmittedForStaff) {
-            $sql .= ' AND TRIM(`sa`.`student_full_name`) <> \'\' AND `sa`.`student_full_name` <> \'' . addslashes(self::DRAFT_FULL_NAME_PLACEHOLDER) . '\'';
+            $sql .= ' AND (' . self::sqlStaffAffairsListPredicate('sa') . ')';
         }
         $stmt = $this->db->prepare($sql);
         if (!$stmt) {
@@ -323,7 +353,7 @@ class StudentApplicationModel extends Model {
             $params[] = $p;
         }
         if ($onlySubmittedForStaff) {
-            $sql .= ' AND TRIM(`sa`.`student_full_name`) <> \'\' AND `sa`.`student_full_name` <> \'' . addslashes(self::DRAFT_FULL_NAME_PLACEHOLDER) . '\'';
+            $sql .= ' AND (' . self::sqlStaffAffairsListPredicate('sa') . ')';
         }
         $sql .= ' ORDER BY `sa`.`created_at` DESC LIMIT ? OFFSET ?';
         $types .= 'ii';
@@ -734,7 +764,7 @@ class StudentApplicationModel extends Model {
             $filterParams[] = $ep;
         }
         if ($onlySubmittedForStaff) {
-            $filterTail .= ' AND TRIM(sa.`student_full_name`) <> \'\' AND sa.`student_full_name` <> \'' . addslashes(self::DRAFT_FULL_NAME_PLACEHOLDER) . '\'';
+            $filterTail .= ' AND (' . self::sqlStaffAffairsListPredicate('sa') . ')';
         }
         $filtered = ($levelPart !== '' || $existsPart['sql'] !== '');
 
@@ -763,10 +793,10 @@ class StudentApplicationModel extends Model {
 
         if (!$filtered) {
             $dw = $onlySubmittedForStaff
-                ? ' WHERE TRIM(`student_full_name`) <> \'\' AND `student_full_name` <> \'' . addslashes(self::DRAFT_FULL_NAME_PLACEHOLDER) . '\''
+                ? ' WHERE (' . self::sqlStaffAffairsListPredicate(null) . ')'
                 : '';
             $dwSa = $onlySubmittedForStaff
-                ? ' WHERE TRIM(sa.`student_full_name`) <> \'\' AND sa.`student_full_name` <> \'' . addslashes(self::DRAFT_FULL_NAME_PLACEHOLDER) . '\''
+                ? ' WHERE (' . self::sqlStaffAffairsListPredicate('sa') . ')'
                 : '';
             $res = $this->db->query("SELECT COUNT(*) AS `c` FROM `{$t}`{$dw}");
             if ($res && $row = $res->fetch_assoc()) {
@@ -980,7 +1010,7 @@ class StudentApplicationModel extends Model {
             $params[] = $ep;
         }
         if ($onlySubmittedForStaff) {
-            $sql .= ' AND TRIM(sa.`student_full_name`) <> \'\' AND sa.`student_full_name` <> \'' . addslashes(self::DRAFT_FULL_NAME_PLACEHOLDER) . '\'';
+            $sql .= ' AND (' . self::sqlStaffAffairsListPredicate('sa') . ')';
         }
         $sql .= ' ORDER BY sa.`created_at` DESC';
 

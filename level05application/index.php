@@ -142,6 +142,18 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
                         <div class="wiz-pane show" data-step="1">
                             <h2 class="h5 mb-3">Step 1</h2>
                             <p class="text-muted small">Enter your National Identity Card number and click <strong>Next</strong>. If you already applied, your details will load so you can review or edit and submit again.</p>
+                            <div class="alert alert-info border border-info border-opacity-25 small mb-3 text-start" role="note">
+                                <p class="mb-2 fw-semibold text-dark"><i class="fas fa-circle-info text-info me-1" aria-hidden="true"></i>Documents and payment (read before you continue)</p>
+                                <p class="mb-2 mb-md-3">The duly filled application form should be submitted together with the <strong>original bank slip / bank deposit slip</strong> of <strong>Rs.&nbsp;1,000/-</strong>, paid to <strong>Account No:&nbsp;048-1-001-8-0086726</strong> at any branch of People&rsquo;s Bank, in favour of <strong>SLGTI, Ariviyal Nagar, Kilinochchi, Sri Lanka</strong>.</p>
+                                <p class="mb-1 fw-semibold text-dark">Applicants must attach scanned copies or screenshots of:</p>
+                                <ul class="mb-0 ps-3">
+                                    <li>Bank slip / deposit slip</li>
+                                    <li>NIC</li>
+                                    <li>Birth certificate</li>
+                                    <li>G.C.E. O/L certificate</li>
+                                    <li>G.C.E. A/L certificate <span class="text-muted">or</span> NVQ Level 04 certificate</li>
+                                </ul>
+                            </div>
                             <div class="row g-3">
                                 <div class="col-12 col-md-8">
                                     <label for="student_nic" class="form-label">NIC <span class="text-danger">*</span></label>
@@ -477,7 +489,7 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
                             <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
                                 <div>
                                     <h2 class="h5 mb-1">Step 8 — Review</h2>
-                                    <p class="text-muted small mb-0">Use <strong>Previous</strong> to edit. Submit sends your application to the server.</p>
+                                    <p class="text-muted small mb-0" id="reviewStepHint">Use <strong>Previous</strong> to edit. Submit sends your application to the server.</p>
                                 </div>
                                 <button type="button" class="btn btn-outline-primary btn-sm flex-shrink-0" id="btnDownloadApplicationPdfReview" title="Download a formatted PDF summary of the form">
                                     <i class="fas fa-file-pdf me-1"></i> Download application (PDF)
@@ -553,6 +565,15 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
     nvq_certificate: 'NVQ certificate',
     bank_receipt: 'Bank receipt'
   };
+
+  /** Required uploads for a “submitted” application — if all present, returning user goes to read-only review + PDF only. */
+  var L05_REQUIRED_DOC_DB_COLS = ['nic_document_path', 'birth_certificate_path', 'bank_receipt_path'];
+  function l05RequiredDocumentsOnFile(data) {
+    if (!data || typeof data !== 'object') return false;
+    return L05_REQUIRED_DOC_DB_COLS.every(function (k) {
+      return data[k] != null && String(data[k]).trim() !== '';
+    });
+  }
 
   function $(id) { return document.getElementById(id); }
 
@@ -1182,26 +1203,24 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
       bar.innerHTML = '';
       return;
     }
-    // Read-only / submitted: do not show "continue" or "edit" hints (user request).
     if (l05ReviewOnlyMode) {
       bar.classList.add('d-none');
       bar.innerHTML = '';
       return;
     }
-    bar.classList.remove('d-none', 'alert-info', 'alert-warning', 'alert-secondary');
+    // Do not show a banner for returning applicants (existing NIC); only for brand-new drafts after NIC is saved.
     if (recordFromDb) {
-      bar.classList.add('alert-warning');
-      bar.innerHTML =
-        '<i class="fas fa-rotate me-2"></i><strong>Continue your application.</strong> This NIC already has a Level 05 record. '
-        + 'Change fields as needed, then use <strong>Next</strong> until you submit.';
-    } else {
-      bar.classList.add('alert-info');
-      bar.innerHTML =
-        '<i class="fas fa-user-plus me-2"></i><strong>New application.</strong> Your NIC is saved. Complete all steps and upload every document before submitting.';
+      bar.classList.add('d-none');
+      bar.innerHTML = '';
+      return;
     }
+    bar.classList.remove('d-none', 'alert-info', 'alert-warning', 'alert-secondary');
+    bar.classList.add('alert-info');
+    bar.innerHTML =
+      '<i class="fas fa-user-plus me-2"></i><strong>New application.</strong> Your NIC is saved. Complete all steps and upload every document before submitting.';
   }
 
-  // When an existing record loads without completed uploads, fields stay editable until submit.
+  // Existing records stay editable until a successful final submit (server success handler then locks the UI).
   var l05EditEnabled = true;
   function setFormEditable(editable) {
     l05EditEnabled = !!editable;
@@ -1240,15 +1259,23 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
     currentStep = n;
     $('btnPrev').disabled = n === 1;
     $('btnNext').classList.toggle('d-none', n === totalSteps);
-    $('btnSubmit').classList.toggle('d-none', n !== totalSteps);
+    $('btnSubmit').classList.toggle('d-none', n !== totalSteps || l05ReviewOnlyMode);
     updatePills();
     hideAlert();
     syncNicContextBar();
     if (n === 7) syncDocUi();
-    if (n === totalSteps) buildReview();
+    if (n === totalSteps) {
+      buildReview();
+      var hint = $('reviewStepHint');
+      if (hint) {
+        hint.innerHTML = l05ReviewOnlyMode
+          ? 'Your <strong>required documents</strong> are already on file. Download a PDF below for your records. To change your application, contact SLGTI.'
+          : 'Use <strong>Previous</strong> to edit. Submit sends your application to the server.';
+      }
+    }
   }
 
-  // When an application already exists and looks fully submitted, show review-only mode.
+  // When required documents are on file, show review + PDF only (no edit / no submit).
   function setReviewOnlyMode(on) {
     l05ReviewOnlyMode = !!on;
     var pills = $('stepPills');
@@ -1258,7 +1285,10 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
     if (pills) pills.classList.toggle('d-none', !!on);
     if (bn) bn.classList.toggle('d-none', !!on);
     if (bp) bp.classList.toggle('d-none', !!on);
-    if (bs) bs.classList.add('d-none');
+    if (bs) {
+      if (on) bs.classList.add('d-none');
+      else bs.classList.toggle('d-none', currentStep !== totalSteps);
+    }
   }
 
   function syncDocUi() {
@@ -1707,13 +1737,11 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
               applyPrefill(j.data);
               nicChecked = true;
               lockNic();
-              // If documents are already uploaded, treat it as a submitted application:
-              // jump straight to Review (Step 8) and hide the rest.
-              if (hadUploadedDocs) {
+              if (l05RequiredDocumentsOnFile(j.data)) {
                 setFormEditable(false);
-                showStep(totalSteps);
                 setReviewOnlyMode(true);
-                showAlert('This NIC already has a submitted Level 05 application. You can download the PDF from Review.', 'info');
+                showStep(totalSteps);
+                showAlert('Your application and documents are on file. Review below and download your PDF.', 'info');
               } else {
                 setReviewOnlyMode(false);
                 setFormEditable(true);

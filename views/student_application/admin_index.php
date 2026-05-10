@@ -213,21 +213,31 @@ $renderAppTable = static function (
                     <td><?php echo $esc((string) ($r['student_phone'] ?? '')); ?></td>
                     <td data-order="<?php echo $submitted['order']; ?>"><?php echo $submitted['display']; ?></td>
                     <td>
-                        <div class="d-flex flex-wrap gap-2 justify-content-end">
-                            <a class="btn btn-sm btn-outline-primary" href="<?php echo $viewUrl($id); ?>">View</a>
+                        <?php if ($can_delete): ?>
+                        <form id="sa-app-del-<?php echo $id; ?>" method="post" action="<?php echo $deleteAction; ?>" class="d-none"
+                              onsubmit="return confirm('Delete application #<?php echo $id; ?>? This will also remove uploaded documents on the server.');">
+                            <input type="hidden" name="application_id" value="<?php echo $id; ?>">
+                        </form>
+                        <?php endif; ?>
+                        <div class="btn-group btn-group-sm sa-apps-table-actions" role="group" aria-label="Application #<?php echo $id; ?> actions">
+                            <a class="btn btn-outline-primary" href="<?php echo $viewUrl($id); ?>"
+                               title="View application">
+                                <i class="fas fa-eye" aria-hidden="true"></i>
+                                <span class="visually-hidden"> View</span>
+                            </a>
                             <?php if ($waDigits !== null): ?>
-                            <a class="btn btn-sm btn-wa-outline" href="<?php echo $esc('https://wa.me/' . $waDigits); ?>"
+                            <a class="btn btn-wa-outline" href="<?php echo $esc('https://wa.me/' . $waDigits); ?>"
                                target="_blank" rel="noopener noreferrer"
                                title="WhatsApp <?php echo $esc($waDigits); ?>">
                                 <i class="fab fa-whatsapp" aria-hidden="true"></i>
+                                <span class="visually-hidden"> WhatsApp</span>
                             </a>
                             <?php endif; ?>
                             <?php if ($can_delete): ?>
-                            <form method="post" action="<?php echo $deleteAction; ?>" class="d-inline"
-                                  onsubmit="return confirm('Delete application #<?php echo $id; ?>? This will also remove uploaded documents on the server.');">
-                                <input type="hidden" name="application_id" value="<?php echo $id; ?>">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                            </form>
+                            <button type="submit" form="sa-app-del-<?php echo $id; ?>" class="btn btn-outline-danger" title="Delete application">
+                                <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                                <span class="visually-hidden"> Delete</span>
+                            </button>
                             <?php endif; ?>
                         </div>
                     </td>
@@ -240,7 +250,7 @@ $renderAppTable = static function (
     <?php
 };
 ?>
-<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=12">
+<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=13">
 <div class="sa-admin-page sa-student-apps-index container-fluid py-3 px-lg-4">
     <header class="sa-apps-page-header mb-4 pb-2 border-bottom">
         <h1 class="h4 mb-0 fw-semibold text-dark"><i class="fas fa-file-alt me-2 text-primary" aria-hidden="true"></i>Online applications</h1>

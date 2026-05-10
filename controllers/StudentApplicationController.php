@@ -33,7 +33,7 @@ class StudentApplicationController extends Controller {
     ];
 
     /**
-     * SAO/RSA without ADM / system admin: hide NIC-only draft rows (placeholder full name) from lists and exports.
+     * SAO/RSA without ADM / system admin: lists/exports omit NIC-only drafts and rows missing NIC copy or birth certificate; ADM and system admin see everything.
      */
     private function staffStudentAppsExcludeNicDrafts(UserModel $userModel, int $uid): bool {
         return $userModel->isSAO($uid) && !$userModel->isAdminOrADM($uid);
@@ -49,11 +49,14 @@ class StudentApplicationController extends Controller {
         if (!$this->staffStudentAppsExcludeNicDrafts($userModel, $uid)) {
             return;
         }
-        if (StudentApplicationModel::isSubmittedForStaffReview($app)) {
-            return;
+        if (!StudentApplicationModel::isSubmittedForStaffReview($app)) {
+            $_SESSION['error'] = 'This registration is still incomplete (NIC-only draft). Student Affairs staff only see submitted applications with both the NIC copy and birth certificate uploaded. Administrators (ADM) can open all records.';
+            $this->redirect('student-applications');
         }
-        $_SESSION['error'] = 'This registration is still incomplete (NIC-only draft). Student Affairs staff only see submitted applications. Administrators (ADM) can open all records.';
-        $this->redirect('student-applications');
+        if (!StudentApplicationModel::hasNicAndBirthCertificateUploaded($app)) {
+            $_SESSION['error'] = 'This application is missing the NIC copy and/or birth certificate upload. Student Affairs staff only see applications with both documents present. Administrators (ADM) can open all records.';
+            $this->redirect('student-applications');
+        }
     }
 
     /**
@@ -170,11 +173,37 @@ class StudentApplicationController extends Controller {
             return $this->processSubmit($level);
         }
         $flash = null;
-        if ($this->get('submitted') === '1' && !empty($_SESSION['flash_student_application_ok'])) {
-            $flash = $_SESSION['flash_student_application_ok'];
-            unset($_SESSION['flash_student_application_ok']);
+        $old = [];
+        $readonlyAfterSubmit = false;
+        if ($this->get('submitted') === '1') {
+            if (!empty($_SESSION['flash_student_application_ok'])) {
+                $flash = $_SESSION['flash_student_application_ok'];
+                unset($_SESSION['flash_student_application_ok']);
+            }
+            if (!empty($_SESSION['flash_student_application_resume']) && is_array($_SESSION['flash_student_application_resume'])) {
+                $resume = $_SESSION['flash_student_application_resume'];
+                if (($resume['application_level'] ?? '') === $level) {
+                    unset($_SESSION['flash_student_application_resume']);
+                    if ($level === '04') {
+                        $model = $this->model('StudentApplicationModel');
+                        $aid = (int) ($resume['application_id'] ?? 0);
+                        $sessNic = $this->normalizeNic((string) ($resume['student_nic'] ?? ''));
+                        $row = $aid > 0 ? $model->findById($aid) : null;
+                        if (
+                            $row
+                            && trim((string) ($row['application_level'] ?? '')) === '04'
+                            && $this->normalizeNic((string) ($row['student_nic'] ?? '')) === $sessNic
+                        ) {
+                            $old = $this->studentApplicationRowForApiJson($model, $row);
+                            $old['application_workflow_status'] = strtolower(trim((string) ($row['status'] ?? '')));
+                            $readonlyAfterSubmit = true;
+                        }
+                    }
+                }
+            }
         }
-        return $this->renderForm($level, [], [], $flash);
+
+        return $this->renderForm($level, [], $old, $flash, $readonlyAfterSubmit);
     }
 
     /**
@@ -215,7 +244,10 @@ class StudentApplicationController extends Controller {
      * @param list<string> $errors
      * @param array<string, mixed> $old
      */
-    private function renderForm(string $level, array $errors, array $old, ?string $flashSuccess = null) {
+    /**
+     * @param bool $readonlyAfterSubmit Wizard-only: after POST submit redirect, reopen in review-only with PDF download.
+     */
+    private function renderForm(string $level, array $errors, array $old, ?string $flashSuccess = null, bool $readonlyAfterSubmit = false) {
         $title = $level === '04' ? 'Level 04 application' : 'Level 05 application';
         $view = $level === '04' ? 'student_application/form_wizard' : 'student_application/form';
         return $this->view($view, [
@@ -226,6 +258,7 @@ class StudentApplicationController extends Controller {
             'errors' => $errors,
             'old' => $old,
             'flash_success' => $flashSuccess,
+            'readonly_after_submit' => $readonlyAfterSubmit && $level === '04',
             'sl_provinces_districts' => $this->getProvinceDistrictMap(),
             'sl_district_postal_codes' => $this->getDistrictPostalMap(),
         ]);
@@ -329,6 +362,11 @@ class StudentApplicationController extends Controller {
         } else {
             $_SESSION['flash_student_application_ok'] = 'Thank you. We received your application. Your reference number is #' . $targetId . '.';
         }
+        $_SESSION['flash_student_application_resume'] = [
+            'application_id' => $targetId,
+            'student_nic' => $nic,
+            'application_level' => $level,
+        ];
         header('Location: ' . rtrim(APP_URL, '/') . '/level' . $level . 'application?submitted=1', true, 303);
         exit;
     }
@@ -892,6 +930,59 @@ class StudentApplicationController extends Controller {
     }
 
     /**
+     * Wizard progress autosave (Level 04): keep DB values when the client sends empty placeholders for untouched steps.
+     *
+     * @param array<string, string|null> $newRow From {@see buildRowFromPost()} with forUpdate=true
+     * @param array<string, mixed> $existing DB row before update
+     * @return array<string, string|null>
+     */
+    private function mergeProgressRowWithExisting(array $newRow, array $existing): array {
+        foreach ($newRow as $k => $v) {
+            if ($k === 'student_nic') {
+                continue;
+            }
+            if ($v !== null && (!is_string($v) || trim($v) !== '')) {
+                continue;
+            }
+            if (!array_key_exists($k, $existing)) {
+                continue;
+            }
+            $ev = $existing[$k];
+            if ($ev === null) {
+                continue;
+            }
+            if (is_string($ev) && trim($ev) === '') {
+                continue;
+            }
+            $newRow[$k] = is_scalar($ev) ? (string) $ev : $ev;
+        }
+
+        return $newRow;
+    }
+
+    /**
+     * Optional multipart uploads during wizard progress — only columns with a successful new file are returned.
+     *
+     * @return array<string, string> DB column => relative stored path
+     */
+    private function collectOptionalProgressUploads(int $applicationId, string $nic): array {
+        $fields = ['nic_document', 'birth_certificate', 'ol_certificate', 'nvq_certificate', 'bank_receipt'];
+        $out = [];
+        foreach ($fields as $fk) {
+            $col = $this->studentApplicationUploadColumnForField($fk);
+            if ($col === null || !$this->isSuccessfulClientUpload($fk)) {
+                continue;
+            }
+            $path = $this->handleUpload($fk, $applicationId, $fk, $nic);
+            if ($path !== null) {
+                $out[$col] = $path;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Flatten application row for JSON (wizard NIC check / prefill).
      *
      * @param array<string, mixed> $row
@@ -1261,6 +1352,191 @@ class StudentApplicationController extends Controller {
             exit;
         }
         echo json_encode(['status' => 'new']);
+        exit;
+    }
+
+    /**
+     * Level 04 portal wizard: create a minimal row after NIC check (NIC + placeholder name) so Later steps use UPDATE only.
+     * POST fields: csrf_token, student_nic, application_level (must be "04").
+     */
+    public function apiInsertDraft(): void {
+        header('Content-Type: application/json; charset=utf-8');
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'message' => 'Use POST.']);
+            exit;
+        }
+        $token = trim((string) ($_POST['csrf_token'] ?? ''));
+        if (!$this->verifyStudentApplicationCsrfToken($token)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'This page is out of date. Refresh and try again.']);
+            exit;
+        }
+        $level = trim((string) ($_POST['application_level'] ?? ''));
+        if ($level !== '04') {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'Draft registration is only for Level 04.']);
+            exit;
+        }
+        $nic = $this->normalizeNic((string) ($_POST['student_nic'] ?? ''));
+        if (!$this->isValidNic($nic)) {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'Enter a valid NIC.']);
+            exit;
+        }
+
+        try {
+            $model = $this->model('StudentApplicationModel');
+            $blockMsg = $this->studentApplicationNicBlockedByOtherLevel($model, $nic, $level);
+            if ($blockMsg !== null) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'message' => $blockMsg]);
+                exit;
+            }
+            $existing = $model->findByNicAndLevel($nic, $level);
+        } catch (Throwable $e) {
+            error_log('apiInsertDraft: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Could not register your NIC.']);
+            exit;
+        }
+        if ($existing) {
+            echo json_encode(['success' => true, 'application_id' => (int) ($existing['application_id'] ?? 0), 'already_existed' => true], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $data = [
+            'application_level' => $level,
+            'student_nic' => $nic,
+            'student_full_name' => StudentApplicationModel::DRAFT_FULL_NAME_PLACEHOLDER,
+            'status' => 'new',
+        ];
+        $sqlErr = null;
+        $newId = $model->insertApplication($data, $sqlErr);
+        if ($newId !== false) {
+            echo json_encode(['success' => true, 'application_id' => (int) $newId, 'already_existed' => false], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if ($sqlErr !== null && stripos($sqlErr, 'Duplicate') !== false) {
+            try {
+                $again = $model->findByNicAndLevel($nic, $level);
+                if ($again) {
+                    echo json_encode(['success' => true, 'application_id' => (int) ($again['application_id'] ?? 0), 'already_existed' => true], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            } catch (Throwable $e2) {
+            }
+        }
+        http_response_code(500);
+        if ($sqlErr) {
+            error_log('apiInsertDraft insert: ' . $sqlErr);
+        }
+        echo json_encode(['success' => false, 'message' => 'Could not save your NIC. Try again or contact the institute.']);
+        exit;
+    }
+
+    /**
+     * Level 04 portal wizard: merge POST into the saved row between steps (no full validation).
+     * POST multipart: same fields as the main form; empty file inputs are omitted before send from the browser.
+     */
+    public function apiSaveProgress(): void {
+        header('Content-Type: application/json; charset=utf-8');
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'message' => 'Use POST.']);
+            exit;
+        }
+        $token = trim((string) ($_POST['csrf_token'] ?? ''));
+        if (!$this->verifyStudentApplicationCsrfToken($token)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'This page is out of date. Refresh and try again.']);
+            exit;
+        }
+        $level = trim((string) ($_POST['application_level'] ?? ''));
+        if ($level !== '04') {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'Autosave applies to Level 04 only.']);
+            exit;
+        }
+        $appId = (int) ($_POST['application_id'] ?? 0);
+        $nic = $this->normalizeNic((string) ($_POST['student_nic'] ?? ''));
+        if ($appId < 1 || !$this->isValidNic($nic)) {
+            http_response_code(422);
+            $hint = ($_POST === [] || ($_POST !== [] && $appId < 1))
+                ? ' If uploads are large, use smaller files (max 5 MB each).' : '';
+            echo json_encode(['success' => false, 'message' => 'Invalid reference. Return to Step 1 and confirm your NIC.' . $hint]);
+            exit;
+        }
+
+        try {
+            $model = $this->model('StudentApplicationModel');
+            $existing = $model->findById($appId);
+        } catch (Throwable $e) {
+            error_log('apiSaveProgress find: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Could not save.']);
+            exit;
+        }
+        if (!$existing || trim((string) ($existing['application_level'] ?? '')) !== $level) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Application was not found.']);
+            exit;
+        }
+        if ($this->normalizeNic((string) ($existing['student_nic'] ?? '')) !== $nic) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'NIC does not match this application record.']);
+            exit;
+        }
+        try {
+            $blockMsg = $this->studentApplicationNicBlockedByOtherLevel($model, $nic, $level);
+            if ($blockMsg !== null) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'message' => $blockMsg]);
+                exit;
+            }
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Could not verify NIC.']);
+            exit;
+        }
+
+        $newRow = $this->buildRowFromPost($level, true);
+        $newRow = $this->mergeProgressRowWithExisting($newRow, $existing);
+
+        $sqlErr = null;
+        if (!$model->update($appId, $newRow, $sqlErr)) {
+            http_response_code(500);
+            if ($sqlErr) {
+                error_log('apiSaveProgress update: ' . $sqlErr);
+            }
+            $msg = 'Could not save your progress.';
+            if ($sqlErr !== null && (stripos($sqlErr, 'Duplicate') !== false || stripos($sqlErr, 'uq_') !== false)) {
+                $msg .= ' Another application may already use this email for Level 04.';
+            }
+            echo json_encode(['success' => false, 'message' => $msg]);
+            exit;
+        }
+
+        $pathsOut = [];
+        foreach (StudentApplicationModel::DOCUMENT_PATH_COLUMNS as $col) {
+            $pathsOut[$col] = isset($existing[$col]) ? (string) $existing[$col] : '';
+        }
+        try {
+            $uploaded = $this->collectOptionalProgressUploads($appId, $nic);
+            foreach ($uploaded as $col => $rel) {
+                $pathsOut[$col] = $rel;
+            }
+            if (!empty($uploaded)) {
+                $model->updateDocumentPaths($appId, $uploaded);
+            }
+        } catch (Throwable $e) {
+            error_log('apiSaveProgress upload: ' . $e->getMessage());
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Upload failed: ' . $e->getMessage()]);
+            exit;
+        }
+
+        echo json_encode(['success' => true, 'application_id' => $appId, 'paths' => $pathsOut], JSON_UNESCAPED_UNICODE);
         exit;
     }
 

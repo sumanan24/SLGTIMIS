@@ -137,6 +137,16 @@
     white-space: nowrap;
 }
 
+/* Icon-only row actions — single fused button group */
+.sa-admin-page .sa-apps-table .sa-apps-table-actions.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+    line-height: 1.25;
+}
+
+.sa-admin-page .sa-apps-table .sa-apps-table-actions.btn-group-sm > .btn i {
+    vertical-align: -0.05em;
+}
+
 /* DataTables + Bootstrap 5 */
 .sa-admin-page .dataTables_wrapper {
     width: 100%;

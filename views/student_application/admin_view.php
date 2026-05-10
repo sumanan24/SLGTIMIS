@@ -1,13 +1,16 @@
 <?php
 /** @var array<string, mixed> $app */
 $app = $app ?? [];
-/** @var bool $staff_exclude_incomplete_drafts SAO/RSA: NIC-only drafts excluded from lists (ADM sees all). */
+/** @var bool $staff_exclude_incomplete_drafts SAO/RSA: NIC-only drafts and rows without NIC+birth uploads excluded from lists (ADM / system admin see all). */
 $staff_exclude_incomplete_drafts = (bool) ($staff_exclude_incomplete_drafts ?? false);
 /** @var bool $can_delete */
 $can_delete = (bool) ($can_delete ?? false);
 
 if (!class_exists('StudentApplicationModel', false)) {
     require_once BASE_PATH . '/models/StudentApplicationModel.php';
+}
+if (!class_exists('StudentModel', false)) {
+    require_once BASE_PATH . '/models/StudentModel.php';
 }
 
 $esc = static function (string $s): string {
@@ -41,6 +44,7 @@ $docLabels = [
 $listUrl = rtrim(APP_URL, '/') . '/student-applications?tab=new';
 $appId = (int) ($app['application_id'] ?? 0);
 $appLevel = (string) ($app['application_level'] ?? '');
+$waDigits = StudentModel::digitsForWhatsAppMe($app);
 $_deleteAction = rtrim(APP_URL, '/') . '/student-applications/delete';
 $approveAction = rtrim(APP_URL, '/') . '/student-applications/approve';
 $rejectAction = rtrim(APP_URL, '/') . '/student-applications/reject';
@@ -89,8 +93,10 @@ $renderDocumentCell = static function (string $relativePath, string $title, call
         </div>
         <div class="sa-doc-actions">
             <?php if ($url): ?>
-            <a class="btn btn-sm btn-outline-primary" href="<?php echo $esc($url); ?>" target="_blank" rel="noopener">Open</a>
-            <a class="btn btn-sm btn-outline-success" href="<?php echo $esc($downloadHref); ?>">
+            <a class="btn btn-outline-primary btn-sm" href="<?php echo $esc($url); ?>" target="_blank" rel="noopener">
+                <i class="fas fa-external-link-alt me-1" aria-hidden="true"></i>Open
+            </a>
+            <a class="btn btn-outline-success btn-sm" href="<?php echo $esc($downloadHref); ?>">
                 <i class="fas fa-download me-1" aria-hidden="true"></i>Download
             </a>
             <?php else: ?>
@@ -102,58 +108,67 @@ $renderDocumentCell = static function (string $relativePath, string $title, call
 };
 
 $saAdminCss = htmlspecialchars(rtrim(APP_URL, '/') . '/assets/css/student-applications-admin.css', ENT_QUOTES, 'UTF-8');
-$exportDataUrl = rtrim(APP_URL, '/') . '/student-applications/export-data?id=' . $appId;
 $exportPdfUrl = rtrim(APP_URL, '/') . '/student-applications/export-pdf?id=' . $appId;
+$st = strtolower(trim((string) ($app['status'] ?? 'new')));
 ?>
-<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=6">
+<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=7">
 <div class="sa-admin-page sa-admin-view container-fluid py-3">
+    <form id="sa-view-form-approve" method="post" action="<?php echo $esc($approveAction); ?>" class="d-none" onsubmit="return confirm('Approve application #<?php echo $appId; ?>?');">
+        <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
+    </form>
+    <form id="sa-view-form-reject" method="post" action="<?php echo $esc($rejectAction); ?>" class="d-none" onsubmit="return confirm('Reject application #<?php echo $appId; ?>?');">
+        <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
+    </form>
+    <?php if ($can_delete): ?>
+    <form id="sa-view-form-delete" method="post" action="<?php echo $esc($_deleteAction); ?>" class="d-none" onsubmit="return confirm('Delete application #<?php echo $appId; ?>? This will also remove uploaded documents on the server.');">
+        <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
+    </form>
+    <?php endif; ?>
     <div class="sa-view-toolbar">
-        <a href="<?php echo $esc($listUrl); ?>" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>All applications</a>
-        <span class="badge <?php echo $staff_exclude_incomplete_drafts ? 'bg-secondary' : 'bg-info text-dark'; ?>"><?php echo $staff_exclude_incomplete_drafts ? 'Student Affairs' : 'Admin · all records'; ?></span>
+        <a href="<?php echo $esc($listUrl); ?>" class="btn btn-outline-secondary btn-sm" title="Back to all applications">
+            <i class="fas fa-arrow-left" aria-hidden="true"></i><span class="visually-hidden"> All applications</span>
+        </a>
+        <span class="badge <?php echo $staff_exclude_incomplete_drafts ? 'bg-secondary' : 'bg-info text-dark'; ?>"><?php echo $staff_exclude_incomplete_drafts ? 'Student Affairs · full docs only' : 'Admin · all records'; ?></span>
         <div class="sa-export-actions">
-            <a class="btn btn-success btn-sm" href="<?php echo $esc($exportDataUrl); ?>" title="CSV: all fields except document file paths">
-                <i class="fas fa-file-export me-1" aria-hidden="true"></i>Download application data
-            </a>
-            <a class="btn btn-outline-danger btn-sm" href="<?php echo $esc($exportPdfUrl); ?>" title="PDF: application fields (as CSV) plus merged uploaded documents">
-                <i class="fas fa-file-pdf me-1" aria-hidden="true"></i>Download PDF summary
-            </a>
-            <?php
-                $st = strtolower(trim((string) ($app['status'] ?? 'new')));
-            ?>
-            <?php if ($st === 'new'): ?>
-            <form method="post" action="<?php echo $esc($approveAction); ?>" class="d-inline"
-                  onsubmit="return confirm('Approve application #<?php echo $appId; ?>?');">
-                <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
-                <button type="submit" class="btn btn-primary btn-sm">
+            <div class="btn-group btn-group-sm" role="group" aria-label="Application actions">
+                <a class="btn btn-outline-danger" href="<?php echo $esc($exportPdfUrl); ?>" title="Download PDF summary (fields plus merged uploads)">
+                    <i class="fas fa-file-pdf" aria-hidden="true"></i><span class="visually-hidden"> Download PDF summary</span>
+                </a>
+                <?php if ($waDigits !== null): ?>
+                <a class="btn btn-wa-outline" href="<?php echo $esc('https://wa.me/' . $waDigits); ?>"
+                   target="_blank" rel="noopener noreferrer"
+                   title="WhatsApp <?php echo $esc($waDigits); ?>">
+                    <i class="fab fa-whatsapp" aria-hidden="true"></i><span class="visually-hidden"> WhatsApp applicant</span>
+                </a>
+                <?php endif; ?>
+                <?php if ($st === 'new'): ?>
+                <button type="submit" form="sa-view-form-approve" class="btn btn-primary" title="Approve application">
                     <i class="fas fa-check me-1" aria-hidden="true"></i>Approve
                 </button>
-            </form>
-            <form method="post" action="<?php echo $esc($rejectAction); ?>" class="d-inline"
-                  onsubmit="return confirm('Reject application #<?php echo $appId; ?>?');">
-                <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
-                <button type="submit" class="btn btn-outline-warning btn-sm">
+                <button type="submit" form="sa-view-form-reject" class="btn btn-outline-warning" title="Reject application">
                     <i class="fas fa-times me-1" aria-hidden="true"></i>Reject
                 </button>
-            </form>
-            <?php elseif ($st === 'approved'): ?>
+                <?php endif; ?>
+                <?php if ($can_delete): ?>
+                <button type="submit" form="sa-view-form-delete" class="btn btn-danger" title="Delete application">
+                    <i class="fas fa-trash-alt" aria-hidden="true"></i><span class="visually-hidden"> Delete</span>
+                </button>
+                <?php endif; ?>
+            </div>
+            <?php if ($st === 'approved'): ?>
             <span class="badge bg-success align-self-center">Approved</span>
             <?php elseif ($st === 'rejected'): ?>
             <span class="badge bg-danger align-self-center">Rejected</span>
-            <?php endif; ?>
-            <?php if ($can_delete): ?>
-            <form method="post" action="<?php echo $esc($_deleteAction); ?>" class="d-inline"
-                  onsubmit="return confirm('Delete application #<?php echo $appId; ?>? This will also remove uploaded documents on the server.');">
-                <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
-                <button type="submit" class="btn btn-danger btn-sm">
-                    <i class="fas fa-trash me-1" aria-hidden="true"></i>Delete
-                </button>
-            </form>
             <?php endif; ?>
         </div>
     </div>
     <?php if (StudentApplicationModel::isSubmittedForStaffReview($app) === false): ?>
     <div class="alert alert-warning py-2 px-3 mb-3 small" role="status">
-        <strong>Incomplete registration:</strong> applicant has not finished the online form beyond the NIC step (draft). Student Affairs staff do not see this row in the list; only Administrators (ADM) can open it here.
+        <strong>Incomplete registration:</strong> applicant has not finished the online form beyond the NIC step (draft). Student Affairs staff do not see this row in the list; Administrators (ADM) and system admins can open it here.
+    </div>
+    <?php elseif ($staff_exclude_incomplete_drafts === false && !StudentApplicationModel::hasNicAndBirthCertificateUploaded($app)): ?>
+    <div class="alert alert-warning py-2 px-3 mb-3 small" role="status">
+        <strong>Missing identity documents:</strong> NIC copy and/or birth certificate is not uploaded. Student Affairs staff do not see this application until both are present; Administrators (ADM) can review it anyway.
     </div>
     <?php endif; ?>
     <div class="sa-view-heading">

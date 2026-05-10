@@ -7,6 +7,7 @@
  * @var list<string> $errors
  * @var array<string, mixed> $old
  * @var string|null $flash_success
+ * @var bool $readonly_after_submit
  * @var array<string, list<string>> $sl_provinces_districts
  * @var array<string, string> $sl_district_postal_codes
  */
@@ -16,6 +17,7 @@ $old = $old ?? [];
 $sl_provinces_districts = $sl_provinces_districts ?? [];
 $sl_district_postal_codes = $sl_district_postal_codes ?? [];
 $errors = $errors ?? [];
+$readonly_after_submit = !empty($readonly_after_submit);
 
 $v = static function (string $key, string $default = '') use ($old): string {
     return htmlspecialchars((string) ($old[$key] ?? $default), ENT_QUOTES, 'UTF-8');
@@ -112,6 +114,17 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
           <div class="wiz-pane show" data-step="1">
             <h2 class="h5 mb-3">Step 1</h2>
             <p class="text-muted small">Enter your National Identity Card number and click <strong>Next</strong>. If you already started an application, your details will load &mdash; you can change answers until you submit. After a complete submission, the form is read-only (download your PDF from Review).</p>
+            <div class="alert alert-info border border-info border-opacity-25 small mb-3 text-start" role="note" aria-label="Documents and payment requirements">
+              <p class="mb-2 fw-semibold text-dark"><i class="fas fa-circle-info text-info me-1" aria-hidden="true"></i>Documents and payment</p>
+              <p class="mb-2 mb-md-3">The duly filled application form should be submitted together with the <strong>original bank slip / bank deposit slip</strong> of <strong>Rs.&nbsp;1,000/-</strong>, paid to <strong>Account No:&nbsp;048-1-001-8-0086726</strong> at any branch of People&rsquo;s Bank, in favour of <strong>SLGTI, Ariviyal Nagar, Kilinochchi, Sri Lanka</strong>.</p>
+              <p class="mb-1 fw-semibold text-dark">Applicants must attach scanned copies or screenshots of:</p>
+              <ul class="mb-0 ps-3">
+                <li>Bank slip / deposit slip</li>
+                <li>NIC</li>
+                <li>Birth certificate</li>
+                <li>G.C.E. O/L certificate <span class="text-muted">or</span> NVQ Level 03 certificate</li>
+              </ul>
+            </div>
             <div class="row g-3">
               <div class="col-12 col-md-8">
                 <label for="student_nic" class="form-label">NIC <?php echo $req; ?></label>
@@ -233,7 +246,7 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
           <!-- Step 4 O/L (Level 04 — A/L not collected on this form) -->
           <div class="wiz-pane" data-step="4">
             <h2 class="h5 mb-2">Step 4 — G.C.E. O/L</h2>
-            <p class="text-muted small mb-4"><strong>Level 04:</strong> You must complete <strong>either</strong> this O/L section <strong>or</strong> all NVQ fields in step 5 (you may do both). If you start O/L, fill every field in this section.</p>
+            <p class="text-muted small mb-4"><strong>Level 04:</strong> Complete <strong>either</strong> this O/L block <strong>or</strong> all NVQ fields in step 5 (you may do both). NVQ-only applicants may leave index, year, and all O/L results empty. If you enter index, year, or any result here, finish the whole section.</p>
 
             <div class="card l05-exam-card ol shadow-sm mb-0">
               <div class="card-header py-3 d-flex align-items-start gap-3">
@@ -275,7 +288,7 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
           <!-- Step 5 NVQ -->
           <div class="wiz-pane" data-step="5">
             <h2 class="h5 mb-3">Step 5 — NVQ</h2>
-            <p class="text-muted small">Fill this section only if you are applying with <strong>NVQ</strong> (required together with O/L if you did not complete O/L in step 4). If you completed O/L in step 4, you may leave all NVQ fields blank.</p>
+            <p class="text-muted small">Use this section if you apply with <strong>NVQ</strong> instead of full O/L in step 4. If step 4 is fully filled, NVQ may be left blank.</p>
             <div class="row g-3">
               <div class="col-md-3">
                 <label class="form-label" for="nvq_level">NVQ level</label>
@@ -395,6 +408,7 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
 window.APP_BASE = <?php echo json_encode(rtrim(APP_URL, '/'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.NVQ_COURSE_LEVEL = <?php echo json_encode(($application_level ?? '04') === '05' ? '5' : '4', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
 window.APP_FORM_OLD = <?php echo json_encode($old, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;
+window.L04_READONLY_AFTER_SUBMIT = <?php echo $readonly_after_submit ? 'true' : 'false'; ?>;
 window.SL_PROVINCE_DISTRICTS = <?php echo json_encode($sl_provinces_districts, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;
 window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;
 </script>
@@ -414,6 +428,7 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
   var hadUploadedDocs = false;
   var workflowStatus = '';
   var reviewOnlyMode = false;
+  var readonlyAfterSubmit = window.L04_READONLY_AFTER_SUBMIT === true;
   var apiBase = (typeof window.APP_BASE === 'string' ? window.APP_BASE : '').replace(/\/$/, '');
   var PATH_FIELD_TO_COL = {
     nic_document: 'nic_document_path',
@@ -422,6 +437,101 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
     nvq_certificate: 'nvq_certificate_path',
     bank_receipt: 'bank_receipt_path'
   };
+
+  function augmentL04FormData(fd) {
+    var id = getApplicationId();
+    var nicVal = normalizeNic(($('student_nic') && $('student_nic').value) || '');
+    try {
+      if (fd.delete) {
+        fd.delete('application_id');
+        fd.delete('student_nic');
+      }
+    } catch (e) {}
+    fd.append('application_id', String(id));
+    fd.append('student_nic', nicVal);
+  }
+
+  function applyPathHintsFromSave(j) {
+    if (!j || !j.paths) return;
+    var any = false;
+    Object.keys(PATH_FIELD_TO_COL).forEach(function (field) {
+      var pk = PATH_FIELD_TO_COL[field];
+      var pv = j.paths[pk];
+      if (pv && String(pv).trim() !== '') {
+        any = true;
+        var hint = document.querySelector('.existing-hint[data-path-key="' + pk + '"]');
+        if (hint) {
+          var parts = String(pv).split(/[/\\\\]/);
+          hint.textContent = 'Current file: ' + parts[parts.length - 1];
+        }
+      }
+    });
+    if (any) hadUploadedDocs = true;
+  }
+
+  var savingProgress = false;
+  function saveWizardProgress(done) {
+    var id = getApplicationId();
+    if (id < 1) {
+      if (typeof done === 'function') done(true);
+      return;
+    }
+    if (savingProgress) {
+      if (typeof done === 'function') done(false);
+      return;
+    }
+    savingProgress = true;
+    var bn = $('btnNext');
+    var bp = $('btnPrev');
+    var bs = $('btnSubmit');
+    if (bn) bn.disabled = true;
+    if (bp) bp.disabled = true;
+    if (bs) bs.disabled = true;
+    var fd = new FormData(form);
+    try {
+      Object.keys(PATH_FIELD_TO_COL).forEach(function (field) {
+        var inp = $(field);
+        if (!inp || !inp.files) return;
+        if (inp.files.length === 0) {
+          if (fd.delete) fd.delete(field);
+        }
+      });
+    } catch (e) {}
+    augmentL04FormData(fd);
+    fetch(apiBase + '/student-application/api/save-progress', { method: 'POST', body: fd })
+      .then(function (r) {
+        return r.text().then(function (t) {
+          var j = {};
+          try {
+            j = t ? JSON.parse(t) : {};
+          } catch (e) {
+            j = {};
+          }
+          return { ok: r.ok, j: j, raw: t };
+        });
+      })
+      .then(function (res) {
+        savingProgress = false;
+        if (bn) bn.disabled = false;
+        if (bp) bp.disabled = currentStep <= 1;
+        if (bs) bs.disabled = false;
+        if (!res.ok || !res.j.success) {
+          showAlert(res.j.message || 'Could not save progress. Check your connection and try again.');
+          if (typeof done === 'function') done(false);
+          return;
+        }
+        applyPathHintsFromSave(res.j);
+        if (typeof done === 'function') done(true);
+      })
+      .catch(function () {
+        savingProgress = false;
+        if (bn) bn.disabled = false;
+        if (bp) bp.disabled = currentStep <= 1;
+        if (bs) bs.disabled = false;
+        showAlert('Network error while saving.');
+        if (typeof done === 'function') done(false);
+      });
+  }
 
   function $(id) { return document.getElementById(id); }
 
@@ -464,10 +574,16 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
     return keys;
   }
 
+  /** True only if user started O/L intentionally — ignore preset hidden subject names for slots 1–6 (matches PHP isOlAnyFilled). */
   function olAnyFilled() {
-    var keys = olExamKeys();
-    for (var k = 0; k < keys.length; k++) {
-      if (inputVal(keys[k]) !== '') return true;
+    if (inputVal('ol_index_number') !== '' || inputVal('ol_exam_year') !== '') return true;
+    for (var mi = 1; mi <= 9; mi++) {
+      var sm = (mi < 10 ? '0' : '') + mi;
+      if (inputVal('ol_subject_' + sm + '_marks') !== '') return true;
+    }
+    for (var bi = 7; bi <= 9; bi++) {
+      var sb = (bi < 10 ? '0' : '') + bi;
+      if (inputVal('ol_subject_name_' + sb) !== '') return true;
     }
     return false;
   }
@@ -642,31 +758,15 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
       bar.innerHTML = '';
       return;
     }
-    bar.classList.remove('d-none', 'alert-info', 'alert-warning', 'alert-secondary', 'alert-success', 'alert-danger');
-    var st = workflowStatus;
-    var stLabel = st === 'approved' ? 'Approved' : (st === 'rejected' ? 'Rejected' : 'Pending review');
-    if (reviewOnlyMode) {
-      bar.classList.add('alert-secondary');
-      var aid = getApplicationId();
-      bar.innerHTML =
-        '<i class="fas fa-circle-check me-2"></i><strong>Application on file.</strong> Reference <strong>#'
-        + aid
-        + '</strong>'
-        + (st ? ' · Status: <strong>' + stLabel + '</strong>' : '')
-        + '. Download your <strong>PDF</strong> from the Review step. This page is read-only.';
+    if (reviewOnlyMode || recordFromDb) {
+      bar.classList.add('d-none');
+      bar.innerHTML = '';
       return;
     }
-    if (recordFromDb) {
-      bar.classList.add('alert-warning');
-      bar.innerHTML =
-        '<i class="fas fa-rotate me-2"></i><strong>Continue your application.</strong> This NIC already has a Level 04 record'
-        + (st ? ' (status: <strong>' + stLabel + '</strong>)' : '')
-        + '. Change fields as needed, then use <strong>Next</strong> until you submit. After submission, this page becomes read-only.';
-    } else {
-      bar.classList.add('alert-info');
-      bar.innerHTML =
-        '<i class="fas fa-user-plus me-2"></i><strong>New application.</strong> Your NIC is confirmed. Complete all steps, then submit.';
-    }
+    bar.classList.remove('d-none', 'alert-info', 'alert-warning', 'alert-secondary', 'alert-success', 'alert-danger');
+    bar.classList.add('alert-info');
+    bar.innerHTML =
+      '<i class="fas fa-user-plus me-2"></i><strong>New application.</strong> Your NIC is confirmed. Complete all steps, then submit.';
   }
 
   function applyPrefillFromServer(data) {
@@ -807,7 +907,7 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
     }
     if (step === 4) {
       if (olAnyFilled() && !olPathComplete()) {
-        showAlert('For O/L: fill every field in that section, or clear all O/L fields if you do not have O/L.');
+        showAlert('For O/L: fill every field in this section, or clear index, year, basket subject choices (7–9), and all marks if you apply with NVQ only.');
         return false;
       }
       if (olPathComplete()) {
@@ -1182,7 +1282,6 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
             showAlert(j.message || 'NIC check failed.');
             return;
           }
-          nicChecked = true;
           if (j.status === 'exists' && j.data) {
             recordFromDb = true;
             applyPrefillFromServer(j.data);
@@ -1190,12 +1289,12 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
               return j.data[c] && String(j.data[c]).trim() !== '';
             });
             lockNic();
+            nicChecked = true;
             if (isFullySubmittedLevel04Data(j.data)) {
               reviewOnlyMode = true;
               setReviewOnlyMode(true);
               setFormEditable(false);
               showStep(8);
-              showAlert('This NIC already has a submitted Level 04 application with all required documents. You can download a PDF copy from Review.', 'info');
             } else {
               reviewOnlyMode = false;
               setReviewOnlyMode(false);
@@ -1208,11 +1307,38 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
             setReviewOnlyMode(false);
             hadUploadedDocs = false;
             workflowStatus = '';
-            $('application_id').value = '';
             clearFileHints();
             lockNic();
             setFormEditable(true);
-            showStep(2);
+            var fdDraft = new FormData();
+            var csrfEl = form.elements.namedItem('csrf_token');
+            fdDraft.append('csrf_token', csrfEl && csrfEl.value ? csrfEl.value : '');
+            fdDraft.append('student_nic', nic);
+            fdDraft.append('application_level', '04');
+            fetch(apiBase + '/student-application/api/insert-draft', { method: 'POST', body: fdDraft })
+              .then(function (r2) {
+                return r2.text().then(function (t2) {
+                  var j2 = {};
+                  try {
+                    j2 = t2 ? JSON.parse(t2) : {};
+                  } catch (e2) {
+                    j2 = {};
+                  }
+                  return { ok: r2.ok, j: j2 };
+                });
+              })
+              .then(function (res2) {
+                if (!res2.ok || !res2.j.success) {
+                  showAlert(res2.j.message || 'Could not save your NIC on the server. Try again.');
+                  return;
+                }
+                $('application_id').value = String(res2.j.application_id);
+                nicChecked = true;
+                showStep(2);
+              })
+              .catch(function () {
+                showAlert('Could not reach the server to start your application.');
+              });
           }
         })
         .catch(function () {
@@ -1222,12 +1348,28 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
     }
     if (!validateStep(currentStep)) return;
     if (reviewOnlyMode) return;
-    if (currentStep < totalSteps) showStep(currentStep + 1);
+    if (currentStep < totalSteps) {
+      var nextStep = currentStep + 1;
+      if (currentStep >= 2 && getApplicationId() >= 1) {
+        saveWizardProgress(function (ok) {
+          if (ok) showStep(nextStep);
+        });
+      } else {
+        showStep(nextStep);
+      }
+    }
   });
   $('btnPrev').addEventListener('click', function () {
     if (reviewOnlyMode) return;
     if (currentStep <= 1) return;
-    showStep(currentStep - 1);
+    var prevStep = currentStep - 1;
+    if (getApplicationId() >= 1 && currentStep >= 2) {
+      saveWizardProgress(function (ok) {
+        if (ok) showStep(prevStep);
+      });
+    } else {
+      showStep(prevStep);
+    }
   });
 
   if (form) {
@@ -1252,6 +1394,16 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
       setFormEditable(true);
     }
     showStep(2);
+  } else if (readonlyAfterSubmit && getApplicationId() > 0) {
+    nicChecked = true;
+    recordFromDb = true;
+    lockNic();
+    var rold = window.APP_FORM_OLD || {};
+    applyPrefillFromServer(rold);
+    reviewOnlyMode = true;
+    setReviewOnlyMode(true);
+    setFormEditable(false);
+    showStep(8);
   } else {
     showStep(1);
   }
