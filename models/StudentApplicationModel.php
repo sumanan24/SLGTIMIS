@@ -732,7 +732,7 @@ class StudentApplicationModel extends Model {
     /**
      * Dashboard aggregates. Optional NVQ level and 1st-preference department/course match the staff list filters.
      *
-     * @return array{total: int, by_status: array{new: int, approved: int, rejected: int}, by_level: list<array{level: string, count: int}>, by_district: list<array{label: string, count: int}>, by_course: list<array{label: string, count: int}>, by_department: list<array{label: string, count: int}>}
+     * @return array{total: int, by_status: array{new: int, approved: int, rejected: int}, by_level: list<array{level: string, count: int}>, by_district: list<array{label: string, count: int}>, by_course: list<array{label: string, count: int}>, by_department: list<array{label: string, count: int}>, by_gender: list<array{label: string, count: int}>}
      */
     public function getDashboardStats(?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false): array {
         $this->ensureTable();
@@ -744,6 +744,7 @@ class StudentApplicationModel extends Model {
             'by_district' => [],
             'by_course' => [],
             'by_department' => [],
+            'by_gender' => [],
         ];
         $t = $this->table;
         $conn = $this->db->getConnection();
@@ -837,6 +838,17 @@ class StudentApplicationModel extends Model {
                     ];
                 }
             }
+            $sqlGender = "SELECT COALESCE(NULLIF(TRIM(`student_gender`), ''), '(Not specified)') AS `lbl`, COUNT(*) AS `cnt` "
+                . "FROM `{$t}`{$dw} GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC";
+            $res = $this->db->query($sqlGender);
+            if ($res) {
+                while ($row = $res->fetch_assoc()) {
+                    $out['by_gender'][] = [
+                        'label' => (string) ($row['lbl'] ?? ''),
+                        'count' => (int) ($row['cnt'] ?? 0),
+                    ];
+                }
+            }
             $sqlCourse = "SELECT COALESCE(NULLIF(TRIM(IF(LOCATE(CONVERT('{$sepEsc}' USING utf8mb4), TRIM(CONVERT(`course_priority_1` USING utf8mb4))) > 0, "
                 . "SUBSTRING_INDEX(TRIM(CONVERT(`course_priority_1` USING utf8mb4)), CONVERT('{$sepEsc}' USING utf8mb4), -1), TRIM(CONVERT(`course_priority_1` USING utf8mb4)))), ''), '(Not specified)') AS `lbl`, COUNT(*) AS `cnt` "
                 . "FROM `{$t}`{$dw} GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC LIMIT 40";
@@ -904,6 +916,17 @@ class StudentApplicationModel extends Model {
         if ($res) {
             while ($row = $res->fetch_assoc()) {
                 $out['by_district'][] = [
+                    'label' => (string) ($row['lbl'] ?? ''),
+                    'count' => (int) ($row['cnt'] ?? 0),
+                ];
+            }
+        }
+        $sqlGender = 'SELECT COALESCE(NULLIF(TRIM(sa.`student_gender`), \'\'), \'(Not specified)\') AS `lbl`, COUNT(*) AS `cnt` '
+            . "FROM `{$t}` sa" . $filterTail . ' GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC';
+        $res = $runFiltered($sqlGender);
+        if ($res) {
+            while ($row = $res->fetch_assoc()) {
+                $out['by_gender'][] = [
                     'label' => (string) ($row['lbl'] ?? ''),
                     'count' => (int) ($row['cnt'] ?? 0),
                 ];
