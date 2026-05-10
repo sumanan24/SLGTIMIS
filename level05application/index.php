@@ -207,8 +207,8 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
                                     <label class="form-label" for="student_language">Language <span class="text-danger">*</span></label>
                                     <select class="form-select" id="student_language" name="student_language" required>
                                         <option value="">Choose…</option>
-                                        <option value="Sinhala">Sinhala</option>
                                         <option value="Tamil">Tamil</option>
+                                        <option value="Sinhala">Sinhala</option>
                                         <option value="English">English</option>
                                     </select>
                                     <div class="invalid-feedback">Required.</div>
@@ -217,8 +217,8 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
                                     <label class="form-label" for="student_religion">Religion <span class="text-danger">*</span></label>
                                     <select class="form-select" id="student_religion" name="student_religion" required>
                                         <option value="">Choose…</option>
-                                        <option value="Buddhism">Buddhism</option>
                                         <option value="Hinduism">Hinduism</option>
+                                        <option value="Buddhism">Buddhism</option>
                                         <option value="Islam">Islam</option>
                                         <option value="Christianity">Christianity</option>
                                     </select>

@@ -589,11 +589,11 @@ class StudentApplicationController extends Controller {
         if (!in_array($t('student_title'), $titles, true)) {
             return ['Please choose a title from the list.'];
         }
-        $langs = ['Sinhala', 'Tamil', 'English'];
+        $langs = ['Tamil', 'Sinhala', 'English'];
         if (!in_array($t('student_language'), $langs, true)) {
-            return ['Please choose Sinhala, Tamil, or English.'];
+            return ['Please choose Tamil, Sinhala, or English.'];
         }
-        $rels = ['Buddhism', 'Hinduism', 'Islam', 'Christianity'];
+        $rels = ['Hinduism', 'Buddhism', 'Islam', 'Christianity'];
         if (!in_array($t('student_religion'), $rels, true)) {
             return ['Please choose a religion from the list.'];
         }
@@ -1315,6 +1315,37 @@ class StudentApplicationController extends Controller {
     }
 
     /**
+     * WhatsApp shortcut for SAO/ADM on the online applications list (config: STAFF_ONLINE_APPLICATIONS_WHATSAPP_DIGITS).
+     *
+     * @return array{url: string, display: string}|null
+     */
+    private function staffOnlineApplicationsWhatsAppShortcut(): ?array {
+        if (!defined('STAFF_ONLINE_APPLICATIONS_WHATSAPP_DIGITS')) {
+            return null;
+        }
+        $digits = preg_replace('/\D+/', '', (string) STAFF_ONLINE_APPLICATIONS_WHATSAPP_DIGITS);
+        if ($digits === '' || strlen($digits) < 9 || strlen($digits) > 15) {
+            return null;
+        }
+
+        return [
+            'url' => 'https://wa.me/' . $digits,
+            'display' => $this->formatLkWhatsappDisplayNumber($digits),
+        ];
+    }
+
+    /**
+     * Human-friendly label for configured WhatsApp (Sri Lanka +94 when 11 digits starting with 94).
+     */
+    private function formatLkWhatsappDisplayNumber(string $digits): string {
+        if (strlen($digits) === 11 && substr($digits, 0, 2) === '94' && strlen($n = substr($digits, 2)) === 9) {
+            return '+94 ' . substr($n, 0, 2) . ' ' . substr($n, 2, 3) . ' ' . substr($n, 5, 4);
+        }
+
+        return '+' . $digits;
+    }
+
+    /**
      * Staff (SAO, ADM, admin): list online applications.
      */
     public function adminIndex() {
@@ -1431,6 +1462,7 @@ class StudentApplicationController extends Controller {
             'applications_rejected' => $applicationsRejected,
             'dashboard_stats' => $dashboardStats,
             'can_delete' => $userModel->isAdminOrADM($uid),
+            'staff_whatsapp' => $this->staffOnlineApplicationsWhatsAppShortcut(),
             'use_public_layout' => false,
         ]);
     }

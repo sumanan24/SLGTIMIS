@@ -9,6 +9,10 @@ $applications_approved = $applications_approved ?? [];
 $applications_rejected = $applications_rejected ?? [];
 /** @var bool $can_delete */
 $can_delete = (bool) ($can_delete ?? false);
+/** @var array{url: string, display: string}|null $staff_whatsapp */
+$staff_whatsapp = isset($staff_whatsapp) && is_array($staff_whatsapp) && !empty($staff_whatsapp['url'])
+    ? $staff_whatsapp
+    : null;
 /** @var array{total: int, by_status?: array{new: int, approved: int, rejected?: int}, by_level: list<array{level: string, count: int}>, by_district: list<array{label: string, count: int}>, by_course: list<array{label: string, count: int}>, by_department: list<array{label: string, count: int}>} $dashboard_stats */
 $dashboard_stats = $dashboard_stats ?? ['total' => 0, 'by_status' => ['new' => 0, 'approved' => 0, 'rejected' => 0], 'by_level' => [], 'by_district' => [], 'by_course' => [], 'by_department' => []];
 /** @var int $per_page */
@@ -290,7 +294,15 @@ $renderAppTable = static function (
                         </select>
                     </div>
                 </div>
-                <div class="dropdown flex-shrink-0 align-self-md-center">
+                <div class="d-flex flex-wrap align-items-center gap-2 flex-shrink-0">
+                    <?php if ($active_tab === 'new' && $staff_whatsapp !== null): ?>
+                    <a href="<?php echo $esc($staff_whatsapp['url']); ?>" class="btn btn-success btn-sm" target="_blank" rel="noopener noreferrer"
+                       title="Open WhatsApp chat — <?php echo $esc($staff_whatsapp['display']); ?>">
+                        <i class="fab fa-whatsapp me-1" aria-hidden="true"></i>
+                        WhatsApp <span class="small opacity-90"><?php echo $esc($staff_whatsapp['display']); ?></span>
+                    </a>
+                    <?php endif; ?>
+                    <div class="dropdown flex-shrink-0 align-self-md-center">
                     <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="fas fa-file-excel me-1 text-success" aria-hidden="true"></i>Export Excel
                     </button>
@@ -309,6 +321,7 @@ $renderAppTable = static function (
                         <li><a class="dropdown-item" href="<?php echo $excelUrl('rejected', $filter_level); ?>">Rejected</a></li>
                         <?php endif; ?>
                     </ul>
+                </div>
                 </div>
             </div>
             <?php if ($active_view === 'table'): ?>

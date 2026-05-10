@@ -440,8 +440,8 @@
                                         <label for="student_religion" class="form-label fw-semibold">Religion <span class="text-danger">*</span></label>
                                         <select class="form-select" id="student_religion" name="student_religion" required>
                                             <option value="">Select Religion</option>
-                                            <option value="Buddhism" <?php echo (isset($student['student_religion']) && $student['student_religion'] === 'Buddhism') ? 'selected' : ''; ?>>Buddhism</option>
                                             <option value="Hinduism" <?php echo (isset($student['student_religion']) && $student['student_religion'] === 'Hinduism') ? 'selected' : ''; ?>>Hinduism</option>
+                                            <option value="Buddhism" <?php echo (isset($student['student_religion']) && $student['student_religion'] === 'Buddhism') ? 'selected' : ''; ?>>Buddhism</option>
                                             <option value="Christianity" <?php echo (isset($student['student_religion']) && $student['student_religion'] === 'Christianity') ? 'selected' : ''; ?>>Christianity</option>
                                             <option value="Islam" <?php echo (isset($student['student_religion']) && $student['student_religion'] === 'Islam') ? 'selected' : ''; ?>>Islam</option>
                                         </select>

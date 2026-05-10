@@ -45,3 +45,8 @@ if (!defined('APP_NAME')) {
 
     define('APP_URL', $protocol . $host . $webBase);
 }
+
+// WhatsApp shortcut for staff on /student-applications (SAO / ADM). Digits only with country code (e.g. 94771234567), no + or spaces. Leave empty to hide the button.
+if (!defined('STAFF_ONLINE_APPLICATIONS_WHATSAPP_DIGITS')) {
+    define('STAFF_ONLINE_APPLICATIONS_WHATSAPP_DIGITS', '');
+}

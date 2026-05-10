@@ -87,7 +87,7 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
                 <label class="form-label" for="student_language">Language <?php echo $req; ?></label>
                 <select name="student_language" id="student_language" class="form-select form-select-sm" required>
                     <option value="">Choose…</option>
-                    <?php foreach (['Sinhala', 'Tamil', 'English'] as $opt): ?>
+                    <?php foreach (['Tamil', 'Sinhala', 'English'] as $opt): ?>
                     <option value="<?php echo htmlspecialchars($opt, ENT_QUOTES, 'UTF-8'); ?>" <?php echo (($old['student_language'] ?? '') === $opt) ? 'selected' : ''; ?>><?php echo htmlspecialchars($opt, ENT_QUOTES, 'UTF-8'); ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -96,7 +96,7 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
                 <label class="form-label" for="student_religion">Religion <?php echo $req; ?></label>
                 <select name="student_religion" id="student_religion" class="form-select form-select-sm" required>
                     <option value="">Choose…</option>
-                    <?php foreach (['Buddhism', 'Hinduism', 'Islam', 'Christianity'] as $opt): ?>
+                    <?php foreach (['Hinduism', 'Buddhism', 'Islam', 'Christianity'] as $opt): ?>
                     <option value="<?php echo htmlspecialchars($opt, ENT_QUOTES, 'UTF-8'); ?>" <?php echo (($old['student_religion'] ?? '') === $opt) ? 'selected' : ''; ?>><?php echo htmlspecialchars($opt, ENT_QUOTES, 'UTF-8'); ?></option>
                     <?php endforeach; ?>
                 </select>

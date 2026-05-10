@@ -643,11 +643,11 @@ function l05_validate_application(array $p, array $files, bool $isUpdate, ?array
     if (!in_array((string) ($p['student_title'] ?? ''), $titles, true)) {
         $errors[] = 'Invalid title.';
     }
-    $langs = ['Sinhala', 'Tamil', 'English'];
+    $langs = ['Tamil', 'Sinhala', 'English'];
     if (!in_array((string) ($p['student_language'] ?? ''), $langs, true)) {
         $errors[] = 'Invalid language.';
     }
-    $rels = ['Buddhism', 'Hinduism', 'Islam', 'Christianity'];
+    $rels = ['Hinduism', 'Buddhism', 'Islam', 'Christianity'];
     if (!in_array((string) ($p['student_religion'] ?? ''), $rels, true)) {
         $errors[] = 'Invalid religion.';
     }
