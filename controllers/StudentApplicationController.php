@@ -2012,7 +2012,9 @@ class StudentApplicationController extends Controller {
 
             // Simple formatting
             $sheet->getStyle('1:1')->getFont()->setBold(true);
-            $sheet->setAutoFilter($sheet->calculateWorksheetDimension());
+            if ($rows !== []) {
+                $sheet->setAutoFilter($sheet->calculateWorksheetDimension());
+            }
             foreach (range(1, count($cols)) as $colIdx) {
                 $letter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIdx);
                 $sheet->getColumnDimension($letter)->setAutoSize(true);
@@ -2032,19 +2034,32 @@ class StudentApplicationController extends Controller {
                 $parts[] = 'course' . preg_replace('/[^A-Za-z0-9_-]+/', '_', $exportCourseId);
             }
             $filename = implode('_', $parts) . '.xlsx';
+
+            // Build XLSX on disk first so we never send headers then fail mid-stream; on any failure use HTML/.xls fallback.
+            $tmpPath = tempnam(sys_get_temp_dir(), 'slgti_sa_xlsx_');
+            if ($tmpPath === false) {
+                throw new RuntimeException('Could not create temp file for XLSX export.');
+            }
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save($tmpPath);
+            $size = filesize($tmpPath);
+            if ($size === false) {
+                @unlink($tmpPath);
+                throw new RuntimeException('XLSX temp file not readable after write.');
+            }
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
             header('Cache-Control: private, max-age=0');
-
-            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-            $writer->save('php://output');
+            header('Content-Length: ' . (string) $size);
+            readfile($tmpPath);
+            @unlink($tmpPath);
             exit;
         } catch (Throwable $e) {
-            error_log('StudentApplicationController::adminExportExcel: ' . $e->getMessage());
-            http_response_code(500);
-            header('Content-Type: text/plain; charset=utf-8');
-            echo 'Service unavailable';
-            exit;
+            if (isset($tmpPath) && is_string($tmpPath) && $tmpPath !== '') {
+                @unlink($tmpPath);
+            }
+            error_log('StudentApplicationController::adminExportExcel: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . (string) $e->getLine());
+            $xlsFallback($rows, $cols, $exportStatus);
         }
     }
 }
