@@ -281,7 +281,7 @@ $renderAppTable = static function (
     <?php
 };
 ?>
-<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=15">
+<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=16">
 <div class="sa-admin-page sa-student-apps-index container-fluid py-3 px-lg-4<?php echo $active_view === 'dashboard' ? ' sa-page-dashboard' : ''; ?>">
     <header class="sa-apps-page-header mb-4 pb-2 border-bottom<?php echo $active_view === 'dashboard' ? ' sa-apps-page-header--dash' : ''; ?>">
         <h1 class="h4 mb-0 fw-semibold text-dark"><i class="fas fa-file-alt me-2 text-primary" aria-hidden="true"></i>Online applications</h1>
@@ -409,46 +409,74 @@ $renderAppTable = static function (
         </div>
         <div class="card-body sa-apps-card-body pt-0 px-0 pb-3">
             <?php if ($active_view === 'dashboard'): ?>
-            <p class="small text-muted mb-2 sa-dash-hint">Counts by <strong>1st course choice</strong>, <strong>department</strong> (from that course), <strong>district</strong>, and <strong>gender</strong> for the current filters. Open <strong>Application table</strong> to review each application.</p>
+            <p class="small text-muted mb-2 sa-dash-hint">Same layout for every block: <strong>category</strong>, <strong>count</strong>, and a <strong>relative bar</strong> (within that block, largest = full width). Open <strong>Application table</strong> to review each application.</p>
             <?php
-            $dashJsonRows = static function (array $rows): array {
-                $labels = [];
-                $full = [];
-                $data = [];
-                foreach ($rows as $row) {
-                    $full[] = (string) ($row['label'] ?? '');
-                    $data[] = (int) ($row['count'] ?? 0);
+            $renderDashBreakdownTable = static function (
+                string $headingId,
+                string $iconClass,
+                string $title,
+                array $rows,
+                string $defaultBarKey,
+                callable $esc,
+                string $sectionExtraClass = ''
+            ): void {
+                $max = 1;
+                foreach ($rows as $r) {
+                    $max = max($max, (int) ($r['count'] ?? 0));
                 }
-                foreach ($full as $f) {
-                    if (function_exists('mb_strlen') && function_exists('mb_substr')) {
-                        $labels[] = mb_strlen($f) > 34 ? (mb_substr($f, 0, 33) . '…') : $f;
-                    } else {
-                        $labels[] = strlen($f) > 34 ? (substr($f, 0, 33) . '…') : $f;
-                    }
-                }
-
-                return ['labels' => $labels, 'fullLabels' => $full, 'data' => $data];
+                $secClass = 'sa-dash-panel' . ($sectionExtraClass !== '' ? ' ' . trim($sectionExtraClass) : '');
+                ?>
+            <section class="<?php echo $esc($secClass); ?>" aria-labelledby="<?php echo $esc($headingId); ?>">
+                <div class="sa-dash-panel-head" id="<?php echo $esc($headingId); ?>">
+                    <i class="<?php echo $esc($iconClass); ?> me-1" aria-hidden="true"></i><?php echo $esc($title); ?>
+                </div>
+                <div class="sa-dash-panel-body">
+                    <table class="table table-sm sa-dash-table mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th scope="col">Category</th>
+                                <th scope="col" class="text-end sa-dash-th-count">Count</th>
+                                <th scope="col" class="sa-dash-th-bar">Relative share</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($rows === []): ?>
+                            <tr>
+                                <td colspan="3" class="text-muted text-center py-3 small">No rows for this filter.</td>
+                            </tr>
+                            <?php else: ?>
+                                <?php foreach ($rows as $row): ?>
+                                    <?php
+                                    $lbl = (string) ($row['label'] ?? '');
+                                    $cnt = (int) ($row['count'] ?? 0);
+                                    $pct = $max > 0 ? (int) min(100, (int) round(100 * $cnt / $max)) : 0;
+                                    $barKey = trim((string) ($row['bar'] ?? $defaultBarKey));
+                                    if ($barKey === '') {
+                                        $barKey = $defaultBarKey;
+                                    }
+                                    ?>
+                            <tr>
+                                <td class="sa-dash-td-label text-break" title="<?php echo $esc($lbl); ?>"><?php echo $esc($lbl); ?></td>
+                                <td class="text-end fw-semibold sa-dash-td-count text-nowrap"><?php echo $cnt; ?></td>
+                                <td class="sa-dash-td-bar">
+                                    <div class="sa-dash-bar-track" role="img" aria-label="Bar: <?php echo $pct; ?> percent within this block">
+                                        <div class="sa-dash-bar-fill sa-dash-bar-fill--<?php echo $esc($barKey); ?>" style="width: <?php echo $pct; ?>%;"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+                <?php
             };
-            $dashPayload = [
-                'total' => $total,
-                'status' => [
-                    'labels' => ['New', 'Approved', 'Rejected'],
-                    'data' => [
-                        (int) ($byStatus['new'] ?? 0),
-                        (int) ($byStatus['approved'] ?? 0),
-                        (int) ($byStatus['rejected'] ?? 0),
-                    ],
-                ],
-                'district' => $dashJsonRows($chartDistrict),
-                'course' => $dashJsonRows($chartCourse),
-                'department' => $dashJsonRows($chartDepartment),
-                'gender' => $dashJsonRows($chartGender),
-                'levels' => $byLevel,
+            $statusRowsTable = [
+                ['label' => 'New', 'count' => (int) ($byStatus['new'] ?? 0), 'bar' => 'status-new'],
+                ['label' => 'Approved', 'count' => (int) ($byStatus['approved'] ?? 0), 'bar' => 'status-approved'],
+                ['label' => 'Rejected', 'count' => (int) ($byStatus['rejected'] ?? 0), 'bar' => 'status-rejected'],
             ];
-            $dashJson = json_encode($dashPayload, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE);
-            if ($dashJson === false) {
-                $dashJson = '{}';
-            }
             ?>
             <div class="sa-dashboard-root" id="saDashboardRoot">
                 <?php if ($total === 0): ?>
@@ -477,130 +505,16 @@ $renderAppTable = static function (
                             <?php endif; ?>
                         </div>
                     </div>
-                    <div class="sa-dash-chart-card sa-dash-chart-card--status">
-                        <div class="sa-dash-chart-card-head"><i class="fas fa-chart-pie me-1" aria-hidden="true"></i> Status mix</div>
-                        <div class="sa-dash-chart-canvas-wrap sa-dash-chart-canvas-wrap--donut">
-                            <canvas id="saDashChartStatus" aria-label="Applications by status chart"></canvas>
-                        </div>
-                    </div>
+                    <?php $renderDashBreakdownTable('sa-dash-status', 'fas fa-list-check', 'Application status', $statusRowsTable, 'status-new', $esc, 'sa-dash-panel--kpi-side'); ?>
                 </div>
                 <div class="sa-dashboard-row-charts" role="group" aria-label="Application counts by course, department, district, and gender">
-                    <section class="sa-dash-chart-card" aria-labelledby="sa-dash-course">
-                        <div class="sa-dash-chart-card-head" id="sa-dash-course"><i class="fas fa-graduation-cap me-1" aria-hidden="true"></i> By 1st course (top <?php echo count($chartCourse); ?>)</div>
-                        <div class="sa-dash-chart-canvas-wrap"><canvas id="saDashChartCourse" aria-label="Applications by first course choice"></canvas></div>
-                    </section>
-                    <section class="sa-dash-chart-card" aria-labelledby="sa-dash-dept">
-                        <div class="sa-dash-chart-card-head" id="sa-dash-dept"><i class="fas fa-building me-1" aria-hidden="true"></i> By department (1st course)</div>
-                        <div class="sa-dash-chart-canvas-wrap"><canvas id="saDashChartDepartment" aria-label="Applications by department from first course"></canvas></div>
-                    </section>
-                    <section class="sa-dash-chart-card" aria-labelledby="sa-dash-district">
-                        <div class="sa-dash-chart-card-head" id="sa-dash-district"><i class="fas fa-map-marker-alt me-1" aria-hidden="true"></i> By district</div>
-                        <div class="sa-dash-chart-canvas-wrap"><canvas id="saDashChartDistrict" aria-label="Applications by district"></canvas></div>
-                    </section>
-                    <section class="sa-dash-chart-card" aria-labelledby="sa-dash-gender">
-                        <div class="sa-dash-chart-card-head" id="sa-dash-gender"><i class="fas fa-venus-mars me-1" aria-hidden="true"></i> By gender</div>
-                        <div class="sa-dash-chart-canvas-wrap"><canvas id="saDashChartGender" aria-label="Applications by gender"></canvas></div>
-                    </section>
+                    <?php $renderDashBreakdownTable('sa-dash-course', 'fas fa-graduation-cap', 'By 1st course (top ' . count($chartCourse) . ')', $chartCourse, 'course', $esc); ?>
+                    <?php $renderDashBreakdownTable('sa-dash-dept', 'fas fa-building', 'By department (1st course)', $chartDepartment, 'dept', $esc); ?>
+                    <?php $renderDashBreakdownTable('sa-dash-district', 'fas fa-map-marker-alt', 'By district', $chartDistrict, 'district', $esc); ?>
+                    <?php $renderDashBreakdownTable('sa-dash-gender', 'fas fa-venus-mars', 'By gender', $chartGender, 'gender', $esc); ?>
                 </div>
                 <?php endif; ?>
             </div>
-            <?php if ($total > 0): ?>
-            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" crossorigin="anonymous"></script>
-            <script>
-            (function () {
-              var payload = <?php echo $dashJson; ?>;
-              if (typeof Chart === 'undefined' || !payload.status) return;
-              Chart.defaults.font.family = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-              Chart.defaults.color = '#475569';
-              var commonBarOpts = {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: { display: false },
-                  tooltip: {
-                    callbacks: {
-                      title: function (items) {
-                        var i = items[0].dataIndex;
-                        var full = items[0].chart.fullLabels;
-                        return (full && full[i]) ? full[i] : (items[0].label || '');
-                      }
-                    }
-                  }
-                },
-                scales: {
-                  x: {
-                    beginAtZero: true,
-                    grid: { color: 'rgba(148, 163, 184, 0.25)' },
-                    ticks: { font: { size: 10 }, precision: 0 }
-                  },
-                  y: {
-                    reverse: true,
-                    grid: { display: false },
-                    ticks: { font: { size: 10 }, autoSkip: false }
-                  }
-                }
-              };
-              function makeHBar(canvasId, series, rgb) {
-                var el = document.getElementById(canvasId);
-                if (!el || !series.labels.length) return null;
-                var r = rgb[0], g = rgb[1], b = rgb[2];
-                var bg = series.labels.map(function (_, i) {
-                  return 'rgba(' + r + ',' + g + ',' + b + ',' + (0.35 + (i % 4) * 0.12) + ')';
-                });
-                var chart = new Chart(el, {
-                  type: 'bar',
-                  data: {
-                    labels: series.labels,
-                    datasets: [{
-                      label: 'Count',
-                      data: series.data,
-                      backgroundColor: bg,
-                      borderRadius: 5,
-                      borderSkipped: false,
-                      maxBarThickness: 18
-                    }]
-                  },
-                  options: commonBarOpts
-                });
-                chart.fullLabels = series.fullLabels;
-                return chart;
-              }
-              var st = payload.status;
-              var donutEl = document.getElementById('saDashChartStatus');
-              if (donutEl) {
-                new Chart(donutEl, {
-                  type: 'doughnut',
-                  data: {
-                    labels: st.labels,
-                    datasets: [{
-                      data: st.data,
-                      backgroundColor: ['#64748b', '#22c55e', '#ef4444'],
-                      borderWidth: 2,
-                      borderColor: '#fff',
-                      hoverOffset: 4
-                    }]
-                  },
-                  options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '58%',
-                    plugins: {
-                      legend: {
-                        position: 'bottom',
-                        labels: { boxWidth: 10, font: { size: 10 }, padding: 8 }
-                      }
-                    }
-                  }
-                });
-              }
-              makeHBar('saDashChartCourse', payload.course, [79, 70, 229]);
-              makeHBar('saDashChartDepartment', payload.department, [13, 148, 136]);
-              makeHBar('saDashChartDistrict', payload.district, [37, 99, 235]);
-              makeHBar('saDashChartGender', payload.gender, [192, 38, 211]);
-            })();
-            </script>
-            <?php endif; ?>
             <?php elseif ($active_tab === 'new'): ?>
             <div class="sa-apps-panel-lead px-3 py-3 mb-0 border-bottom bg-white" id="sa-panel-desc">
                 <p class="small text-secondary mb-0"><span class="fw-semibold text-dark"><?php echo $count_new; ?></span> to review<?php echo $filterContextSuffix; ?>.</p>
