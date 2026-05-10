@@ -740,9 +740,10 @@ class StudentApplicationController extends Controller {
         if ($d === '') {
             return false;
         }
-        if (str_starts_with($d, '94') && strlen($d) > 2) {
+        // PHP 7.4: no str_starts_with().
+        if (strncmp($d, '94', 2) === 0 && strlen($d) > 2) {
             $d = substr($d, 2);
-        } elseif (str_starts_with($d, '0') && strlen($d) > 1) {
+        } elseif ($d !== '' && $d[0] === '0' && strlen($d) > 1) {
             $d = substr($d, 1);
         }
         return strlen($d) === 9 && (bool) preg_match('/^[1-9]\d{8}$/', $d);
@@ -1704,7 +1705,7 @@ class StudentApplicationController extends Controller {
 
         $rel = isset($app[$col]) ? trim(str_replace('\\', '/', (string) $app[$col])) : '';
         $relLower = strtolower($rel);
-        if ($rel === '' || strpos($rel, '..') !== false || !str_starts_with($relLower, 'uploads/student_applications/')) {
+        if ($rel === '' || strpos($rel, '..') !== false || strncmp($relLower, 'uploads/student_applications/', strlen('uploads/student_applications/')) !== 0) {
             http_response_code(404);
             header('Content-Type: text/plain; charset=utf-8');
             echo 'Not found';
@@ -1774,7 +1775,9 @@ class StudentApplicationController extends Controller {
 
         $rel = isset($app[$col]) ? trim(str_replace('\\', '/', (string) $app[$col])) : '';
         $relLower = strtolower($rel);
-        if ($rel === '' || strpos($rel, '..') !== false || !str_starts_with($relLower, 'uploads/student_applications/')) {
+        // PHP 7.4: no str_starts_with().
+        $prefix = 'uploads/student_applications/';
+        if ($rel === '' || strpos($rel, '..') !== false || strncmp($relLower, $prefix, strlen($prefix)) !== 0) {
             return null;
         }
 
