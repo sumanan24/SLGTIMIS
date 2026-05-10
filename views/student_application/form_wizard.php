@@ -111,7 +111,7 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
           <!-- Step 1 -->
           <div class="wiz-pane show" data-step="1">
             <h2 class="h5 mb-3">Step 1</h2>
-            <p class="text-muted small">Enter your National Identity Card number and click <strong>Next</strong>. If you already applied, your details will load so you can review or edit and submit again.</p>
+            <p class="text-muted small">Enter your National Identity Card number and click <strong>Next</strong>. If you already started an application, your details will load &mdash; you can change answers until you submit. After a complete submission, the form is read-only (download your PDF from Review).</p>
             <div class="row g-3">
               <div class="col-12 col-md-8">
                 <label for="student_nic" class="form-label">NIC <?php echo $req; ?></label>
@@ -659,10 +659,9 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
     if (recordFromDb) {
       bar.classList.add('alert-warning');
       bar.innerHTML =
-        '<i class="fas fa-rotate me-2"></i><strong>Update your application.</strong> This NIC already has a Level 04 record'
+        '<i class="fas fa-rotate me-2"></i><strong>Continue your application.</strong> This NIC already has a Level 04 record'
         + (st ? ' (status: <strong>' + stLabel + '</strong>)' : '')
-        + '. Click <strong>Edit</strong> to change details, then use <strong>Next</strong> and submit again. '
-        + '<button type="button" class="btn btn-sm btn-outline-dark ms-2 py-0" id="btnEnableEdit">Edit</button>';
+        + '. Change fields as needed, then use <strong>Next</strong> until you submit. After submission, this page becomes read-only.';
     } else {
       bar.classList.add('alert-info');
       bar.innerHTML =
@@ -732,18 +731,7 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
     if (typeof window.appCoursePrefsRestore === 'function') {
       window.appCoursePrefsRestore(data);
     }
-    if (data.application_id) {
-      setFormEditable(false);
-    }
   }
-
-  document.addEventListener('click', function (ev) {
-    var t = ev && ev.target ? ev.target : null;
-    if (!t || !t.getAttribute) return;
-    if (t.getAttribute('id') !== 'btnEnableEdit') return;
-    setFormEditable(true);
-    showAlert('Editing enabled. Update fields, then continue with Next.', 'info');
-  });
 
   function updatePills() {
     document.querySelectorAll('.step-pill').forEach(function (pill) {
@@ -1211,7 +1199,7 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
             } else {
               reviewOnlyMode = false;
               setReviewOnlyMode(false);
-              setFormEditable(false);
+              setFormEditable(true);
               showStep(2);
             }
           } else {

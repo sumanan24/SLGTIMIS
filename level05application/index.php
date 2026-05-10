@@ -529,6 +529,8 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
   /** True if any document path was stored for this application (re-upload optional). */
   var hadUploadedDocs = false;
   var nicChecked = false;
+  /** True after NIC check when application is shown read-only (documents on file / submitted). */
+  var l05ReviewOnlyMode = false;
 
   var slProv = {};
   try {
@@ -1180,13 +1182,18 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
       bar.innerHTML = '';
       return;
     }
+    // Read-only / submitted: do not show "continue" or "edit" hints (user request).
+    if (l05ReviewOnlyMode) {
+      bar.classList.add('d-none');
+      bar.innerHTML = '';
+      return;
+    }
     bar.classList.remove('d-none', 'alert-info', 'alert-warning', 'alert-secondary');
     if (recordFromDb) {
       bar.classList.add('alert-warning');
       bar.innerHTML =
-        '<i class="fas fa-rotate me-2"></i><strong>Update.</strong> This NIC already has a Level 05 application. '
-        + 'Click <strong>Edit</strong> to change details, then click <strong>Next</strong>. '
-        + '<button type="button" class="btn btn-sm btn-outline-dark ms-2 py-0" id="btnEnableEdit">Edit</button>';
+        '<i class="fas fa-rotate me-2"></i><strong>Continue your application.</strong> This NIC already has a Level 05 record. '
+        + 'Change fields as needed, then use <strong>Next</strong> until you submit.';
     } else {
       bar.classList.add('alert-info');
       bar.innerHTML =
@@ -1194,7 +1201,7 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
     }
   }
 
-  // When an existing application is loaded by NIC, start in view-only mode.
+  // When an existing record loads without completed uploads, fields stay editable until submit.
   var l05EditEnabled = true;
   function setFormEditable(editable) {
     l05EditEnabled = !!editable;
@@ -1216,14 +1223,6 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
       el.classList.toggle('bg-light', !l05EditEnabled);
     });
   }
-
-  document.addEventListener('click', function (ev) {
-    var t = ev && ev.target ? ev.target : null;
-    if (!t || !t.getAttribute) return;
-    if (t.getAttribute('id') !== 'btnEnableEdit') return;
-    setFormEditable(true);
-    showAlert('Editing enabled. Update fields and click Next to save.', 'info');
-  });
 
   function updatePills() {
     document.querySelectorAll('.step-pill').forEach(function (pill) {
@@ -1251,6 +1250,7 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
 
   // When an application already exists and looks fully submitted, show review-only mode.
   function setReviewOnlyMode(on) {
+    l05ReviewOnlyMode = !!on;
     var pills = $('stepPills');
     var bn = $('btnNext');
     var bp = $('btnPrev');
@@ -1509,6 +1509,7 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
     if (!form) return;
     recordFromDb = false;
     hadUploadedDocs = false;
+    l05ReviewOnlyMode = false;
     form.querySelectorAll('input, select, textarea').forEach(function (el) {
       if (el.name === 'student_nic' || el.type === 'hidden') return;
       if (el.type === 'file') { el.value = ''; return; }
@@ -1622,11 +1623,6 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
       }
     }
     if (data.nvq_level != null) l05EnsureSelectHasValue('nvq_level', data.nvq_level);
-
-    // Existing NIC → lock editing until user explicitly enables it.
-    if (data.application_id) {
-      setFormEditable(false);
-    }
   }
 
   function buildReview() {
@@ -1714,11 +1710,13 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
               // If documents are already uploaded, treat it as a submitted application:
               // jump straight to Review (Step 8) and hide the rest.
               if (hadUploadedDocs) {
+                setFormEditable(false);
                 showStep(totalSteps);
                 setReviewOnlyMode(true);
                 showAlert('This NIC already has a submitted Level 05 application. You can download the PDF from Review.', 'info');
               } else {
                 setReviewOnlyMode(false);
+                setFormEditable(true);
                 showStep(2);
               }
               return;
@@ -1745,6 +1743,7 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
                 $('application_id').value = String(j2.application_id);
                 recordFromDb = false;
                 hadUploadedDocs = false;
+                l05ReviewOnlyMode = false;
                 nicChecked = true;
                 lockNic();
                 showStep(2);
@@ -1823,6 +1822,7 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
       .then(function (res) {
         btn.disabled = false;
         if (res.ok && res.j.success) {
+          l05ReviewOnlyMode = true;
           $('globalAlert').classList.add('d-none');
           $('nicContextBarFixed').classList.add('d-none');
           var sb = $('successBanner');
