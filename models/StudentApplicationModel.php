@@ -24,6 +24,9 @@ class StudentApplicationModel extends Model {
         . '`nic_document_path`, `birth_certificate_path`, `ol_certificate_path`, `al_certificate_path`, `nvq_certificate_path`, `bank_receipt_path`, '
         . '`status`, `created_at`';
 
+    /** NIC-step draft rows (`insert_draft.php`) until the applicant enters a real name. */
+    public const DRAFT_FULL_NAME_PLACEHOLDER = '(Pending)';
+
     /** Upload path columns — excluded from staff data-only exports (CSV, etc.). */
     public const DOCUMENT_PATH_COLUMNS = [
         'nic_document_path',
@@ -46,6 +49,17 @@ class StudentApplicationModel extends Model {
 
     protected function getPrimaryKey() {
         return 'application_id';
+    }
+
+    /**
+     * True once the applicant has started the form beyond the NIC-only draft (visible to SAO lists).
+     * ADM / system admin may still open drafts via direct URL.
+     *
+     * @param array<string, mixed> $app Row from `student_applications`
+     */
+    public static function isSubmittedForStaffReview(array $app): bool {
+        $name = trim((string) ($app['student_full_name'] ?? ''));
+        return $name !== '' && $name !== self::DRAFT_FULL_NAME_PLACEHOLDER;
     }
 
     /**
@@ -238,7 +252,7 @@ class StudentApplicationModel extends Model {
     /**
      * Count applications for staff list (optional NVQ level 04 / 05; optional 1st preference department / course).
      */
-    public function countListForAdmin(string $status, ?string $level = null, ?string $departmentId = null, ?string $courseId = null): int {
+    public function countListForAdmin(string $status, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false): int {
         $this->ensureTable();
         $this->migrateSchema();
         if (!in_array($status, ['new', 'approved', 'rejected'], true)) {
@@ -257,6 +271,9 @@ class StudentApplicationModel extends Model {
         $types .= $frag['suffixTypes'];
         foreach ($frag['suffixParams'] as $p) {
             $params[] = $p;
+        }
+        if ($onlySubmittedForStaff) {
+            $sql .= ' AND TRIM(`sa`.`student_full_name`) <> \'\' AND `sa`.`student_full_name` <> \'' . addslashes(self::DRAFT_FULL_NAME_PLACEHOLDER) . '\'';
         }
         $stmt = $this->db->prepare($sql);
         if (!$stmt) {
@@ -281,7 +298,7 @@ class StudentApplicationModel extends Model {
      *
      * @return list<array<string, mixed>>
      */
-    public function getListPageForAdmin(string $status, ?string $level, int $page, int $perPage, ?string $departmentId = null, ?string $courseId = null): array {
+    public function getListPageForAdmin(string $status, ?string $level, int $page, int $perPage, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false): array {
         $this->ensureTable();
         $this->migrateSchema();
         if (!in_array($status, ['new', 'approved', 'rejected'], true)) {
@@ -304,6 +321,9 @@ class StudentApplicationModel extends Model {
         $types .= $frag['suffixTypes'];
         foreach ($frag['suffixParams'] as $p) {
             $params[] = $p;
+        }
+        if ($onlySubmittedForStaff) {
+            $sql .= ' AND TRIM(`sa`.`student_full_name`) <> \'\' AND `sa`.`student_full_name` <> \'' . addslashes(self::DRAFT_FULL_NAME_PLACEHOLDER) . '\'';
         }
         $sql .= ' ORDER BY `sa`.`created_at` DESC LIMIT ? OFFSET ?';
         $types .= 'ii';
@@ -684,7 +704,7 @@ class StudentApplicationModel extends Model {
      *
      * @return array{total: int, by_status: array{new: int, approved: int, rejected: int}, by_level: list<array{level: string, count: int}>, by_district: list<array{label: string, count: int}>, by_course: list<array{label: string, count: int}>, by_department: list<array{label: string, count: int}>}
      */
-    public function getDashboardStats(?string $level = null, ?string $departmentId = null, ?string $courseId = null): array {
+    public function getDashboardStats(?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false): array {
         $this->ensureTable();
         $this->migrateSchema();
         $out = [
@@ -713,6 +733,9 @@ class StudentApplicationModel extends Model {
         foreach ($existsPart['params'] as $ep) {
             $filterParams[] = $ep;
         }
+        if ($onlySubmittedForStaff) {
+            $filterTail .= ' AND TRIM(sa.`student_full_name`) <> \'\' AND sa.`student_full_name` <> \'' . addslashes(self::DRAFT_FULL_NAME_PLACEHOLDER) . '\'';
+        }
         $filtered = ($levelPart !== '' || $existsPart['sql'] !== '');
 
         $db = $this->db;
@@ -739,11 +762,17 @@ class StudentApplicationModel extends Model {
         };
 
         if (!$filtered) {
-            $res = $this->db->query("SELECT COUNT(*) AS `c` FROM `{$t}`");
+            $dw = $onlySubmittedForStaff
+                ? ' WHERE TRIM(`student_full_name`) <> \'\' AND `student_full_name` <> \'' . addslashes(self::DRAFT_FULL_NAME_PLACEHOLDER) . '\''
+                : '';
+            $dwSa = $onlySubmittedForStaff
+                ? ' WHERE TRIM(sa.`student_full_name`) <> \'\' AND sa.`student_full_name` <> \'' . addslashes(self::DRAFT_FULL_NAME_PLACEHOLDER) . '\''
+                : '';
+            $res = $this->db->query("SELECT COUNT(*) AS `c` FROM `{$t}`{$dw}");
             if ($res && $row = $res->fetch_assoc()) {
                 $out['total'] = (int) ($row['c'] ?? 0);
             }
-            $res = $this->db->query("SELECT `status`, COUNT(*) AS `cnt` FROM `{$t}` GROUP BY `status`");
+            $res = $this->db->query("SELECT `status`, COUNT(*) AS `cnt` FROM `{$t}`{$dw} GROUP BY `status`");
             if ($res) {
                 while ($row = $res->fetch_assoc()) {
                     $st = strtolower(trim((string) ($row['status'] ?? '')));
@@ -756,7 +785,7 @@ class StudentApplicationModel extends Model {
                     }
                 }
             }
-            $sqlLevel = "SELECT TRIM(`application_level`) AS `lvl`, COUNT(*) AS `cnt` FROM `{$t}` GROUP BY `lvl` ORDER BY `lvl` ASC";
+            $sqlLevel = "SELECT TRIM(`application_level`) AS `lvl`, COUNT(*) AS `cnt` FROM `{$t}`{$dw} GROUP BY `lvl` ORDER BY `lvl` ASC";
             $res = $this->db->query($sqlLevel);
             if ($res) {
                 while ($row = $res->fetch_assoc()) {
@@ -768,7 +797,7 @@ class StudentApplicationModel extends Model {
                 }
             }
             $sqlDist = "SELECT COALESCE(NULLIF(TRIM(`student_district`), ''), '(Not specified)') AS `lbl`, COUNT(*) AS `cnt` "
-                . "FROM `{$t}` GROUP BY `lbl` ORDER BY (`lbl` = '(Not specified)'), `lbl` ASC";
+                . "FROM `{$t}`{$dw} GROUP BY `lbl` ORDER BY (`lbl` = '(Not specified)'), `lbl` ASC";
             $res = $this->db->query($sqlDist);
             if ($res) {
                 while ($row = $res->fetch_assoc()) {
@@ -780,7 +809,7 @@ class StudentApplicationModel extends Model {
             }
             $sqlCourse = "SELECT COALESCE(NULLIF(TRIM(IF(LOCATE(CONVERT('{$sepEsc}' USING utf8mb4), TRIM(CONVERT(`course_priority_1` USING utf8mb4))) > 0, "
                 . "SUBSTRING_INDEX(TRIM(CONVERT(`course_priority_1` USING utf8mb4)), CONVERT('{$sepEsc}' USING utf8mb4), -1), TRIM(CONVERT(`course_priority_1` USING utf8mb4)))), ''), '(Not specified)') AS `lbl`, COUNT(*) AS `cnt` "
-                . "FROM `{$t}` GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC LIMIT 40";
+                . "FROM `{$t}`{$dw} GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC LIMIT 40";
             $res = $this->db->query($sqlCourse);
             if ($res) {
                 while ($row = $res->fetch_assoc()) {
@@ -795,7 +824,7 @@ class StudentApplicationModel extends Model {
                 . 'LEFT JOIN `course` c ON (' . self::sqlTrimUtf8mb4('c', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', 'course_priority_1') . ' OR '
                 . self::sqlLegacyCourseRowConcatLiteral('c', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', 'course_priority_1') . ') '
                 . "LEFT JOIN `department` d ON d.`department_id` = c.`department_id` "
-                . "GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC LIMIT 40";
+                . "{$dwSa} GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC LIMIT 40";
             $res = $this->db->query($sqlDept);
             if ($res) {
                 while ($row = $res->fetch_assoc()) {
@@ -890,7 +919,7 @@ class StudentApplicationModel extends Model {
      * @param string|null $courseId optional: 1st preference matches this `course`.`course_id`
      * @return list<array<string, mixed>>
      */
-    public function getAllForStaffExport(?string $status = null, ?string $level = null, ?string $departmentId = null, ?string $courseId = null): array {
+    public function getAllForStaffExport(?string $status = null, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false): array {
         $this->ensureTable();
         $this->migrateSchema();
         $conn = $this->db->getConnection();
@@ -949,6 +978,9 @@ class StudentApplicationModel extends Model {
         $types .= $existsParts['types'];
         foreach ($existsParts['params'] as $ep) {
             $params[] = $ep;
+        }
+        if ($onlySubmittedForStaff) {
+            $sql .= ' AND TRIM(sa.`student_full_name`) <> \'\' AND sa.`student_full_name` <> \'' . addslashes(self::DRAFT_FULL_NAME_PLACEHOLDER) . '\'';
         }
         $sql .= ' ORDER BY sa.`created_at` DESC';
 

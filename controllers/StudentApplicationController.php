@@ -23,6 +23,30 @@ class StudentApplicationController extends Controller {
     ];
 
     /**
+     * SAO/RSA without ADM / system admin: hide NIC-only draft rows (placeholder full name) from lists and exports.
+     */
+    private function staffStudentAppsExcludeNicDrafts(UserModel $userModel, int $uid): bool {
+        return $userModel->isSAO($uid) && !$userModel->isAdminOrADM($uid);
+    }
+
+    /**
+     * @param array<string, mixed> $app
+     */
+    private function redirectIfSaoCannotViewIncomplete(UserModel $userModel, int $uid, array $app): void {
+        if (!class_exists('StudentApplicationModel', false)) {
+            require_once BASE_PATH . '/models/StudentApplicationModel.php';
+        }
+        if (!$this->staffStudentAppsExcludeNicDrafts($userModel, $uid)) {
+            return;
+        }
+        if (StudentApplicationModel::isSubmittedForStaffReview($app)) {
+            return;
+        }
+        $_SESSION['error'] = 'This registration is still incomplete (NIC-only draft). Student Affairs staff only see submitted applications. Administrators (ADM) can open all records.';
+        $this->redirect('student-applications');
+    }
+
+    /**
      * NIC folder segment (uploads/student_applications/{NIC}/) — digits + V/X only.
      */
     private function nicFolderSegment(string $nic): string {
@@ -1297,6 +1321,7 @@ class StudentApplicationController extends Controller {
         }
 
         $model = $this->model('StudentApplicationModel');
+        $excludeNicDrafts = $this->staffStudentAppsExcludeNicDrafts($userModel, $uid);
         $levelRaw = trim((string) $this->get('level', ''));
         $filterLevel = in_array($levelRaw, ['04', '05'], true) ? $levelRaw : null;
         $tabRaw = strtolower(trim((string) $this->get('tab', '')));
@@ -1328,12 +1353,12 @@ class StudentApplicationController extends Controller {
         $activeView = $viewRaw === 'dashboard' ? 'dashboard' : 'table';
 
         $perPage = 20;
-        $dashboardStats = $model->getDashboardStats($filterLevel, $filterDeptId, $filterCourseId);
+        $dashboardStats = $model->getDashboardStats($filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts);
 
         if ($activeView === 'table') {
-            $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId);
-            $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId);
-            $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId);
+            $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts);
+            $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts);
+            $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts);
             $maxPageNew = max(1, (int) ceil($countNew / $perPage));
             $maxPageApproved = max(1, (int) ceil($countApproved / $perPage));
             $maxPageRejected = max(1, (int) ceil($countRejected / $perPage));
@@ -1342,13 +1367,13 @@ class StudentApplicationController extends Controller {
             $pageRejected = max(1, min((int) $this->get('pr', 1), $maxPageRejected));
 
             $applicationsNew = $activeTab === 'new'
-                ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId)
+                ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts)
                 : [];
             $applicationsApproved = $activeTab === 'approved'
-                ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId)
+                ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts)
                 : [];
             $applicationsRejected = $activeTab === 'rejected'
-                ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId)
+                ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts)
                 : [];
         } else {
             $countNew = 0;
@@ -1431,11 +1456,14 @@ class StudentApplicationController extends Controller {
 
         $app = $model->enrichApplicationForStaffExport($app);
 
+        $this->redirectIfSaoCannotViewIncomplete($userModel, $uid, $app);
+
         return $this->view('student_application/admin_view', [
             'title' => 'Application #' . $id,
             'page' => 'student-applications',
             'app' => $app,
             'can_delete' => $userModel->isAdminOrADM($uid),
+            'staff_exclude_incomplete_drafts' => $this->staffStudentAppsExcludeNicDrafts($userModel, $uid),
             'use_public_layout' => false,
         ]);
     }
@@ -1547,6 +1575,8 @@ class StudentApplicationController extends Controller {
             return;
         }
 
+        $this->redirectIfSaoCannotViewIncomplete($userModel, $uid, $app);
+
         $ok = false;
         try {
             $ok = $model->setStatus($id, 'approved');
@@ -1598,6 +1628,8 @@ class StudentApplicationController extends Controller {
             $this->redirect('student-applications');
             return;
         }
+
+        $this->redirectIfSaoCannotViewIncomplete($userModel, $uid, $app);
 
         $st = strtolower(trim((string) ($app['status'] ?? '')));
         if ($st !== 'new') {
@@ -1657,6 +1689,8 @@ class StudentApplicationController extends Controller {
             echo 'Not found';
             exit;
         }
+
+        $this->redirectIfSaoCannotViewIncomplete($userModel, $uid, $app);
 
         $rel = isset($app[$col]) ? trim(str_replace('\\', '/', (string) $app[$col])) : '';
         $relLower = strtolower($rel);
@@ -1752,6 +1786,8 @@ class StudentApplicationController extends Controller {
             exit;
         }
 
+        $this->redirectIfSaoCannotViewIncomplete($userModel, $uid, $app);
+
         $app = $model->enrichApplicationForStaffExport($app);
 
         $filename = 'application_' . $applicationId . '_data.csv';
@@ -1811,6 +1847,8 @@ class StudentApplicationController extends Controller {
             exit;
         }
 
+        $this->redirectIfSaoCannotViewIncomplete($userModel, $uid, $app);
+
         $app = $model->enrichApplicationForStaffExport($app);
 
         require_once BASE_PATH . '/helpers/StudentApplicationSummaryPdf.php';
@@ -1860,6 +1898,8 @@ class StudentApplicationController extends Controller {
             exit;
         }
 
+        $excludeNicDrafts = $this->staffStudentAppsExcludeNicDrafts($userModel, $uid);
+
         // PhpSpreadsheet has several PHP extension requirements; if any are missing,
         // export as an Excel-readable HTML table (.xls) instead of failing.
         $xlsFallback = static function (array $rows, array $cols, ?string $exportStatus): void {
@@ -1892,7 +1932,7 @@ class StudentApplicationController extends Controller {
             error_log('StudentApplicationController::adminExportExcel autoload: ' . $e->getMessage());
             // Autoloader missing → fallback.
             $model = $this->model('StudentApplicationModel');
-            $rows = $model->getAllForStaffExport(null, null, null, null);
+            $rows = $model->getAllForStaffExport(null, null, null, null, $excludeNicDrafts);
             $xlsFallback($rows, StudentApplicationModel::getStaffExportColumnOrder(), null);
         }
 
@@ -1922,7 +1962,7 @@ class StudentApplicationController extends Controller {
                 }
             }
         }
-        $rows = $model->getAllForStaffExport($exportStatus, $exportLevel, $exportDeptId, $exportCourseId);
+        $rows = $model->getAllForStaffExport($exportStatus, $exportLevel, $exportDeptId, $exportCourseId, $excludeNicDrafts);
         $allCols = StudentApplicationModel::getStaffExportColumnOrder();
         $colsParam = trim((string) $this->get('cols', ''));
         $cols = $allCols;

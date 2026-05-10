@@ -110,8 +110,9 @@
 
 .sa-admin-page .sa-apps-table th:nth-child(1),
 .sa-admin-page .sa-apps-table td:nth-child(1) {
-    text-align: center;
-    width: 3.5rem;
+    text-align: end;
+    width: 3.25rem;
+    font-variant-numeric: tabular-nums;
 }
 
 .sa-admin-page .sa-apps-table th:nth-child(2),

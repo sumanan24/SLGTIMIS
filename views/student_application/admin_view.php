@@ -1,6 +1,8 @@
 <?php
 /** @var array<string, mixed> $app */
 $app = $app ?? [];
+/** @var bool $staff_exclude_incomplete_drafts SAO/RSA: NIC-only drafts excluded from lists (ADM sees all). */
+$staff_exclude_incomplete_drafts = (bool) ($staff_exclude_incomplete_drafts ?? false);
 /** @var bool $can_delete */
 $can_delete = (bool) ($can_delete ?? false);
 
@@ -107,7 +109,7 @@ $exportPdfUrl = rtrim(APP_URL, '/') . '/student-applications/export-pdf?id=' . $
 <div class="sa-admin-page sa-admin-view container-fluid py-3">
     <div class="sa-view-toolbar">
         <a href="<?php echo $esc($listUrl); ?>" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>All applications</a>
-        <span class="badge bg-info text-dark">SAO / ADM</span>
+        <span class="badge <?php echo $staff_exclude_incomplete_drafts ? 'bg-secondary' : 'bg-info text-dark'; ?>"><?php echo $staff_exclude_incomplete_drafts ? 'Student Affairs' : 'Admin · all records'; ?></span>
         <div class="sa-export-actions">
             <a class="btn btn-success btn-sm" href="<?php echo $esc($exportDataUrl); ?>" title="CSV: all fields except document file paths">
                 <i class="fas fa-file-export me-1" aria-hidden="true"></i>Download application data
@@ -149,6 +151,11 @@ $exportPdfUrl = rtrim(APP_URL, '/') . '/student-applications/export-pdf?id=' . $
             <?php endif; ?>
         </div>
     </div>
+    <?php if (StudentApplicationModel::isSubmittedForStaffReview($app) === false): ?>
+    <div class="alert alert-warning py-2 px-3 mb-3 small" role="status">
+        <strong>Incomplete registration:</strong> applicant has not finished the online form beyond the NIC step (draft). Student Affairs staff do not see this row in the list; only Administrators (ADM) can open it here.
+    </div>
+    <?php endif; ?>
     <div class="sa-view-heading">
         <h1 class="h3">Application #<?php echo $appId; ?></h1>
         <span class="badge bg-primary align-middle">Level <?php echo $esc($appLevel); ?></span>

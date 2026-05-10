@@ -153,14 +153,15 @@ $renderAppTable = static function (
     bool $can_delete,
     callable $formatSubmitted,
     string $statusLabel,
-    string $badgeClass
+    string $badgeClass,
+    int $rowNumBase = 0
 ): void {
     ?>
     <div class="table-responsive sa-apps-table-responsive">
         <table class="table table-striped table-hover table-bordered align-middle w-100 mb-0 sa-apps-table">
             <thead class="table-light">
                 <tr>
-                    <th scope="col">ID</th>
+                    <th scope="col" class="text-end sa-apps-col-num">#</th>
                     <th scope="col">Level</th>
                     <th scope="col">Status</th>
                     <th scope="col">Full name</th>
@@ -184,12 +185,16 @@ $renderAppTable = static function (
                     ?>.</td>
                 </tr>
                 <?php else: ?>
-                    <?php foreach ($rows as $r):
+                    <?php
+                    $rowIx = 0;
+                    foreach ($rows as $r):
+                        $rowIx++;
                         $id = (int) ($r['application_id'] ?? 0);
+                        $seq = $rowNumBase + $rowIx;
                         $submitted = $formatSubmitted(isset($r['created_at']) ? (string) $r['created_at'] : null);
                         ?>
                 <tr>
-                    <td><?php echo $id; ?></td>
+                    <td class="text-muted text-end sa-apps-col-num"><?php echo (int) $seq; ?></td>
                     <td><?php echo $esc((string) ($r['application_level'] ?? '')); ?></td>
                     <td><span class="badge rounded-pill px-2 <?php echo $esc($badgeClass); ?>"><?php echo $esc(ucfirst($statusLabel)); ?></span></td>
                     <td><?php echo $esc((string) ($r['student_full_name'] ?? '')); ?></td>
@@ -219,11 +224,10 @@ $renderAppTable = static function (
     <?php
 };
 ?>
-<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=11">
+<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=12">
 <div class="sa-admin-page sa-student-apps-index container-fluid py-3 px-lg-4">
     <header class="sa-apps-page-header mb-4 pb-2 border-bottom">
-        <h1 class="h4 mb-1 fw-semibold text-dark"><i class="fas fa-file-alt me-2 text-primary" aria-hidden="true"></i>Online applications</h1>
-        <p class="small text-secondary mb-0">NVQ Level 04 &amp; 05 · Student Affairs / Administration</p>
+        <h1 class="h4 mb-0 fw-semibold text-dark"><i class="fas fa-file-alt me-2 text-primary" aria-hidden="true"></i>Online applications</h1>
     </header>
 
     <section class="card shadow-sm border-0 sa-apps-card mb-4" aria-labelledby="sa-apps-viewnav-heading">
@@ -461,7 +465,7 @@ $renderAppTable = static function (
             <div class="sa-apps-panel-lead px-3 py-3 mb-0 border-bottom bg-white" id="sa-panel-desc">
                 <p class="small text-secondary mb-0"><span class="fw-semibold text-dark"><?php echo $count_new; ?></span> to review<?php echo $filterContextSuffix; ?>.</p>
             </div>
-            <?php $renderAppTable($applications_new, $esc, $viewUrl, $deleteAction, $can_delete, $formatSubmitted, 'new', 'bg-secondary'); ?>
+            <?php $renderAppTable($applications_new, $esc, $viewUrl, $deleteAction, $can_delete, $formatSubmitted, 'new', 'bg-secondary', ($page_new - 1) * $per_page); ?>
             <?php if ($max_page_new > 1): ?>
             <nav class="sa-apps-pagination pt-3 px-3 border-top mt-3" aria-label="New applications pages">
                 <ul class="pagination pagination-sm justify-content-center flex-wrap mb-0">
@@ -495,7 +499,7 @@ $renderAppTable = static function (
             <div class="sa-apps-panel-lead px-3 py-3 mb-0 border-bottom bg-white" id="sa-panel-desc">
                 <p class="small text-secondary mb-0"><span class="fw-semibold text-dark"><?php echo $count_approved; ?></span> approved<?php echo $filterContextSuffix; ?>.</p>
             </div>
-            <?php $renderAppTable($applications_approved, $esc, $viewUrl, $deleteAction, $can_delete, $formatSubmitted, 'approved', 'bg-success'); ?>
+            <?php $renderAppTable($applications_approved, $esc, $viewUrl, $deleteAction, $can_delete, $formatSubmitted, 'approved', 'bg-success', ($page_approved - 1) * $per_page); ?>
             <?php if ($max_page_approved > 1): ?>
             <nav class="sa-apps-pagination pt-3 px-3 border-top mt-3" aria-label="Approved applications pages">
                 <ul class="pagination pagination-sm justify-content-center flex-wrap mb-0">
@@ -529,7 +533,7 @@ $renderAppTable = static function (
             <div class="sa-apps-panel-lead sa-apps-panel-lead--rejected px-3 py-3 mb-0 border-bottom bg-white" id="sa-panel-desc">
                 <p class="small text-secondary mb-0"><span class="fw-semibold text-dark"><?php echo $count_rejected; ?></span> rejected<?php echo $filterContextSuffix; ?>.</p>
             </div>
-            <?php $renderAppTable($applications_rejected, $esc, $viewUrl, $deleteAction, $can_delete, $formatSubmitted, 'rejected', 'bg-danger'); ?>
+            <?php $renderAppTable($applications_rejected, $esc, $viewUrl, $deleteAction, $can_delete, $formatSubmitted, 'rejected', 'bg-danger', ($page_rejected - 1) * $per_page); ?>
             <?php if ($max_page_rejected > 1): ?>
             <nav class="sa-apps-pagination pt-3 px-3 border-top mt-3" aria-label="Rejected applications pages">
                 <ul class="pagination pagination-sm justify-content-center flex-wrap mb-0">
