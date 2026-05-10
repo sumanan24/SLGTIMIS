@@ -22,6 +22,16 @@ class StudentApplicationController extends Controller {
         'bank_receipt_path',
     ];
 
+    /** Human labels for bundled PDF appendix (same order as {@see self::STAFF_DOWNLOAD_DOCUMENT_COLUMNS}). */
+    private const STAFF_DOCUMENT_LABELS = [
+        'nic_document_path' => 'NIC copy',
+        'birth_certificate_path' => 'Birth certificate',
+        'ol_certificate_path' => 'O/L certificate',
+        'al_certificate_path' => 'A/L certificate',
+        'nvq_certificate_path' => 'NVQ certificate',
+        'bank_receipt_path' => 'Bank receipt',
+    ];
+
     /**
      * SAO/RSA without ADM / system admin: hide NIC-only draft rows (placeholder full name) from lists and exports.
      */
@@ -1752,6 +1762,36 @@ class StudentApplicationController extends Controller {
     }
 
     /**
+     * Resolve a stored document path to an absolute file under uploads/student_applications/, or null if invalid / missing.
+     * Same rules as {@see self::adminDownloadDocument()}.
+     *
+     * @param array<string, mixed> $app Application row
+     */
+    private function resolveStaffDocumentAbsolutePath(array $app, string $col): ?string {
+        if (!in_array($col, self::STAFF_DOWNLOAD_DOCUMENT_COLUMNS, true)) {
+            return null;
+        }
+
+        $rel = isset($app[$col]) ? trim(str_replace('\\', '/', (string) $app[$col])) : '';
+        $relLower = strtolower($rel);
+        if ($rel === '' || strpos($rel, '..') !== false || !str_starts_with($relLower, 'uploads/student_applications/')) {
+            return null;
+        }
+
+        $full = realpath(BASE_PATH . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel));
+        $uploadsRoot = realpath(BASE_PATH . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'student_applications');
+        if ($full === false || $uploadsRoot === false || !is_file($full)) {
+            return null;
+        }
+        $uploadsPrefix = $uploadsRoot . DIRECTORY_SEPARATOR;
+        if (strpos($full, $uploadsPrefix) !== 0) {
+            return null;
+        }
+
+        return $full;
+    }
+
+    /**
      * Staff: download all application fields as CSV (no upload paths / no document files).
      */
     public function adminExportApplicationData(): void {
@@ -1813,7 +1853,7 @@ class StudentApplicationController extends Controller {
     }
 
     /**
-     * Staff: download application data as a one-page PDF summary (no document files / no upload paths).
+     * Staff: download application data as PDF — summary pages plus merged uploaded documents when available.
      */
     public function adminExportApplicationPdf(): void {
         if (!isset($_SESSION['user_id'])) {
@@ -1852,6 +1892,7 @@ class StudentApplicationController extends Controller {
         $app = $model->enrichApplicationForStaffExport($app);
 
         require_once BASE_PATH . '/helpers/StudentApplicationSummaryPdf.php';
+        require_once BASE_PATH . '/helpers/StudentApplicationMergedPdf.php';
 
         $level = trim((string) ($app['application_level'] ?? ''));
         $title = 'Application #' . $applicationId . ($level !== '' ? ' (Level ' . $level . ')' : '');
@@ -1868,8 +1909,21 @@ class StudentApplicationController extends Controller {
             $rows[] = [$col, $val];
         }
 
-        $pdf = StudentApplicationSummaryPdf::build($title, $rows);
-        $filename = 'application_' . $applicationId . '_summary.pdf';
+        $summaryPdf = StudentApplicationSummaryPdf::build($title, $rows);
+
+        $documents = [];
+        foreach (self::STAFF_DOWNLOAD_DOCUMENT_COLUMNS as $col) {
+            $fullPath = $this->resolveStaffDocumentAbsolutePath($app, $col);
+            if ($fullPath !== null) {
+                $documents[] = [
+                    'label' => self::STAFF_DOCUMENT_LABELS[$col] ?? $col,
+                    'path' => $fullPath,
+                ];
+            }
+        }
+
+        $pdf = StudentApplicationMergedPdf::mergeSummaryWithDocuments($summaryPdf, $documents);
+        $filename = 'application_' . $applicationId . '_full.pdf';
 
         header('Content-Type: application/pdf');
         header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');

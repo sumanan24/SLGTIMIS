@@ -153,7 +153,7 @@ class StudentApplicationSummaryPdf {
             $lines[] = '/F1 ' . self::SUBTITLE_SIZE . ' Tf';
             $lines[] = '0.36 0.38 0.42 rg';
             $lines[] = sprintf('1 0 0 1 %d 714 Tm', self::MARGIN_L + 4);
-            $lines[] = self::literal(self::toPdfText('Student application summary (data only — no uploaded files)')) . ' Tj';
+            $lines[] = self::literal(self::toPdfText('Student application summary — uploaded documents follow this section when exported')) . ' Tj';
             $lines[] = 'ET';
             $lines[] = '0.72 0.76 0.84 RG';
             $lines[] = '0.6 w';

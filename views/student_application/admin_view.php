@@ -114,7 +114,7 @@ $exportPdfUrl = rtrim(APP_URL, '/') . '/student-applications/export-pdf?id=' . $
             <a class="btn btn-success btn-sm" href="<?php echo $esc($exportDataUrl); ?>" title="CSV: all fields except document file paths">
                 <i class="fas fa-file-export me-1" aria-hidden="true"></i>Download application data
             </a>
-            <a class="btn btn-outline-danger btn-sm" href="<?php echo $esc($exportPdfUrl); ?>" title="PDF summary: same fields as CSV (no uploads)">
+            <a class="btn btn-outline-danger btn-sm" href="<?php echo $esc($exportPdfUrl); ?>" title="PDF: application fields (as CSV) plus merged uploaded documents">
                 <i class="fas fa-file-pdf me-1" aria-hidden="true"></i>Download PDF summary
             </a>
             <?php
