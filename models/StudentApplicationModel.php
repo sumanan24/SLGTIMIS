@@ -1081,7 +1081,7 @@ class StudentApplicationModel extends Model {
     }
 
     /**
-     * Public URL for a stored path under `uploads/student_applications/…` (relative, absolute, full URL, or legacy filesystem path).
+     * Public URL for a stored path under `uploads/student_applications/` (Level 05 + MVC) or legacy `uploads/students_applications/…`.
      */
     public static function storedUploadPublicUrl(?string $stored): ?string {
         if (!defined('APP_URL')) {
@@ -1107,6 +1107,8 @@ class StudentApplicationModel extends Model {
         }
         if (preg_match('#(^|/)uploads/student_applications/(.+)$#i', $s, $m)) {
             $s = 'uploads/student_applications/' . $m[2];
+        } elseif (preg_match('#(^|/)uploads/students_applications/(.+)$#i', $s, $m)) {
+            $s = 'uploads/students_applications/' . $m[2];
         }
         $base = rtrim(APP_URL, '/');
         if (strpos($s, '/') === 0) {

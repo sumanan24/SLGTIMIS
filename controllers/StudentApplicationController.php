@@ -1,6 +1,11 @@
 <?php
 /**
  * Public student applications (NVQ Level 04 / 05) — no login required.
+ *
+ * Uploaded documents (MVC Level 04/05) use the same layout as Level 05 (`level05application`):
+ *   uploads/student_applications/{NIC}/
+ * Example: uploads/student_applications/200312345678/
+ * {NIC} uses the normalized NIC (12 digits, or 9 digits + V/X). Older `uploads/students_applications/` paths are still read and migrated on final submit.
  */
 
 class StudentApplicationController extends Controller {
@@ -12,7 +17,7 @@ class StudentApplicationController extends Controller {
     /** CSRF token lifetime (seconds); long enough to fill the form without relying on PHP session. */
     private const STUDENT_APP_CSRF_TTL = 604800; // 7 days
 
-    /** Whitelist: staff download only these DB columns (paths under uploads/student_applications/). Keep in sync with StudentApplicationModel::DOCUMENT_PATH_COLUMNS. */
+    /** Whitelist: staff download only these DB columns (paths under uploads/student_applications/ or legacy uploads/students_applications/). Keep in sync with StudentApplicationModel::DOCUMENT_PATH_COLUMNS. */
     private const STAFF_DOWNLOAD_DOCUMENT_COLUMNS = [
         'nic_document_path',
         'birth_certificate_path',
@@ -60,7 +65,7 @@ class StudentApplicationController extends Controller {
     }
 
     /**
-     * NIC folder segment (uploads/student_applications/{NIC}/) — digits + V/X only.
+     * NIC folder segment under uploads (digits + V/X only).
      */
     private function nicFolderSegment(string $nic): string {
         $nic = strtoupper(preg_replace('/[^0-9VX]/', '', $nic));
@@ -68,22 +73,25 @@ class StudentApplicationController extends Controller {
     }
 
     /**
-     * Recursively delete a directory only if it lives under uploads/student_applications/.
+     * Recursively delete uploads/{uploadFolderName}/{segment}/ only if it stays inside that uploads root.
+     *
+     * @param string $uploadFolderName `student_applications` (Level 04/05 MVC + Level 05 portal) or legacy `students_applications`
+     * @param string $segment          Single path segment: normalized NIC or numeric application id (legacy MVC)
      */
-    private function safeDeleteStudentApplicationUploadDir(string $nic): bool {
-        $root = realpath(BASE_PATH);
-        if ($root === false) {
+    private function safeDeleteUploadSubdir(string $uploadFolderName, string $segment): bool {
+        if ($segment === '' || preg_match('#[/\\\\]#', $segment)) {
             return false;
         }
-        $uploadsBase = realpath($root . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'student_applications');
+        if ($uploadFolderName !== 'students_applications' && $uploadFolderName !== 'student_applications') {
+            return false;
+        }
+
+        $uploadsBase = realpath(BASE_PATH . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $uploadFolderName);
         if ($uploadsBase === false) {
-            // Nothing to delete if uploads root doesn't exist.
             return true;
         }
 
-        $seg = $this->nicFolderSegment($nic);
-        $target = $root . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'student_applications' . DIRECTORY_SEPARATOR . $seg;
-        $targetReal = realpath($target);
+        $targetReal = realpath($uploadsBase . DIRECTORY_SEPARATOR . $segment);
         if ($targetReal === false) {
             return true;
         }
@@ -112,11 +120,131 @@ class StudentApplicationController extends Controller {
             }
             @rmdir($targetReal);
         } catch (Throwable $e) {
-            error_log('StudentApplicationController::safeDeleteStudentApplicationUploadDir: ' . $e->getMessage());
+            error_log('StudentApplicationController::safeDeleteUploadSubdir: ' . $e->getMessage());
             return false;
         }
 
         return !is_dir($targetReal);
+    }
+
+    /**
+     * After DB delete: remove NIC folder (new + legacy trees) and legacy per-application-id folder.
+     */
+    private function safeDeleteStudentApplicationUploadStorage(int $applicationId, string $nicRaw): bool {
+        $allOk = true;
+        if ($applicationId >= 1) {
+            $allOk = $this->safeDeleteUploadSubdir('student_applications', (string) $applicationId) && $allOk;
+        }
+        $nicNorm = $this->normalizeNic($nicRaw);
+        if ($this->isValidNic($nicNorm)) {
+            $seg = $this->nicFolderSegment($nicNorm);
+            $allOk = $this->safeDeleteUploadSubdir('students_applications', $seg) && $allOk;
+            $allOk = $this->safeDeleteUploadSubdir('student_applications', $seg) && $allOk;
+        }
+
+        return $allOk;
+    }
+
+    /**
+     * Resolve stored relative path to an absolute file under uploads/student_applications/ or legacy uploads/students_applications/.
+     */
+    private function resolveUploadedFileAbsolutePath(string $rel): ?string {
+        $rel = trim(str_replace('\\', '/', $rel));
+        if ($rel === '' || strpos($rel, '..') !== false) {
+            return null;
+        }
+        $relLower = strtolower($rel);
+        $pCanon = 'uploads/student_applications/';
+        $pLegacy = 'uploads/students_applications/';
+        if (strncmp($relLower, $pCanon, strlen($pCanon)) !== 0 && strncmp($relLower, $pLegacy, strlen($pLegacy)) !== 0) {
+            return null;
+        }
+
+        $full = realpath(BASE_PATH . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel));
+        if ($full === false || !is_file($full)) {
+            return null;
+        }
+
+        foreach (['student_applications', 'students_applications'] as $dirname) {
+            $base = realpath(BASE_PATH . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $dirname);
+            if ($base !== false) {
+                $prefix = $base . DIRECTORY_SEPARATOR;
+                if (strpos($full, $prefix) === 0) {
+                    return $full;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * After {@see collectUploads()}, move any legacy-on-disk paths so every saved path sits under:
+     *   uploads/student_applications/{NIC}/
+     * Same as Level 05 (`l05_process_uploads`). Also migrates wrong-tree `uploads/students_applications/{NIC}/`.
+     *
+     * @param array<string, string> $paths DB doc column => relative path
+     * @return array<string, string>
+     */
+    private function finalizeDocPathsUnderNicFolder(array $paths, string $nicNormalized): array {
+        $nicNorm = $this->normalizeNic($nicNormalized);
+        if (!$this->isValidNic($nicNorm)) {
+            return $paths;
+        }
+        $seg = $this->nicFolderSegment($nicNorm);
+        $wantPrefixLc = strtolower('uploads/student_applications/' . $seg . '/');
+        try {
+            $nicDirAbs = $this->ensureNicStudentUploadDirectory($nicNorm);
+        } catch (Throwable $e) {
+            error_log('finalizeDocPathsUnderNicFolder ensure dir: ' . $e->getMessage());
+            return $paths;
+        }
+
+        foreach ($paths as $col => $relRaw) {
+            $rel = trim(str_replace('\\', '/', (string) $relRaw));
+            if ($rel === '' || strpos($rel, '..') !== false) {
+                continue;
+            }
+            $relLc = strtolower($rel);
+            if (strncmp($relLc, $wantPrefixLc, strlen($wantPrefixLc)) === 0) {
+                continue;
+            }
+
+            $srcAbs = $this->resolveUploadedFileAbsolutePath($rel);
+            if ($srcAbs === null || !is_file($srcAbs) || !is_readable($srcAbs)) {
+                continue;
+            }
+
+            $baseName = basename($srcAbs);
+            if ($baseName === '' || $baseName === '.' || $baseName === '..') {
+                continue;
+            }
+
+            $destAbs = $nicDirAbs . DIRECTORY_SEPARATOR . $baseName;
+
+            $srcReal = realpath($srcAbs);
+            $destReal = is_file($destAbs) ? realpath($destAbs) : false;
+            if ($srcReal !== false && $destReal !== false && $srcReal === $destReal) {
+                $paths[$col] = 'uploads/student_applications/' . $seg . '/' . $baseName;
+                continue;
+            }
+
+            if (is_file($destAbs)) {
+                @unlink($destAbs);
+            }
+            if (@rename($srcAbs, $destAbs)) {
+                $paths[$col] = 'uploads/student_applications/' . $seg . '/' . $baseName;
+                continue;
+            }
+            if (@copy($srcAbs, $destAbs)) {
+                @unlink($srcAbs);
+                $paths[$col] = 'uploads/student_applications/' . $seg . '/' . $baseName;
+            } else {
+                error_log('finalizeDocPathsUnderNicFolder: failed to migrate ' . $rel . ' to NIC folder');
+            }
+        }
+
+        return $paths;
     }
 
     /**
@@ -349,6 +477,10 @@ class StudentApplicationController extends Controller {
         try {
             $nic = $this->normalizeNic((string) $this->post('student_nic', ''));
             $paths = $this->collectUploads($targetId, $nic, $level, $existingDocPaths);
+            // Level 04/05 MVC: same tree as Level 05 portal — uploads/student_applications/{NIC}/ (migrate older paths on submit).
+            if (($level === '04' || $level === '05') && $paths !== []) {
+                $paths = $this->finalizeDocPathsUnderNicFolder($paths, $nic);
+            }
         } catch (Exception $e) {
             return $this->renderForm($level, ['Upload problem: ' . $e->getMessage()], $this->oldPostWithStudentApplicationDocPaths($level, $_POST), null);
         }
@@ -1108,6 +1240,54 @@ class StudentApplicationController extends Controller {
         return 'The server could not accept ' . $label . '. Please try another PDF, JPG, or PNG.';
     }
 
+    /**
+     * Ensures uploads/student_applications/ exists (same base as Level 05 `l05_process_uploads`), then creates {NIC}/.
+     *
+     * @return string Absolute filesystem path to the NIC directory (no trailing separator)
+     */
+    private function ensureNicStudentUploadDirectory(string $nic): string {
+        $nicNorm = $this->normalizeNic($nic);
+        if (!$this->isValidNic($nicNorm)) {
+            throw new Exception('Invalid NIC for upload path.');
+        }
+        $seg = $this->nicFolderSegment($nicNorm);
+        $uploadsRoot = BASE_PATH . DIRECTORY_SEPARATOR . 'uploads';
+        if (!is_dir($uploadsRoot)) {
+            if (!@mkdir($uploadsRoot, 0755, false) && !is_dir($uploadsRoot)) {
+                throw new Exception('Could not create the uploads folder. Check server permissions.');
+            }
+        }
+        $parentDir = $uploadsRoot . DIRECTORY_SEPARATOR . 'student_applications';
+        if (!is_dir($parentDir)) {
+            if (!@mkdir($parentDir, 0755, false) && !is_dir($parentDir)) {
+                throw new Exception('Could not create uploads/student_applications. Check folder permissions.');
+            }
+        }
+        if (!is_writable($parentDir)) {
+            throw new Exception('uploads/student_applications is not writable by the server.');
+        }
+        $dir = $parentDir . DIRECTORY_SEPARATOR . $seg;
+        if (!is_dir($dir)) {
+            if (!@mkdir($dir, 0755, false) && !is_dir($dir)) {
+                throw new Exception('Could not create the NIC folder under uploads/student_applications.');
+            }
+        }
+        if (!is_writable($dir)) {
+            throw new Exception('The NIC upload folder is not writable by the server.');
+        }
+
+        return $dir;
+    }
+
+    /** Like {@see ensureNicStudentUploadDirectory()} but never throws; logs on failure (e.g. NIC check must still succeed). */
+    private function tryEnsureNicStudentUploadDirectory(string $nic): void {
+        try {
+            $this->ensureNicStudentUploadDirectory($nic);
+        } catch (Throwable $e) {
+            error_log('tryEnsureNicStudentUploadDirectory: ' . $e->getMessage());
+        }
+    }
+
     private function handleUpload(string $fieldName, int $applicationId, string $documentKey, string $nic): ?string {
         if (!$this->isSuccessfulClientUpload($fieldName)) {
             return null;
@@ -1121,14 +1301,11 @@ class StudentApplicationController extends Controller {
         if (!in_array($ext, self::ALLOWED_EXT, true)) {
             throw new Exception('Allowed file types: PDF, JPG, PNG.');
         }
-        $dir = BASE_PATH . '/uploads/student_applications/' . $applicationId;
-        if (!is_dir($dir)) {
-            if (!mkdir($dir, 0755, true) && !is_dir($dir)) {
-                throw new Exception('Could not create upload directory.');
-            }
-        }
+        $dir = $this->ensureNicStudentUploadDirectory($nic);
+        $nicFolder = $this->nicFolderSegment($this->normalizeNic($nic));
         $base = $this->uploadBasename($documentKey, $nic);
         $tmp = (string) $_FILES[$fieldName]['tmp_name'];
+        $relPrefix = 'uploads/student_applications/' . $nicFolder . '/';
 
         if ($ext === 'pdf') {
             if (extension_loaded('imagick') && class_exists('Imagick')) {
@@ -1138,7 +1315,7 @@ class StudentApplicationController extends Controller {
                         $safe = $base . '.jpg';
                         $full = $dir . DIRECTORY_SEPARATOR . $safe;
                         $this->compressRasterToJpegUnderLimit($raster, $full);
-                        return 'uploads/student_applications/' . $applicationId . '/' . $safe;
+                        return $relPrefix . $safe;
                     } finally {
                         @unlink($raster);
                     }
@@ -1151,14 +1328,14 @@ class StudentApplicationController extends Controller {
             if (!@move_uploaded_file($tmp, $full) && !@copy($tmp, $full)) {
                 throw new Exception('Could not save PDF. Check that uploads/student_applications is writable.');
             }
-            return 'uploads/student_applications/' . $applicationId . '/' . $safe;
+            return $relPrefix . $safe;
         }
 
         $safe = $base . '.jpg';
         $full = $dir . DIRECTORY_SEPARATOR . $safe;
         $this->compressRasterToJpegUnderLimit($tmp, $full);
 
-        return 'uploads/student_applications/' . $applicationId . '/' . $safe;
+        return $relPrefix . $safe;
     }
 
     /**
@@ -1346,6 +1523,9 @@ class StudentApplicationController extends Controller {
             echo json_encode(['status' => 'error', 'message' => 'Could not verify NIC.']);
             exit;
         }
+        if ($level === '04') {
+            $this->tryEnsureNicStudentUploadDirectory($nic);
+        }
         if ($row) {
             $data = $this->studentApplicationRowForApiJson($model, $row);
             echo json_encode(['status' => 'exists', 'data' => $data], JSON_UNESCAPED_UNICODE);
@@ -1401,6 +1581,7 @@ class StudentApplicationController extends Controller {
             exit;
         }
         if ($existing) {
+            $this->tryEnsureNicStudentUploadDirectory($nic);
             echo json_encode(['success' => true, 'application_id' => (int) ($existing['application_id'] ?? 0), 'already_existed' => true], JSON_UNESCAPED_UNICODE);
             exit;
         }
@@ -1414,6 +1595,7 @@ class StudentApplicationController extends Controller {
         $sqlErr = null;
         $newId = $model->insertApplication($data, $sqlErr);
         if ($newId !== false) {
+            $this->tryEnsureNicStudentUploadDirectory($nic);
             echo json_encode(['success' => true, 'application_id' => (int) $newId, 'already_existed' => false], JSON_UNESCAPED_UNICODE);
             exit;
         }
@@ -1421,6 +1603,7 @@ class StudentApplicationController extends Controller {
             try {
                 $again = $model->findByNicAndLevel($nic, $level);
                 if ($again) {
+                    $this->tryEnsureNicStudentUploadDirectory($nic);
                     echo json_encode(['success' => true, 'application_id' => (int) ($again['application_id'] ?? 0), 'already_existed' => true], JSON_UNESCAPED_UNICODE);
                     exit;
                 }
@@ -1487,6 +1670,7 @@ class StudentApplicationController extends Controller {
             echo json_encode(['success' => false, 'message' => 'NIC does not match this application record.']);
             exit;
         }
+        $this->tryEnsureNicStudentUploadDirectory($nic);
         try {
             $blockMsg = $this->studentApplicationNicBlockedByOtherLevel($model, $nic, $level);
             if ($blockMsg !== null) {
@@ -1838,10 +2022,7 @@ class StudentApplicationController extends Controller {
         }
 
         $nic = (string) ($app['student_nic'] ?? '');
-        $filesOk = true;
-        if (trim($nic) !== '') {
-            $filesOk = $this->safeDeleteStudentApplicationUploadDir($nic);
-        }
+        $filesOk = $this->safeDeleteStudentApplicationUploadStorage($id, $nic);
 
         $this->logActivity(
             'DELETE',
@@ -2012,27 +2193,11 @@ class StudentApplicationController extends Controller {
         $this->redirectIfSaoCannotViewIncomplete($userModel, $uid, $app);
 
         $rel = isset($app[$col]) ? trim(str_replace('\\', '/', (string) $app[$col])) : '';
-        $relLower = strtolower($rel);
-        if ($rel === '' || strpos($rel, '..') !== false || strncmp($relLower, 'uploads/student_applications/', strlen('uploads/student_applications/')) !== 0) {
+        $full = $this->resolveUploadedFileAbsolutePath($rel);
+        if ($full === null) {
             http_response_code(404);
             header('Content-Type: text/plain; charset=utf-8');
             echo 'Not found';
-            exit;
-        }
-
-        $full = realpath(BASE_PATH . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel));
-        $uploadsRoot = realpath(BASE_PATH . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'student_applications');
-        if ($full === false || $uploadsRoot === false || !is_file($full)) {
-            http_response_code(404);
-            header('Content-Type: text/plain; charset=utf-8');
-            echo 'Not found';
-            exit;
-        }
-        $uploadsPrefix = $uploadsRoot . DIRECTORY_SEPARATOR;
-        if (strpos($full, $uploadsPrefix) !== 0) {
-            http_response_code(403);
-            header('Content-Type: text/plain; charset=utf-8');
-            echo 'Forbidden';
             exit;
         }
 
@@ -2071,7 +2236,7 @@ class StudentApplicationController extends Controller {
     }
 
     /**
-     * Resolve a stored document path to an absolute file under uploads/student_applications/, or null if invalid / missing.
+     * Resolve a stored document path to an absolute file under allowed upload trees, or null if invalid / missing.
      * Same rules as {@see self::adminDownloadDocument()}.
      *
      * @param array<string, mixed> $app Application row
@@ -2082,24 +2247,8 @@ class StudentApplicationController extends Controller {
         }
 
         $rel = isset($app[$col]) ? trim(str_replace('\\', '/', (string) $app[$col])) : '';
-        $relLower = strtolower($rel);
-        // PHP 7.4: no str_starts_with().
-        $prefix = 'uploads/student_applications/';
-        if ($rel === '' || strpos($rel, '..') !== false || strncmp($relLower, $prefix, strlen($prefix)) !== 0) {
-            return null;
-        }
 
-        $full = realpath(BASE_PATH . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel));
-        $uploadsRoot = realpath(BASE_PATH . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'student_applications');
-        if ($full === false || $uploadsRoot === false || !is_file($full)) {
-            return null;
-        }
-        $uploadsPrefix = $uploadsRoot . DIRECTORY_SEPARATOR;
-        if (strpos($full, $uploadsPrefix) !== 0) {
-            return null;
-        }
-
-        return $full;
+        return $this->resolveUploadedFileAbsolutePath($rel);
     }
 
     /**
