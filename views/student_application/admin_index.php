@@ -52,6 +52,10 @@ $filter_departments = $filter_departments ?? [];
 /** @var list<array{course_id: string, course_name: string}> $filter_courses */
 $filter_courses = $filter_courses ?? [];
 
+if (defined('BASE_PATH') && is_file(BASE_PATH . '/models/StudentModel.php')) {
+    require_once BASE_PATH . '/models/StudentModel.php';
+}
+
 $esc = static function (string $s): string {
     return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 };
@@ -196,6 +200,7 @@ $renderAppTable = static function (
                         $id = (int) ($r['application_id'] ?? 0);
                         $seq = $rowNumBase + $rowIx;
                         $submitted = $formatSubmitted(isset($r['created_at']) ? (string) $r['created_at'] : null);
+                        $waDigits = StudentModel::digitsForWhatsAppMe($r);
                         ?>
                 <tr>
                     <td class="text-muted text-end sa-apps-col-num"><?php echo (int) $seq; ?></td>
@@ -210,6 +215,13 @@ $renderAppTable = static function (
                     <td>
                         <div class="d-flex flex-wrap gap-2 justify-content-end">
                             <a class="btn btn-sm btn-outline-primary" href="<?php echo $viewUrl($id); ?>">View</a>
+                            <?php if ($waDigits !== null): ?>
+                            <a class="btn btn-sm btn-wa-outline" href="<?php echo $esc('https://wa.me/' . $waDigits); ?>"
+                               target="_blank" rel="noopener noreferrer"
+                               title="WhatsApp <?php echo $esc($waDigits); ?>">
+                                <i class="fab fa-whatsapp" aria-hidden="true"></i>
+                            </a>
+                            <?php endif; ?>
                             <?php if ($can_delete): ?>
                             <form method="post" action="<?php echo $deleteAction; ?>" class="d-inline"
                                   onsubmit="return confirm('Delete application #<?php echo $id; ?>? This will also remove uploaded documents on the server.');">
@@ -295,8 +307,8 @@ $renderAppTable = static function (
                     </div>
                 </div>
                 <div class="d-flex flex-wrap align-items-center gap-2 flex-shrink-0">
-                    <?php if ($active_tab === 'new' && $staff_whatsapp !== null): ?>
-                    <a href="<?php echo $esc($staff_whatsapp['url']); ?>" class="btn btn-success btn-sm" target="_blank" rel="noopener noreferrer"
+                    <?php if ($staff_whatsapp !== null): ?>
+                    <a href="<?php echo $esc($staff_whatsapp['url']); ?>" class="btn btn-sm btn-wa-outline" target="_blank" rel="noopener noreferrer"
                        title="Open WhatsApp chat — <?php echo $esc($staff_whatsapp['display']); ?>">
                         <i class="fab fa-whatsapp me-1" aria-hidden="true"></i>
                         WhatsApp <span class="small opacity-90"><?php echo $esc($staff_whatsapp['display']); ?></span>

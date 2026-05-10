@@ -63,6 +63,29 @@ class StudentController extends Controller {
     }
 
     /**
+     * Optional institute WhatsApp shortcut (same config as online applications staff button).
+     *
+     * @return array{url: string, display: string}|null
+     */
+    private function staffWhatsAppShortcutFromConfig(): ?array {
+        if (!defined('STAFF_ONLINE_APPLICATIONS_WHATSAPP_DIGITS')) {
+            return null;
+        }
+        $digits = preg_replace('/\D+/', '', (string) STAFF_ONLINE_APPLICATIONS_WHATSAPP_DIGITS);
+        if ($digits === '' || strlen($digits) < 9 || strlen($digits) > 15) {
+            return null;
+        }
+        $display = strlen($digits) === 11 && substr($digits, 0, 2) === '94'
+            ? '+94 ' . substr($digits, 2, 2) . ' ' . substr($digits, 4, 3) . ' ' . substr($digits, 7, 4)
+            : '+' . $digits;
+
+        return [
+            'url' => 'https://wa.me/' . $digits,
+            'display' => $display,
+        ];
+    }
+
+    /**
      * Student change password (from student dashboard)
      */
     public function changeStudentPassword() {
@@ -245,6 +268,7 @@ class StudentController extends Controller {
             'canExport' => $canExport,
             'isADM' => $isADM,
             'canEdit' => $canEdit,
+            'staff_whatsapp_header' => $this->staffWhatsAppShortcutFromConfig(),
             'message' => $_SESSION['message'] ?? null,
             'error' => $_SESSION['error'] ?? null
         ];

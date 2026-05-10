@@ -1681,5 +1681,35 @@ class StudentModel extends Model {
         
         return null;
     }
+
+    /**
+     * Build international digits for https://wa.me/{digits} — prefers WhatsApp field, then phone.
+     * Handles common Sri Lanka formats (0XXXXXXXXX, 9-digit mobile).
+     *
+     * @param array<string, mixed> $student Row including student_whatsapp / student_phone
+     */
+    public static function digitsForWhatsAppMe(array $student): ?string {
+        $prefer = trim((string) ($student['student_whatsapp'] ?? ''));
+        $fallback = trim((string) ($student['student_phone'] ?? ''));
+        $raw = $prefer !== '' ? $prefer : $fallback;
+        $d = preg_replace('/\D+/', '', $raw);
+        if ($d === '') {
+            return null;
+        }
+        if (strlen($d) >= 11 && strlen($d) <= 15) {
+            return $d;
+        }
+        if (strlen($d) === 10 && isset($d[0]) && $d[0] === '0') {
+            return '94' . substr($d, 1);
+        }
+        if (strlen($d) === 9) {
+            return '94' . $d;
+        }
+        if (strlen($d) >= 10 && strlen($d) <= 15) {
+            return $d;
+        }
+
+        return null;
+    }
 }
 

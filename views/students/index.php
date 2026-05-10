@@ -38,12 +38,22 @@
 }
 </style>
 
+<?php
+$staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsapp_header) ? $staff_whatsapp_header : [];
+?>
+
 <div class="container-fluid px-4 py-3">
     <div class="card shadow-sm border-0">
         <div class="card-header bg-primary text-white">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                         <h5 class="mb-0 fw-bold"><i class="fas fa-user-graduate me-2"></i>Students Management</h5>
                 <div class="d-flex gap-2 flex-wrap mt-2 mt-md-0">
+                <?php if (!empty($staff_whatsapp_header['url'])): ?>
+                <a href="<?php echo htmlspecialchars($staff_whatsapp_header['url'], ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-sm btn-wa-outline" target="_blank" rel="noopener noreferrer"
+                   title="WhatsApp <?php echo htmlspecialchars($staff_whatsapp_header['display'], ENT_QUOTES, 'UTF-8'); ?>">
+                    <i class="fab fa-whatsapp me-1" aria-hidden="true"></i><?php echo htmlspecialchars($staff_whatsapp_header['display'], ENT_QUOTES, 'UTF-8'); ?>
+                </a>
+                <?php endif; ?>
                 <?php if (isset($canEdit) && $canEdit): ?>
                 <a href="<?php echo APP_URL; ?>/students/create" class="btn btn-light btn-sm">
                     <i class="fas fa-plus me-1"></i>Add New Student
@@ -224,6 +234,7 @@
                             
                             foreach ($students as $student): 
                                 $profileImageUrl = $studentModelHelper->getProfileImagePath($student);
+                                $waDigits = StudentModel::digitsForWhatsAppMe($student);
                             ?>
                                 <tr>
                                     <td class="text-muted"><?php echo $rowNumber++; ?></td>
@@ -253,6 +264,12 @@
                                             <a href="<?php echo APP_URL; ?>/students/view?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-primary" title="View">
                                                 <i class="fas fa-eye"></i>
                                             </a>
+                                            <?php if ($waDigits !== null): ?>
+                                            <a href="<?php echo htmlspecialchars('https://wa.me/' . $waDigits, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-wa-outline" target="_blank" rel="noopener noreferrer"
+                                               title="WhatsApp chat — <?php echo htmlspecialchars($waDigits, ENT_QUOTES, 'UTF-8'); ?>">
+                                                <i class="fab fa-whatsapp" aria-hidden="true"></i>
+                                            </a>
+                                            <?php endif; ?>
                                             <?php if (!empty($isADM)): ?>
                                             <a href="<?php echo APP_URL; ?>/students/id-card?student_id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-primary" title="Preview ID Card">
                                                 <i class="fas fa-id-card"></i>

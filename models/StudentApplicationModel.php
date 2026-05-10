@@ -39,7 +39,7 @@ class StudentApplicationModel extends Model {
 
     /** Staff list at `/student-applications`. */
     private const APPLICATION_LIST_SELECT = '`application_id`, `application_level`, `status`, `student_full_name`, `student_nic`, `student_district`, '
-        . '`student_email`, `student_phone`, `created_at`';
+        . '`student_email`, `student_phone`, `student_whatsapp`, `created_at`';
 
     public function __construct() {
         parent::__construct();
