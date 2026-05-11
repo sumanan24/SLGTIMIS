@@ -51,6 +51,8 @@ $filter_course_id = isset($filter_course_id) && trim((string) $filter_course_id)
 $filter_departments = $filter_departments ?? [];
 /** @var list<array{course_id: string, course_name: string}> $filter_courses */
 $filter_courses = $filter_courses ?? [];
+/** @var string $ajax_table_url JSON endpoint for NIC-filtered table refresh */
+$ajax_table_url = isset($ajax_table_url) && trim((string) $ajax_table_url) !== '' ? trim((string) $ajax_table_url) : '';
 
 if (defined('BASE_PATH') && is_file(BASE_PATH . '/models/StudentModel.php')) {
     require_once BASE_PATH . '/models/StudentModel.php';
@@ -61,6 +63,9 @@ $esc = static function (string $s): string {
 };
 
 $appBase = rtrim(APP_URL, '/');
+if ($ajax_table_url === '') {
+    $ajax_table_url = $appBase . '/student-applications/ajax-table';
+}
 $viewUrl = static function (int $id) use ($appBase, $esc): string {
     return $esc($appBase . '/student-applications/view?id=' . $id);
 };
@@ -183,103 +188,6 @@ if ($filter_course_id !== null) {
 if ($ctxParts !== []) {
     $filterContextSuffix = ' · ' . implode(' · ', $ctxParts);
 }
-
-$renderAppTable = static function (
-    array $rows,
-    callable $esc,
-    callable $viewUrl,
-    string $deleteAction,
-    bool $can_delete,
-    callable $formatSubmitted,
-    string $statusLabel,
-    string $badgeClass,
-    int $rowNumBase = 0
-): void {
-    ?>
-    <div class="table-responsive sa-apps-table-responsive">
-        <table class="table table-striped table-hover table-bordered align-middle w-100 mb-0 sa-apps-table">
-            <thead class="table-light">
-                <tr>
-                    <th scope="col" class="text-end sa-apps-col-num">#</th>
-                    <th scope="col">Level</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Full name</th>
-                    <th scope="col">NIC</th>
-                    <th scope="col">District</th>
-                    <th scope="col">Email</th>
-                    <th scope="col">Phone</th>
-                    <th scope="col">Date sent</th>
-                    <th scope="col"><span class="visually-hidden">Actions</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if ($rows === []): ?>
-                <tr>
-                    <td colspan="10" class="sa-apps-empty text-secondary text-center py-5 px-3">No <?php echo $esc($statusLabel); ?> applications<?php
-                        if ($statusLabel === 'new') {
-                            echo ' to review';
-                        } elseif ($statusLabel === 'rejected') {
-                            echo ' for this view';
-                        }
-                    ?>.</td>
-                </tr>
-                <?php else: ?>
-                    <?php
-                    $rowIx = 0;
-                    foreach ($rows as $r):
-                        $rowIx++;
-                        $id = (int) ($r['application_id'] ?? 0);
-                        $seq = $rowNumBase + $rowIx;
-                        $submitted = $formatSubmitted(isset($r['created_at']) ? (string) $r['created_at'] : null);
-                        $waDigits = StudentModel::digitsForWhatsAppMe($r);
-                        ?>
-                <tr>
-                    <td class="text-muted text-end sa-apps-col-num"><?php echo (int) $seq; ?></td>
-                    <td><?php echo $esc((string) ($r['application_level'] ?? '')); ?></td>
-                    <td><span class="badge rounded-pill px-2 <?php echo $esc($badgeClass); ?>"><?php echo $esc(ucfirst($statusLabel)); ?></span></td>
-                    <td><?php echo $esc((string) ($r['student_full_name'] ?? '')); ?></td>
-                    <td><?php echo $esc((string) ($r['student_nic'] ?? '')); ?></td>
-                    <td><?php echo $esc((string) ($r['student_district'] ?? '')); ?></td>
-                    <td><?php echo $esc((string) ($r['student_email'] ?? '')); ?></td>
-                    <td><?php echo $esc((string) ($r['student_phone'] ?? '')); ?></td>
-                    <td data-order="<?php echo $submitted['order']; ?>"><?php echo $submitted['display']; ?></td>
-                    <td>
-                        <?php if ($can_delete): ?>
-                        <form id="sa-app-del-<?php echo $id; ?>" method="post" action="<?php echo $deleteAction; ?>" class="d-none"
-                              onsubmit="return confirm('Delete application #<?php echo $id; ?>? This will also remove uploaded documents on the server.');">
-                            <input type="hidden" name="application_id" value="<?php echo $id; ?>">
-                        </form>
-                        <?php endif; ?>
-                        <div class="btn-group btn-group-sm sa-apps-table-actions" role="group" aria-label="Application #<?php echo $id; ?> actions">
-                            <a class="btn btn-outline-primary" href="<?php echo $viewUrl($id); ?>"
-                               title="View application">
-                                <i class="fas fa-eye" aria-hidden="true"></i>
-                                <span class="visually-hidden"> View</span>
-                            </a>
-                            <?php if ($waDigits !== null): ?>
-                            <a class="btn btn-wa-outline" href="<?php echo $esc('https://wa.me/' . $waDigits); ?>"
-                               target="_blank" rel="noopener noreferrer"
-                               title="WhatsApp <?php echo $esc($waDigits); ?>">
-                                <i class="fab fa-whatsapp" aria-hidden="true"></i>
-                                <span class="visually-hidden"> WhatsApp</span>
-                            </a>
-                            <?php endif; ?>
-                            <?php if ($can_delete): ?>
-                            <button type="submit" form="sa-app-del-<?php echo $id; ?>" class="btn btn-outline-danger" title="Delete application">
-                                <i class="fas fa-trash-alt" aria-hidden="true"></i>
-                                <span class="visually-hidden"> Delete</span>
-                            </button>
-                            <?php endif; ?>
-                        </div>
-                    </td>
-                </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-    <?php
-};
 ?>
 <link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=18">
 <div class="sa-admin-page sa-student-apps-index container-fluid py-3 px-lg-4<?php echo $active_view === 'dashboard' ? ' sa-page-dashboard' : ''; ?>">
@@ -346,6 +254,12 @@ $renderAppTable = static function (
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <?php if ($active_view === 'table'): ?>
+                    <div class="d-flex flex-column gap-1 sa-apps-filter-field sa-apps-filter-nic">
+                        <label for="saNicFilter" class="form-label small text-secondary text-uppercase mb-0 fw-semibold">NIC</label>
+                        <input type="search" id="saNicFilter" class="form-control form-control-sm" maxlength="20" placeholder="Filter as you type" autocomplete="off" spellcheck="false" aria-label="Filter table by NIC" style="min-width: 9rem;">
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <div class="d-flex flex-wrap align-items-center gap-2 flex-shrink-0">
                     <?php if ($staff_whatsapp !== null): ?>
@@ -361,17 +275,17 @@ $renderAppTable = static function (
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><h6 class="dropdown-header">All levels</h6></li>
-                        <li><a class="dropdown-item" href="<?php echo $excelUrl(null, null); ?>">All applications</a></li>
-                        <li><a class="dropdown-item" href="<?php echo $excelUrl('new', null); ?>">New only</a></li>
-                        <li><a class="dropdown-item" href="<?php echo $excelUrl('approved', null); ?>">Approved only</a></li>
-                        <li><a class="dropdown-item" href="<?php echo $excelUrl('rejected', null); ?>">Rejected only</a></li>
+                        <li><a class="dropdown-item sa-excel-export-item" href="<?php echo $excelUrl(null, null); ?>">All applications</a></li>
+                        <li><a class="dropdown-item sa-excel-export-item" href="<?php echo $excelUrl('new', null); ?>">New only</a></li>
+                        <li><a class="dropdown-item sa-excel-export-item" href="<?php echo $excelUrl('approved', null); ?>">Approved only</a></li>
+                        <li><a class="dropdown-item sa-excel-export-item" href="<?php echo $excelUrl('rejected', null); ?>">Rejected only</a></li>
                         <?php if ($filter_level === '04' || $filter_level === '05'): ?>
                         <li><hr class="dropdown-divider"></li>
                         <li><h6 class="dropdown-header">Level <?php echo $esc($filter_level); ?> only</h6></li>
-                        <li><a class="dropdown-item" href="<?php echo $excelUrl(null, $filter_level); ?>">All statuses</a></li>
-                        <li><a class="dropdown-item" href="<?php echo $excelUrl('new', $filter_level); ?>">New</a></li>
-                        <li><a class="dropdown-item" href="<?php echo $excelUrl('approved', $filter_level); ?>">Approved</a></li>
-                        <li><a class="dropdown-item" href="<?php echo $excelUrl('rejected', $filter_level); ?>">Rejected</a></li>
+                        <li><a class="dropdown-item sa-excel-export-item" href="<?php echo $excelUrl(null, $filter_level); ?>">All statuses</a></li>
+                        <li><a class="dropdown-item sa-excel-export-item" href="<?php echo $excelUrl('new', $filter_level); ?>">New</a></li>
+                        <li><a class="dropdown-item sa-excel-export-item" href="<?php echo $excelUrl('approved', $filter_level); ?>">Approved</a></li>
+                        <li><a class="dropdown-item sa-excel-export-item" href="<?php echo $excelUrl('rejected', $filter_level); ?>">Rejected</a></li>
                         <?php endif; ?>
                     </ul>
                 </div>
@@ -384,7 +298,7 @@ $renderAppTable = static function (
                     <a class="nav-link text-nowrap<?php echo $active_tab === 'new' ? ' active' : ''; ?>"
                        href="<?php echo $buildListUrl($filter_level, 'new', 1, 1, 1); ?>"
                        <?php echo $active_tab === 'new' ? 'aria-current="page"' : ''; ?>>
-                        <span class="badge bg-secondary me-1"><?php echo $count_new; ?></span>
+                        <span class="badge bg-secondary me-1" id="saTabBadgeNew"><?php echo $count_new; ?></span>
                         New
                     </a>
                 </li>
@@ -392,7 +306,7 @@ $renderAppTable = static function (
                     <a class="nav-link text-nowrap<?php echo $active_tab === 'approved' ? ' active' : ''; ?>"
                        href="<?php echo $buildListUrl($filter_level, 'approved', 1, 1, 1); ?>"
                        <?php echo $active_tab === 'approved' ? 'aria-current="page"' : ''; ?>>
-                        <span class="badge bg-success me-1"><?php echo $count_approved; ?></span>
+                        <span class="badge bg-success me-1" id="saTabBadgeApproved"><?php echo $count_approved; ?></span>
                         Approved
                     </a>
                 </li>
@@ -400,7 +314,7 @@ $renderAppTable = static function (
                     <a class="nav-link text-nowrap<?php echo $active_tab === 'rejected' ? ' active' : ''; ?>"
                        href="<?php echo $buildListUrl($filter_level, 'rejected', 1, 1, 1); ?>"
                        <?php echo $active_tab === 'rejected' ? 'aria-current="page"' : ''; ?>>
-                        <span class="badge bg-danger me-1"><?php echo $count_rejected; ?></span>
+                        <span class="badge bg-danger me-1" id="saTabBadgeRejected"><?php echo $count_rejected; ?></span>
                         Rejected
                     </a>
                 </li>
@@ -514,108 +428,21 @@ $renderAppTable = static function (
                 </div>
                 <?php endif; ?>
             </div>
-            <?php elseif ($active_tab === 'new'): ?>
-            <div class="sa-apps-panel-lead px-3 py-3 mb-0 border-bottom bg-white" id="sa-panel-desc">
-                <p class="small text-secondary mb-0"><span class="fw-semibold text-dark"><?php echo $count_new; ?></span> to review<?php echo $filterContextSuffix; ?>.</p>
+            <?php elseif ($active_view === 'table'): ?>
+            <div id="saAppsTableMount" class="sa-apps-table-mount" role="region" aria-live="polite" aria-busy="false"
+                 data-sa-ajax="<?php echo $esc($ajax_table_url); ?>"
+                 data-sa-tab="<?php echo $esc($active_tab); ?>"
+                 data-sa-pn="<?php echo (int) $page_new; ?>"
+                 data-sa-pa="<?php echo (int) $page_approved; ?>"
+                 data-sa-pr="<?php echo (int) $page_rejected; ?>"
+                 <?php if ($filter_level !== null): ?>data-sa-level="<?php echo $esc($filter_level); ?>"<?php endif; ?>
+                 <?php if ($filter_department_id !== null && $filter_department_id !== ''): ?>data-sa-dept="<?php echo $esc($filter_department_id); ?>"<?php endif; ?>
+                 <?php if ($filter_course_id !== null && $filter_course_id !== ''): ?>data-sa-course="<?php echo $esc($filter_course_id); ?>"<?php endif; ?>>
+                <?php
+                $ajax_pagination = true;
+                require BASE_PATH . '/views/student_application/admin_ajax_table_inner.php';
+                ?>
             </div>
-            <?php $renderAppTable($applications_new, $esc, $viewUrl, $deleteAction, $can_delete, $formatSubmitted, 'new', 'bg-secondary', ($page_new - 1) * $per_page); ?>
-            <?php if ($max_page_new > 1): ?>
-            <nav class="sa-apps-pagination pt-3 px-3 border-top mt-3" aria-label="New applications pages">
-                <ul class="pagination pagination-sm justify-content-center flex-wrap mb-0">
-                    <li class="page-item<?php echo $page_new <= 1 ? ' disabled' : ''; ?>">
-                        <a class="page-link" href="<?php echo $buildListUrl($filter_level, 'new', max(1, $page_new - 1), 1, 1); ?>">Previous</a>
-                    </li>
-                    <?php
-                    $window = 2;
-                    $start = max(1, $page_new - $window);
-                    $end = min($max_page_new, $page_new + $window);
-                    if ($start > 1): ?>
-                    <li class="page-item"><a class="page-link" href="<?php echo $buildListUrl($filter_level, 'new', 1, 1, 1); ?>">1</a></li>
-                    <?php if ($start > 2): ?><li class="page-item disabled"><span class="page-link">…</span></li><?php endif; ?>
-                    <?php endif; ?>
-                    <?php for ($p = $start; $p <= $end; $p++): ?>
-                    <li class="page-item<?php echo $p === $page_new ? ' active' : ''; ?>">
-                        <a class="page-link" href="<?php echo $buildListUrl($filter_level, 'new', $p, 1, 1); ?>"><?php echo $p; ?></a>
-                    </li>
-                    <?php endfor; ?>
-                    <?php if ($end < $max_page_new): ?>
-                    <?php if ($end < $max_page_new - 1): ?><li class="page-item disabled"><span class="page-link">…</span></li><?php endif; ?>
-                    <li class="page-item"><a class="page-link" href="<?php echo $buildListUrl($filter_level, 'new', $max_page_new, 1, 1); ?>"><?php echo $max_page_new; ?></a></li>
-                    <?php endif; ?>
-                    <li class="page-item<?php echo $page_new >= $max_page_new ? ' disabled' : ''; ?>">
-                        <a class="page-link" href="<?php echo $buildListUrl($filter_level, 'new', min($max_page_new, $page_new + 1), 1, 1); ?>">Next</a>
-                    </li>
-                </ul>
-            </nav>
-            <?php endif; ?>
-            <?php elseif ($active_tab === 'approved'): ?>
-            <div class="sa-apps-panel-lead px-3 py-3 mb-0 border-bottom bg-white" id="sa-panel-desc">
-                <p class="small text-secondary mb-0"><span class="fw-semibold text-dark"><?php echo $count_approved; ?></span> approved<?php echo $filterContextSuffix; ?>.</p>
-            </div>
-            <?php $renderAppTable($applications_approved, $esc, $viewUrl, $deleteAction, $can_delete, $formatSubmitted, 'approved', 'bg-success', ($page_approved - 1) * $per_page); ?>
-            <?php if ($max_page_approved > 1): ?>
-            <nav class="sa-apps-pagination pt-3 px-3 border-top mt-3" aria-label="Approved applications pages">
-                <ul class="pagination pagination-sm justify-content-center flex-wrap mb-0">
-                    <li class="page-item<?php echo $page_approved <= 1 ? ' disabled' : ''; ?>">
-                        <a class="page-link" href="<?php echo $buildListUrl($filter_level, 'approved', 1, max(1, $page_approved - 1), 1); ?>">Previous</a>
-                    </li>
-                    <?php
-                    $windowAppr = 2;
-                    $startA = max(1, $page_approved - $windowAppr);
-                    $endA = min($max_page_approved, $page_approved + $windowAppr);
-                    if ($startA > 1): ?>
-                    <li class="page-item"><a class="page-link" href="<?php echo $buildListUrl($filter_level, 'approved', 1, 1, 1); ?>">1</a></li>
-                    <?php if ($startA > 2): ?><li class="page-item disabled"><span class="page-link">…</span></li><?php endif; ?>
-                    <?php endif; ?>
-                    <?php for ($p = $startA; $p <= $endA; $p++): ?>
-                    <li class="page-item<?php echo $p === $page_approved ? ' active' : ''; ?>">
-                        <a class="page-link" href="<?php echo $buildListUrl($filter_level, 'approved', 1, $p, 1); ?>"><?php echo $p; ?></a>
-                    </li>
-                    <?php endfor; ?>
-                    <?php if ($endA < $max_page_approved): ?>
-                    <?php if ($endA < $max_page_approved - 1): ?><li class="page-item disabled"><span class="page-link">…</span></li><?php endif; ?>
-                    <li class="page-item"><a class="page-link" href="<?php echo $buildListUrl($filter_level, 'approved', 1, $max_page_approved, 1); ?>"><?php echo $max_page_approved; ?></a></li>
-                    <?php endif; ?>
-                    <li class="page-item<?php echo $page_approved >= $max_page_approved ? ' disabled' : ''; ?>">
-                        <a class="page-link" href="<?php echo $buildListUrl($filter_level, 'approved', 1, min($max_page_approved, $page_approved + 1), 1); ?>">Next</a>
-                    </li>
-                </ul>
-            </nav>
-            <?php endif; ?>
-            <?php else: ?>
-            <div class="sa-apps-panel-lead sa-apps-panel-lead--rejected px-3 py-3 mb-0 border-bottom bg-white" id="sa-panel-desc">
-                <p class="small text-secondary mb-0"><span class="fw-semibold text-dark"><?php echo $count_rejected; ?></span> rejected<?php echo $filterContextSuffix; ?>.</p>
-            </div>
-            <?php $renderAppTable($applications_rejected, $esc, $viewUrl, $deleteAction, $can_delete, $formatSubmitted, 'rejected', 'bg-danger', ($page_rejected - 1) * $per_page); ?>
-            <?php if ($max_page_rejected > 1): ?>
-            <nav class="sa-apps-pagination pt-3 px-3 border-top mt-3" aria-label="Rejected applications pages">
-                <ul class="pagination pagination-sm justify-content-center flex-wrap mb-0">
-                    <li class="page-item<?php echo $page_rejected <= 1 ? ' disabled' : ''; ?>">
-                        <a class="page-link" href="<?php echo $buildListUrl($filter_level, 'rejected', 1, 1, max(1, $page_rejected - 1)); ?>">Previous</a>
-                    </li>
-                    <?php
-                    $windowR = 2;
-                    $startR = max(1, $page_rejected - $windowR);
-                    $endR = min($max_page_rejected, $page_rejected + $windowR);
-                    if ($startR > 1): ?>
-                    <li class="page-item"><a class="page-link" href="<?php echo $buildListUrl($filter_level, 'rejected', 1, 1, 1); ?>">1</a></li>
-                    <?php if ($startR > 2): ?><li class="page-item disabled"><span class="page-link">…</span></li><?php endif; ?>
-                    <?php endif; ?>
-                    <?php for ($p = $startR; $p <= $endR; $p++): ?>
-                    <li class="page-item<?php echo $p === $page_rejected ? ' active' : ''; ?>">
-                        <a class="page-link" href="<?php echo $buildListUrl($filter_level, 'rejected', 1, 1, $p); ?>"><?php echo $p; ?></a>
-                    </li>
-                    <?php endfor; ?>
-                    <?php if ($endR < $max_page_rejected): ?>
-                    <?php if ($endR < $max_page_rejected - 1): ?><li class="page-item disabled"><span class="page-link">…</span></li><?php endif; ?>
-                    <li class="page-item"><a class="page-link" href="<?php echo $buildListUrl($filter_level, 'rejected', 1, 1, $max_page_rejected); ?>"><?php echo $max_page_rejected; ?></a></li>
-                    <?php endif; ?>
-                    <li class="page-item<?php echo $page_rejected >= $max_page_rejected ? ' disabled' : ''; ?>">
-                        <a class="page-link" href="<?php echo $buildListUrl($filter_level, 'rejected', 1, 1, min($max_page_rejected, $page_rejected + 1)); ?>">Next</a>
-                    </li>
-                </ul>
-            </nav>
-            <?php endif; ?>
             <?php endif; ?>
         </div>
     </section>
@@ -624,6 +451,85 @@ $renderAppTable = static function (
     (function () {
       document.querySelectorAll('[data-sa-filter-nav="1"]').forEach(function (el) {
         el.addEventListener('change', function () { if (this.value) window.location.href = this.value; });
+      });
+      var mount = document.getElementById('saAppsTableMount');
+      var nic = document.getElementById('saNicFilter');
+      if (!mount || !nic || !mount.getAttribute('data-sa-ajax')) return;
+      var ajaxUrl = mount.getAttribute('data-sa-ajax');
+      var abort;
+      var debTimer;
+      function buildQuery(resetPage) {
+        if (resetPage) {
+          mount.setAttribute('data-sa-pn', '1');
+          mount.setAttribute('data-sa-pa', '1');
+          mount.setAttribute('data-sa-pr', '1');
+        }
+        var p = new URLSearchParams();
+        var tab = mount.getAttribute('data-sa-tab') || 'new';
+        p.set('tab', tab);
+        var lev = mount.getAttribute('data-sa-level');
+        if (lev) p.set('level', lev);
+        var dept = mount.getAttribute('data-sa-dept');
+        if (dept) p.set('dept', dept);
+        var course = mount.getAttribute('data-sa-course');
+        if (course) p.set('course', course);
+        var nicVal = nic.value.trim();
+        if (nicVal) p.set('nic', nicVal);
+        if (tab === 'new') p.set('pn', mount.getAttribute('data-sa-pn') || '1');
+        else if (tab === 'approved') p.set('pa', mount.getAttribute('data-sa-pa') || '1');
+        else p.set('pr', mount.getAttribute('data-sa-pr') || '1');
+        return p.toString();
+      }
+      function runFetch(resetPage) {
+        if (abort) abort.abort();
+        abort = new AbortController();
+        mount.setAttribute('aria-busy', 'true');
+        var q = buildQuery(resetPage);
+        fetch(ajaxUrl + (q ? '?' + q : ''), { signal: abort.signal, credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            mount.setAttribute('aria-busy', 'false');
+            if (!j || !j.ok) return;
+            var inner = mount.querySelector('.sa-apps-table-mount-inner');
+            if (inner) inner.outerHTML = j.html;
+            if (j.counts) {
+              var bN = document.getElementById('saTabBadgeNew');
+              var bA = document.getElementById('saTabBadgeApproved');
+              var bR = document.getElementById('saTabBadgeRejected');
+              if (bN) bN.textContent = String(j.counts.new);
+              if (bA) bA.textContent = String(j.counts.approved);
+              if (bR) bR.textContent = String(j.counts.rejected);
+            }
+          })
+          .catch(function () { mount.setAttribute('aria-busy', 'false'); });
+      }
+      nic.addEventListener('input', function () {
+        clearTimeout(debTimer);
+        debTimer = setTimeout(function () { runFetch(true); }, 300);
+      });
+      mount.addEventListener('click', function (e) {
+        var btn = e.target.closest('.sa-nic-ajax-pag');
+        if (!btn || !mount.contains(btn) || btn.disabled) return;
+        e.preventDefault();
+        var tab = btn.getAttribute('data-sa-tab') || 'new';
+        var pn = parseInt(btn.getAttribute('data-sa-pn'), 10) || 1;
+        mount.setAttribute('data-sa-tab', tab);
+        if (tab === 'new') mount.setAttribute('data-sa-pn', String(pn));
+        else if (tab === 'approved') mount.setAttribute('data-sa-pa', String(pn));
+        else mount.setAttribute('data-sa-pr', String(pn));
+        runFetch(false);
+      });
+      document.querySelectorAll('a.sa-excel-export-item').forEach(function (a) {
+        a.addEventListener('click', function (ev) {
+          var inp = document.getElementById('saNicFilter');
+          if (!inp) return;
+          var v = inp.value.trim();
+          if (!v) return;
+          ev.preventDefault();
+          var u = new URL(this.getAttribute('href'), window.location.href);
+          u.searchParams.set('nic', v);
+          window.location.href = u.pathname + u.search;
+        });
       });
     })();
     </script>

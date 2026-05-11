@@ -280,9 +280,25 @@ class StudentApplicationModel extends Model {
     }
 
     /**
+     * Optional NIC substring filter for staff list, dashboard, and exports.
+     * Search term uses digits and V/X only (other characters stripped); matches stored NIC with spaces/dashes/slashes removed.
+     *
+     * @return array{sql: string, types: string, params: list<string>}
+     */
+    private function adminNicFilterPartsFromRaw(?string $nicFilterRaw): array {
+        $norm = preg_replace('/[^0-9vVxX]/', '', (string) ($nicFilterRaw ?? ''));
+        if ($norm === '') {
+            return ['sql' => '', 'types' => '', 'params' => []];
+        }
+        $norm = strtoupper($norm);
+        $sql = ' AND UPPER(REPLACE(REPLACE(REPLACE(TRIM(CONVERT(`sa`.`student_nic` USING utf8mb4)), \' \', \'\'), \'-\', \'\'), \'/\', \'\')) LIKE ?';
+        return ['sql' => $sql, 'types' => 's', 'params' => ['%' . $norm . '%']];
+    }
+
+    /**
      * Count applications for staff list (optional NVQ level 04 / 05; optional 1st preference department / course).
      */
-    public function countListForAdmin(string $status, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false): int {
+    public function countListForAdmin(string $status, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null): int {
         $this->ensureTable();
         $this->migrateSchema();
         if (!in_array($status, ['new', 'approved', 'rejected'], true)) {
@@ -300,6 +316,12 @@ class StudentApplicationModel extends Model {
         $sql .= $frag['whereSuffix'];
         $types .= $frag['suffixTypes'];
         foreach ($frag['suffixParams'] as $p) {
+            $params[] = $p;
+        }
+        $nicFrag = $this->adminNicFilterPartsFromRaw($nicFilterRaw);
+        $sql .= $nicFrag['sql'];
+        $types .= $nicFrag['types'];
+        foreach ($nicFrag['params'] as $p) {
             $params[] = $p;
         }
         if ($onlySubmittedForStaff) {
@@ -328,7 +350,7 @@ class StudentApplicationModel extends Model {
      *
      * @return list<array<string, mixed>>
      */
-    public function getListPageForAdmin(string $status, ?string $level, int $page, int $perPage, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false): array {
+    public function getListPageForAdmin(string $status, ?string $level, int $page, int $perPage, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null): array {
         $this->ensureTable();
         $this->migrateSchema();
         if (!in_array($status, ['new', 'approved', 'rejected'], true)) {
@@ -350,6 +372,12 @@ class StudentApplicationModel extends Model {
         $sql .= $frag['whereSuffix'];
         $types .= $frag['suffixTypes'];
         foreach ($frag['suffixParams'] as $p) {
+            $params[] = $p;
+        }
+        $nicFrag = $this->adminNicFilterPartsFromRaw($nicFilterRaw);
+        $sql .= $nicFrag['sql'];
+        $types .= $nicFrag['types'];
+        foreach ($nicFrag['params'] as $p) {
             $params[] = $p;
         }
         if ($onlySubmittedForStaff) {
@@ -734,7 +762,7 @@ class StudentApplicationModel extends Model {
      *
      * @return array{total: int, by_status: array{new: int, approved: int, rejected: int}, by_level: list<array{level: string, count: int}>, by_district: list<array{label: string, count: int}>, by_course: list<array{label: string, count: int}>, by_department: list<array{label: string, count: int}>, by_gender: list<array{label: string, count: int}>}
      */
-    public function getDashboardStats(?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false): array {
+    public function getDashboardStats(?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null): array {
         $this->ensureTable();
         $this->migrateSchema();
         $out = [
@@ -764,10 +792,16 @@ class StudentApplicationModel extends Model {
         foreach ($existsPart['params'] as $ep) {
             $filterParams[] = $ep;
         }
+        $nicPart = $this->adminNicFilterPartsFromRaw($nicFilterRaw);
+        $filterTail .= $nicPart['sql'];
+        $filterTypes .= $nicPart['types'];
+        foreach ($nicPart['params'] as $np) {
+            $filterParams[] = $np;
+        }
         if ($onlySubmittedForStaff) {
             $filterTail .= ' AND (' . self::sqlStaffAffairsListPredicate('sa') . ')';
         }
-        $filtered = ($levelPart !== '' || $existsPart['sql'] !== '');
+        $filtered = ($levelPart !== '' || $existsPart['sql'] !== '' || $nicPart['sql'] !== '');
 
         $db = $this->db;
         $self = $this;
@@ -972,7 +1006,7 @@ class StudentApplicationModel extends Model {
      * @param string|null $courseId optional: 1st preference matches this `course`.`course_id`
      * @return list<array<string, mixed>>
      */
-    public function getAllForStaffExport(?string $status = null, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false): array {
+    public function getAllForStaffExport(?string $status = null, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null): array {
         $this->ensureTable();
         $this->migrateSchema();
         $conn = $this->db->getConnection();
@@ -1034,6 +1068,12 @@ class StudentApplicationModel extends Model {
         }
         if ($onlySubmittedForStaff) {
             $sql .= ' AND (' . self::sqlStaffAffairsListPredicate('sa') . ')';
+        }
+        $nicFrag = $this->adminNicFilterPartsFromRaw($nicFilterRaw);
+        $sql .= $nicFrag['sql'];
+        $types .= $nicFrag['types'];
+        foreach ($nicFrag['params'] as $p) {
+            $params[] = $p;
         }
         $sql .= ' ORDER BY sa.`created_at` DESC';
 

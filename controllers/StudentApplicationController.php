@@ -1806,29 +1806,13 @@ class StudentApplicationController extends Controller {
     }
 
     /**
-     * Staff (SAO, ADM, admin): list online applications.
+     * NVQ level + department + course filters for staff applications list (shared by admin index + AJAX table).
+     *
+     * @return array{level: ?string, dept_id: ?string, course_id: ?string}
      */
-    public function adminIndex() {
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return;
-        }
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $uid = (int) $_SESSION['user_id'];
-        if (!$userModel->canViewOnlineStudentApplications($uid)) {
-            $_SESSION['error'] = 'You cannot open this page. Only Student Affairs (SAO) and Administrators (ADM) may access online applications.';
-            $this->redirect('dashboard');
-            return;
-        }
-
-        $model = $this->model('StudentApplicationModel');
-        $excludeNicDrafts = $this->staffStudentAppsExcludeNicDrafts($userModel, $uid);
+    private function studentApplicationsAdminListFilters(): array {
         $levelRaw = trim((string) $this->get('level', ''));
         $filterLevel = in_array($levelRaw, ['04', '05'], true) ? $levelRaw : null;
-        $tabRaw = strtolower(trim((string) $this->get('tab', '')));
-        $activeTab = in_array($tabRaw, ['approved', 'rejected'], true) ? $tabRaw : 'new';
-
         $deptRaw = trim((string) $this->get('dept', ''));
         $courseRaw = trim((string) $this->get('course', ''));
         $filterDeptId = null;
@@ -1850,6 +1834,189 @@ class StudentApplicationController extends Controller {
                 }
             }
         }
+
+        return ['level' => $filterLevel, 'dept_id' => $filterDeptId, 'course_id' => $filterCourseId];
+    }
+
+    /**
+     * Staff: JSON payload to refresh applications table + tab counts (NIC filter, AJAX).
+     */
+    public function adminAjaxTable(): void {
+        if (!isset($_SESSION['user_id'])) {
+            http_response_code(401);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => 'auth']);
+            exit;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        if (!$userModel->canViewOnlineStudentApplications($uid)) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => 'forbidden']);
+            exit;
+        }
+
+        $filters = $this->studentApplicationsAdminListFilters();
+        $filterLevel = $filters['level'];
+        $filterDeptId = $filters['dept_id'];
+        $filterCourseId = $filters['course_id'];
+        $nicRaw = trim((string) $this->get('nic', ''));
+
+        $tabRaw = strtolower(trim((string) $this->get('tab', '')));
+        $activeTab = in_array($tabRaw, ['approved', 'rejected'], true) ? $tabRaw : 'new';
+
+        $model = $this->model('StudentApplicationModel');
+        $excludeNicDrafts = $this->staffStudentAppsExcludeNicDrafts($userModel, $uid);
+        $perPage = 20;
+
+        $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw);
+        $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw);
+        $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw);
+        $maxPageNew = max(1, (int) ceil($countNew / $perPage));
+        $maxPageApproved = max(1, (int) ceil($countApproved / $perPage));
+        $maxPageRejected = max(1, (int) ceil($countRejected / $perPage));
+
+        $pageNew = max(1, min((int) $this->get('pn', 1), $maxPageNew));
+        $pageApproved = max(1, min((int) $this->get('pa', 1), $maxPageApproved));
+        $pageRejected = max(1, min((int) $this->get('pr', 1), $maxPageRejected));
+
+        $applicationsNew = $activeTab === 'new'
+            ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw)
+            : [];
+        $applicationsApproved = $activeTab === 'approved'
+            ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw)
+            : [];
+        $applicationsRejected = $activeTab === 'rejected'
+            ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw)
+            : [];
+
+        if (defined('BASE_PATH') && is_file(BASE_PATH . '/models/StudentModel.php')) {
+            require_once BASE_PATH . '/models/StudentModel.php';
+        }
+
+        $appBase = rtrim(APP_URL, '/');
+        $esc = static function (string $s): string {
+            return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+        };
+        $viewUrl = static function (int $id) use ($appBase, $esc): string {
+            return $esc($appBase . '/student-applications/view?id=' . $id);
+        };
+        $deleteAction = $esc($appBase . '/student-applications/delete');
+        $formatSubmitted = static function (?string $createdAt) use ($esc): array {
+            if ($createdAt === null || trim($createdAt) === '') {
+                return ['order' => '', 'display' => ''];
+            }
+            $raw = trim($createdAt);
+            $ts = strtotime($raw);
+            $display = $ts ? date('Y-m-d H:i', $ts) : $raw;
+            return ['order' => $esc($raw), 'display' => $esc($display)];
+        };
+        $listBase = $appBase . '/student-applications';
+        $activeView = 'table';
+        $makeListQuery = static function (?string $level, string $tab, int $pn, int $pa, int $pr, ?string $deptId, ?string $courseId, ?string $viewOverride = null) use ($activeView): array {
+            $tab = in_array($tab, ['approved', 'rejected'], true) ? $tab : 'new';
+            $q = ['tab' => $tab];
+            if ($level === '04' || $level === '05') {
+                $q['level'] = $level;
+            }
+            if ($tab === 'new' && $pn > 1) {
+                $q['pn'] = $pn;
+            }
+            if ($tab === 'approved' && $pa > 1) {
+                $q['pa'] = $pa;
+            }
+            if ($tab === 'rejected' && $pr > 1) {
+                $q['pr'] = $pr;
+            }
+            if ($deptId !== null && $deptId !== '') {
+                $q['dept'] = $deptId;
+            }
+            if ($courseId !== null && $courseId !== '') {
+                $q['course'] = $courseId;
+            }
+            $effView = $viewOverride !== null ? $viewOverride : $activeView;
+            if ($effView === 'dashboard') {
+                $q['view'] = 'dashboard';
+            }
+            return $q;
+        };
+        $buildListUrl = static function (?string $level, string $tab, int $pn = 1, int $pa = 1, int $pr = 1) use ($listBase, $esc, $makeListQuery, $filterDeptId, $filterCourseId): string {
+            return $esc($listBase . '?' . http_build_query($makeListQuery($level, $tab, $pn, $pa, $pr, $filterDeptId, $filterCourseId, null)));
+        };
+
+        $ctxParts = [];
+        if ($filterLevel !== null) {
+            $ctxParts[] = 'NVQ Level ' . $esc($filterLevel);
+        }
+        if ($filterDeptId !== null) {
+            $ctxParts[] = 'Department';
+        }
+        if ($filterCourseId !== null) {
+            $ctxParts[] = 'Course';
+        }
+        $filterContextSuffix = $ctxParts !== [] ? ' · ' . implode(' · ', $ctxParts) : '';
+
+        $ajax_pagination = true;
+        $can_delete = $userModel->isAdminOrADM($uid);
+        $applications_new = $applicationsNew;
+        $applications_approved = $applicationsApproved;
+        $applications_rejected = $applicationsRejected;
+        $page_new = $pageNew;
+        $page_approved = $pageApproved;
+        $page_rejected = $pageRejected;
+        $max_page_new = $maxPageNew;
+        $max_page_approved = $maxPageApproved;
+        $max_page_rejected = $maxPageRejected;
+        $count_new = $countNew;
+        $count_approved = $countApproved;
+        $count_rejected = $countRejected;
+        $active_tab = $activeTab;
+        $filter_level = $filterLevel;
+        $per_page = $perPage;
+        ob_start();
+        require BASE_PATH . '/views/student_application/admin_ajax_table_inner.php';
+        $html = ob_get_clean();
+
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => true,
+            'html' => $html,
+            'counts' => [
+                'new' => $countNew,
+                'approved' => $countApproved,
+                'rejected' => $countRejected,
+            ],
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    /**
+     * Staff (SAO, ADM, admin): list online applications.
+     */
+    public function adminIndex() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        if (!$userModel->canViewOnlineStudentApplications($uid)) {
+            $_SESSION['error'] = 'You cannot open this page. Only Student Affairs (SAO) and Administrators (ADM) may access online applications.';
+            $this->redirect('dashboard');
+            return;
+        }
+
+        $model = $this->model('StudentApplicationModel');
+        $excludeNicDrafts = $this->staffStudentAppsExcludeNicDrafts($userModel, $uid);
+        $filters = $this->studentApplicationsAdminListFilters();
+        $filterLevel = $filters['level'];
+        $filterDeptId = $filters['dept_id'];
+        $filterCourseId = $filters['course_id'];
+        $tabRaw = strtolower(trim((string) $this->get('tab', '')));
+        $activeTab = in_array($tabRaw, ['approved', 'rejected'], true) ? $tabRaw : 'new';
 
         $viewRaw = strtolower(trim((string) $this->get('view', '')));
         $activeView = $viewRaw === 'dashboard' ? 'dashboard' : 'table';
@@ -1898,6 +2065,7 @@ class StudentApplicationController extends Controller {
             'filter_level' => $filterLevel,
             'filter_department_id' => $filterDeptId,
             'filter_course_id' => $filterCourseId,
+            'ajax_table_url' => rtrim(APP_URL, '/') . '/student-applications/ajax-table',
             // Filter dropdowns: load full catalogue (not just values used by applications).
             'filter_departments' => $this->model('DepartmentModel')->getAll(),
             'filter_courses' => $this->model('CourseModel')->getCoursesWithDepartment([
@@ -2413,6 +2581,7 @@ class StudentApplicationController extends Controller {
         }
 
         $excludeNicDrafts = $this->staffStudentAppsExcludeNicDrafts($userModel, $uid);
+        $exportNicRaw = trim((string) $this->get('nic', ''));
 
         // PhpSpreadsheet has several PHP extension requirements; if any are missing,
         // export as an Excel-readable HTML table (.xls) instead of failing.
@@ -2446,7 +2615,7 @@ class StudentApplicationController extends Controller {
             error_log('StudentApplicationController::adminExportExcel autoload: ' . $e->getMessage());
             // Autoloader missing → fallback.
             $model = $this->model('StudentApplicationModel');
-            $rows = $model->getAllForStaffExport(null, null, null, null, $excludeNicDrafts);
+            $rows = $model->getAllForStaffExport(null, null, null, null, $excludeNicDrafts, $exportNicRaw);
             $xlsFallback($rows, StudentApplicationModel::getStaffExportColumnOrder(), null);
         }
 
@@ -2476,7 +2645,7 @@ class StudentApplicationController extends Controller {
                 }
             }
         }
-        $rows = $model->getAllForStaffExport($exportStatus, $exportLevel, $exportDeptId, $exportCourseId, $excludeNicDrafts);
+        $rows = $model->getAllForStaffExport($exportStatus, $exportLevel, $exportDeptId, $exportCourseId, $excludeNicDrafts, $exportNicRaw);
         $allCols = StudentApplicationModel::getStaffExportColumnOrder();
         $colsParam = trim((string) $this->get('cols', ''));
         $cols = $allCols;

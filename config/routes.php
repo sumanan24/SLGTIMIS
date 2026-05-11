@@ -208,6 +208,7 @@ return [
     'student-application/api/departments' => 'StudentApplicationController@apiDepartments',
     'student-application/api/courses' => 'StudentApplicationController@apiCourses',
     'student-applications' => 'StudentApplicationController@adminIndex',
+    'student-applications/ajax-table' => 'StudentApplicationController@adminAjaxTable',
     'student-applications/view' => 'StudentApplicationController@adminView',
     'student-applications/approve' => 'StudentApplicationController@adminApprove',
     'student-applications/reject' => 'StudentApplicationController@adminReject',
