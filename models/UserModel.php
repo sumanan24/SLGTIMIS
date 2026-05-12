@@ -276,6 +276,13 @@ class UserModel extends Model {
     }
 
     /**
+     * Edit stored application fields (same gate as delete): system admin or ADM only — not SAO/RSA.
+     */
+    public function canEditOnlineStudentApplications($userId): bool {
+        return $this->isAdminOrADM($userId);
+    }
+
+    /**
      * Exam module: examinations office (EXAM) or Administrator (ADM), plus system admin.
      */
     public function canAccessExamsModule($userId): bool {

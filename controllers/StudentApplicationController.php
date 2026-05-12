@@ -1903,6 +1903,9 @@ class StudentApplicationController extends Controller {
         $viewUrl = static function (int $id) use ($appBase, $esc): string {
             return $esc($appBase . '/student-applications/view?id=' . $id);
         };
+        $editUrl = static function (int $id) use ($appBase, $esc): string {
+            return $esc($appBase . '/student-applications/edit?id=' . $id);
+        };
         $deleteAction = $esc($appBase . '/student-applications/delete');
         $formatSubmitted = static function (?string $createdAt) use ($esc): array {
             if ($createdAt === null || trim($createdAt) === '') {
@@ -1960,6 +1963,7 @@ class StudentApplicationController extends Controller {
 
         $ajax_pagination = true;
         $can_delete = $userModel->isAdminOrADM($uid);
+        $can_edit = $userModel->canEditOnlineStudentApplications($uid);
         $applications_new = $applicationsNew;
         $applications_approved = $applicationsApproved;
         $applications_rejected = $applicationsRejected;
@@ -2090,6 +2094,7 @@ class StudentApplicationController extends Controller {
             'applications_rejected' => $applicationsRejected,
             'dashboard_stats' => $dashboardStats,
             'can_delete' => $userModel->isAdminOrADM($uid),
+            'can_edit' => $userModel->canEditOnlineStudentApplications($uid),
             'staff_whatsapp' => $this->staffOnlineApplicationsWhatsAppShortcut(),
             'use_public_layout' => false,
         ]);
@@ -2134,7 +2139,88 @@ class StudentApplicationController extends Controller {
             'page' => 'student-applications',
             'app' => $app,
             'can_delete' => $userModel->isAdminOrADM($uid),
+            'can_edit' => $userModel->canEditOnlineStudentApplications($uid),
             'staff_exclude_incomplete_drafts' => $this->staffStudentAppsExcludeNicDrafts($userModel, $uid),
+            'use_public_layout' => false,
+        ]);
+    }
+
+    /**
+     * ADM / system admin: edit stored application fields (uploads unchanged — use view page to open files).
+     */
+    public function adminEdit() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        if (!$userModel->canEditOnlineStudentApplications($uid)) {
+            $_SESSION['error'] = 'Only Administrators (ADM) and system admins can edit applications.';
+            $this->redirect('student-applications');
+            return;
+        }
+
+        $id = (int) $this->get('id', 0);
+        if ($id < 1) {
+            $id = (int) $this->post('application_id', 0);
+        }
+        if ($id < 1) {
+            $this->redirect('student-applications');
+            return;
+        }
+
+        $model = $this->model('StudentApplicationModel');
+        $app = $model->findById($id);
+        if (!$app) {
+            $_SESSION['error'] = 'That application was not found.';
+            $this->redirect('student-applications');
+            return;
+        }
+
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+            $post = $this->post();
+            $postArr = is_array($post) ? $post : [];
+            if (isset($postArr['application_id']) && (int) $postArr['application_id'] !== $id) {
+                $_SESSION['error'] = 'Invalid form submission.';
+                $this->redirect('student-applications/edit?id=' . $id);
+                return;
+            }
+            $snapshotBefore = $app;
+            $err = null;
+            $ok = $model->updateApplicationFromStaffPost($id, $postArr, $err);
+            if ($ok) {
+                $appAfter = $model->findById($id);
+                $this->logActivity(
+                    'UPDATE',
+                    'student_application',
+                    (string) $id,
+                    'Staff updated stored fields for application #' . $id . '.',
+                    $snapshotBefore,
+                    $appAfter
+                );
+                $_SESSION['message'] = 'Application #' . $id . ' saved.';
+                $this->redirect('student-applications/view?id=' . $id);
+                return;
+            }
+            $_SESSION['error'] = $err !== null && $err !== '' ? $err : 'Could not save changes.';
+            $app = $model->findById($id) ?: $app;
+            foreach (StudentApplicationModel::getStaffEditableColumnNames() as $c) {
+                if (array_key_exists($c, $postArr)) {
+                    $app[$c] = $postArr[$c];
+                }
+            }
+        }
+
+        $coursePrefsOld = $this->studentApplicationRowForApiJson($model, $app);
+
+        return $this->view('student_application/admin_edit', [
+            'title' => 'Edit application #' . $id,
+            'page' => 'student-applications',
+            'app' => $app,
+            'application_id' => $id,
+            'course_prefs_old' => $coursePrefsOld,
             'use_public_layout' => false,
         ]);
     }

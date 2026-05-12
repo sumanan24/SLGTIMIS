@@ -5,7 +5,7 @@
  * Expected variables: $active_tab, $filterContextSuffix, $count_new, $count_approved, $count_rejected,
  * $applications_new, $applications_approved, $applications_rejected,
  * $page_new, $page_approved, $page_rejected, $max_page_new, $max_page_approved, $max_page_rejected,
- * $per_page, $ajax_pagination, $filter_level, $esc, $viewUrl, $deleteAction, $can_delete, $formatSubmitted, $buildListUrl
+ * $per_page, $ajax_pagination, $filter_level, $esc, $viewUrl, $editUrl, $deleteAction, $can_delete, $can_edit, $formatSubmitted, $buildListUrl
  */
 if (!function_exists('sa_admin_student_applications_render_table')) {
     require_once __DIR__ . '/partials/sa_admin_app_table.php';
@@ -24,8 +24,10 @@ if (!function_exists('sa_admin_student_applications_pagination')) {
         $applications_new,
         $esc,
         $viewUrl,
+        $editUrl,
         $deleteAction,
         $can_delete,
+        $can_edit,
         $formatSubmitted,
         'new',
         'bg-secondary',
@@ -44,8 +46,10 @@ if (!function_exists('sa_admin_student_applications_pagination')) {
         $applications_approved,
         $esc,
         $viewUrl,
+        $editUrl,
         $deleteAction,
         $can_delete,
+        $can_edit,
         $formatSubmitted,
         'approved',
         'bg-success',
@@ -64,8 +68,10 @@ if (!function_exists('sa_admin_student_applications_pagination')) {
         $applications_rejected,
         $esc,
         $viewUrl,
+        $editUrl,
         $deleteAction,
         $can_delete,
+        $can_edit,
         $formatSubmitted,
         'rejected',
         'bg-danger',

@@ -9,6 +9,8 @@ $applications_approved = $applications_approved ?? [];
 $applications_rejected = $applications_rejected ?? [];
 /** @var bool $can_delete */
 $can_delete = (bool) ($can_delete ?? false);
+/** @var bool $can_edit ADM / system admin — edit application fields */
+$can_edit = (bool) ($can_edit ?? false);
 /** @var array{url: string, display: string}|null $staff_whatsapp */
 $staff_whatsapp = isset($staff_whatsapp) && is_array($staff_whatsapp) && !empty($staff_whatsapp['url'])
     ? $staff_whatsapp
@@ -68,6 +70,9 @@ if ($ajax_table_url === '') {
 }
 $viewUrl = static function (int $id) use ($appBase, $esc): string {
     return $esc($appBase . '/student-applications/view?id=' . $id);
+};
+$editUrl = static function (int $id) use ($appBase, $esc): string {
+    return $esc($appBase . '/student-applications/edit?id=' . $id);
 };
 $deleteAction = $esc($appBase . '/student-applications/delete');
 

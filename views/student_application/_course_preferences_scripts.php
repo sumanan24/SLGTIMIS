@@ -1,26 +1,36 @@
 <?php
 /**
- * Expects: window.APP_BASE, window.NVQ_COURSE_LEVEL, window.APP_FORM_OLD (set by form.php).
+ * Expects: window.APP_BASE, window.NVQ_COURSE_LEVEL, window.APP_FORM_OLD (set by host page).
+ * Exposes: window.initAppCoursePreferenceSelects(), window.appCoursePrefsRestore(data)
  */
 ?>
 <script>
 (function () {
-  const base = (typeof window.APP_BASE === 'string' ? window.APP_BASE : '').replace(/\/$/, '');
-  const nvqLevel = (typeof window.NVQ_COURSE_LEVEL === 'string' ? window.NVQ_COURSE_LEVEL : '4');
-  const oldData = (typeof window.APP_FORM_OLD === 'object' && window.APP_FORM_OLD) ? window.APP_FORM_OLD : {};
   const prefRows = [1, 2, 3];
 
+  function baseUrl() {
+    return (typeof window.APP_BASE === 'string' ? window.APP_BASE : '').replace(/\/$/, '');
+  }
+
+  function nvqLevel() {
+    return typeof window.NVQ_COURSE_LEVEL === 'string' ? window.NVQ_COURSE_LEVEL : '4';
+  }
+
+  function oldData() {
+    return (typeof window.APP_FORM_OLD === 'object' && window.APP_FORM_OLD) ? window.APP_FORM_OLD : {};
+  }
+
   async function loadDepartments() {
-    const qs = new URLSearchParams({ nvq_level: nvqLevel });
-    const r = await fetch(base + '/student-application/api/departments?' + qs.toString(), { credentials: 'same-origin' });
+    const qs = new URLSearchParams({ nvq_level: nvqLevel() });
+    const r = await fetch(baseUrl() + '/student-application/api/departments?' + qs.toString(), { credentials: 'same-origin' });
     const j = await r.json();
     return (j && j.success && Array.isArray(j.departments)) ? j.departments : [];
   }
 
   async function loadCourses(deptId) {
     if (!deptId) return [];
-    const qs = new URLSearchParams({ department_id: deptId, nvq_level: nvqLevel });
-    const r = await fetch(base + '/student-application/api/courses?' + qs.toString(), { credentials: 'same-origin' });
+    const qs = new URLSearchParams({ department_id: deptId, nvq_level: nvqLevel() });
+    const r = await fetch(baseUrl() + '/student-application/api/courses?' + qs.toString(), { credentials: 'same-origin' });
     const j = await r.json();
     return (j && j.success && Array.isArray(j.courses)) ? j.courses : [];
   }
@@ -59,11 +69,28 @@
     });
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
+  function wireDeptChange(deptSel, courseSel) {
+    deptSel.addEventListener('change', function () {
+      loadCourses(deptSel.value).then(function (courses) {
+        fillCourseSelect(courseSel, courses, '');
+      });
+    });
+  }
+
+  window.initAppCoursePreferenceSelects = function () {
+    const od = oldData();
     loadDepartments().then(function (depts) {
       prefRows.forEach(function (n) {
         var deptSel = document.getElementById('dept_pref_' + n);
         var courseSel = document.getElementById('course_priority_' + n);
+        if (!deptSel || !courseSel) return;
+
+        var cloneD = deptSel.cloneNode(true);
+        var cloneC = courseSel.cloneNode(true);
+        deptSel.parentNode.replaceChild(cloneD, deptSel);
+        courseSel.parentNode.replaceChild(cloneC, courseSel);
+        deptSel = document.getElementById('dept_pref_' + n);
+        courseSel = document.getElementById('course_priority_' + n);
         if (!deptSel || !courseSel) return;
 
         deptSel.innerHTML = '';
@@ -85,20 +112,22 @@
           });
         }
 
-        var oldDept = oldData['dept_pref_' + n] || '';
-        var oldCourse = oldData['course_priority_' + n] || '';
+        var oldDept = od['dept_pref_' + n] || '';
+        var oldCourse = od['course_priority_' + n] || '';
 
-        deptSel.addEventListener('change', function () {
-          loadCourses(deptSel.value).then(function (courses) {
-            fillCourseSelect(courseSel, courses, '');
-          });
-        });
+        wireDeptChange(deptSel, courseSel);
 
         if (oldDept) {
           deptSel.value = oldDept;
           loadCourses(oldDept).then(function (courses) {
             fillCourseSelect(courseSel, courses, oldCourse);
           });
+        } else {
+          courseSel.innerHTML = '';
+          var o0 = document.createElement('option');
+          o0.value = '';
+          o0.textContent = 'Choose department first…';
+          courseSel.appendChild(o0);
         }
       });
     }).catch(function () {
@@ -109,26 +138,20 @@
         }
       });
     });
+  };
+
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof window.initAppCoursePreferenceSelects === 'function') {
+      window.initAppCoursePreferenceSelects();
+    }
   });
 
   window.appCoursePrefsRestore = function (data) {
     if (!data || typeof data !== 'object') return;
-    prefRows.forEach(function (n) {
-      var deptSel = document.getElementById('dept_pref_' + n);
-      var courseSel = document.getElementById('course_priority_' + n);
-      if (!deptSel || !courseSel) return;
-      var oldDept = data['dept_pref_' + n] || '';
-      var oldCourse = data['course_priority_' + n] || '';
-      if (oldDept) {
-        deptSel.value = oldDept;
-        loadCourses(oldDept).then(function (courses) {
-          fillCourseSelect(courseSel, courses, oldCourse);
-        });
-      } else {
-        deptSel.value = '';
-        courseSel.innerHTML = '<option value="">Choose department first…</option>';
-      }
-    });
+    window.APP_FORM_OLD = data;
+    if (typeof window.initAppCoursePreferenceSelects === 'function') {
+      window.initAppCoursePreferenceSelects();
+    }
   };
 })();
 </script>

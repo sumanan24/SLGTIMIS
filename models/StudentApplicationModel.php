@@ -37,6 +37,32 @@ class StudentApplicationModel extends Model {
         'bank_receipt_path',
     ];
 
+    /**
+     * Columns ADM / system admin may change on {@see self::updateApplicationFromStaffPost} (not uploads or keys).
+     *
+     * @return list<string>
+     */
+    public static function getStaffEditableColumnNames(): array {
+        return [
+            'application_level', 'status',
+            'student_title', 'student_full_name', 'student_initial_name', 'student_gender', 'student_civil_status',
+            'student_email', 'student_phone', 'student_whatsapp', 'student_nic', 'student_dob',
+            'student_language', 'student_religion', 'student_blood_group', 'student_address', 'student_zip_code',
+            'student_district', 'student_province',
+            'course_priority_1', 'course_priority_2', 'course_priority_3',
+            'ol_index_number', 'ol_exam_year',
+            'ol_subject_name_01', 'ol_subject_01_marks', 'ol_subject_name_02', 'ol_subject_02_marks',
+            'ol_subject_name_03', 'ol_subject_03_marks', 'ol_subject_name_04', 'ol_subject_04_marks',
+            'ol_subject_name_05', 'ol_subject_05_marks', 'ol_subject_name_06', 'ol_subject_06_marks',
+            'ol_subject_name_07', 'ol_subject_07_marks', 'ol_subject_name_08', 'ol_subject_08_marks',
+            'ol_subject_name_09', 'ol_subject_09_marks',
+            'al_index_number', 'al_exam_year', 'al_stream',
+            'al_subject_name_01', 'al_subject_01_marks', 'al_subject_name_02', 'al_subject_02_marks',
+            'al_subject_name_03', 'al_subject_03_marks',
+            'nvq_level', 'nvq_course_name', 'nvq_institute_name', 'nvq_year_completed',
+        ];
+    }
+
     /** Staff list at `/student-applications`. */
     private const APPLICATION_LIST_SELECT = '`application_id`, `application_level`, `status`, `student_full_name`, `student_nic`, `student_district`, '
         . '`student_email`, `student_phone`, `student_whatsapp`, `created_at`';
@@ -201,6 +227,194 @@ class StudentApplicationModel extends Model {
         $ok = $stmt->execute();
         $stmt->close();
         return (bool) $ok;
+    }
+
+    /**
+     * ADM / system admin: persist allowed columns from POST (upload paths unchanged).
+     *
+     * @param array<string, mixed> $post
+     */
+    public function updateApplicationFromStaffPost(int $applicationId, array $post, ?string &$errorMessage = null): bool {
+        $existing = $this->findById($applicationId);
+        if (!$existing) {
+            $errorMessage = 'Application not found.';
+            return false;
+        }
+        $data = [];
+        foreach (self::getStaffEditableColumnNames() as $col) {
+            if (!array_key_exists($col, $post)) {
+                continue;
+            }
+            $raw = $post[$col];
+            $s = is_scalar($raw) || $raw === null ? trim((string) $raw) : '';
+            $prev = $existing[$col] ?? null;
+            $res = $this->normalizeStaffEditableValue($col, $s, $prev);
+            if (!$res[0]) {
+                $errorMessage = $res[2] ?? 'Invalid data.';
+                return false;
+            }
+            $data[$col] = $res[1];
+        }
+        if ($data === []) {
+            return true;
+        }
+        $sqlErr = null;
+        $ok = $this->update((string) $applicationId, $data, $sqlErr);
+        if (!$ok) {
+            $msg = $sqlErr !== null && $sqlErr !== '' ? $sqlErr : 'Could not save changes.';
+            if (strpos((string) $sqlErr, '1062') !== false || stripos((string) $sqlErr, 'duplicate') !== false) {
+                $msg = 'Another application already uses this NIC or email for the same NVQ level.';
+            }
+            $errorMessage = $msg;
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * @param mixed $previous
+     * @return array{0:bool,1:mixed,2?:string} [ ok, value, errorMessage ]
+     */
+    private function normalizeStaffEditableValue(string $col, string $s, $previous): array {
+        $prevStr = $previous === null ? '' : trim((string) $previous);
+        switch ($col) {
+            case 'application_level':
+                if ($s === '') {
+                    $fb = in_array($prevStr, ['04', '05'], true) ? $prevStr : '05';
+                    return [true, $fb, ''];
+                }
+                if (!in_array($s, ['04', '05'], true)) {
+                    return [false, null, 'NVQ level must be 04 or 05.'];
+                }
+                return [true, $s, ''];
+
+            case 'status':
+                if ($s === '') {
+                    $fb = in_array($prevStr, ['new', 'approved', 'rejected'], true) ? $prevStr : 'new';
+                    return [true, $fb, ''];
+                }
+                if (!in_array($s, ['new', 'approved', 'rejected'], true)) {
+                    return [false, null, 'Status must be new, approved, or rejected.'];
+                }
+                return [true, $s, ''];
+
+            case 'student_title':
+                if ($s === '') {
+                    return [true, null, ''];
+                }
+                if (!in_array($s, ['Mr', 'Miss', 'Mrs'], true)) {
+                    return [false, null, 'Title must be Mr, Miss, or Mrs.'];
+                }
+                return [true, $s, ''];
+
+            case 'student_gender':
+                if ($s === '') {
+                    return [true, null, ''];
+                }
+                if (!in_array($s, ['Male', 'Female', 'Other'], true)) {
+                    return [false, null, 'Gender must be Male, Female, or Other.'];
+                }
+                return [true, $s, ''];
+
+            case 'student_civil_status':
+                if ($s === '') {
+                    return [true, null, ''];
+                }
+                if (!in_array($s, ['Single', 'Married'], true)) {
+                    return [false, null, 'Civil status must be Single or Married.'];
+                }
+                return [true, $s, ''];
+
+            case 'student_language':
+                if ($s === '') {
+                    return [true, null, ''];
+                }
+                if (!in_array($s, ['Tamil', 'Sinhala', 'English'], true)) {
+                    return [false, null, 'Language must be Tamil, Sinhala, or English.'];
+                }
+                return [true, $s, ''];
+
+            case 'student_religion':
+                if ($s === '') {
+                    return [true, null, ''];
+                }
+                if (!in_array($s, ['Hinduism', 'Buddhism', 'Islam', 'Christianity'], true)) {
+                    return [false, null, 'Choose a religion from the list.'];
+                }
+                return [true, $s, ''];
+
+            case 'student_blood_group':
+                if ($s === '') {
+                    return [true, null, ''];
+                }
+                $bloods = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+                if (!in_array($s, $bloods, true)) {
+                    return [false, null, 'Blood group must be a standard value or left blank.'];
+                }
+                return [true, $s, ''];
+
+            case 'student_email':
+                if ($s === '') {
+                    return [true, null, ''];
+                }
+                if (!filter_var($s, FILTER_VALIDATE_EMAIL)) {
+                    return [false, null, 'Invalid email address.'];
+                }
+                return [true, $s, ''];
+
+            case 'student_nic':
+                $nic = strtoupper(preg_replace('/\s+|-|_/', '', $s));
+                if ($nic === '') {
+                    return [false, null, 'NIC cannot be empty.'];
+                }
+                if (!preg_match('/^(\d{9}[VX]|\d{12})$/', $nic)) {
+                    return [false, null, 'NIC must be 9 digits + V or X, or 12 digits.'];
+                }
+                return [true, $nic, ''];
+
+            case 'student_dob':
+                if ($s === '') {
+                    return [true, null, ''];
+                }
+                $d = \DateTimeImmutable::createFromFormat('Y-m-d', $s);
+                if ($d === false || $d->format('Y-m-d') !== $s) {
+                    return [false, null, 'Date of birth must be YYYY-MM-DD.'];
+                }
+                return [true, $s, ''];
+
+            case 'ol_exam_year':
+            case 'al_exam_year':
+            case 'nvq_year_completed':
+                if ($s === '') {
+                    return [true, null, ''];
+                }
+                $y = (int) $s;
+                if ($col === 'nvq_year_completed') {
+                    if ($y < 1900 || $y > 2100) {
+                        return [false, null, 'Year must be between 1900 and 2100.'];
+                    }
+                } else {
+                    if ($y < 1990 || $y > 2100) {
+                        return [false, null, 'Exam year must be between 1990 and 2100.'];
+                    }
+                }
+                return [true, (string) $y, ''];
+
+            case 'student_full_name':
+                if ($s === '') {
+                    if ($prevStr !== '') {
+                        return [true, $prevStr, ''];
+                    }
+                    return [false, null, 'Full name cannot be empty.'];
+                }
+                return [true, $s, ''];
+
+            default:
+                if ($s === '') {
+                    return [true, null, ''];
+                }
+                return [true, $s, ''];
+        }
     }
 
     /**

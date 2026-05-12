@@ -5,14 +5,20 @@
  * @param list<array<string, mixed>> $rows
  * @param callable(string):string $esc
  * @param callable(int):string $viewUrl
+ * @param callable(int):string $editUrl
+ * @param string $deleteAction
+ * @param bool $can_delete
+ * @param bool $can_edit
  * @param callable(?string):array{order:string,display:string} $formatSubmitted
  */
 function sa_admin_student_applications_render_table(
     array $rows,
     callable $esc,
     callable $viewUrl,
+    callable $editUrl,
     string $deleteAction,
     bool $can_delete,
+    bool $can_edit,
     callable $formatSubmitted,
     string $statusLabel,
     string $badgeClass,
@@ -79,6 +85,13 @@ function sa_admin_student_applications_render_table(
                                 <i class="fas fa-eye" aria-hidden="true"></i>
                                 <span class="visually-hidden"> View</span>
                             </a>
+                            <?php if ($can_edit): ?>
+                            <a class="btn btn-outline-secondary" href="<?php echo $editUrl($id); ?>"
+                               title="Edit application data">
+                                <i class="fas fa-pen" aria-hidden="true"></i>
+                                <span class="visually-hidden"> Edit</span>
+                            </a>
+                            <?php endif; ?>
                             <?php if ($waDigits !== null): ?>
                             <a class="btn btn-wa-outline" href="<?php echo $esc('https://wa.me/' . $waDigits); ?>"
                                target="_blank" rel="noopener noreferrer"

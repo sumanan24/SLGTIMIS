@@ -246,7 +246,7 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
           <!-- Step 4 O/L (Level 04 — A/L not collected on this form) -->
           <div class="wiz-pane" data-step="4">
             <h2 class="h5 mb-2">Step 4 — G.C.E. O/L</h2>
-            <p class="text-muted small mb-4"><strong>Level 04:</strong> Complete <strong>either</strong> this O/L block <strong>or</strong> all NVQ fields in step 5 (you may do both). NVQ-only applicants may leave index, year, and all O/L results empty. If you enter index, year, or any result here, finish the whole section.</p>
+            <p class="text-muted small mb-4"><strong>Level 04:</strong> Complete <strong>either</strong> this O/L block <strong>or</strong> all NVQ fields in step 5 (you may do both). NVQ-only applicants may leave index, year, and all O/L results empty. If you enter index, year, or any result here, finish the whole section — including <strong>a letter grade (A–W) in each &ldquo;Result&rdquo; box</strong> for all six main subjects and for all three basket subjects you choose.</p>
 
             <div class="card l05-exam-card ol shadow-sm mb-0">
               <div class="card-header py-3 d-flex align-items-start gap-3">
@@ -255,7 +255,7 @@ $dobMin = $today->modify('-90 years')->format('Y-m-d');
                 </span>
                 <div>
                   <div class="l05-exam-title">G.C.E. Ordinary Level (O/L)</div>
-                  <p class="l05-exam-sub mb-0">Index, year, main subjects (grades) and three basket subject choices, or leave the whole section blank if you apply with NVQ only.</p>
+                  <p class="l05-exam-sub mb-0">Index, year, grades for six main subjects, three basket subjects <strong>and</strong> a grade for each basket row — or leave the whole section blank if you apply with NVQ only.</p>
                 </div>
               </div>
               <div class="card-body pt-0">
@@ -540,7 +540,13 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
     var el = $(selId);
     if (!el) return;
     if (el.tagName === 'INPUT' && el.type === 'hidden') {
-      el.value = String(val).trim();
+      var t = String(val).trim();
+      var fixed = el.getAttribute('data-fixed-subject');
+      if (fixed != null && String(fixed).trim() !== '' && t === '') {
+        el.value = String(fixed).trim();
+        return;
+      }
+      el.value = t;
       return;
     }
     if (el.tagName !== 'SELECT') return;
@@ -816,6 +822,7 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
       if (data[nameKey] != null) l04EnsureSelectValue(nameKey, data[nameKey]);
       if (data[markKey] != null) l04EnsureSelectValue(markKey, data[markKey]);
     }
+    repairOlFixedSlotHiddenNames();
     $('application_id').value = data.application_id ? String(data.application_id) : '';
     clearFileHints();
     Object.keys(PATH_FIELD_TO_COL).forEach(function (field) {
@@ -863,6 +870,75 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
     el.classList.toggle('is-invalid', !!on);
   }
 
+  /** Slots 1–6: hidden subject name must stay the fixed curriculum label (DB/autosave may store ""). */
+  function repairOlFixedSlotHiddenNames() {
+    for (var ri = 1; ri <= 6; ri++) {
+      var rs = (ri < 10 ? '0' : '') + ri;
+      var h = $('ol_subject_name_' + rs);
+      if (!h || h.tagName !== 'INPUT' || h.type !== 'hidden') continue;
+      var fix = h.getAttribute('data-fixed-subject');
+      if (!fix || !String(fix).trim()) continue;
+      if (!String(h.value || '').trim()) {
+        h.value = String(fix).trim();
+      }
+    }
+  }
+
+  function clearOlFieldInvalid() {
+    var ids = ['ol_index_number', 'ol_exam_year'];
+    for (var ci = 1; ci <= 9; ci++) {
+      var cs = (ci < 10 ? '0' : '') + ci;
+      ids.push('ol_subject_name_' + cs, 'ol_subject_' + cs + '_marks');
+    }
+    ids.forEach(function (id) {
+      var el = $(id);
+      if (el) markInvalid(el, false);
+    });
+  }
+
+  /** First O/L gap for messaging / scroll (matches olPathComplete ordering). */
+  function olFirstGap() {
+    if (!inputVal('ol_index_number')) {
+      return { el: $('ol_index_number'), hint: 'Enter your O/L index number, or clear the whole O/L section if you apply with NVQ only.' };
+    }
+    if (!inputVal('ol_exam_year')) {
+      return { el: $('ol_exam_year'), hint: 'Enter your O/L examination year, or clear index and the rest of this section for NVQ only.' };
+    }
+    var yr = parseInt(($('ol_exam_year') && $('ol_exam_year').value) || '', 10);
+    if (isNaN(yr) || yr < 1990 || yr > 2100) {
+      return { el: $('ol_exam_year'), hint: 'Enter a valid O/L year between 1990 and 2100.' };
+    }
+    for (var gi = 1; gi <= 9; gi++) {
+      var gs = (gi < 10 ? '0' : '') + gi;
+      var nameEl = $('ol_subject_name_' + gs);
+      var markEl = $('ol_subject_' + gs + '_marks');
+      var hasName = !!inputVal('ol_subject_name_' + gs);
+      var hasMark = !!inputVal('ol_subject_' + gs + '_marks');
+      if (!hasName) {
+        if (gi <= 6) {
+          return {
+            el: markEl || nameEl,
+            hint: 'A main O/L subject label is missing from the form (data out of sync). Click Previous then Next to reload this step, or refresh the page.'
+          };
+        }
+        return {
+          el: nameEl,
+          hint: 'Choose a subject for Basket ' + (gi - 6) + ' (or clear index, year, all results, and all basket choices for NVQ only).'
+        };
+      }
+      if (!hasMark) {
+        if (gi <= 6) {
+          return { el: markEl, hint: 'Choose a result (A, B, C, S, or W) for every main subject.' };
+        }
+        return {
+          el: markEl,
+          hint: 'Under each basket subject, open the Result list and choose A, B, C, S, or W (scroll down if the Result row is below your screen). Or clear the whole O/L section for NVQ only.'
+        };
+      }
+    }
+    return { el: null, hint: '' };
+  }
+
   function validateStep(step) {
     hideAlert();
     if (step === 1) {
@@ -906,8 +982,35 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
       return ok3;
     }
     if (step === 4) {
+      repairOlFixedSlotHiddenNames();
+      clearOlFieldInvalid();
       if (olAnyFilled() && !olPathComplete()) {
-        showAlert('For O/L: fill every field in this section, or clear index, year, basket subject choices (7–9), and all marks if you apply with NVQ only.');
+        var gap = olFirstGap();
+        var gEl = gap.el;
+        for (var gi2 = 1; gi2 <= 9; gi2++) {
+          var gs2 = (gi2 < 10 ? '0' : '') + gi2;
+          if (!inputVal('ol_subject_name_' + gs2)) {
+            var ne = $('ol_subject_name_' + gs2);
+            if (ne && ne.type !== 'hidden') markInvalid(ne, true);
+            else markInvalid($('ol_subject_' + gs2 + '_marks'), true);
+          }
+          if (!inputVal('ol_subject_' + gs2 + '_marks')) {
+            markInvalid($('ol_subject_' + gs2 + '_marks'), true);
+          }
+        }
+        if (!inputVal('ol_index_number')) markInvalid($('ol_index_number'), true);
+        if (!inputVal('ol_exam_year')) markInvalid($('ol_exam_year'), true);
+        else {
+          var yrG = parseInt(($('ol_exam_year') && $('ol_exam_year').value) || '', 10);
+          if (isNaN(yrG) || yrG < 1990 || yrG > 2100) markInvalid($('ol_exam_year'), true);
+        }
+        showAlert(
+          gap.hint ||
+            'For O/L: fill every field in this section, or clear index, year, basket subject choices (7–9), and all marks if you apply with NVQ only.'
+        );
+        if (gEl && typeof gEl.scrollIntoView === 'function') {
+          gEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
         return false;
       }
       if (olPathComplete()) {

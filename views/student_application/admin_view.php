@@ -109,7 +109,10 @@ $renderDocumentCell = static function (string $relativePath, string $title, call
 
 $saAdminCss = htmlspecialchars(rtrim(APP_URL, '/') . '/assets/css/student-applications-admin.css', ENT_QUOTES, 'UTF-8');
 $exportPdfUrl = rtrim(APP_URL, '/') . '/student-applications/export-pdf?id=' . $appId;
+$editUrl = rtrim(APP_URL, '/') . '/student-applications/edit?id=' . $appId;
 $st = strtolower(trim((string) ($app['status'] ?? 'new')));
+/** @var bool $can_edit ADM / system admin */
+$can_edit = (bool) ($can_edit ?? false);
 ?>
 <link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=7">
 <div class="sa-admin-page sa-admin-view container-fluid py-3">
@@ -134,6 +137,11 @@ $st = strtolower(trim((string) ($app['status'] ?? 'new')));
                 <a class="btn btn-outline-danger" href="<?php echo $esc($exportPdfUrl); ?>" title="Download PDF summary (fields plus merged uploads)">
                     <i class="fas fa-file-pdf" aria-hidden="true"></i><span class="visually-hidden"> Download PDF summary</span>
                 </a>
+                <?php if ($can_edit): ?>
+                <a class="btn btn-outline-secondary" href="<?php echo $esc($editUrl); ?>" title="Edit stored application fields">
+                    <i class="fas fa-pen me-1" aria-hidden="true"></i>Edit
+                </a>
+                <?php endif; ?>
                 <?php if ($waDigits !== null): ?>
                 <a class="btn btn-wa-outline" href="<?php echo $esc('https://wa.me/' . $waDigits); ?>"
                    target="_blank" rel="noopener noreferrer"
