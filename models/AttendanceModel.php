@@ -344,6 +344,11 @@ class AttendanceModel extends Model {
         }
         $result = $stmt->get_result();
         
+        $reportYm = substr($startDate, 0, 7);
+        // From Feb 2026 onward: >=90% = 7500, >=75% = 6000; Jan 2026 and earlier: 5000 / 4000
+        $allowanceTierHigh = ($reportYm > '2026-01') ? 7500 : 5000;
+        $allowanceTierMid = ($reportYm > '2026-01') ? 6000 : 4000;
+        
         $students = [];
         while ($row = $result->fetch_assoc()) {
             $studentId = $row['student_id'];
@@ -404,14 +409,13 @@ class AttendanceModel extends Model {
             }
             
             // Calculate allowance based on percentage and eligibility month
-            // 90% - 100% = 5000, 75% - 89% = 4000
+            // Tiers by report month: after Jan 2026 — >=90% = 7500, >=75% = 6000; otherwise 5000 / 4000
             // Payment only when report month (YYYY-MM) is on or after allowance_eligible_date month; NULL date = no month gate
             $allowance = 0;
             $isEligibleForMonth = false;
             
             if (!empty($row['allowance_eligible']) && $row['allowance_eligible'] == 1) {
                 if (!empty($row['allowance_eligible_date'])) {
-                    $reportYm = substr($startDate, 0, 7);
                     $eligibleYm = substr($row['allowance_eligible_date'], 0, 7);
                     if ($reportYm >= $eligibleYm) {
                         $isEligibleForMonth = true;
@@ -424,9 +428,9 @@ class AttendanceModel extends Model {
             // Calculate allowance only if eligible for this month
             if ($isEligibleForMonth) {
                 if ($attendancePercentage >= 90) {
-                    $allowance = 5000;
+                    $allowance = $allowanceTierHigh;
                 } elseif ($attendancePercentage >= 75) {
-                    $allowance = 4000;
+                    $allowance = $allowanceTierMid;
                 }
             }
             
