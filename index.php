@@ -108,6 +108,14 @@ if (!in_array($uri, $publicNoTimeoutUris, true)) {
             if (session_id() !== '') {
                 session_destroy();
             }
+            $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH'])
+                && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                http_response_code(401);
+                echo json_encode(['success' => false, 'error' => 'Session expired. Please log in again.']);
+                exit();
+            }
             if (defined('APP_URL')) {
                 header("Location: " . APP_URL . "/login?timeout=1");
             } else {

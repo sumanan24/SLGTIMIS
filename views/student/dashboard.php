@@ -791,15 +791,31 @@ document.addEventListener('DOMContentLoaded', function() {
         const originalText = acceptBtn.innerHTML;
         acceptBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
         
-        // Send AJAX request
-        fetch('<?php echo APP_URL; ?>/student/accept-conduct', {
+        // Send AJAX request (same-origin; relative path avoids APP_URL misconfiguration)
+        fetch('<?php echo rtrim(APP_URL, '/'); ?>/student/accept-conduct', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
             },
             body: JSON.stringify({})
         })
-        .then(response => response.json())
+        .then(async response => {
+            const text = await response.text();
+            let data;
+            try {
+                data = text ? JSON.parse(text) : {};
+            } catch (e) {
+                console.error('Non-JSON response:', text);
+                throw new Error('Server returned an invalid response. Please refresh and try again.');
+            }
+            if (!response.ok && !data.error) {
+                data.error = 'Request failed (' + response.status + ').';
+            }
+            return data;
+        })
         .then(data => {
             if (data.success) {
                 // Close modal
@@ -830,7 +846,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred. Please try again.');
+            alert(error.message || 'An error occurred. Please try again.');
             acceptBtn.disabled = false;
             acceptBtn.innerHTML = originalText;
         });

@@ -794,74 +794,72 @@ class StudentController extends Controller {
      * Accept Code of Conduct (AJAX endpoint for students)
      */
     public function acceptConduct() {
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
-            return;
-        }
-        
-        // Check if user is a student
-        if (!isset($_SESSION['user_table']) || $_SESSION['user_table'] !== 'student') {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Access denied. Only students can accept the code of conduct.']);
-            return;
-        }
-        
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
-            return;
-        }
-        
-        $studentId = $_SESSION['user_name'];
-        $studentModel = $this->model('StudentModel');
-        $student = $studentModel->find($studentId);
-        
-        if (!$student) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Student record not found.']);
-            return;
-        }
-        
-        // Check if already accepted
-        if (!empty($student['student_conduct_accepted_at'])) {
-            header('Content-Type: application/json');
-            echo json_encode([
-                'success' => true, 
-                'message' => 'Code of conduct already accepted.',
-                'accepted_at' => $student['student_conduct_accepted_at']
-            ]);
-            return;
-        }
-        
-        // Update acceptance date
-        $currentDateTime = date('Y-m-d H:i:s');
-        $result = $studentModel->updateStudent($studentId, [
-            'student_conduct_accepted_at' => $currentDateTime
-        ]);
-        
-        if ($result) {
-            // Log activity
-            require_once BASE_PATH . '/core/ActivityLogger.php';
-            $activityLogger = new ActivityLogger();
-            $activityLogger->log(
-                'student_conduct_accepted',
-                "Student {$studentId} accepted Code of Conduct",
-                'success',
-                $_SESSION['user_id'],
-                $studentId
-            );
+        try {
+            if (!isset($_SESSION['user_id'])) {
+                $this->json(['success' => false, 'error' => 'Unauthorized'], 401);
+            }
             
-            header('Content-Type: application/json');
-            echo json_encode([
+            if (!isset($_SESSION['user_table']) || $_SESSION['user_table'] !== 'student') {
+                $this->json(['success' => false, 'error' => 'Access denied. Only students can accept the code of conduct.'], 403);
+            }
+            
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                $this->json(['success' => false, 'error' => 'Invalid request method'], 405);
+            }
+            
+            $studentId = $_SESSION['user_name'];
+            $studentModel = $this->model('StudentModel');
+            $studentModel->addStudentConductAcceptedAtColumnIfNotExists();
+            $student = $studentModel->find($studentId);
+            
+            if (!$student) {
+                $this->json(['success' => false, 'error' => 'Student record not found.'], 404);
+            }
+            
+            if (!empty($student['student_conduct_accepted_at'])) {
+                $this->json([
+                    'success' => true,
+                    'message' => 'Code of conduct already accepted.',
+                    'accepted_at' => $student['student_conduct_accepted_at']
+                ]);
+            }
+            
+            $currentDateTime = date('Y-m-d H:i:s');
+            $result = $studentModel->updateStudent($studentId, [
+                'student_conduct_accepted_at' => $currentDateTime
+            ]);
+            
+            if (!$result) {
+                $sqlError = $studentModel->getLastSqlError();
+                error_log('acceptConduct update failed for ' . $studentId . ': ' . $sqlError);
+                $this->json([
+                    'success' => false,
+                    'error' => 'Failed to save acceptance. Please try again or contact the office.'
+                ], 500);
+            }
+            
+            try {
+                require_once BASE_PATH . '/core/ActivityLogger.php';
+                $activityLogger = new ActivityLogger();
+                $activityLogger->log(
+                    'student_conduct_accepted',
+                    "Student {$studentId} accepted Code of Conduct",
+                    'success',
+                    $_SESSION['user_id'],
+                    $studentId
+                );
+            } catch (Throwable $logEx) {
+                error_log('acceptConduct activity log failed: ' . $logEx->getMessage());
+            }
+            
+            $this->json([
                 'success' => true,
                 'message' => 'Code of conduct accepted successfully.',
                 'accepted_at' => $currentDateTime
             ]);
-        } else {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Failed to update acceptance. Please try again.']);
+        } catch (Throwable $e) {
+            error_log('acceptConduct error: ' . $e->getMessage());
+            $this->json(['success' => false, 'error' => 'An unexpected error occurred. Please try again.'], 500);
         }
     }
     
