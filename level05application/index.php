@@ -36,7 +36,21 @@ $l05DobMin = $l05Today->modify('-120 years')->format('Y-m-d');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SLGTI NVQ Level 05 application — 2026 — Sri Lanka German Training Institute</title>
+    <?php
+    if (!defined('BASE_PATH')) {
+        define('BASE_PATH', dirname(__DIR__));
+    }
+    if (!defined('APP_URL')) {
+        require_once BASE_PATH . '/config/database.php';
+    }
+    $title = 'NVQ Level 05 Online Application 2026';
+    $seoCfg = require BASE_PATH . '/config/seo.php';
+    $seo_description = $seoCfg['application_description_05'];
+    $seo_keywords = $seoCfg['application_keywords'];
+    $seo_robots = 'index, follow';
+    $seo_canonical = rtrim(APP_URL, '/') . '/level05application/';
+    require BASE_PATH . '/views/partials/seo_head.php';
+    ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">

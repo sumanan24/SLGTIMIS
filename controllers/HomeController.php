@@ -28,10 +28,16 @@ class HomeController extends Controller {
         $departmentModel = $this->model('DepartmentModel');
         $departments = $departmentModel->getAll();
         
+        require_once BASE_PATH . '/core/SeoHelper.php';
+        $seoCfg = SeoHelper::config();
+
         $data = [
-            'title' => 'Welcome to SLGTI SIS',
+            'title' => 'Student Information System',
             'page' => 'home',
-            'departments' => $departments ?? []
+            'departments' => $departments ?? [],
+            'seo_description' => $seoCfg['home_description'],
+            'seo_keywords' => $seoCfg['home_keywords'],
+            'seo_robots' => 'index, follow',
         ];
         
         return $this->view('home/index', $data);
