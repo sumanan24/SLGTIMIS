@@ -77,6 +77,8 @@ return [
     'attendance' => 'AttendanceController@index',
     'attendance/bulk-update' => 'AttendanceController@bulkUpdate',
     'attendance/report' => 'AttendanceController@report',
+    'attendance/range-summary' => 'AttendanceController@rangeSummaryReport',
+    'attendance/export-range-summary' => 'AttendanceController@exportRangeSummaryReport',
     'attendance/export-report' => 'AttendanceController@exportReport',
     'attendance/month-sheet' => 'AttendanceController@monthSheet',
     'attendance/export-month-sheet' => 'AttendanceController@exportMonthSheet',

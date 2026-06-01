@@ -507,6 +507,265 @@ class AttendanceController extends Controller {
     }
     
     /**
+     * HOD / ADM / Admin: attendance % summary across a calendar month range (e.g. Mar–May).
+     */
+    private function checkAttendanceRangeSummaryAccess() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $userRole = $userModel->getUserRole($_SESSION['user_id']);
+        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
+        $allowedRoles = ['HOD', 'ADM'];
+        $hasAccess = in_array($userRole, $allowedRoles, true) || $isAdmin;
+        
+        if (!$hasAccess) {
+            $_SESSION['error'] = 'Access denied. Only HOD and ADM can view the month-range attendance summary.';
+            $this->redirect('dashboard');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * @return array{ok:bool,error?:string,startDate?:string,endDate?:string,rangeLabel?:string,year?:int,monthFrom?:int,monthTo?:int,departmentId?:string,courseId?:string,academicYear?:string,eligibleOnly?:bool}
+     */
+    private function parseAttendanceRangeParams() {
+        $year = (int) $this->get('year', date('Y'));
+        $monthFrom = (int) $this->get('month_from', (int) date('n'));
+        $monthTo = (int) $this->get('month_to', (int) date('n'));
+        
+        if ($year < 2000 || $year > 2100) {
+            return ['ok' => false, 'error' => 'Invalid calendar year.'];
+        }
+        if ($monthFrom < 1 || $monthFrom > 12 || $monthTo < 1 || $monthTo > 12) {
+            return ['ok' => false, 'error' => 'Month must be between 1 and 12.'];
+        }
+        if ($monthFrom > $monthTo) {
+            return ['ok' => false, 'error' => 'From month cannot be after To month.'];
+        }
+        
+        $startDate = sprintf('%04d-%02d-01', $year, $monthFrom);
+        $endDate = date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $year, $monthTo)));
+        
+        $monthNames = [
+            1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
+            5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
+            9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
+        ];
+        $rangeLabel = $monthNames[$monthFrom];
+        if ($monthFrom !== $monthTo) {
+            $rangeLabel .= ' – ' . $monthNames[$monthTo];
+        }
+        $rangeLabel .= ' ' . $year;
+        
+        $userDepartmentId = $this->getUserDepartment();
+        if ($this->isDepartmentRestricted()) {
+            if ($userDepartmentId === null || $userDepartmentId === '') {
+                return ['ok' => false, 'error' => 'Your account has no department assigned. Please contact the administrator.'];
+            }
+            $departmentId = trim((string) $userDepartmentId);
+        } else {
+            $departmentId = trim((string) $this->get('department_id', ''));
+        }
+        
+        return [
+            'ok' => true,
+            'year' => $year,
+            'monthFrom' => $monthFrom,
+            'monthTo' => $monthTo,
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'rangeLabel' => $rangeLabel,
+            'departmentId' => $departmentId,
+            'courseId' => trim((string) $this->get('course_id', '')),
+            'academicYear' => trim((string) $this->get('academic_year', '')),
+            'eligibleOnly' => $this->get('eligible_only', '0') === '1',
+        ];
+    }
+    
+    /**
+     * Month-range attendance percentage summary (HOD / ADM).
+     */
+    public function rangeSummaryReport() {
+        if (!$this->checkAttendanceRangeSummaryAccess()) {
+            return;
+        }
+        
+        $departmentModel = $this->model('DepartmentModel');
+        $courseModel = $this->model('CourseModel');
+        $studentModel = $this->model('StudentModel');
+        $attendanceModel = $this->model('AttendanceModel');
+        
+        $isHOD = $this->isHOD();
+        $userDepartmentId = $this->getUserDepartment();
+        
+        if ($userDepartmentId) {
+            $dept = $departmentModel->getById($userDepartmentId);
+            $departments = $dept ? [$dept] : [];
+        } else {
+            $departments = $departmentModel->getAll();
+        }
+        
+        $academicYears = $studentModel->getAcademicYears();
+        
+        $parsed = $this->parseAttendanceRangeParams();
+        $reportData = [];
+        $summary = [
+            'total_students' => 0,
+            'above_90' => 0,
+            'above_75' => 0,
+            'below_75' => 0,
+            'total_present' => 0,
+            'total_effective_working_days' => 0,
+        ];
+        
+        $departmentId = $parsed['departmentId'] ?? '';
+        $courseId = $parsed['courseId'] ?? '';
+        $courses = [];
+        if (!empty($departmentId)) {
+            $courses = $courseModel->getCoursesWithDepartment(['department_id' => $departmentId]);
+        }
+        
+        $generate = $this->get('generate', '') === '1';
+        $rangeError = null;
+        
+        if ($generate) {
+            if (!$parsed['ok']) {
+                $rangeError = $parsed['error'] ?? 'Invalid range.';
+            } elseif (empty($departmentId)) {
+                $rangeError = 'Department is required.';
+            } else {
+                $filters = [
+                    'department_id' => $departmentId,
+                    'course_id' => $courseId,
+                    'academic_year' => $parsed['academicYear'],
+                    'eligible_only' => $parsed['eligibleOnly'],
+                ];
+                $reportData = $attendanceModel->getAttendanceReportByDateRange(
+                    $parsed['startDate'],
+                    $parsed['endDate'],
+                    $filters
+                );
+                
+                $summary['total_students'] = count($reportData);
+                foreach ($reportData as $student) {
+                    $summary['total_present'] += $student['present_days'];
+                    $summary['total_effective_working_days'] += $student['effective_working_days'];
+                    $pct = $student['attendance_percentage'];
+                    if ($pct >= 90) {
+                        $summary['above_90']++;
+                    } elseif ($pct >= 75) {
+                        $summary['above_75']++;
+                    } else {
+                        $summary['below_75']++;
+                    }
+                }
+            }
+        }
+        
+        $data = [
+            'title' => 'Month Range Attendance Summary',
+            'page' => 'attendance-range-summary',
+            'departments' => $departments,
+            'courses' => $courses,
+            'academicYears' => $academicYears,
+            'reportData' => $reportData,
+            'summary' => $summary,
+            'selectedDepartment' => $departmentId,
+            'selectedCourse' => $courseId,
+            'selectedAcademicYear' => $parsed['academicYear'] ?? '',
+            'selectedYear' => $parsed['year'] ?? (int) date('Y'),
+            'selectedMonthFrom' => $parsed['monthFrom'] ?? (int) date('n'),
+            'selectedMonthTo' => $parsed['monthTo'] ?? (int) date('n'),
+            'rangeLabel' => $parsed['rangeLabel'] ?? '',
+            'startDate' => $parsed['startDate'] ?? '',
+            'endDate' => $parsed['endDate'] ?? '',
+            'eligibleOnly' => $parsed['eligibleOnly'] ?? false,
+            'isHOD' => $isHOD,
+            'generate' => $generate,
+            'rangeError' => $rangeError,
+            'error' => $_SESSION['error'] ?? null,
+            'message' => $_SESSION['message'] ?? null,
+        ];
+        
+        unset($_SESSION['error'], $_SESSION['message']);
+        return $this->view('attendance/range-summary', $data);
+    }
+    
+    /**
+     * Export month-range attendance summary as CSV (HOD / ADM).
+     */
+    public function exportRangeSummaryReport() {
+        if (!$this->checkAttendanceRangeSummaryAccess()) {
+            return;
+        }
+        
+        $parsed = $this->parseAttendanceRangeParams();
+        if (!$parsed['ok']) {
+            $_SESSION['error'] = $parsed['error'] ?? 'Invalid range.';
+            $this->redirect('attendance/range-summary');
+            return;
+        }
+        
+        $departmentId = $parsed['departmentId'] ?? '';
+        if (empty($departmentId)) {
+            $_SESSION['error'] = 'Department is required for export.';
+            $this->redirect('attendance/range-summary');
+            return;
+        }
+        
+        $attendanceModel = $this->model('AttendanceModel');
+        $filters = [
+            'department_id' => $departmentId,
+            'course_id' => $parsed['courseId'],
+            'academic_year' => $parsed['academicYear'],
+            'eligible_only' => $parsed['eligibleOnly'],
+        ];
+        $reportData = $attendanceModel->getAttendanceReportByDateRange(
+            $parsed['startDate'],
+            $parsed['endDate'],
+            $filters
+        );
+        
+        $filename = 'attendance_range_' . $parsed['year'] . '_' . $parsed['monthFrom'] . '-' . $parsed['monthTo'] . '.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        
+        $output = fopen('php://output', 'w');
+        fprintf($output, chr(0xEF) . chr(0xBB) . chr(0xBF));
+        fputcsv($output, ['Month range attendance summary', $parsed['rangeLabel']]);
+        fputcsv($output, []);
+        fputcsv($output, [
+            'Student ID', 'Full Name', 'NIC', 'Course', 'Academic Year',
+            'Working Days', 'Present', 'Absent', 'Holidays', 'Attendance %',
+        ]);
+        
+        foreach ($reportData as $student) {
+            $absent = max(0, ($student['effective_working_days'] ?? 0) - ($student['present_days'] ?? 0));
+            fputcsv($output, [
+                $student['student_id'],
+                $student['student_fullname'],
+                $student['student_nic'],
+                $student['course_name'] ?? '',
+                $student['academic_year'] ?? '',
+                $student['effective_working_days'],
+                $student['present_days'],
+                $absent,
+                $student['holiday_days'],
+                number_format($student['attendance_percentage'], 2) . '%',
+            ]);
+        }
+        
+        fclose($output);
+        exit;
+    }
+    
+    /**
      * Lock attendance month for a department (HOD only)
      */
     public function lockMonth() {
