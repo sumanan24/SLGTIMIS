@@ -26,6 +26,7 @@ class StudentModel extends Model {
     public function find($id) {
         // Ensure student_profile_img column exists
         $this->addStudentProfileImgColumnIfNotExists();
+        $this->addStudentConductAcceptedAtColumnIfNotExists();
         
         return parent::find($id);
     }
@@ -1581,6 +1582,33 @@ class StudentModel extends Model {
         } catch (Exception $e) {
             // Column might already exist or other error
             // Silently continue
+        }
+    }
+    
+    /**
+     * Add student_conduct_accepted_at column to student table if it doesn't exist
+     */
+    public function addStudentConductAcceptedAtColumnIfNotExists() {
+        try {
+            $checkSql = "SHOW COLUMNS FROM `{$this->table}` LIKE 'student_conduct_accepted_at'";
+            $result = $this->db->query($checkSql);
+            
+            if ($result && $result->num_rows == 0) {
+                $sql = "ALTER TABLE `{$this->table}` ADD COLUMN `student_conduct_accepted_at` DATETIME DEFAULT NULL COMMENT 'Code of conduct accepted at' AFTER `bank_frontsheet_path`";
+                $this->db->query($sql);
+            }
+        } catch (Exception $e) {
+            // Column may already exist or AFTER column missing — retry without position
+            try {
+                $checkSql = "SHOW COLUMNS FROM `{$this->table}` LIKE 'student_conduct_accepted_at'";
+                $result = $this->db->query($checkSql);
+                if ($result && $result->num_rows == 0) {
+                    $sql = "ALTER TABLE `{$this->table}` ADD COLUMN `student_conduct_accepted_at` DATETIME DEFAULT NULL COMMENT 'Code of conduct accepted at'";
+                    $this->db->query($sql);
+                }
+            } catch (Exception $e2) {
+                // Silently continue
+            }
         }
     }
     

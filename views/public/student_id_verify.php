@@ -10,14 +10,25 @@ $message = $message ?? null;
 $student = $student ?? null;
 $enrollment = $enrollment ?? null;
 $profileImageUrl = $profileImageUrl ?? null;
-$pageTitle = htmlspecialchars($title ?? 'Student verification', ENT_QUOTES, 'UTF-8');
+if (!defined('BASE_PATH')) {
+    define('BASE_PATH', dirname(__DIR__, 2));
+}
+if (!defined('APP_URL')) {
+    require_once BASE_PATH . '/config/database.php';
+}
+require_once BASE_PATH . '/core/SeoHelper.php';
+$seoCfg = SeoHelper::config();
+$title = $title ?? 'Student ID Verification';
+$seo_description = $seoCfg['verify_description'];
+$seo_keywords = $seoCfg['verify_keywords'];
+$seo_robots = 'noindex, nofollow';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $pageTitle; ?> — Sri Lanka German Training Institute</title>
+    <?php require BASE_PATH . '/views/partials/seo_head.php'; ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">

@@ -376,10 +376,15 @@ class StudentApplicationController extends Controller {
      * @param bool $readonlyAfterSubmit Wizard-only: after POST submit redirect, reopen in review-only with PDF download.
      */
     private function renderForm(string $level, array $errors, array $old, ?string $flashSuccess = null, bool $readonlyAfterSubmit = false) {
-        $title = $level === '04' ? 'Level 04 application' : 'Level 05 application';
+        require_once BASE_PATH . '/core/SeoHelper.php';
+        $seoCfg = SeoHelper::config();
+        $title = $level === '04' ? 'NVQ Level 04 Online Application 2026' : 'NVQ Level 05 Online Application 2026';
         $view = $level === '04' ? 'student_application/form_wizard' : 'student_application/form';
         return $this->view($view, [
             'title' => $title,
+            'seo_description' => $level === '04' ? $seoCfg['application_description_04'] : $seoCfg['application_description_05'],
+            'seo_keywords' => $seoCfg['application_keywords'],
+            'seo_robots' => 'index, follow',
             'use_public_layout' => true,
             'application_level' => $level,
             'csrf_token' => $this->generateStudentApplicationCsrfToken(),

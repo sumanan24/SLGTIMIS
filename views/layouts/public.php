@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo isset($title) ? htmlspecialchars($title) . ' — ' : ''; ?>Sri Lanka German Training Institute — Apply online 2026</title>
+    <?php
+    $seo_robots = $seo_robots ?? 'index, follow';
+    require BASE_PATH . '/views/partials/seo_head.php';
+    ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
@@ -21,8 +24,8 @@
     </main>
     <footer class="container-fluid px-2 px-sm-3 px-lg-4 app-form-footer text-center">
         <div class="app-form-footer-inner py-3 py-md-4">
-            <p class="mb-1 app-form-footer-brand">Sri Lanka German Training Institute</p>
-            <p class="mb-0 app-form-footer-meta">Apply online 2026 · &copy; <?php echo date('Y'); ?></p>
+            <p class="mb-1 app-form-footer-brand">SLGTI — Sri Lanka German Training Institute</p>
+            <p class="mb-0 app-form-footer-meta">SLGTI apply online 2026 · &copy; <?php echo date('Y'); ?></p>
         </div>
     </footer>
     </div>

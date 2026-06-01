@@ -221,9 +221,15 @@ class AuthController extends Controller {
             }
         }
         
+        require_once BASE_PATH . '/core/SeoHelper.php';
+        $seoCfg = SeoHelper::config();
+
         $data = [
             'title' => 'Login',
-            'page' => 'login'
+            'page' => 'login',
+            'seo_description' => $seoCfg['login_description'],
+            'seo_keywords' => $seoCfg['login_keywords'],
+            'seo_robots' => 'noindex, nofollow',
         ];
         
         return $this->view('auth/login', $data);
