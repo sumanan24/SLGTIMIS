@@ -327,7 +327,7 @@ class AttendanceModel extends Model {
         $params[] = $startDate;
         $types .= 's';
         
-        $sql .= " ORDER BY s.student_fullname ASC";
+        $sql .= " ORDER BY s.student_id ASC";
         
         $stmt = $conn->prepare($sql);
         if (!$stmt) {
