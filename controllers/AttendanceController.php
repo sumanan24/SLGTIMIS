@@ -1748,127 +1748,13 @@ class AttendanceController extends Controller {
     }
 
     /**
-     * Raw punch list (device table) — main app layout + staff device side nav.
+     * Legacy URL — raw punch list removed; send users to the dashboard.
      */
     public function staffDeviceList() {
         if (!$this->staffDeviceAccessOk()) {
             return;
         }
-        require_once BASE_PATH . '/staff_attendance/config.php';
-
-        $urls = $this->staffDeviceNavUrls();
-        $listBase = $urls['list'];
-
-        $perPage = isset($_GET['per_page']) ? max(5, min(100, (int) $_GET['per_page'])) : (defined('ATT_PAGE_SIZE') ? ATT_PAGE_SIZE : 25);
-        $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
-        $offset = ($page - 1) * $perPage;
-
-        $q = trim((string) ($_GET['q'] ?? ''));
-        $employeeNo = trim((string) ($_GET['employee_no'] ?? ''));
-        $staffName = trim((string) ($_GET['staff_name'] ?? ''));
-        $department = trim((string) ($_GET['department'] ?? ''));
-        $startDate = trim((string) ($_GET['start_date'] ?? ''));
-        $endDate = trim((string) ($_GET['end_date'] ?? ''));
-
-        $where = [];
-        $params = [];
-        $types = '';
-
-        if ($q !== '') {
-            $where[] = '(employee_no LIKE ? OR staff_name LIKE ?)';
-            $like = '%' . $q . '%';
-            $params[] = $like;
-            $params[] = $like;
-            $types .= 'ss';
-        }
-        if ($employeeNo !== '') {
-            $where[] = 'employee_no LIKE ?';
-            $params[] = '%' . $employeeNo . '%';
-            $types .= 's';
-        }
-        if ($staffName !== '') {
-            $where[] = 'staff_name LIKE ?';
-            $params[] = '%' . $staffName . '%';
-            $types .= 's';
-        }
-        if ($department !== '') {
-            $where[] = 'department LIKE ?';
-            $params[] = '%' . $department . '%';
-            $types .= 's';
-        }
-        if ($startDate !== '' && $endDate !== '') {
-            $where[] = 'DATE(attendance_time) BETWEEN ? AND ?';
-            $params[] = $startDate;
-            $params[] = $endDate;
-            $types .= 'ss';
-        } elseif ($startDate !== '') {
-            $where[] = 'DATE(attendance_time) >= ?';
-            $params[] = $startDate;
-            $types .= 's';
-        } elseif ($endDate !== '') {
-            $where[] = 'DATE(attendance_time) <= ?';
-            $params[] = $endDate;
-            $types .= 's';
-        }
-
-        $sqlWhere = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
-
-        $db = attendance_db();
-
-        $countSql = "SELECT COUNT(*) AS c FROM staff_attendance $sqlWhere";
-        $countStmt = $db->prepare($countSql);
-        if ($types !== '') {
-            $countStmt->bind_param($types, ...$params);
-        }
-        $countStmt->execute();
-        $totalRows = (int) ($countStmt->get_result()->fetch_assoc()['c'] ?? 0);
-        $countStmt->close();
-
-        $totalPages = max(1, (int) ceil($totalRows / $perPage));
-        if ($page > $totalPages) {
-            $page = $totalPages;
-            $offset = ($page - 1) * $perPage;
-        }
-
-        $listSql = "SELECT attendance_id, employee_no, staff_name, department, attendance_time, device_ip, event_type, created_at
-            FROM staff_attendance $sqlWhere
-            ORDER BY attendance_time DESC
-            LIMIT ? OFFSET ?";
-        $listStmt = $db->prepare($listSql);
-        $typesList = $types . 'ii';
-        $paramsList = array_merge($params, [$perPage, $offset]);
-        if ($typesList !== 'ii') {
-            $listStmt->bind_param($typesList, ...$paramsList);
-        } else {
-            $listStmt->bind_param('ii', $perPage, $offset);
-        }
-        $listStmt->execute();
-        $rows = $listStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $listStmt->close();
-
-        $qs = $_GET;
-        unset($qs['page']);
-        $baseQuery = http_build_query($qs);
-
-        return $this->view('attendance/staff_device_list', [
-            'title' => 'Staff device — All punches',
-            'page' => 'staff-attendance-device-list',
-            'staffDeviceSection' => 'list',
-            'urls' => $urls,
-            'listBase' => $listBase,
-            'baseQuery' => $baseQuery,
-            'rows' => $rows,
-            'totalRows' => $totalRows,
-            'totalPages' => $totalPages,
-            'pageNum' => $page,
-            'perPage' => $perPage,
-            'q' => $q,
-            'employeeNo' => $employeeNo,
-            'staffName' => $staffName,
-            'department' => $department,
-            'startDate' => $startDate,
-            'endDate' => $endDate,
-        ]);
+        $this->redirect('attendance/staff-device');
     }
 
     /**

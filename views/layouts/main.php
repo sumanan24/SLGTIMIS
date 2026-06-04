@@ -338,7 +338,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff'];
                             <?php endif; ?>
                             
                             <?php
-                            $staffDevicePages = ['staff-attendance-device', 'staff-attendance-device-list', 'staff-attendance-device-daily', 'staff-attendance-device-month', 'staff-attendance-device-sync'];
+                            $staffDevicePages = ['staff-attendance-device', 'staff-attendance-device-daily', 'staff-attendance-device-month', 'staff-attendance-device-sync'];
                             $studentAttendancePages = [];
                             if ($hasAttendanceAccess) {
                                 $studentAttendancePages[] = 'attendance';
