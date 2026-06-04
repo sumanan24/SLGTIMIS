@@ -94,8 +94,8 @@
                 <div class="mb-2 d-flex justify-content-center" style="position: relative; z-index: 1;">
                     <img src="<?php echo APP_URL; ?>/assets/img/logo.png" alt="SLGTI Logo" class="img-fluid" style="max-height: 60px; width: auto;">
                 </div>
-                <h1 class="h3 fw-bold mb-1" style="color: #000000; font-size: 1.75rem; margin-left: auto; margin-right: auto; position: relative; z-index: 1;">SLGTI — Sri Lanka German Training Institute</h1>
-                <p class="mb-2" style="color: #333333; font-size: 0.95rem; max-width: 500px; margin-left: auto; margin-right: auto; padding: 0 1rem; line-height: 1.4; position: relative; z-index: 1;">Welcome to the SLGTI Student Information System (SIS). SLGTI helps students and staff manage records, courses, attendance, and institute activities online — faster and more organized.</p>
+                <h1 class="h3 fw-bold mb-1" style="color: #000000; font-size: 1.75rem; margin-left: auto; margin-right: auto; position: relative; z-index: 1;">Sri Lanka German Training Institute</h1>
+                <p class="mb-2" style="color: #333333; font-size: 0.95rem; max-width: 500px; margin-left: auto; margin-right: auto; padding: 0 1rem; line-height: 1.4; position: relative; z-index: 1;">Welcome to the Student Information System (SIS). Students and staff can manage records, courses, attendance, and institute services online quickly and in one place.</p>
                 <?php if (!isset($_SESSION['user_id'])): ?>
                     <?php
                     $h = static function (string $path): string {
