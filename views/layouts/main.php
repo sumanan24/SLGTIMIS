@@ -55,7 +55,6 @@
                             </button>
                         </div>
                         <nav class="sidebar-nav">
-                        <ul class="sidebar-menu">
                             <?php
                             // Get user role to determine menu access
                             $userRole = null;
@@ -92,16 +91,24 @@
                                 $hasGroupAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'ADM']) || $isAdmin;
                                 // Instructor diary access: teaching staff, HOD, DIR/DPA/DPI/REG, ADM, and Admin
                                 $hasInstructorDiaryAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'LE1', 'LE2', 'SLE', 'DIR', 'DPA', 'DPI', 'REG', 'ADM']) || $isAdmin;
-                                // Instructor diary report (HOD + management roles + Admin)
-                                $hasInstructorDiaryReportAccess = in_array($userRole, ['HOD', 'DIR', 'DPA', 'DPI', 'REG', 'ADM']) || $isAdmin;
                                 // Staff device (Hikvision) menu: ADM/Admin full module; DIR, REG, FIN, ACC, HOD see dashboard + month only
                                 $canStaffDeviceAttendanceMenu = !$isSAO && ($isAdminOrADM || in_array($userRole, ['DIR', 'REG', 'FIN', 'ACC', 'HOD'], true));
                                 $canViewStudentApplications = $userModel->canViewOnlineStudentApplications($_SESSION['user_id']);
                                 $canAccessExamsModule = $userModel->canAccessExamsModule($_SESSION['user_id']);
+                                // Bus Season processing & payments: SAO, ADM, Admin
+                                $canProcessBusSeasonMenu = $isSAO || ($userRole === 'ADM') || $isAdmin;
                             }
+                            $isADMRole = ($userRole === 'ADM');
+                            if (!isset($canProcessBusSeasonMenu)) {
+                                $canProcessBusSeasonMenu = false;
+                            }
+                            $busSeasonPages = ['bus-season-requests-sao', 'bus-season-payments'];
+                            $paymentsPages = ['payments', 'payments-create', 'payments-edit', 'payments-delete'];
+                            $hasStaffApprovalAccess = $isADMRole;
                             ?>
                             
-                            <li>
+                            <ul class="sidebar-menu<?php echo $isADMRole ? ' sidebar-menu-adm' : ''; ?>">
+                            <li data-nav="dashboard">
                                 <a href="<?php echo APP_URL; ?>/<?php echo ($isHOD) ? 'hod/dashboard' : 'dashboard'; ?>" class="<?php echo (isset($page) && $page === 'dashboard') ? 'active' : ''; ?>">
                                     <i class="fas fa-tachometer-alt"></i>
                                     <span>Dashboard</span>
@@ -109,7 +116,7 @@
                             </li>
 
                             <?php if (!empty($canAccessExamsModule)): ?>
-                            <li>
+                            <li data-nav="exams">
                                 <a href="<?php echo APP_URL; ?>/exams" class="<?php echo (isset($page) && in_array($page, ['exams', 'exams-marks'], true)) ? 'active' : ''; ?>">
                                     <i class="fas fa-file-signature"></i>
                                     <span>Exams</span>
@@ -119,20 +126,14 @@
                             
                             <?php if (!$isSAO): ?>
                             <!-- Deputy Principal Education Branch - Hidden for SAO -->
-                            <li class="menu-item-has-children <?php 
-$educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
-                                    if ($hasGroupAccess) {
-                                        $educationPages[] = 'groups';
-                                    }
+                            <li data-nav="management" class="menu-item-has-children <?php 
+$educationPages = ['departments', 'courses', 'modules', 'staff'];
                             if ($isAdminOrADM) {
                                 $educationPages[] = 'staff-roles';
                             }
                             // HOD staff module enrollment page
                             if ($isHOD) {
                                 $educationPages[] = 'hod-staff-module-enroll';
-                            }
-                            if (isset($hasInstructorDiaryReportAccess) && $hasInstructorDiaryReportAccess) {
-                                $educationPages[] = 'hod-instructor-diary';
                             }
                             echo (isset($page) && in_array($page, $educationPages)) ? 'active' : ''; 
                             ?>">
@@ -142,18 +143,12 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
                                 <ul class="submenu" style="<?php 
-                                    $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
-                                    if ($hasGroupAccess) {
-                                        $educationPages[] = 'groups';
-                                    }
+                                    $educationPages = ['departments', 'courses', 'modules', 'staff'];
                                     if ($isAdminOrADM) {
                                         $educationPages[] = 'staff-roles';
                                     }
                                     if ($isHOD) {
                                         $educationPages[] = 'hod-staff-module-enroll';
-                                    }
-                                    if (isset($hasInstructorDiaryReportAccess) && $hasInstructorDiaryReportAccess) {
-                                        $educationPages[] = 'hod-instructor-diary';
                                     }
                                     echo (isset($page) && in_array($page, $educationPages)) ? 'display: block;' : ''; 
                                 ?>">
@@ -175,14 +170,6 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                             <span>Modules</span>
                                         </a>
                                     </li>
-                                    <?php if ($hasGroupAccess): ?>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/groups" class="<?php echo (isset($page) && $page === 'groups') ? 'active' : ''; ?>">
-                                            <i class="fas fa-users"></i>
-                                            <span>Groups</span>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
                                     <?php if ($isAdminOrADM): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/staff-roles" class="<?php echo (isset($page) && $page === 'staff-roles') ? 'active' : ''; ?>">
@@ -205,20 +192,6 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    <?php if (isset($hasInstructorDiaryReportAccess) && $hasInstructorDiaryReportAccess): ?>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/hod/instructor-diary" class="<?php echo (isset($page) && $page === 'hod-instructor-diary') ? 'active' : ''; ?>">
-                                            <i class="fas fa-book-open"></i>
-                                            <span>Instructor Diary Report</span>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/inventory" class="<?php echo (isset($page) && $page === 'inventory') ? 'active' : ''; ?>">
-                                            <i class="fas fa-boxes"></i>
-                                            <span>Inventory</span>
-                                        </a>
-                                    </li>
                                 </ul>
                             </li>
                             <?php endif; ?>
@@ -242,14 +215,15 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                 $canViewRoomAllocations = in_array($userRole, $allowedRoomAllocRoles) || $isAdmin;
                             }
                             
-                            if ($isAdminOrADM && !$isHOD) {
-                                $studentAffairsPages = array_merge($studentAffairsPages, ['hostels', 'rooms']);
+                            $showHostelsRoomsMenu = $isAdminOrADM && !$isHOD;
+                            $showRoomAllocationsMenu = !$isHOD && ($canManageRoomAllocations || $canViewRoomAllocations);
+                            $hasHostelMenu = $showHostelsRoomsMenu || $showRoomAllocationsMenu;
+                            $hostelPages = [];
+                            if ($showHostelsRoomsMenu) {
+                                $hostelPages = array_merge($hostelPages, ['hostels', 'rooms']);
                             }
-                            if ($canManageRoomAllocations && !$isHOD) {
-                                $studentAffairsPages[] = 'room-allocations';
-                            }
-                            if ($canViewRoomAllocations && !$isHOD) {
-                                $studentAffairsPages[] = 'room-allocations';
+                            if ($showRoomAllocationsMenu) {
+                                $hostelPages[] = 'room-allocations';
                             }
                             if ($canViewHostelInfo) {
                                 $studentAffairsPages[] = 'students'; // Ensure students page is in array
@@ -257,8 +231,14 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                             if (!empty($canViewStudentApplications)) {
                                 $studentAffairsPages[] = 'student-applications';
                             }
+                            if ($hasGroupAccess) {
+                                $studentAffairsPages[] = 'groups';
+                            }
+                            if (!empty($canProcessBusSeasonMenu)) {
+                                $studentAffairsPages = array_merge($studentAffairsPages, $busSeasonPages);
+                            }
                             ?>
-                            <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, $studentAffairsPages)) ? 'active' : ''; ?>">
+                            <li data-nav="student-info" class="menu-item-has-children <?php echo (isset($page) && in_array($page, $studentAffairsPages)) ? 'active' : ''; ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-user-graduate"></i>
                                     <span>Student Info</span>
@@ -271,6 +251,14 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                             <span>Students</span>
                                         </a>
                                     </li>
+                                    <?php if ($hasGroupAccess): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/groups" class="<?php echo (isset($page) && $page === 'groups') ? 'active' : ''; ?>">
+                                            <i class="fas fa-users"></i>
+                                            <span>Groups</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
                                     <?php if (!empty($isAdminOrADM) && ($userRole === 'ADM')): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/students/id-card-select" class="<?php echo (isset($page) && $page === 'students-id-card') ? 'active' : ''; ?>">
@@ -287,8 +275,33 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    <?php if ($isAdminOrADM && !$isHOD): ?>
+                                    <?php if (!empty($canProcessBusSeasonMenu)): ?>
                                     <li class="menu-divider-submenu"></li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/bus-season-requests/sao-process" class="<?php echo (isset($page) && $page === 'bus-season-requests-sao') ? 'active' : ''; ?>">
+                                            <i class="fas fa-bus"></i>
+                                            <span>Process Bus Season</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/bus-season-requests/payment-collections" class="<?php echo (isset($page) && $page === 'bus-season-payments') ? 'active' : ''; ?>">
+                                            <i class="fas fa-money-bill-wave"></i>
+                                            <span>Payment Collections</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
+                                </ul>
+                            </li>
+
+                            <?php if (!empty($hasHostelMenu)): ?>
+                            <li data-nav="hostel" class="menu-item-has-children <?php echo (isset($page) && in_array($page, $hostelPages, true)) ? 'active' : ''; ?>">
+                                <a href="#" class="menu-toggle">
+                                    <i class="fas fa-hotel"></i>
+                                    <span>Hostel</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, $hostelPages, true)) ? 'display: block;' : ''; ?>">
+                                    <?php if ($showHostelsRoomsMenu): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/hostels" class="<?php echo (isset($page) && $page === 'hostels') ? 'active' : ''; ?>">
                                             <i class="fas fa-building"></i>
@@ -302,8 +315,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    <?php if ($canViewRoomAllocations && !$isHOD): ?>
-                                    <li class="menu-divider-submenu"></li>
+                                    <?php if ($showRoomAllocationsMenu): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/room-allocations" class="<?php echo (isset($page) && $page === 'room-allocations') ? 'active' : ''; ?>">
                                             <i class="fas fa-user-check"></i>
@@ -311,40 +323,13 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    <?php
-                                    // Check if user can process bus season requests (SAO, ADM, Admin)
-                                    $canProcessBusSeasonMenu = false;
-                                    if (isset($_SESSION['user_id'])) {
-                                        require_once BASE_PATH . '/models/UserModel.php';
-                                        $userModelMenu = new UserModel();
-                                        $userRoleMenu = $userModelMenu->getUserRole($_SESSION['user_id']);
-                                        $isSAOMenu = $userModelMenu->isSAO($_SESSION['user_id']);
-                                        $isADMMenu = ($userRoleMenu === 'ADM');
-                                        $isAdminMenu = $userModelMenu->isAdmin($_SESSION['user_id']);
-                                        $canProcessBusSeasonMenu = $isSAOMenu || $isADMMenu || $isAdminMenu;
-                                    }
-                                    ?>
-                                    <?php if ($canProcessBusSeasonMenu): ?>
-                                    <li class="menu-divider-submenu"></li>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/bus-season-requests/sao-process" class="<?php echo (isset($page) && $page === 'bus-season-requests-sao') ? 'active' : ''; ?>">
-                                            <i class="fas fa-bus"></i>
-                                            <span>Process Bus Season Tickets</span>
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/bus-season-requests/payment-collections" class="<?php echo (isset($page) && $page === 'bus-season-payments') ? 'active' : ''; ?>">
-                                            <i class="fas fa-money-bill-wave"></i>
-                                            <span>Payment Collections</span>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
                                 </ul>
                             </li>
+                            <?php endif; ?>
 
                             <?php if (!empty($userRole) && $userRole === 'ADM'): ?>
                             <!-- ID Card Print (ADM) - Main menu shortcut -->
-                            <li>
+                            <li data-nav="id-card-print">
                                 <a href="<?php echo APP_URL; ?>/students/id-card-select" class="<?php echo (isset($page) && $page === 'students-id-card') ? 'active' : ''; ?>">
                                     <i class="fas fa-id-card"></i>
                                     <span>ID Card Print</span>
@@ -352,30 +337,36 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                             </li>
                             <?php endif; ?>
                             
-                            <!-- Attendance Management - Show if user has attendance access or report access -->
-                            <?php if ($hasAttendanceAccess || $hasAttendanceReportAccess || !empty($hasAttendanceRangeSummaryAccess)): ?>
-                            <?php $staffDevicePages = ['staff-attendance-device', 'staff-attendance-device-list', 'staff-attendance-device-daily', 'staff-attendance-device-month', 'staff-attendance-device-sync']; ?>
-                            <?php $attendanceSubPages = array_merge(['attendance', 'attendance-report', 'attendance-range-summary', 'attendance-month-sheet'], $staffDevicePages); ?>
-                            <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, $attendanceSubPages, true)) ? 'active' : ''; ?>">
+                            <?php
+                            $staffDevicePages = ['staff-attendance-device', 'staff-attendance-device-list', 'staff-attendance-device-daily', 'staff-attendance-device-month', 'staff-attendance-device-sync'];
+                            $studentAttendancePages = [];
+                            if ($hasAttendanceAccess) {
+                                $studentAttendancePages[] = 'attendance';
+                            }
+                            if ($hasAttendanceReportAccess) {
+                                $studentAttendancePages[] = 'attendance-report';
+                            }
+                            if (!empty($hasAttendanceRangeSummaryAccess)) {
+                                $studentAttendancePages[] = 'attendance-range-summary';
+                            }
+                            if (!empty($hasMonthAttendanceSheetAccess)) {
+                                $studentAttendancePages[] = 'attendance-month-sheet';
+                            }
+                            $hasStudentAttendanceMenu = !empty($studentAttendancePages);
+                            ?>
+                            <?php if ($hasStudentAttendanceMenu): ?>
+                            <li data-nav="student-attendance" class="menu-item-has-children <?php echo (isset($page) && in_array($page, $studentAttendancePages, true)) ? 'active' : ''; ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-calendar-check"></i>
-                                    <span>Attendance</span>
+                                    <span>Student Attendance</span>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
-                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, $attendanceSubPages, true)) ? 'display: block;' : ''; ?>">
+                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, $studentAttendancePages, true)) ? 'display: block;' : ''; ?>">
                                     <?php if ($hasAttendanceAccess): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/attendance" class="<?php echo (isset($page) && $page === 'attendance') ? 'active' : ''; ?>">
                                             <i class="fas fa-calendar-alt"></i>
                                             <span>Student Attendance</span>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
-                                    <?php if (!empty($hasMonthAttendanceSheetAccess)): ?>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/attendance/month-sheet" class="<?php echo (isset($page) && $page === 'attendance-month-sheet') ? 'active' : ''; ?>">
-                                            <i class="fas fa-file-excel"></i>
-                                            <span>Month register (Excel)</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
@@ -391,29 +382,52 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/attendance/range-summary" class="<?php echo (isset($page) && $page === 'attendance-range-summary') ? 'active' : ''; ?>">
                                             <i class="fas fa-calendar-week"></i>
-                                            <span>Month range summary</span>
+                                            <span>Month Summary</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    <?php if (!empty($canStaffDeviceAttendanceMenu)): ?>
+                                    <?php if (!empty($hasMonthAttendanceSheetAccess)): ?>
                                     <li>
-                                        <a href="<?php echo APP_URL; ?>/attendance/staff-device" class="<?php echo (isset($page) && in_array($page, $staffDevicePages, true)) ? 'active' : ''; ?>">
-                                            <i class="fas fa-id-card"></i>
-                                            <span>Staff attendance (device)</span>
+                                        <a href="<?php echo APP_URL; ?>/attendance/month-sheet" class="<?php echo (isset($page) && $page === 'attendance-month-sheet') ? 'active' : ''; ?>">
+                                            <i class="fas fa-file-excel"></i>
+                                            <span>Month Register</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
                                 </ul>
                             </li>
                             <?php endif; ?>
+
+                            <?php if (!empty($canStaffDeviceAttendanceMenu)): ?>
+                            <li data-nav="staff-attendance">
+                                <a href="<?php echo APP_URL; ?>/attendance/staff-device" class="<?php echo (isset($page) && in_array($page, $staffDevicePages, true)) ? 'active' : ''; ?>">
+                                    <i class="fas fa-id-card"></i>
+                                    <span>Staff Attendance</span>
+                                </a>
+                            </li>
+                            <?php endif; ?>
                             
                             <?php if ($hasFinanceAccess): ?>
-                            <!-- Payments - Only for FIN, ACC, ADM -->
-                            <li>
-                                <a href="<?php echo APP_URL; ?>/payments" class="<?php echo (isset($page) && $page === 'payments') ? 'active' : ''; ?>">
+                            <li data-nav="payments" class="menu-item-has-children <?php echo (isset($page) && in_array($page, $paymentsPages, true)) ? 'active' : ''; ?>">
+                                <a href="#" class="menu-toggle">
                                     <i class="fas fa-money-bill-wave"></i>
-                                    <span>Payments</span>
+                                    <span><?php echo $isADMRole ? 'Payment' : 'Payments'; ?></span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
+                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, $paymentsPages, true)) ? 'display: block;' : ''; ?>">
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/payments" class="<?php echo (isset($page) && $page === 'payments') ? 'active' : ''; ?>">
+                                            <i class="fas fa-list"></i>
+                                            <span>All Payments</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/payments/create" class="<?php echo (isset($page) && $page === 'payments-create') ? 'active' : ''; ?>">
+                                            <i class="fas fa-plus-circle"></i>
+                                            <span>Add Payment</span>
+                                        </a>
+                                    </li>
+                                </ul>
                             </li>
                             <?php endif; ?>
                             
@@ -435,10 +449,9 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                     $hasStudentsApprovalAccess = true;
                                 }
                                 
-                                // DIR, DPA, DPI, REG can approve second level
+                                // DIR, DPA, DPI, REG can approve second level (on-peak)
                                 if (in_array($userRole, ['DIR', 'DPA', 'DPI', 'REG']) || $isAdmin) {
                                     $studentsApprovalPages[] = 'on-peak-requests-final';
-                                    $studentsApprovalPages[] = 'bus-season-requests-second';
                                     $hasStudentsApprovalAccess = true;
                                 }
                                 
@@ -452,10 +465,10 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                             
                             <?php if ($hasStudentsApprovalAccess): ?>
                             <!-- Students Approval - Consolidated menu for all student approvals -->
-                            <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, $studentsApprovalPages)) ? 'active' : ''; ?>">
+                            <li data-nav="student-approval" class="menu-item-has-children <?php echo (isset($page) && in_array($page, $studentsApprovalPages)) ? 'active' : ''; ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-user-check"></i>
-                                    <span>Students Approval</span>
+                                    <span><?php echo $isADMRole ? 'Student Approval' : 'Students Approval'; ?></span>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
                                 <ul class="submenu" style="<?php echo (isset($page) && in_array($page, $studentsApprovalPages)) ? 'display: block;' : ''; ?>">
@@ -496,51 +509,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    
-                                    <?php 
-                                    // Show Bus Season Second Approval for DIR, DPA, DPI, REG, Admin
-                                    $canApproveBusSeasonSecond = false;
-                                    if (isset($_SESSION['user_id'])) {
-                                        require_once BASE_PATH . '/models/UserModel.php';
-                                        $userModel = new UserModel();
-                                        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-                                        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-                                        $canApproveBusSeasonSecond = in_array($userRole, ['DIR', 'DPA', 'DPI', 'REG']) || $isAdmin;
-                                    }
-                                    ?>
-                                    <?php if ($canApproveBusSeasonSecond): ?>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/bus-season-requests/second-approval" class="<?php echo (isset($page) && $page === 'bus-season-requests-second') ? 'active' : ''; ?>">
-                                            <i class="fas fa-bus"></i>
-                                            <span>Bus Season Second Approval</span>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
                                 </ul>
-                            </li>
-                            <?php endif; ?>
-                            
-                            <?php
-                            // Check if user is SAO, ADM, or Admin for bus season processing
-                            $canProcessBusSeason = false;
-                            if (isset($_SESSION['user_id'])) {
-                                require_once BASE_PATH . '/models/UserModel.php';
-                                $userModel = new UserModel();
-                                $userRole = $userModel->getUserRole($_SESSION['user_id']);
-                                $isSAO = $userModel->isSAO($_SESSION['user_id']);
-                                $isADM = ($userRole === 'ADM');
-                                $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-                                $canProcessBusSeason = $isSAO || $isADM || $isAdmin;
-                            }
-                            ?>
-                            
-                            <?php if ($canProcessBusSeason): ?>
-                            <!-- Bus Season Processing - For SAO, ADM, Admin -->
-                            <li>
-                                <a href="<?php echo APP_URL; ?>/bus-season-requests/sao-process" class="<?php echo (isset($page) && $page === 'bus-season-requests-sao') ? 'active' : ''; ?>">
-                                    <i class="fas fa-ticket-alt"></i>
-                                    <span>Process Bus Season Tickets</span>
-                                </a>
                             </li>
                             <?php endif; ?>
                             
@@ -551,9 +520,18 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                 $isStudent = true;
                             }
                             ?>
+                            <?php if (!empty($hasStaffApprovalAccess)): ?>
+                            <li data-nav="staff-approval">
+                                <a href="<?php echo APP_URL; ?>/circuit-program/approval" class="<?php echo (isset($page) && $page === 'circuit-program-approval') ? 'active' : ''; ?>">
+                                    <i class="fas fa-user-check"></i>
+                                    <span>Staff Approval</span>
+                                </a>
+                            </li>
+                            <?php endif; ?>
+
                             <?php if (!$isStudent): ?>
                             <!-- Circuit Program - Staff Only (not students) -->
-                            <li>
+                            <li data-nav="circuit-program">
                                 <a href="<?php echo APP_URL; ?>/circuit-program" class="<?php echo (isset($page) && in_array($page, ['circuit-program', 'circuit-program-create', 'circuit-program-view'])) ? 'active' : ''; ?>">
                                     <i class="fas fa-route"></i>
                                     <span>Circuit Program</span>
@@ -563,7 +541,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                             
                             <?php if (isset($hasInstructorDiaryAccess) && $hasInstructorDiaryAccess): ?>
                             <!-- Instructor Diary (Teaching Staff + HOD) -->
-                            <li>
+                            <li data-nav="instructor-diary">
                                 <a href="<?php echo APP_URL; ?>/instructor-diary" class="<?php echo (isset($page) && $page === 'instructor-diary') ? 'active' : ''; ?>">
                                     <i class="fas fa-book-open"></i>
                                     <span>Instructor Diary</span>
@@ -596,8 +574,8 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'inventory'];
                                     }
                             ?>
                             <!-- Administration Branch -->
-                            <li class="menu-divider"></li>
-                            <li class="menu-item-has-children <?php echo (isset($page) && in_array($page, $adminPages)) ? 'active' : ''; ?>">
+                            <li data-nav="admin-divider" class="menu-divider"></li>
+                            <li data-nav="administration" class="menu-item-has-children <?php echo (isset($page) && in_array($page, $adminPages)) ? 'active' : ''; ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-cog"></i>
                                     <span>Administration</span>

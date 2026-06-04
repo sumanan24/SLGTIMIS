@@ -272,11 +272,11 @@ class CircuitProgramController extends Controller {
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
         
-        // Check if user is authorized for approval (DIR, DPA, DPI, REG)
-        $canApprove = in_array($userRole, ['DIR', 'DPA', 'DPI', 'REG']) || $isAdmin;
+        // Check if user is authorized for approval (DIR, DPA, DPI, REG, ADM)
+        $canApprove = in_array($userRole, ['DIR', 'DPA', 'DPI', 'REG', 'ADM']) || $isAdmin;
         
         if (!$canApprove) {
-            $_SESSION['error'] = 'Access denied. Only Director, DPA, DPI, or Registrar can approve circuit programs.';
+            $_SESSION['error'] = 'Access denied. Only Director, DPA, DPI, Registrar, or Administrator (ADM) can approve circuit programs.';
             $this->redirect('dashboard');
             return;
         }
@@ -332,11 +332,11 @@ class CircuitProgramController extends Controller {
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
         
-        // Check if user is authorized for approval (DIR, DPA, DPI, REG)
-        $canApprove = in_array($userRole, ['DIR', 'DPA', 'DPI', 'REG']) || $isAdmin;
+        // Check if user is authorized for approval (DIR, DPA, DPI, REG, ADM)
+        $canApprove = in_array($userRole, ['DIR', 'DPA', 'DPI', 'REG', 'ADM']) || $isAdmin;
         
         if (!$canApprove) {
-            $_SESSION['error'] = 'Access denied. Only Director, DPA, DPI, or Registrar can approve circuit programs.';
+            $_SESSION['error'] = 'Access denied. Only Director, DPA, DPI, Registrar, or Administrator (ADM) can approve circuit programs.';
             $this->redirect('dashboard');
             return;
         }

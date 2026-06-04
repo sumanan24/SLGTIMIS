@@ -98,6 +98,7 @@ return [
     'attendance/get-groups-by-course-and-year' => 'AttendanceController@getGroupsByCourseAndYear',
     'payments' => 'PaymentController@index',
     'payments/create' => 'PaymentController@create',
+    'payments/receipt' => 'PaymentController@receipt',
     'payments/edit' => 'PaymentController@edit',
     'payments/delete' => 'PaymentController@delete',
     'hostels' => 'HostelController@index',

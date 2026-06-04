@@ -251,17 +251,25 @@
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
+                                    <th class="fw-bold" style="width: 60px;">No</th>
+                                    <th class="fw-bold">Course ID</th>
                                     <th class="fw-bold">Course Name</th>
+                                    <th class="fw-bold">Department</th>
                                     <th class="fw-bold">NVQ Level</th>
                                     <th class="fw-bold text-end">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($courses as $course): ?>
+                                <?php $rowNumber = 1; foreach ($courses as $course): ?>
                                     <tr>
+                                        <td class="text-muted"><?php echo $rowNumber++; ?></td>
+                                        <td>
+                                            <span class="fw-semibold text-primary"><?php echo htmlspecialchars($course['course_id'] ?? ''); ?></span>
+                                        </td>
                                         <td>
                                             <span class="fw-semibold"><?php echo htmlspecialchars($course['course_name']); ?></span>
                                         </td>
+                                        <td><?php echo htmlspecialchars($course['department_name'] ?? '—'); ?></td>
                                         <td>
                                             <span class="badge bg-primary rounded-pill px-3">
                                                 Level <?php echo htmlspecialchars($course['course_nvq_level']); ?>

@@ -27,7 +27,6 @@ class PaymentController extends Controller {
         $search = $this->get('search', '');
         $studentId = $this->get('student_id', '');
         $paymentType = $this->get('payment_type', '');
-        $approved = $this->get('approved', '');
         $dateFrom = $this->get('date_from', '');
         $dateTo = $this->get('date_to', '');
         $page = max(1, (int)$this->get('page', 1));
@@ -43,9 +42,6 @@ class PaymentController extends Controller {
         }
         if (!empty($paymentType)) {
             $filters['payment_type'] = $paymentType;
-        }
-        if ($approved !== '') {
-            $filters['approved'] = (int)$approved;
         }
         if (!empty($dateFrom)) {
             $filters['date_from'] = $dateFrom;
@@ -82,14 +78,13 @@ class PaymentController extends Controller {
             'payments' => $payments,
             'students' => $students,
             'total' => $total,
-            'page' => $page,
+            'currentPage' => $page,
             'totalPages' => $totalPages,
             'perPage' => $perPage,
             'filters' => [
                 'search' => $search,
                 'student_id' => $studentId,
                 'payment_type' => $paymentType,
-                'approved' => $approved,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo
             ],
@@ -172,7 +167,7 @@ class PaymentController extends Controller {
             
             if ($result) {
                 $_SESSION['message'] = 'Payment created successfully.';
-                $this->redirect('payments');
+                $this->redirect('payments/receipt?id=' . (int)$result);
             } else {
                 $_SESSION['error'] = 'Failed to create payment.';
                 $this->redirect('payments/create');
@@ -186,7 +181,7 @@ class PaymentController extends Controller {
             
             $data = [
                 'title' => 'Create Payment',
-                'page' => 'payments',
+                'page' => 'payments-create',
                 'students' => $students,
                 'paymentReasons' => $paymentReasons,
                 'error' => $_SESSION['error'] ?? null
@@ -196,6 +191,52 @@ class PaymentController extends Controller {
         }
     }
     
+    public function receipt() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+
+        if (!$this->checkFinanceAccess()) {
+            return;
+        }
+
+        $id = (int)$this->get('id', 0);
+        if ($id <= 0) {
+            $_SESSION['error'] = 'Payment ID is required.';
+            $this->redirect('payments');
+            return;
+        }
+
+        $paymentModel = $this->model('PaymentModel');
+        $payment = $paymentModel->getById($id);
+
+        if (!$payment) {
+            $_SESSION['error'] = 'Payment not found.';
+            $this->redirect('payments');
+            return;
+        }
+
+        $autoPrint = $this->get('print', '1') !== '0';
+        $qty = max(1, (int)($payment['pays_qty'] ?? 1));
+        $unitAmount = (float)($payment['pays_amount'] ?? 0);
+        $lineTotal = $unitAmount * $qty;
+
+        $data = [
+            'title' => 'Payment Receipt (POS)',
+            'use_print_layout' => true,
+            'payment' => $payment,
+            'cashierName' => $_SESSION['user_name'] ?? 'Staff',
+            'lineTotal' => $lineTotal,
+            'autoPrint' => $autoPrint,
+            'posReceipt' => true,
+            'message' => $_SESSION['message'] ?? null,
+        ];
+        unset($_SESSION['message']);
+
+        return $this->view('payments/receipt', $data);
+    }
+
     public function edit() {
         // Check authentication
         if (!isset($_SESSION['user_id'])) {
@@ -294,7 +335,7 @@ class PaymentController extends Controller {
             
             $data = [
                 'title' => 'Edit Payment',
-                'page' => 'payments',
+                'page' => 'payments-edit',
                 'payment' => $payment,
                 'students' => $students,
                 'paymentReasons' => $paymentReasons,
@@ -347,7 +388,7 @@ class PaymentController extends Controller {
         } else {
             $data = [
                 'title' => 'Delete Payment',
-                'page' => 'payments',
+                'page' => 'payments-delete',
                 'payment' => $payment
             ];
             return $this->view('payments/delete', $data);

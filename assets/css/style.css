@@ -397,6 +397,226 @@ body:not(.logged-in) .main-content {
     opacity: 0.8;
 }
 
+/* Student approval workflow pages */
+.mis-approval-workflow .approval-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.mis-approval-workflow .approval-summary-card {
+    background: var(--white);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: var(--shadow);
+}
+
+.mis-approval-workflow .approval-summary-card .summary-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.mis-approval-workflow .approval-summary-card.pending .summary-icon {
+    background: rgba(255, 193, 7, 0.15);
+    color: #856404;
+}
+
+.mis-approval-workflow .approval-summary-card.completed .summary-icon {
+    background: rgba(40, 167, 69, 0.12);
+    color: var(--success);
+}
+
+.mis-approval-workflow .approval-summary-card .summary-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--primary-navy);
+}
+
+.mis-approval-workflow .approval-summary-card .summary-label {
+    font-size: 0.8125rem;
+    color: var(--text-gray);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+}
+
+.mis-approval-workflow .section-panel {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    background: var(--white);
+}
+
+.mis-approval-workflow .section-panel-header {
+    background: var(--light-gray);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.875rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.mis-approval-workflow .section-panel-header h6 {
+    margin: 0;
+    font-weight: 700;
+    color: var(--primary-navy);
+}
+
+.mis-approval-workflow .section-panel-body {
+    padding: 1.25rem;
+}
+
+.mis-approval-workflow .section-panel-body.flush-table {
+    padding: 0;
+}
+
+.mis-approval-workflow .approval-empty {
+    text-align: center;
+    padding: 2.5rem 1.5rem;
+    color: var(--text-gray);
+}
+
+.mis-approval-workflow .approval-empty i {
+    font-size: 2.5rem;
+    opacity: 0.35;
+    margin-bottom: 0.75rem;
+    display: block;
+}
+
+.mis-approval-workflow .approval-request-item {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+    background: var(--white);
+    transition: box-shadow 0.2s ease;
+}
+
+.mis-approval-workflow .approval-request-item:last-child {
+    margin-bottom: 0;
+}
+
+.mis-approval-workflow .approval-request-item:hover {
+    box-shadow: var(--shadow);
+}
+
+.mis-approval-workflow .approval-request-item__header {
+    background: linear-gradient(90deg, rgba(0, 31, 63, 0.04) 0%, transparent 100%);
+    border-bottom: 1px solid var(--soft-gray);
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.mis-approval-workflow .approval-request-item__title {
+    font-weight: 700;
+    color: var(--primary-navy);
+    margin-bottom: 0.25rem;
+}
+
+.mis-approval-workflow .approval-request-item__meta {
+    font-size: 0.875rem;
+    color: var(--text-gray);
+}
+
+.mis-approval-workflow .approval-step-track {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    padding: 0.75rem 1.25rem;
+    background: #f0f6fc;
+    border-bottom: 1px solid #d6e4f0;
+    font-size: 0.875rem;
+}
+
+.mis-approval-workflow .approval-step-track .step-done {
+    color: var(--success);
+    font-weight: 600;
+}
+
+.mis-approval-workflow .approval-step-track .step-current {
+    color: var(--primary-navy);
+    font-weight: 600;
+}
+
+.mis-approval-workflow .approval-step-track .step-arrow {
+    color: var(--text-gray);
+    opacity: 0.6;
+}
+
+.mis-approval-workflow .approval-detail-grid {
+    padding: 1.25rem;
+}
+
+.mis-approval-workflow .detail-field label {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-gray);
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.mis-approval-workflow .detail-field .detail-value {
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 0.9375rem;
+}
+
+.mis-approval-workflow .detail-note {
+    background: var(--light-gray);
+    border: 1px solid var(--soft-gray);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.9375rem;
+    margin-bottom: 1rem;
+}
+
+.mis-approval-workflow .approval-request-item__actions {
+    padding: 1rem 1.25rem 1.25rem;
+    border-top: 1px solid var(--soft-gray);
+    background: var(--light-gray);
+}
+
+.mis-approval-workflow .approval-request-item__actions .form-label {
+    font-size: 0.875rem;
+}
+
+.mis-approval-workflow .table tbody td {
+    vertical-align: middle;
+    font-size: 0.9375rem;
+}
+
+@media (max-width: 768px) {
+    .mis-approval-workflow .approval-request-item__actions .btn-group-actions {
+        flex-direction: column;
+    }
+
+    .mis-approval-workflow .approval-request-item__actions .btn-group-actions .btn {
+        width: 100%;
+    }
+}
+
 /* Alerts */
 .alert {
     padding: 1rem;
@@ -691,10 +911,34 @@ body.logged-in {
     top: 60px;
     left: 0;
     height: calc(100vh - 60px);
+    overflow-x: hidden;
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-navy-light) var(--primary-navy-dark);
     z-index: 999;
     transition: transform 0.3s ease;
     border-right: 2px solid var(--primary-navy-light);
+}
+
+/* Sidebar scrollbar — navy blue theme */
+.sidebar::-webkit-scrollbar {
+    width: 8px;
+    height: 0;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: var(--primary-navy-dark);
+    border-radius: 0;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: var(--primary-navy-light);
+    border-radius: 4px;
+    border: 2px solid var(--primary-navy-dark);
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #0056b3;
 }
 
 .sidebar-content {
@@ -704,6 +948,8 @@ body.logged-in {
     position: relative;
     z-index: 1002;
     pointer-events: auto;
+    overflow-x: hidden;
+    min-width: 0;
 }
 
 .sidebar-overlay {
@@ -758,12 +1004,41 @@ body.logged-in {
 
 .sidebar-nav {
     padding: 0.75rem 0;
+    overflow-x: hidden;
+    min-width: 0;
 }
 
 .sidebar-menu {
     list-style: none;
     padding: 0.5rem 0;
     margin: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+/* ADM role: primary sidebar order (Dashboard → Instructor Diary) */
+.sidebar-menu-adm {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.sidebar-menu-adm > li[data-nav="dashboard"] { order: 1; }
+.sidebar-menu-adm > li[data-nav="management"] { order: 2; }
+.sidebar-menu-adm > li[data-nav="student-info"] { order: 3; }
+.sidebar-menu-adm > li[data-nav="hostel"] { order: 4; }
+.sidebar-menu-adm > li[data-nav="student-attendance"] { order: 5; }
+.sidebar-menu-adm > li[data-nav="staff-attendance"] { order: 6; }
+.sidebar-menu-adm > li[data-nav="payments"] { order: 7; }
+.sidebar-menu-adm > li[data-nav="student-approval"] { order: 8; }
+.sidebar-menu-adm > li[data-nav="staff-approval"] { order: 9; }
+.sidebar-menu-adm > li[data-nav="instructor-diary"] { order: 10; }
+.sidebar-menu-adm > li[data-nav="exams"] { order: 20; }
+.sidebar-menu-adm > li[data-nav="admin-divider"],
+.sidebar-menu-adm > li[data-nav="administration"] { order: 21; }
+.sidebar-menu-adm > li[data-nav="id-card-print"],
+.sidebar-menu-adm > li[data-nav="circuit-program"] {
+    display: none;
 }
 
 .sidebar-menu li {
@@ -805,7 +1080,6 @@ body.logged-in {
     background: linear-gradient(90deg, rgba(0, 61, 122, 0.25) 0%, rgba(0, 61, 122, 0.15) 100%);
     color: var(--white);
     border-left-color: var(--primary-navy-light);
-    transform: translateX(2px);
 }
 
 .sidebar-menu li a:hover::before {
@@ -901,6 +1175,9 @@ body.logged-in {
     border-left: 2px solid rgba(255, 255, 255, 0.1);
     border-radius: 0 8px 8px 0;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
 }
 
 .menu-item-has-children.active .submenu {
@@ -947,7 +1224,6 @@ body.logged-in {
     color: var(--white);
     border-left-color: rgba(255, 255, 255, 0.3);
     padding-left: 2.25rem;
-    transform: translateX(2px);
 }
 
 .submenu li a:hover::before {
@@ -1014,26 +1290,6 @@ body.logged-in {
     background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.1) 20%, rgba(255, 255, 255, 0.1) 80%, transparent 100%);
     margin: 0.5rem 2rem;
     list-style: none;
-}
-
-/* Scrollbar Styling for Sidebar - Professional Style */
-.sidebar-nav::-webkit-scrollbar {
-    width: 5px;
-}
-
-.sidebar-nav::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
-}
-
-.sidebar-nav::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.25);
-    border-radius: 10px;
-    transition: background 0.3s ease;
-}
-
-.sidebar-nav::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.4);
 }
 
 /* Main Content Wrapper */
@@ -1783,6 +2039,10 @@ body.logged-in {
 
 /* Print Styles */
 @media print {
+    body.print-layout-body {
+        background: #fff !important;
+    }
+
     .sidebar,
     .top-navbar,
     .btn,

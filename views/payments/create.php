@@ -1,143 +1,169 @@
-<div class="container-fluid px-4 py-3">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0 fw-bold"><i class="fas fa-plus-circle me-2"></i>Create New Payment</h5>
+<style>
+.payment-form-wrap .payment-form .form-control,
+.payment-form-wrap .payment-form .form-select {
+    width: 100%;
+}
+
+.payment-form-wrap #student_search_results .list-group {
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .payment-form-wrap.container-fluid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    .payment-form-wrap .card {
+        border-radius: 0;
+    }
+    .payment-form-wrap .card-body {
+        padding: 1rem !important;
+    }
+    .payment-form-wrap .payment-form-actions {
+        flex-direction: column;
+    }
+    .payment-form-wrap .payment-form-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+</style>
+
+<div class="container-fluid px-4 py-3 payment-form-wrap">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0 fw-bold"><i class="fas fa-plus-circle me-2"></i>Create New Payment</h5>
+        </div>
+        <div class="card-body">
+            <?php if (isset($error)): ?>
+                <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <div><?php echo htmlspecialchars($error); ?></div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
-                <div class="card-body">
-                    <?php if (isset($error)): ?>
-                        <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center" role="alert">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            <div><?php echo htmlspecialchars($error); ?></div>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <?php endif; ?>
+
+            <form method="POST" action="<?php echo APP_URL; ?>/payments/create" class="payment-form">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label for="student_search" class="form-label fw-semibold mb-1">
+                            Student <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="student_search"
+                               placeholder="Search by Student ID or Name..."
+                               autocomplete="off">
+                        <input type="hidden" id="student_id" name="student_id" required>
+                        <div id="student_search_results" class="position-relative" style="display: none;">
+                            <div class="list-group position-absolute w-100" style="z-index: 1000; max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 0.375rem; margin-top: 0.25rem; box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);">
+                            </div>
                         </div>
-                    <?php endif; ?>
-                    
-                    <form method="POST" action="<?php echo APP_URL; ?>/payments/create">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="student_search" class="form-label fw-semibold">
-                                    Student <span class="text-danger">*</span>
-                                </label>
-                                <input type="text" class="form-control" id="student_search" 
-                                       placeholder="Search by Student ID or Name..." 
-                                       autocomplete="off">
-                                <input type="hidden" id="student_id" name="student_id" required>
-                                <div id="student_search_results" class="position-relative" style="display: none;">
-                                    <div class="list-group position-absolute w-100" style="z-index: 1000; max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 0.375rem; margin-top: 0.25rem; box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);">
-                                        <!-- Student list will be populated here -->
-                                    </div>
-                                </div>
-                                <div id="selected_student" class="mt-2" style="display: none;">
-                                    <div class="alert alert-info mb-0 py-2">
-                                        <i class="fas fa-check-circle me-2"></i>
-                                        <strong>Selected:</strong> <span id="selected_student_text"></span>
-                                        <button type="button" class="btn btn-sm btn-link p-0 ms-2" onclick="clearStudentSelection()">
-                                            <i class="fas fa-times"></i> Clear
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="invalid-feedback">Please select a student.</div>
+                        <div id="selected_student" class="mt-2" style="display: none;">
+                            <div class="alert alert-info mb-0 py-2">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <strong>Selected:</strong> <span id="selected_student_text"></span>
+                                <button type="button" class="btn btn-sm btn-link p-0 ms-2" onclick="clearStudentSelection()">
+                                    <i class="fas fa-times"></i> Clear
+                                </button>
                             </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="payment_date" class="form-label fw-semibold">
-                                    Payment Date <span class="text-danger">*</span>
-                                </label>
-                                <input type="date" class="form-control" id="payment_date" name="payment_date" 
-                                       value="<?php echo date('Y-m-d'); ?>" required>
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="payment_type" class="form-label fw-semibold">
-                                    Payment Type <span class="text-danger">*</span>
-                                </label>
-                                <select class="form-select" id="payment_type" name="payment_type" required>
-                                    <option value="">Select Payment Type</option>
-                                    <?php
-                                    $types = [];
-                                    if (isset($paymentReasons) && !empty($paymentReasons)) {
-                                        foreach ($paymentReasons as $reason) {
-                                            if (!in_array($reason['payment_type'], $types)) {
-                                                $types[] = $reason['payment_type'];
-                                            }
-                                        }
-                                        foreach ($types as $type) {
-                                            echo '<option value="' . htmlspecialchars($type) . '">' . htmlspecialchars($type) . '</option>';
-                                        }
+                        </div>
+                        <div class="invalid-feedback">Please select a student.</div>
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label for="payment_date" class="form-label fw-semibold mb-1">
+                            Payment Date <span class="text-danger">*</span>
+                        </label>
+                        <input type="date" class="form-control" id="payment_date" name="payment_date"
+                               value="<?php echo date('Y-m-d'); ?>" required>
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label for="payment_type" class="form-label fw-semibold mb-1">
+                            Payment Type <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="payment_type" name="payment_type" required>
+                            <option value="">Select Payment Type</option>
+                            <?php
+                            $types = [];
+                            if (isset($paymentReasons) && !empty($paymentReasons)) {
+                                foreach ($paymentReasons as $reason) {
+                                    if (!in_array($reason['payment_type'], $types)) {
+                                        $types[] = $reason['payment_type'];
                                     }
-                                    ?>
-                                </select>
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="payment_reason" class="form-label fw-semibold">
-                                    Payment Reason <span class="text-danger">*</span>
-                                </label>
-                                <select class="form-select" id="payment_reason" name="payment_reason" required>
-                                    <option value="">Select Payment Type First</option>
-                                </select>
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="payment_amount" class="form-label fw-semibold">
-                                    Payment Amount (Rs.) <span class="text-danger">*</span>
-                                </label>
-                                <input type="number" class="form-control" id="payment_amount" name="payment_amount" 
-                                       step="0.01" min="0.01" required placeholder="0.00">
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="pays_qty" class="form-label fw-semibold">Quantity</label>
-                                <input type="number" class="form-control" id="pays_qty" name="pays_qty" 
-                                       value="1" min="1" required>
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="payment_method" class="form-label fw-semibold">Payment Method</label>
-                                <select class="form-select" id="payment_method" name="payment_method">
-                                    <option value="">Select Method</option>
-                                    <option value="CASH">Cash</option>
-                                    <option value="BANK">Bank Transfer</option>
-                                    <option value="CHEQUE">Cheque</option>
-                                    <option value="ONLINE">Online Payment</option>
-                                    <option value="OTHER">Other</option>
-                                </select>
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="reference_no" class="form-label fw-semibold">Reference Number</label>
-                                <input type="text" class="form-control" id="reference_no" name="reference_no" 
-                                       placeholder="Optional reference number">
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="approved" class="form-label fw-semibold">Approval Status</label>
-                                <select class="form-select" id="approved" name="approved">
-                                    <option value="0">Pending</option>
-                                    <option value="1">Approved</option>
-                                </select>
-                            </div>
-                            
-                            <div class="col-12 mb-4">
-                                <label for="payment_notes" class="form-label fw-semibold">Notes</label>
-                                <textarea class="form-control" id="payment_notes" name="payment_notes" 
-                                          rows="3" placeholder="Additional notes about this payment"></textarea>
-                            </div>
-                        </div>
-                        
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-1"></i>Create Payment
-                            </button>
-                            <a href="<?php echo APP_URL; ?>/payments" class="btn btn-outline-secondary">
-                                <i class="fas fa-times me-1"></i>Cancel
-                            </a>
-                        </div>
-                    </form>
+                                }
+                                foreach ($types as $type) {
+                                    echo '<option value="' . htmlspecialchars($type) . '">' . htmlspecialchars($type) . '</option>';
+                                }
+                            }
+                            ?>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label for="payment_reason" class="form-label fw-semibold mb-1">
+                            Payment Reason <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="payment_reason" name="payment_reason" required>
+                            <option value="">Select Payment Type First</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label for="payment_amount" class="form-label fw-semibold mb-1">
+                            Payment Amount (Rs.) <span class="text-danger">*</span>
+                        </label>
+                        <input type="number" class="form-control" id="payment_amount" name="payment_amount"
+                               step="0.01" min="0.01" required placeholder="0.00">
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label for="pays_qty" class="form-label fw-semibold mb-1">Quantity</label>
+                        <input type="number" class="form-control" id="pays_qty" name="pays_qty"
+                               value="1" min="1" required>
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label for="payment_method" class="form-label fw-semibold mb-1">Payment Method</label>
+                        <select class="form-select" id="payment_method" name="payment_method">
+                            <option value="">Select Method</option>
+                            <option value="CASH">Cash</option>
+                            <option value="BANK">Bank Transfer</option>
+                            <option value="CHEQUE">Cheque</option>
+                            <option value="ONLINE">Online Payment</option>
+                            <option value="OTHER">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label for="reference_no" class="form-label fw-semibold mb-1">Reference Number</label>
+                        <input type="text" class="form-control" id="reference_no" name="reference_no"
+                               placeholder="Optional reference number">
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label for="approved" class="form-label fw-semibold mb-1">Approval Status</label>
+                        <select class="form-select" id="approved" name="approved">
+                            <option value="0">Pending</option>
+                            <option value="1">Approved</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12">
+                        <label for="payment_notes" class="form-label fw-semibold mb-1">Notes</label>
+                        <textarea class="form-control" id="payment_notes" name="payment_notes"
+                                  rows="3" placeholder="Additional notes about this payment"></textarea>
+                    </div>
                 </div>
-            </div>
+
+                <div class="payment-form-actions d-flex flex-wrap gap-2 mt-4 pt-3 border-top">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>Create Payment
+                    </button>
+                    <a href="<?php echo APP_URL; ?>/payments" class="btn btn-outline-secondary">
+                        <i class="fas fa-times me-1"></i>Cancel
+                    </a>
+                </div>
+            </form>
         </div>
     </div>
 </div>

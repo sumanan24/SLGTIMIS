@@ -49,14 +49,6 @@
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label for="approved" class="form-label fw-semibold">Status</label>
-                        <select class="form-select" id="approved" name="approved">
-                            <option value="">All Status</option>
-                            <option value="1" <?php echo ($filters['approved'] ?? '') == '1' ? 'selected' : ''; ?>>Approved</option>
-                            <option value="0" <?php echo ($filters['approved'] ?? '') == '0' ? 'selected' : ''; ?>>Pending</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
                         <label for="date_from" class="form-label fw-semibold">Date From</label>
                         <input type="date" class="form-control" id="date_from" name="date_from" 
                                value="<?php echo htmlspecialchars($filters['date_from'] ?? ''); ?>">
@@ -92,7 +84,6 @@
                                 <th class="fw-bold">Type</th>
                                 <th class="fw-bold">Reason</th>
                                 <th class="fw-bold">Method</th>
-                                <th class="fw-bold">Status</th>
                                 <th class="fw-bold text-end">Actions</th>
                             </tr>
                         </thead>
@@ -105,29 +96,25 @@
                                         <small class="text-muted"><?php echo htmlspecialchars($payment['student_fullname'] ?? '-'); ?></small>
                                     </td>
                                     <td><?php echo date('M d, Y', strtotime($payment['pays_date'])); ?></td>
-                                    <td><span class="fw-bold text-success">Rs. <?php echo number_format($payment['pays_amount'], 2); ?></span></td>
+                                    <?php
+                                    $rowQty = max(1, (int)($payment['pays_qty'] ?? 1));
+                                    $rowTotal = (float)($payment['pays_amount'] ?? 0) * $rowQty;
+                                    ?>
+                                    <td><span class="fw-bold text-success">Rs. <?php echo number_format($rowTotal, 2); ?></span></td>
                                     <td><?php echo htmlspecialchars($payment['payment_type'] ?? '-'); ?></td>
                                     <td><?php echo htmlspecialchars($payment['payment_reason'] ?? '-'); ?></td>
                                     <td><?php echo htmlspecialchars($payment['payment_method'] ?? '-'); ?></td>
-                                    <td>
-                                        <?php
-                                        $statusClass = 'bg-warning text-dark';
-                                        $statusText = 'Pending';
-                                        if (!empty($payment['approved']) && $payment['approved'] == 1) {
-                                            $statusClass = 'bg-success';
-                                            $statusText = 'Approved';
-                                        }
-                                        ?>
-                                        <span class="badge <?php echo $statusClass; ?>">
-                                            <?php echo $statusText; ?>
-                                        </span>
-                                    </td>
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm" role="group">
-                                            <a href="<?php echo APP_URL; ?>/payments/edit?id=<?php echo urlencode($payment['pays_id']); ?>" class="btn btn-outline-primary">
+                                            <a href="<?php echo APP_URL; ?>/payments/receipt?id=<?php echo (int)$payment['pays_id']; ?>&print=1"
+                                               class="btn btn-outline-secondary" target="_blank" rel="noopener"
+                                               title="Print POS receipt">
+                                                <i class="fas fa-print"></i>
+                                            </a>
+                                            <a href="<?php echo APP_URL; ?>/payments/edit?id=<?php echo urlencode($payment['pays_id']); ?>" class="btn btn-outline-primary" title="Edit">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            <a href="<?php echo APP_URL; ?>/payments/delete?id=<?php echo urlencode($payment['pays_id']); ?>" class="btn btn-outline-danger" onclick="return confirm('Are you sure you want to delete this payment?');">
+                                            <a href="<?php echo APP_URL; ?>/payments/delete?id=<?php echo urlencode($payment['pays_id']); ?>" class="btn btn-outline-danger" title="Delete" onclick="return confirm('Are you sure you want to delete this payment?');">
                                                 <i class="fas fa-trash"></i>
                                             </a>
                                         </div>
@@ -144,17 +131,18 @@
                         <ul class="pagination justify-content-center">
                             <?php
                             $queryParams = $filters;
-                            $queryParams['page'] = max(1, $page - 1);
+                            $currentPage = (int) ($currentPage ?? 1);
+                            $queryParams['page'] = max(1, $currentPage - 1);
                             ?>
-                            <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
+                            <li class="page-item <?php echo $currentPage <= 1 ? 'disabled' : ''; ?>">
                                 <a class="page-link" href="<?php echo APP_URL; ?>/payments?<?php echo http_build_query($queryParams); ?>">Previous</a>
                             </li>
                             
-                            <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                            <?php for ($i = max(1, $currentPage - 2); $i <= min($totalPages, $currentPage + 2); $i++): ?>
                                 <?php
                                 $queryParams['page'] = $i;
                                 ?>
-                                <li class="page-item <?php echo $i == $page ? 'active' : ''; ?>">
+                                <li class="page-item <?php echo $i == $currentPage ? 'active' : ''; ?>">
                                     <a class="page-link" href="<?php echo APP_URL; ?>/payments?<?php echo http_build_query($queryParams); ?>">
                                         <?php echo $i; ?>
                                     </a>
@@ -162,9 +150,9 @@
                             <?php endfor; ?>
                             
                             <?php
-                            $queryParams['page'] = min($totalPages, $page + 1);
+                            $queryParams['page'] = min($totalPages, $currentPage + 1);
                             ?>
-                            <li class="page-item <?php echo $page >= $totalPages ? 'disabled' : ''; ?>">
+                            <li class="page-item <?php echo $currentPage >= $totalPages ? 'disabled' : ''; ?>">
                                 <a class="page-link" href="<?php echo APP_URL; ?>/payments?<?php echo http_build_query($queryParams); ?>">Next</a>
                             </li>
                         </ul>

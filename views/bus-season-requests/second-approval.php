@@ -2,11 +2,16 @@
 <div class="container-fluid px-4 py-3 mis-approval-workflow">
     <div class="card shadow-sm border-0">
         <div class="card-header bg-primary text-white">
-            <div>
-                <h5 class="mb-1 fw-bold">
-                    <i class="fas fa-bus me-2"></i>Bus Season — First Approval
-                </h5>
-                <p class="mb-0 small opacity-75">HOD review for bus season requests in your department</p>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                    <h5 class="mb-1 fw-bold">
+                        <i class="fas fa-bus me-2"></i>Bus Season — Second Approval
+                    </h5>
+                    <p class="mb-0 small opacity-75">Approve or reject requests after HOD first approval</p>
+                </div>
+                <?php if (!empty($userRole)): ?>
+                    <span class="badge bg-light text-dark"><?php echo htmlspecialchars($userRole); ?></span>
+                <?php endif; ?>
             </div>
         </div>
         <div class="card-body">
@@ -46,7 +51,7 @@
                         <div class="approval-empty">
                             <i class="fas fa-inbox"></i>
                             <p class="mb-0 fw-semibold">No pending requests</p>
-                            <p class="small mb-0">New student requests will appear here.</p>
+                            <p class="small mb-0">All HOD-approved bus season requests have been processed.</p>
                         </div>
                     <?php else: ?>
                         <?php foreach ($requests as $request): ?>
@@ -59,13 +64,19 @@
                                             <span><i class="fas fa-building me-1"></i><?php echo htmlspecialchars($request['department_name'] ?? 'N/A'); ?></span>
                                         </div>
                                     </div>
-                                    <span class="badge bg-warning text-dark">Pending</span>
+                                    <span class="badge bg-success">HOD Approved</span>
                                 </div>
 
                                 <div class="approval-step-track">
                                     <span class="step-done"><i class="fas fa-check-circle me-1"></i>Submitted</span>
                                     <span class="step-arrow"><i class="fas fa-chevron-right"></i></span>
-                                    <span class="step-current"><i class="fas fa-circle-notch me-1"></i>Awaiting HOD approval</span>
+                                    <span class="step-done"><i class="fas fa-check-circle me-1"></i>HOD
+                                        <?php if (!empty($request['hod_approver_name'])): ?>
+                                            (<?php echo htmlspecialchars($request['hod_approver_name']); ?>)
+                                        <?php endif; ?>
+                                    </span>
+                                    <span class="step-arrow"><i class="fas fa-chevron-right"></i></span>
+                                    <span class="step-current"><i class="fas fa-circle-notch me-1"></i>Awaiting second approval</span>
                                 </div>
 
                                 <div class="approval-detail-grid">
@@ -111,12 +122,27 @@
                                             </div>
                                         </div>
                                         <?php endif; ?>
+                                        <?php if (!empty($request['depot_name'])): ?>
+                                        <div class="col-md-3 col-6">
+                                            <div class="detail-field">
+                                                <label>Depot</label>
+                                                <div class="detail-value"><?php echo htmlspecialchars($request['depot_name']); ?></div>
+                                            </div>
+                                        </div>
+                                        <?php endif; ?>
                                     </div>
 
                                     <?php if (!empty($request['notes'])): ?>
                                         <div class="mt-3">
                                             <label class="small text-muted text-uppercase fw-semibold">Student notes</label>
                                             <div class="detail-note"><?php echo nl2br(htmlspecialchars($request['notes'])); ?></div>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <?php if (!empty($request['hod_comments'])): ?>
+                                        <div>
+                                            <label class="small text-muted text-uppercase fw-semibold">HOD comments</label>
+                                            <div class="detail-note"><?php echo nl2br(htmlspecialchars($request['hod_comments'])); ?></div>
                                         </div>
                                     <?php endif; ?>
 
@@ -127,17 +153,17 @@
                                     <?php endif; ?>
                                 </div>
 
-                                <form action="<?php echo APP_URL; ?>/bus-season-requests/hod-approve" method="POST" class="approval-request-item__actions">
+                                <form action="<?php echo APP_URL; ?>/bus-season-requests/second-approve" method="POST" class="approval-request-item__actions">
                                     <input type="hidden" name="request_id" value="<?php echo (int)$request['id']; ?>">
                                     <div class="mb-3">
                                         <label for="comments_<?php echo (int)$request['id']; ?>" class="form-label fw-semibold">Your comments (optional)</label>
                                         <textarea class="form-control" id="comments_<?php echo (int)$request['id']; ?>" name="comments" rows="2" placeholder="Add approval notes…"></textarea>
                                     </div>
                                     <div class="d-flex flex-wrap gap-2 btn-group-actions">
-                                        <button type="submit" name="action" value="approve" class="btn btn-success" onclick="return confirm('Approve this request?');">
+                                        <button type="submit" name="action" value="approve" class="btn btn-success" onclick="return confirm('Approve this bus season request?');">
                                             <i class="fas fa-check me-1"></i>Approve
                                         </button>
-                                        <button type="submit" name="action" value="reject" class="btn btn-danger" onclick="return confirm('Reject this request?');">
+                                        <button type="submit" name="action" value="reject" class="btn btn-danger" onclick="return confirm('Reject this bus season request?');">
                                             <i class="fas fa-times me-1"></i>Reject
                                         </button>
                                         <a href="<?php echo APP_URL; ?>/bus-season-requests/view?id=<?php echo (int)$request['id']; ?>" class="btn btn-outline-primary">

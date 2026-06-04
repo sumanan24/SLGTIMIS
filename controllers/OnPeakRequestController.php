@@ -389,13 +389,15 @@ class OnPeakRequestController extends Controller {
             $userGender = $userModel->getUserGender($_SESSION['user_id']);
         }
         
-        // Get pending requests for second approval
+        // Get pending and completed requests for second approval
         $requests = $requestModel->getPendingFinalRequests($userRole, $_SESSION['user_id'], $userGender);
+        $completedRequests = $requestModel->getCompletedFinalRequests($userRole, $_SESSION['user_id'], $userGender);
         
         $data = [
             'title' => 'On-Peak/Off-Peak Final Approvals',
             'page' => 'on-peak-requests-final',
             'requests' => $requests,
+            'completedRequests' => $completedRequests,
             'userRole' => $userRole,
             'message' => $_SESSION['message'] ?? null,
             'error' => $_SESSION['error'] ?? null

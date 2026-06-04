@@ -33,7 +33,9 @@ class View {
         // Determine which layout to use based on user type
         $layoutFile = null;
         
-        if (!empty($this->data['use_public_layout'])) {
+        if (!empty($this->data['use_print_layout'])) {
+            $layoutFile = BASE_PATH . '/views/layouts/print.php';
+        } elseif (!empty($this->data['use_public_layout'])) {
             $layoutFile = BASE_PATH . '/views/layouts/public.php';
         } elseif (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student') {
             $layoutFile = BASE_PATH . '/views/layouts/student.php';

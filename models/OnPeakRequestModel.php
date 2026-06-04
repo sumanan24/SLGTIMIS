@@ -204,6 +204,67 @@ class OnPeakRequestModel extends Model {
     }
     
     /**
+     * Get hostel requests that completed final (second) approval
+     */
+    public function getCompletedFinalRequests($approverRole, $userId, $approverGender = null, $limit = 200) {
+        return $this->getCompletedSecondRequests($approverRole, $userId, $approverGender, $limit);
+    }
+    
+    /**
+     * Hostel requests with final approver recorded (Approved or Rejected)
+     */
+    public function getCompletedSecondRequests($approverRole, $userId, $approverGender = null, $limit = 200) {
+        $allowedRoles = ['DIR', 'DPA', 'DPI', 'REG', 'ADM', 'HOD', 'WAR'];
+        if (!in_array($approverRole, $allowedRoles)) {
+            return [];
+        }
+        
+        $limit = max(1, min(500, (int)$limit));
+        
+        $sql = "SELECT r.*, 
+                s.student_fullname, s.student_email, s.student_id, s.student_gender,
+                d.department_name, d.department_id,
+                hod.user_name as hod_approver_name,
+                second.user_name as second_approver_name
+                FROM `{$this->table}` r
+                INNER JOIN `student` s ON r.student_id = s.student_id
+                LEFT JOIN `department` d ON r.department_id = d.department_id
+                LEFT JOIN `user` hod ON r.hod_approver_id = hod.user_id
+                LEFT JOIN `user` second ON r.second_approver_id = second.user_id
+                WHERE r.is_hostel_student = 1
+                AND r.second_approver_id IS NOT NULL
+                AND (r.onpeak_request_status = 'Approved' OR r.onpeak_request_status = 'Rejected')
+                AND (r.second_approver_role IS NULL OR r.second_approver_role != 'HOD')";
+        
+        if ($approverRole === 'WAR' && $approverGender) {
+            $normalizedGender = ucfirst(strtolower($approverGender));
+            $sql .= " AND s.student_gender = ?";
+            $params = [$normalizedGender];
+            $types = 's';
+        }
+        
+        $sql .= " ORDER BY r.second_approval_date DESC, r.id DESC LIMIT {$limit}";
+        
+        if (isset($params)) {
+            $stmt = $this->db->prepare($sql);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+        } else {
+            $result = $this->db->query($sql);
+        }
+        
+        $data = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $data[] = $row;
+            }
+        }
+        
+        return $data;
+    }
+    
+    /**
      * Create new request
      */
     public function createRequest($data) {
