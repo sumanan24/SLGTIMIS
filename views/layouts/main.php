@@ -89,8 +89,8 @@
                                 $hasAttendanceRangeSummaryAccess = in_array($userRole, ['HOD', 'ADM'], true) || $isAdmin;
                                 // Groups access: HOD, IN1, IN2, IN3, ADM, and Admin
                                 $hasGroupAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'ADM']) || $isAdmin;
-                                // Instructor diary access: teaching staff, HOD, DIR/DPA/DPI/REG, ADM, and Admin
-                                $hasInstructorDiaryAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'LE1', 'LE2', 'SLE', 'DIR', 'DPA', 'DPI', 'REG', 'ADM']) || $isAdmin;
+                                // Instructor diary menu: teaching staff, HOD, ADM, Admin only (not DIR/DPA/DPI/REG/SAO)
+                                $hasInstructorDiaryAccess = !$isSAO && (in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'LE1', 'LE2', 'SLE', 'ADM'], true) || $isAdmin);
                                 // Staff device (Hikvision) menu: ADM/Admin full module; DIR, REG, FIN, ACC, HOD see dashboard + month only
                                 $canStaffDeviceAttendanceMenu = !$isSAO && ($isAdminOrADM || in_array($userRole, ['DIR', 'REG', 'FIN', 'ACC', 'HOD'], true));
                                 $canViewStudentApplications = $userModel->canViewOnlineStudentApplications($_SESSION['user_id']);

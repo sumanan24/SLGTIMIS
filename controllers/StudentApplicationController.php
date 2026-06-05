@@ -38,10 +38,10 @@ class StudentApplicationController extends Controller {
     ];
 
     /**
-     * SAO/RSA without ADM / system admin: lists/exports omit NIC-only drafts and rows missing NIC copy or birth certificate; ADM and system admin see everything.
+     * SAO/RSA and DIR (not ADM / system admin): lists/exports omit NIC-only drafts and rows missing NIC copy or birth certificate.
      */
     private function staffStudentAppsExcludeNicDrafts(UserModel $userModel, int $uid): bool {
-        return $userModel->isSAO($uid) && !$userModel->isAdminOrADM($uid);
+        return $userModel->usesLimitedStudentApplicationList($uid);
     }
 
     /**
@@ -2013,7 +2013,7 @@ class StudentApplicationController extends Controller {
         $userModel = new UserModel();
         $uid = (int) $_SESSION['user_id'];
         if (!$userModel->canViewOnlineStudentApplications($uid)) {
-            $_SESSION['error'] = 'You cannot open this page. Only Student Affairs (SAO) and Administrators (ADM) may access online applications.';
+            $_SESSION['error'] = 'You cannot open this page. Only Student Affairs (SAO), Director (DIR), and Administrators (ADM) may access online applications.';
             $this->redirect('dashboard');
             return;
         }
@@ -2117,7 +2117,7 @@ class StudentApplicationController extends Controller {
         $userModel = new UserModel();
         $uid = (int) $_SESSION['user_id'];
         if (!$userModel->canViewOnlineStudentApplications($uid)) {
-            $_SESSION['error'] = 'You cannot open this page. Only Student Affairs (SAO) and Administrators (ADM) may access online applications.';
+            $_SESSION['error'] = 'You cannot open this page. Only Student Affairs (SAO), Director (DIR), and Administrators (ADM) may access online applications.';
             $this->redirect('dashboard');
             return;
         }
@@ -2145,6 +2145,7 @@ class StudentApplicationController extends Controller {
             'app' => $app,
             'can_delete' => $userModel->isAdminOrADM($uid),
             'can_edit' => $userModel->canEditOnlineStudentApplications($uid),
+            'can_decide' => $userModel->canDecideOnlineStudentApplications($uid),
             'staff_exclude_incomplete_drafts' => $this->staffStudentAppsExcludeNicDrafts($userModel, $uid),
             'use_public_layout' => false,
         ]);
@@ -2309,8 +2310,8 @@ class StudentApplicationController extends Controller {
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         $uid = (int) $_SESSION['user_id'];
-        if (!$userModel->canViewOnlineStudentApplications($uid)) {
-            $_SESSION['error'] = 'You cannot open this page.';
+        if (!$userModel->canDecideOnlineStudentApplications($uid)) {
+            $_SESSION['error'] = 'You cannot approve applications.';
             $this->redirect('dashboard');
             return;
         }
@@ -2363,8 +2364,8 @@ class StudentApplicationController extends Controller {
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         $uid = (int) $_SESSION['user_id'];
-        if (!$userModel->canViewOnlineStudentApplications($uid)) {
-            $_SESSION['error'] = 'You cannot open this page.';
+        if (!$userModel->canDecideOnlineStudentApplications($uid)) {
+            $_SESSION['error'] = 'You cannot reject applications.';
             $this->redirect('dashboard');
             return;
         }

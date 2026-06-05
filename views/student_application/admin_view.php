@@ -5,6 +5,8 @@ $app = $app ?? [];
 $staff_exclude_incomplete_drafts = (bool) ($staff_exclude_incomplete_drafts ?? false);
 /** @var bool $can_delete */
 $can_delete = (bool) ($can_delete ?? false);
+/** @var bool $can_decide SAO / ADM may approve or reject; DIR is view-only */
+$can_decide = (bool) ($can_decide ?? false);
 
 if (!class_exists('StudentApplicationModel', false)) {
     require_once BASE_PATH . '/models/StudentApplicationModel.php';
@@ -131,7 +133,7 @@ $can_edit = (bool) ($can_edit ?? false);
         <a href="<?php echo $esc($listUrl); ?>" class="btn btn-outline-secondary btn-sm" title="Back to all applications">
             <i class="fas fa-arrow-left" aria-hidden="true"></i><span class="visually-hidden"> All applications</span>
         </a>
-        <span class="badge <?php echo $staff_exclude_incomplete_drafts ? 'bg-secondary' : 'bg-info text-dark'; ?>"><?php echo $staff_exclude_incomplete_drafts ? 'Student Affairs · full docs only' : 'Admin · all records'; ?></span>
+        <span class="badge <?php echo $staff_exclude_incomplete_drafts ? 'bg-secondary' : 'bg-info text-dark'; ?>"><?php echo $staff_exclude_incomplete_drafts ? 'NIC updated · full docs only' : 'Admin · all records'; ?></span>
         <div class="sa-export-actions">
             <div class="btn-group btn-group-sm" role="group" aria-label="Application actions">
                 <a class="btn btn-outline-danger" href="<?php echo $esc($exportPdfUrl); ?>" title="Download PDF summary (fields plus merged uploads)">
@@ -149,7 +151,7 @@ $can_edit = (bool) ($can_edit ?? false);
                     <i class="fab fa-whatsapp" aria-hidden="true"></i><span class="visually-hidden"> WhatsApp applicant</span>
                 </a>
                 <?php endif; ?>
-                <?php if ($st === 'new'): ?>
+                <?php if ($can_decide && $st === 'new'): ?>
                 <button type="submit" form="sa-view-form-approve" class="btn btn-primary" title="Approve application">
                     <i class="fas fa-check me-1" aria-hidden="true"></i>Approve
                 </button>

@@ -269,9 +269,29 @@ class UserModel extends Model {
     }
 
     /**
-     * Online applications list and detail: SAO/RSA, ADM, system admin.
+     * Online applications list and detail: SAO/RSA, DIR (NIC-complete rows only), ADM, system admin.
      */
     public function canViewOnlineStudentApplications($userId): bool {
+        if ($this->isSAO($userId) || $this->isAdminOrADM($userId)) {
+            return true;
+        }
+        return $this->getUserRole($userId) === 'DIR';
+    }
+
+    /**
+     * SAO/RSA and DIR: hide NIC-only drafts and rows missing NIC copy + birth certificate (ADM / system admin see all).
+     */
+    public function usesLimitedStudentApplicationList($userId): bool {
+        if ($this->isAdminOrADM($userId)) {
+            return false;
+        }
+        return $this->isSAO($userId) || $this->getUserRole($userId) === 'DIR';
+    }
+
+    /**
+     * Approve / reject online applications: SAO/RSA and ADM / system admin (DIR is view-only).
+     */
+    public function canDecideOnlineStudentApplications($userId): bool {
         return $this->isSAO($userId) || $this->isAdminOrADM($userId);
     }
 
