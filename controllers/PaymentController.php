@@ -12,10 +12,13 @@ class PaymentController extends Controller {
             return;
         }
         
-        // Restrict to FIN, ACC, ADM only
-        if (!$this->checkFinanceAccess()) {
+        if (!$this->checkPaymentsViewAccess()) {
             return;
         }
+
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $canManagePayments = $userModel->hasFinanceAccess($_SESSION['user_id']);
         
         $paymentModel = $this->model('PaymentModel');
         $studentModel = $this->model('StudentModel');
@@ -89,7 +92,8 @@ class PaymentController extends Controller {
                 'date_to' => $dateTo
             ],
             'message' => $_SESSION['message'] ?? null,
-            'error' => $_SESSION['error'] ?? null
+            'error' => $_SESSION['error'] ?? null,
+            'can_manage_payments' => $canManagePayments,
         ];
         
         unset($_SESSION['message'], $_SESSION['error']);
@@ -197,7 +201,7 @@ class PaymentController extends Controller {
             return;
         }
 
-        if (!$this->checkFinanceAccess()) {
+        if (!$this->checkPaymentsViewAccess()) {
             return;
         }
 

@@ -1,11 +1,14 @@
+<?php $can_manage_payments = (bool) ($can_manage_payments ?? true); ?>
 <div class="container-fluid px-4 py-3">
     <div class="card shadow-sm border-0">
         <div class="card-header bg-primary text-white">
             <div class="d-flex align-items-center justify-content-between flex-wrap">
                 <h5 class="mb-0 fw-bold"><i class="fas fa-money-bill-wave me-2"></i>Payments</h5>
+                <?php if ($can_manage_payments): ?>
                 <a href="<?php echo APP_URL; ?>/payments/create" class="btn btn-light btn-sm mt-2 mt-md-0">
                     <i class="fas fa-plus me-1"></i>Add New Payment
                 </a>
+                <?php endif; ?>
             </div>
         </div>
         <div class="card-body">
@@ -111,12 +114,14 @@
                                                title="Print POS receipt">
                                                 <i class="fas fa-print"></i>
                                             </a>
+                                            <?php if ($can_manage_payments): ?>
                                             <a href="<?php echo APP_URL; ?>/payments/edit?id=<?php echo urlencode($payment['pays_id']); ?>" class="btn btn-outline-primary" title="Edit">
                                                 <i class="fas fa-edit"></i>
                                             </a>
                                             <a href="<?php echo APP_URL; ?>/payments/delete?id=<?php echo urlencode($payment['pays_id']); ?>" class="btn btn-outline-danger" title="Delete" onclick="return confirm('Are you sure you want to delete this payment?');">
                                                 <i class="fas fa-trash"></i>
                                             </a>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>

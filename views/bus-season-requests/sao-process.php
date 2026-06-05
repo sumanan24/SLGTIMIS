@@ -130,6 +130,8 @@
     }
 </style>
 
+<?php $can_manage_bus_season = (bool) ($can_manage_bus_season ?? true); ?>
+
 <div class="container-fluid px-3 px-md-4 py-4">
     <!-- Page Header -->
     <div class="page-header">
@@ -144,9 +146,11 @@
                 </p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
+                <?php if ($can_manage_bus_season): ?>
                 <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#createRequestModal">
                     <i class="fas fa-plus me-2"></i>Create Request
                 </button>
+                <?php endif; ?>
                 <a href="<?php echo APP_URL; ?>/bus-season-requests/payment-collections" class="btn btn-outline-light">
                     <i class="fas fa-list me-2"></i>View All Payments
                 </a>
@@ -321,6 +325,7 @@
                                 </td>
                                 <td class="text-end">
                                     <div class="action-buttons">
+                                        <?php if ($can_manage_bus_season): ?>
                                         <!-- Edit Route Button -->
                                         <button type="button"
                                                 class="btn btn-outline-secondary btn-sm mb-1"
@@ -346,6 +351,7 @@
                                                 ?>
                                             </button>
                                         <?php endif; ?>
+                                        <?php endif; ?>
                                         <a href="<?php echo APP_URL; ?>/bus-season-requests/view?id=<?php echo $request['id']; ?>" 
                                            class="btn btn-outline-primary btn-sm" 
                                            title="View Details">
@@ -353,6 +359,7 @@
                                         </a>
                                     </div>
                                     
+                                    <?php if ($can_manage_bus_season): ?>
                                     <!-- Edit Route Modal -->
                                     <div class="modal fade" id="editRouteModal_<?php echo $request['id']; ?>" tabindex="-1">
                                         <div class="modal-dialog">
@@ -507,6 +514,7 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -516,6 +524,7 @@
         <?php endif; ?>
     </div>
     
+    <?php if ($can_manage_bus_season): ?>
     <!-- Create Request Modal -->
     <div class="modal fade" id="createRequestModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -618,6 +627,7 @@
             </div>
         </div>
     </div>
+    <?php endif; ?>
 </div>
 
 <script>

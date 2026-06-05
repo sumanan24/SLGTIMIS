@@ -422,7 +422,7 @@ class BusSeasonRequestController extends Controller {
      */
     public function saoProcess() {
         $this->requireAuth();
-        $this->requireSAOAccess();
+        $this->requireBusSeasonViewAccess();
         
         $requestModel = $this->model('BusSeasonRequestModel');
         $requestModel->ensureTableStructure();
@@ -452,6 +452,9 @@ class BusSeasonRequestController extends Controller {
             }
         }
         
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+
         $data = [
             'title' => 'Bus Season Requests - Payment Collection',
             'page' => 'bus-season-requests-sao',
@@ -459,6 +462,7 @@ class BusSeasonRequestController extends Controller {
             'filters' => $filters,
             'academicYears' => $academicYears,
             'students' => $students,
+            'can_manage_bus_season' => $userModel->canManageBusSeasonOperations((int) $_SESSION['user_id']),
             'message' => $this->getFlashMessage(),
             'error' => $this->getFlashError()
         ];
@@ -471,7 +475,7 @@ class BusSeasonRequestController extends Controller {
      */
     public function saoCreateRequest() {
         $this->requireAuth();
-        $this->requireSAOAccess();
+        $this->requireBusSeasonManageAccess();
         $this->requirePost();
         
         $isAjax = SeasonRequestHelper::isAjaxRequest();
@@ -598,7 +602,7 @@ class BusSeasonRequestController extends Controller {
      */
     public function saoProcessSave() {
         $this->requireAuth();
-        $this->requireSAOAccess();
+        $this->requireBusSeasonManageAccess();
         $this->requirePost();
         
         $requestId = (int)$this->post('request_id', 0);
@@ -672,7 +676,7 @@ class BusSeasonRequestController extends Controller {
      */
     public function updateRoute() {
         $this->requireAuth();
-        $this->requireSAOAccess();
+        $this->requireBusSeasonManageAccess();
         $this->requirePost();
         
         require_once BASE_PATH . '/core/SeasonRequestHelper.php';
@@ -739,7 +743,7 @@ class BusSeasonRequestController extends Controller {
      */
     public function paymentCollections() {
         $this->requireAuth();
-        $this->requireSAOAccess();
+        $this->requireBusSeasonViewAccess();
         
         $requestModel = $this->model('BusSeasonRequestModel');
         $requestModel->ensureTableStructure();
@@ -752,11 +756,15 @@ class BusSeasonRequestController extends Controller {
         
         $collections = $requestModel->getAllPaymentCollections($filters);
         
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+
         $data = [
             'title' => 'Bus Season Payment Collections',
             'page' => 'bus-season-payments',
             'collections' => $collections,
             'filters' => $filters,
+            'can_manage_bus_season' => $userModel->canManageBusSeasonOperations((int) $_SESSION['user_id']),
             'message' => $this->getFlashMessage(),
             'error' => $this->getFlashError()
         ];
@@ -769,7 +777,7 @@ class BusSeasonRequestController extends Controller {
      */
     public function editPayment() {
         $this->requireAuth();
-        $this->requireSAOAccess();
+        $this->requireBusSeasonManageAccess();
         $this->requirePost();
         
         $paymentId = (int)$this->post('payment_id', 0);
@@ -829,7 +837,7 @@ class BusSeasonRequestController extends Controller {
      */
     public function deletePayment() {
         $this->requireAuth();
-        $this->requireSAOAccess();
+        $this->requireBusSeasonManageAccess();
         $this->requirePost();
         
         $paymentId = (int)$this->post('payment_id', 0);
@@ -875,7 +883,7 @@ class BusSeasonRequestController extends Controller {
      */
     public function updatePaymentStatus() {
         $this->requireAuth();
-        $this->requireSAOAccess();
+        $this->requireBusSeasonManageAccess();
         $this->requirePost();
         
         $paymentId = (int)$this->post('payment_id', 0);
@@ -927,7 +935,7 @@ class BusSeasonRequestController extends Controller {
      */
     public function bulkUpdateStatus() {
         $this->requireAuth();
-        $this->requireSAOAccess();
+        $this->requireBusSeasonManageAccess();
         $this->requirePost();
         
         $paymentIds = $this->post('payment_ids', []);
@@ -960,7 +968,7 @@ class BusSeasonRequestController extends Controller {
      */
     public function exportPaymentsExcel() {
         $this->requireAuth();
-        $this->requireSAOAccess();
+        $this->requireBusSeasonViewAccess();
         
         $requestModel = $this->model('BusSeasonRequestModel');
         $status = $this->get('status', 'paid');
@@ -1176,18 +1184,26 @@ class BusSeasonRequestController extends Controller {
     }
     
     /**
-     * Require SAO access
+     * View bus season process / payment collections (SAO, DIR, ADM, Admin).
      */
-    private function requireSAOAccess() {
+    private function requireBusSeasonViewAccess() {
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
-        $isSAO = $userModel->isSAO($_SESSION['user_id']);
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isADM = ($userRole === 'ADM');
-        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-        
-        if (!$isSAO && !$isADM && !$isAdmin) {
-            $this->setError('Access denied. Only SAO and Administrators can access this section.');
+        if (!$userModel->canViewBusSeasonOperations((int) $_SESSION['user_id'])) {
+            $this->setError('Access denied. Bus season information is available to Student Affairs, Director, and Administrators.');
+            $this->redirect('dashboard');
+            exit;
+        }
+    }
+
+    /**
+     * Modify bus season records (SAO, ADM, Admin only).
+     */
+    private function requireBusSeasonManageAccess() {
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        if (!$userModel->canManageBusSeasonOperations((int) $_SESSION['user_id'])) {
+            $this->setError('Access denied. Only Student Affairs and Administrators can change bus season records.');
             $this->redirect('dashboard');
             exit;
         }

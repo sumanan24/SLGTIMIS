@@ -228,6 +228,27 @@ class Controller {
         
         return true;
     }
+
+    /**
+     * View payments list / print receipt (FIN, ACC, ADM, or read-only DIR).
+     */
+    protected function checkPaymentsViewAccess() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+
+        if (!$userModel->canViewPaymentsList($_SESSION['user_id'])) {
+            $_SESSION['error'] = 'Access denied. Payments are available to Finance staff, Administrator, or Director (view only).';
+            $this->redirect('dashboard');
+            return false;
+        }
+
+        return true;
+    }
     
     /**
      * Check if current logged-in user is Admin or ADM
@@ -327,18 +348,13 @@ class Controller {
         
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        
-        // Allow SAO, ADM, Admin, and FIN to view room allocations
-        $allowedRoles = ['SAO', 'ADM', 'FIN'];
-        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-        
-        if (!in_array($userRole, $allowedRoles) && !$isAdmin) {
+
+        if (!$userModel->canViewRoomAllocations($_SESSION['user_id'])) {
             $_SESSION['error'] = 'Access denied. Room Allocations section is only available for authorized roles.';
             $this->redirect('dashboard');
             return false;
         }
-        
+
         return true;
     }
     

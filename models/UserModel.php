@@ -314,6 +314,43 @@ class UserModel extends Model {
     }
     
     /**
+     * View payments list / receipts: FIN, ACC, ADM, or DIR (DIR is read-only).
+     */
+    public function canViewPaymentsList($userId): bool {
+        if ($this->hasFinanceAccess($userId)) {
+            return true;
+        }
+        return $this->getUserRole($userId) === 'DIR';
+    }
+
+    /**
+     * Bus season process & payment collections: SAO, DIR (view), ADM, system admin.
+     */
+    public function canViewBusSeasonOperations($userId): bool {
+        if ($this->isSAO($userId) || $this->isAdminOrADM($userId)) {
+            return true;
+        }
+        return $this->getUserRole($userId) === 'DIR';
+    }
+
+    /**
+     * Modify bus season requests / payments: SAO and ADM / system admin only.
+     */
+    public function canManageBusSeasonOperations($userId): bool {
+        return $this->isSAO($userId) || $this->isAdminOrADM($userId);
+    }
+
+    /**
+     * View hostel room allocations: SAO, ADM, FIN, DIR, system admin.
+     */
+    public function canViewRoomAllocations($userId): bool {
+        if ($this->canManageRoomAllocations($userId)) {
+            return true;
+        }
+        return in_array($this->getUserRole($userId), ['FIN', 'DIR'], true);
+    }
+
+    /**
      * Check if user can access room allocations (SAO or ADM)
      */
     public function canManageRoomAllocations($userId) {

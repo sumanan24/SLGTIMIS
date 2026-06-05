@@ -95,12 +95,16 @@
                                 $canStaffDeviceAttendanceMenu = !$isSAO && ($isAdminOrADM || in_array($userRole, ['DIR', 'REG', 'FIN', 'ACC', 'HOD'], true));
                                 $canViewStudentApplications = $userModel->canViewOnlineStudentApplications($_SESSION['user_id']);
                                 $canAccessExamsModule = $userModel->canAccessExamsModule($_SESSION['user_id']);
-                                // Bus Season processing & payments: SAO, ADM, Admin
-                                $canProcessBusSeasonMenu = $isSAO || ($userRole === 'ADM') || $isAdmin;
+                                // Bus Season processing & payments: SAO, DIR (view), ADM, Admin
+                                $canProcessBusSeasonMenu = $userModel->canViewBusSeasonOperations($_SESSION['user_id']);
+                                $canViewPaymentsMenu = $userModel->canViewPaymentsList($_SESSION['user_id']);
                             }
                             $isADMRole = ($userRole === 'ADM');
                             if (!isset($canProcessBusSeasonMenu)) {
                                 $canProcessBusSeasonMenu = false;
+                            }
+                            if (!isset($canViewPaymentsMenu)) {
+                                $canViewPaymentsMenu = false;
                             }
                             $busSeasonPages = ['bus-season-requests-sao', 'bus-season-payments'];
                             $paymentsPages = ['payments', 'payments-create', 'payments-edit', 'payments-delete'];
@@ -208,11 +212,10 @@ $educationPages = ['departments', 'courses', 'modules', 'staff'];
                                 $canViewHostelInfo = in_array($userRole, $allowedHostelViewRoles) || $isAdmin;
                             }
                             
-                            // Check if user can view room allocations (SAO, ADM, FIN, Admin)
+                            // Check if user can view room allocations (SAO, ADM, FIN, DIR, Admin)
                             $canViewRoomAllocations = false;
                             if (isset($_SESSION['user_id'])) {
-                                $allowedRoomAllocRoles = ['SAO', 'ADM', 'FIN'];
-                                $canViewRoomAllocations = in_array($userRole, $allowedRoomAllocRoles) || $isAdmin;
+                                $canViewRoomAllocations = $userModel->canViewRoomAllocations($_SESSION['user_id']);
                             }
                             
                             $showHostelsRoomsMenu = $isAdminOrADM && !$isHOD;
@@ -407,7 +410,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff'];
                             </li>
                             <?php endif; ?>
                             
-                            <?php if ($hasFinanceAccess): ?>
+                            <?php if (!empty($canViewPaymentsMenu)): ?>
                             <li data-nav="payments" class="menu-item-has-children <?php echo (isset($page) && in_array($page, $paymentsPages, true)) ? 'active' : ''; ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-money-bill-wave"></i>
@@ -421,12 +424,14 @@ $educationPages = ['departments', 'courses', 'modules', 'staff'];
                                             <span>All Payments</span>
                                         </a>
                                     </li>
+                                    <?php if (!empty($hasFinanceAccess)): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/payments/create" class="<?php echo (isset($page) && $page === 'payments-create') ? 'active' : ''; ?>">
                                             <i class="fas fa-plus-circle"></i>
                                             <span>Add Payment</span>
                                         </a>
                                     </li>
+                                    <?php endif; ?>
                                 </ul>
                             </li>
                             <?php endif; ?>

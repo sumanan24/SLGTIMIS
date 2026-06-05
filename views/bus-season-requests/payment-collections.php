@@ -135,6 +135,8 @@
     }
 </style>
 
+<?php $can_manage_bus_season = (bool) ($can_manage_bus_season ?? true); ?>
+
 <div class="container-fluid px-3 px-md-4 py-4">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
         <div>
@@ -243,31 +245,40 @@
             <div class="table-container">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="fw-bold mb-0">Paid Seasons</h5>
+                    <?php if ($can_manage_bus_season): ?>
                     <button onclick="bulkUpdate('processing')" id="btnBulkProcess" class="btn btn-warning btn-sm" disabled>
                         <i class="fas fa-cog"></i> Mark Selected as Processing
                     </button>
+                    <?php endif; ?>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
                             <tr>
+                                <?php if ($can_manage_bus_season): ?>
                                 <th width="40"><input type="checkbox" id="checkAllPaid"></th>
+                                <?php endif; ?>
                                 <th>Student Details</th>
                                 <th>Route</th>
                                 <th>NIC</th>
                                 <th>Paid Amount</th>
                                 <th>Date</th>
+                                <?php if ($can_manage_bus_season): ?>
                                 <th class="text-end">Actions</th>
+                                <?php endif; ?>
                             </tr>
                         </thead>
                         <tbody>
                             <?php 
                             $paidItems = array_filter($collections, fn($c) => strtolower($c['payment_status'] ?? '') === 'paid');
+                            $paidColspan = $can_manage_bus_season ? 7 : 5;
                             if (empty($paidItems)): ?>
-                                <tr><td colspan="7" class="text-center py-4">No records found</td></tr>
+                                <tr><td colspan="<?php echo $paidColspan; ?>" class="text-center py-4">No records found</td></tr>
                             <?php else: foreach ($paidItems as $c): ?>
                                 <tr>
+                                    <?php if ($can_manage_bus_season): ?>
                                     <td><input type="checkbox" class="paid-check" value="<?php echo $c['payment_id']; ?>"></td>
+                                    <?php endif; ?>
                                     <td>
                                         <div class="fw-bold"><?php echo htmlspecialchars($c['student_fullname'] ?? 'N/A'); ?></div>
                                         <small class="text-muted"><?php echo htmlspecialchars($c['payment_student_id'] ?? $c['profile_student_id'] ?? $c['request_student_id'] ?? 'N/A'); ?></small>
@@ -278,6 +289,7 @@
                                     <td><?php echo htmlspecialchars($c['student_nic'] ?? '-'); ?></td>
                                     <td class="fw-bold text-success">Rs. <?php echo number_format($c['paid_amount'] ?? 0, 2); ?></td>
                                     <td><?php echo !empty($c['payment_date']) ? date('M d, Y', strtotime($c['payment_date'])) : 'N/A'; ?></td>
+                                    <?php if ($can_manage_bus_season): ?>
                                     <td class="text-end">
                                         <div class="action-buttons">
                                             <button onclick="updateStatus(<?php echo $c['payment_id']; ?>, 'processing')" class="btn btn-outline-warning" title="Move to Processing">
@@ -339,6 +351,7 @@
                                             </div>
                                         </div>
                                     </td>
+                                    <?php endif; ?>
                                 </tr>
                             <?php endforeach; endif; ?>
                         </tbody>
@@ -360,14 +373,17 @@
                                 <th>NIC</th>
                                 <th>Paid Amount</th>
                                 <th>Processing Started</th>
+                                <?php if ($can_manage_bus_season): ?>
                                 <th class="text-end">Actions</th>
+                                <?php endif; ?>
                             </tr>
                         </thead>
                         <tbody>
                             <?php 
                             $procItems = array_filter($collections, fn($c) => strtolower($c['payment_status'] ?? '') === 'processing');
+                            $procColspan = $can_manage_bus_season ? 6 : 5;
                             if (empty($procItems)): ?>
-                                <tr><td colspan="6" class="text-center py-4">No records found</td></tr>
+                                <tr><td colspan="<?php echo $procColspan; ?>" class="text-center py-4">No records found</td></tr>
                             <?php else: foreach ($procItems as $c): ?>
                                 <tr>
                                     <td>
@@ -380,6 +396,7 @@
                                     <td><?php echo htmlspecialchars($c['student_nic'] ?? '-'); ?></td>
                                     <td class="fw-bold text-success">Rs. <?php echo number_format($c['paid_amount'] ?? 0, 2); ?></td>
                                     <td><?php echo !empty($c['updated_at']) ? date('M d, Y', strtotime($c['updated_at'])) : 'N/A'; ?></td>
+                                    <?php if ($can_manage_bus_season): ?>
                                     <td class="text-end">
                                         <div class="action-buttons">
                                             <button onclick="updateStatus(<?php echo $c['payment_id']; ?>, 'issued')" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#issueModal_<?php echo $c['payment_id']; ?>" title="Issue Season Ticket">
@@ -446,6 +463,7 @@
                                             </div>
                                         </div>
                                     </td>
+                                    <?php endif; ?>
                                 </tr>
                             <?php endforeach; endif; ?>
                         </tbody>
