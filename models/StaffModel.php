@@ -154,6 +154,25 @@ class StaffModel extends Model {
     }
     
     /**
+     * All staff for navbar assignment (ordered by name)
+     */
+    public function getAllForNavAssign(): array {
+        $sql = "SELECT s.`staff_id`, s.`staff_name`, s.`department_id`, s.`staff_position`, d.`department_name`
+                FROM `{$this->table}` s
+                LEFT JOIN `department` d ON d.`department_id` = s.`department_id`
+                ORDER BY s.`staff_name` ASC, s.`staff_id` ASC";
+        $result = $this->db->query($sql);
+        if (!$result) {
+            return [];
+        }
+        $rows = [];
+        while ($row = $result->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
+    /**
      * Check if staff exists
      */
     public function exists($id) {

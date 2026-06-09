@@ -10,6 +10,9 @@
     <?php if (!empty($scopeNoDepartment)): ?>
         <div class="alert alert-warning">Your account has no department assigned. Inventory totals and activity are hidden until an administrator links your staff profile to a department.</div>
     <?php endif; ?>
+    <?php if (empty($logTableReady) && !empty($logTableError)): ?>
+        <div class="alert alert-warning"><?php echo htmlspecialchars($logTableError); ?></div>
+    <?php endif; ?>
 
     <div class="row g-3 mb-4">
         <div class="col-md-4">
@@ -73,7 +76,10 @@
         </div>
         <div class="col-lg-6">
             <div class="card shadow-sm border-0">
-                <div class="card-header bg-white fw-semibold">Recent activity</div>
+                <div class="card-header bg-white fw-semibold d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span>Recent activity</span>
+                    <a href="<?php echo APP_URL; ?>/inventory/log" class="btn btn-sm btn-outline-primary">View full log</a>
+                </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm mb-0">
@@ -97,6 +103,47 @@
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mt-3">
+        <div class="card-header bg-white fw-semibold d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span>Inventory log</span>
+            <a href="<?php echo APP_URL; ?>/inventory/log" class="btn btn-sm btn-outline-primary">Filters &amp; full history</a>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Item</th>
+                            <th>Dept</th>
+                            <th class="text-end">Qty</th>
+                            <th>Ref</th>
+                            <th>Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($inventoryLogs)): ?>
+                            <tr><td colspan="7" class="text-center text-muted py-4">No log entries yet. Stock in, out, and transfers will appear here.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($inventoryLogs as $r): ?>
+                                <tr>
+                                    <td class="text-nowrap small"><?php echo htmlspecialchars($r['action_date'] ?? ''); ?></td>
+                                    <td><span class="badge bg-secondary"><?php echo htmlspecialchars($r['action_type'] ?? ''); ?></span></td>
+                                    <td><?php echo htmlspecialchars($r['item_name'] ?? ''); ?> <?php if (!empty($r['item_code'])): ?><small class="text-muted">(<?php echo htmlspecialchars($r['item_code']); ?>)</small><?php endif; ?></td>
+                                    <td><?php echo htmlspecialchars($r['department_name'] ?? $r['department_id'] ?? ''); ?></td>
+                                    <td class="text-end"><?php echo (int)($r['quantity'] ?? 0); ?></td>
+                                    <td><?php echo (int)($r['reference_id'] ?? 0); ?></td>
+                                    <td class="small"><?php echo htmlspecialchars($r['remarks'] ?? ''); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
