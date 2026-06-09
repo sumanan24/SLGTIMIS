@@ -222,7 +222,41 @@ class UserModel extends Model {
         $role = $this->getUserRole($userId);
         return $role === 'HOD';
     }
-    
+
+    /**
+     * Check if user is HRO (HR Officer)
+     */
+    public function isHRO($userId) {
+        return $this->getUserRole($userId) === 'HRO';
+    }
+
+    /**
+     * Staff CRUD: ADM, MHF, REG, HRO, or system admin.
+     */
+    public function canManageStaff($userId) {
+        if ($this->isAdmin($userId)) {
+            return true;
+        }
+        return in_array($this->getUserRole($userId), ['ADM', 'MHF', 'REG', 'HRO'], true);
+    }
+
+    /**
+     * Staff device attendance — daily report + device sync (full module tier).
+     */
+    public function canManageStaffDeviceSyncDaily($userId) {
+        if ($this->isAdminOrADM($userId)) {
+            return true;
+        }
+        return $this->isHRO($userId);
+    }
+
+    /**
+     * Side nav: dashboard, daily, month, sync (not limited to dashboard + month only).
+     */
+    public function hasFullStaffDeviceAttendanceNav($userId) {
+        return $this->isAdminOrADM($userId) || $this->isHRO($userId);
+    }
+
     /**
      * Check if user has finance-related position (FIN, ACC, or ADM)
      * FIN = Finance Officer
@@ -250,11 +284,11 @@ class UserModel extends Model {
 
     /**
      * Staff device attendance: dashboard + month report (embedded app).
-     * List / daily / sync remain restricted to Admin/ADM via AttendanceController.
+     * Daily / sync: Admin/ADM and HRO via canManageStaffDeviceSyncDaily().
      * DIR, REG, FIN, ACC, HOD: dashboard + month only (limited side nav).
      */
     public function canViewStaffDeviceDashboardMonth($userId) {
-        if ($this->isAdminOrADM($userId)) {
+        if ($this->isAdminOrADM($userId) || $this->isHRO($userId)) {
             return true;
         }
         $role = $this->getUserRole($userId);

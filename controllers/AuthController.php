@@ -28,6 +28,8 @@ class AuthController extends Controller {
                 $this->redirect('student/dashboard');
             } elseif ($userModel->isHOD($_SESSION['user_id'])) {
                 $this->redirect('hod/dashboard');
+            } elseif ($userModel->isHRO($_SESSION['user_id'])) {
+                $this->redirect('attendance/staff-device');
             } else {
                 $this->redirect('dashboard');
             }
@@ -173,8 +175,9 @@ class AuthController extends Controller {
                     if ($userTable === 'student') {
                         header("Location: " . APP_URL . "/student/dashboard");
                     } elseif ($userModelCheck->isHOD($user['user_id'])) {
-                        // Redirect HOD users to HOD dashboard
                         header("Location: " . APP_URL . "/hod/dashboard");
+                    } elseif ($userModelCheck->isHRO($user['user_id'])) {
+                        header("Location: " . APP_URL . "/attendance/staff-device");
                     } else {
                         header("Location: " . APP_URL . "/dashboard");
                     }

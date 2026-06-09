@@ -1688,13 +1688,13 @@ class AttendanceController extends Controller {
         $state['urls'] = staff_attendance_embed_nav_urls();
         $state['embed_main_layout'] = true;
         $userModel = new UserModel();
-        $state['staffDeviceNavLimited'] = !$userModel->isAdminOrADM((int) $_SESSION['user_id']);
+        $state['staffDeviceNavLimited'] = !$userModel->hasFullStaffDeviceAttendanceNav((int) $_SESSION['user_id']);
 
         return $this->view('attendance/staff_device_dashboard', $state);
     }
 
     /**
-     * Full staff device module (all punches, daily, sync): Admin / ADM only.
+     * Full staff device module (daily report, device sync): Admin / ADM / HRO.
      */
     private function checkStaffDeviceAccess(): bool {
         if (!isset($_SESSION['user_id'])) {
@@ -1706,8 +1706,8 @@ class AttendanceController extends Controller {
         }
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
-        if (!$userModel->isAdminOrADM($_SESSION['user_id'])) {
-            $_SESSION['error'] = 'Access denied. This staff device section is only available to Administrators (ADM).';
+        if (!$userModel->canManageStaffDeviceSyncDaily($_SESSION['user_id'])) {
+            $_SESSION['error'] = 'Access denied. Daily report and device sync are available to ADM, HRO, or Administrators.';
             $this->redirect('dashboard');
             return false;
         }
@@ -1730,7 +1730,7 @@ class AttendanceController extends Controller {
         if ($userModel->canViewStaffDeviceDashboardMonth($_SESSION['user_id'])) {
             return true;
         }
-        $_SESSION['error'] = 'Access denied. Staff device attendance is available to DIR, REG, FIN, ACC, HOD, ADM, or Administrators.';
+        $_SESSION['error'] = 'Access denied. Staff device attendance is available to HRO, DIR, REG, FIN, ACC, HOD, ADM, or Administrators.';
         $this->redirect('dashboard');
         return false;
     }
@@ -1813,7 +1813,7 @@ class AttendanceController extends Controller {
 
         $urls = $this->staffDeviceNavUrls();
         $userModel = new UserModel();
-        $staffDeviceNavLimited = !$userModel->isAdminOrADM((int) $_SESSION['user_id']);
+        $staffDeviceNavLimited = !$userModel->hasFullStaffDeviceAttendanceNav((int) $_SESSION['user_id']);
         $tz = new DateTimeZone(STAFF_TIMEZONE);
         $defaultMonth = (new DateTimeImmutable('now', $tz))->format('Y-m');
 

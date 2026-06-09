@@ -29,12 +29,9 @@ class StaffController extends Controller {
         $total = $staffModel->getTotalStaff($search, $userDepartmentId ? $userDepartmentId : '');
         $totalPages = ceil($total / 20);
         
-        // Check if user can manage staff (ADM, MHF, REG only)
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-        $canManageStaff = in_array($userRole, ['ADM', 'MHF', 'REG']) || $isAdmin;
+        $canManageStaff = $userModel->canManageStaff($_SESSION['user_id']);
         
         $data = [
             'title' => 'Staff',
@@ -65,15 +62,10 @@ class StaffController extends Controller {
             return;
         }
         
-        // Only ADM, MHF, REG can create staff
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-        $canManageStaff = in_array($userRole, ['ADM', 'MHF', 'REG']) || $isAdmin;
-        
-        if (!$canManageStaff) {
-            $_SESSION['error'] = 'Access denied. Only ADM, MHF, and REG can create staff.';
+        if (!$userModel->canManageStaff($_SESSION['user_id'])) {
+            $_SESSION['error'] = 'Access denied. Only ADM, MHF, REG, HRO, or Administrators can create staff.';
             $this->redirect('staff');
             return;
         }
@@ -195,15 +187,10 @@ class StaffController extends Controller {
             return;
         }
         
-        // Only ADM, MHF, REG can edit staff
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-        $canManageStaff = in_array($userRole, ['ADM', 'MHF', 'REG']) || $isAdmin;
-        
-        if (!$canManageStaff) {
-            $_SESSION['error'] = 'Access denied. Only ADM, MHF, and REG can edit staff.';
+        if (!$userModel->canManageStaff($_SESSION['user_id'])) {
+            $_SESSION['error'] = 'Access denied. Only ADM, MHF, REG, HRO, or Administrators can edit staff.';
             $this->redirect('staff');
             return;
         }
@@ -313,15 +300,10 @@ class StaffController extends Controller {
             return;
         }
         
-        // Only ADM, MHF, REG can delete staff
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-        $canManageStaff = in_array($userRole, ['ADM', 'MHF', 'REG']) || $isAdmin;
-        
-        if (!$canManageStaff) {
-            $_SESSION['error'] = 'Access denied. Only ADM, MHF, and REG can delete staff.';
+        if (!$userModel->canManageStaff($_SESSION['user_id'])) {
+            $_SESSION['error'] = 'Access denied. Only ADM, MHF, REG, HRO, or Administrators can delete staff.';
             $this->redirect('staff');
             return;
         }

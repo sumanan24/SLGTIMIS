@@ -91,8 +91,8 @@
                                 $hasGroupAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'ADM']) || $isAdmin;
                                 // Instructor diary menu: teaching staff, HOD, ADM, Admin only (not DIR/DPA/DPI/REG/SAO)
                                 $hasInstructorDiaryAccess = !$isSAO && (in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'LE1', 'LE2', 'SLE', 'ADM'], true) || $isAdmin);
-                                // Staff device (Hikvision) menu: ADM/Admin full module; DIR, REG, FIN, ACC, HOD see dashboard + month only
-                                $canStaffDeviceAttendanceMenu = !$isSAO && ($isAdminOrADM || in_array($userRole, ['DIR', 'REG', 'FIN', 'ACC', 'HOD'], true));
+                                // Staff device (Hikvision) menu: ADM/Admin/HRO full module; DIR, REG, FIN, ACC, HOD see dashboard + month only
+                                $canStaffDeviceAttendanceMenu = !$isSAO && $userModel->canViewStaffDeviceDashboardMonth($_SESSION['user_id']);
                                 $canViewStudentApplications = $userModel->canViewOnlineStudentApplications($_SESSION['user_id']);
                                 $canAccessExamsModule = $userModel->canAccessExamsModule($_SESSION['user_id']);
                                 // Bus Season processing & payments: SAO, DIR (view), ADM, Admin

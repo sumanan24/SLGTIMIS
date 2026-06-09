@@ -12,7 +12,7 @@
                         $userModelStaff = new UserModel();
                         $userRoleStaff = $userModelStaff->getUserRole($_SESSION['user_id']);
                         $isAdminStaff = $userModelStaff->isAdmin($_SESSION['user_id']);
-                        $canManageStaff = in_array($userRoleStaff, ['ADM', 'MHF', 'REG']) || $isAdminStaff;
+                        $canManageStaff = $userModelStaff->canManageStaff($_SESSION['user_id']);
                     }
                 }
                 ?>
