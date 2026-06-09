@@ -15,10 +15,39 @@ if (!($showMonthPdfCurrentBtn || $showMonthPdfAllBtn)) {
     if (typeof window.jspdf === 'undefined') return;
     var jsPDF = window.jspdf.jsPDF;
 
+    function drawSignatureBlock(doc) {
+        var pageW = doc.internal.pageSize.getWidth();
+        var pageH = doc.internal.pageSize.getHeight();
+        var marginX = 14;
+        var blockTop = pageH - 38;
+        var colW = (pageW - marginX * 2) / 3;
+        var labels = ['Prepared by', 'Checked by', 'Approved by'];
+
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(0, 0, 0);
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.25);
+
+        labels.forEach(function (label, i) {
+            var colLeft = marginX + i * colW;
+            var colCenter = colLeft + colW / 2;
+            var lineLeft = colLeft + 10;
+            var lineRight = colLeft + colW - 10;
+            var lineY = blockTop;
+            var labelY = blockTop + 6;
+
+            doc.line(lineLeft, lineY, lineRight, lineY);
+            doc.text(label, colCenter, labelY, { align: 'center' });
+        });
+    }
+
     function drawPortraitMonthPdf(doc, payload) {
         var sections = payload.sections || [];
         var marginX = 12;
         var pageW = doc.internal.pageSize.getWidth();
+        var pageH = doc.internal.pageSize.getHeight();
+        var signatureReserve = 42;
         var firstPage = true;
         sections.forEach(function (sec) {
             if (!firstPage) {
@@ -53,7 +82,7 @@ if (!($showMonthPdfCurrentBtn || $showMonthPdfAllBtn)) {
             });
             doc.autoTable({
                 startY: y,
-                margin: { left: marginX, right: marginX, bottom: 10 },
+                margin: { left: marginX, right: marginX, bottom: signatureReserve },
                 head: [['Date', 'Day', 'In', 'Out', 'Others']],
                 body: body,
                 styles: {
@@ -82,6 +111,12 @@ if (!($showMonthPdfCurrentBtn || $showMonthPdfAllBtn)) {
                     4: { halign: 'center', cellWidth: 'auto' }
                 }
             });
+
+            var finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : y;
+            if (finalY > pageH - signatureReserve) {
+                doc.addPage();
+            }
+            drawSignatureBlock(doc);
         });
     }
 
