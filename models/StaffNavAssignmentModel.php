@@ -225,7 +225,10 @@ class StaffNavAssignmentModel extends Model {
         }
     }
 
-    public function createAssignment(int $navId, string $staffId, int $assignedBy, bool $autoApprove): int|false {
+    /**
+     * @return int|false New assignment id on success, false on failure
+     */
+    public function createAssignment(int $navId, string $staffId, int $assignedBy, bool $autoApprove) {
         $status = $autoApprove ? 'approved' : 'pending';
         $data = [
             'nav_id' => $navId,

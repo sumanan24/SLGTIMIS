@@ -101,7 +101,10 @@ class NavMenuModel extends Model {
         return $options;
     }
 
-    public function createItem(array $data): int|false {
+    /**
+     * @return int|false New nav_id on success, false on failure
+     */
+    public function createItem(array $data) {
         $this->ensureTable();
         $payload = $this->preparePayload($data);
         if ($this->create($payload)) {
