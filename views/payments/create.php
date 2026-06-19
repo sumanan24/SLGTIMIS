@@ -32,7 +32,12 @@
 <div class="container-fluid px-4 py-3 payment-form-wrap">
     <div class="card shadow-sm border-0">
         <div class="card-header bg-primary text-white">
-            <h5 class="mb-0 fw-bold"><i class="fas fa-plus-circle me-2"></i>Create New Payment</h5>
+            <div class="d-flex align-items-center justify-content-between flex-wrap">
+                <h5 class="mb-0 fw-bold"><i class="fas fa-plus-circle me-2"></i>Create New Payment</h5>
+                <a href="<?php echo APP_URL; ?>/payment-types" class="btn btn-outline-light btn-sm mt-2 mt-md-0">
+                    <i class="fas fa-tags me-1"></i>Manage Payment Types
+                </a>
+            </div>
         </div>
         <div class="card-body">
             <?php if (isset($error)): ?>
@@ -97,6 +102,12 @@
                             }
                             ?>
                         </select>
+                        <?php if (empty($paymentReasons)): ?>
+                            <div class="form-text text-warning">
+                                No payment types configured.
+                                <a href="<?php echo APP_URL; ?>/payment-types/create">Add payment type &amp; reason</a>
+                            </div>
+                        <?php endif; ?>
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">

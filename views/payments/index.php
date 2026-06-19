@@ -5,9 +5,14 @@
             <div class="d-flex align-items-center justify-content-between flex-wrap">
                 <h5 class="mb-0 fw-bold"><i class="fas fa-money-bill-wave me-2"></i>Payments</h5>
                 <?php if ($can_manage_payments): ?>
-                <a href="<?php echo APP_URL; ?>/payments/create" class="btn btn-light btn-sm mt-2 mt-md-0">
-                    <i class="fas fa-plus me-1"></i>Add New Payment
-                </a>
+                <div class="d-flex flex-wrap gap-2 mt-2 mt-md-0">
+                    <a href="<?php echo APP_URL; ?>/payment-types" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-tags me-1"></i>Payment Types
+                    </a>
+                    <a href="<?php echo APP_URL; ?>/payments/create" class="btn btn-light btn-sm">
+                        <i class="fas fa-plus me-1"></i>Add New Payment
+                    </a>
+                </div>
                 <?php endif; ?>
             </div>
         </div>

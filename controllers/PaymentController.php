@@ -148,6 +148,13 @@ class PaymentController extends Controller {
                 $this->redirect('payments/create');
                 return;
             }
+
+            $paymentTypeModel = $this->model('PaymentTypeModel');
+            if (!$paymentTypeModel->exists($paymentReason, $paymentType)) {
+                $_SESSION['error'] = 'Invalid payment type and reason. Please select from the configured options or add them under Payment Types.';
+                $this->redirect('payments/create');
+                return;
+            }
             
             // Get student's department from enrollment
             $studentEnrollmentModel = $this->model('StudentEnrollmentModel');
@@ -299,6 +306,13 @@ class PaymentController extends Controller {
             // Check if student exists
             if (!$studentModel->exists($studentId)) {
                 $_SESSION['error'] = 'Student not found.';
+                $this->redirect('payments/edit?id=' . urlencode($id));
+                return;
+            }
+
+            $paymentTypeModel = $this->model('PaymentTypeModel');
+            if (!$paymentTypeModel->exists($paymentReason, $paymentType)) {
+                $_SESSION['error'] = 'Invalid payment type and reason. Please select from the configured options or add them under Payment Types.';
                 $this->redirect('payments/edit?id=' . urlencode($id));
                 return;
             }
