@@ -2,9 +2,14 @@
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
             <h4 class="mb-0"><i class="fas fa-users-cog me-2"></i>User Management</h4>
-            <a href="<?php echo APP_URL; ?>/admin/backup-db" class="btn btn-light btn-sm fw-bold">
-                <i class="fas fa-database me-1 text-primary"></i> Download SQL Backup
-            </a>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="<?php echo APP_URL; ?>/admin/backup-db" class="btn btn-light btn-sm fw-bold" download>
+                    <i class="fas fa-download me-1 text-primary"></i> SQL to PC
+                </a>
+                <a href="<?php echo APP_URL; ?>/admin/backup-files" class="btn btn-outline-light btn-sm fw-bold" download>
+                    <i class="fas fa-file-archive me-1"></i> Files ZIP to PC
+                </a>
+            </div>
         </div>
         <div class="card-body">
             <?php if (isset($message)): ?>
@@ -27,6 +32,12 @@
                     <strong><?php echo $lockedCount; ?></strong> account(s) are currently locked.
                 </div>
             <?php endif; ?>
+
+            <div class="alert alert-info py-2 mb-4">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Backup to your PC or laptop:</strong> click <strong>SQL to PC</strong> or <strong>Files ZIP to PC</strong> above.
+                Your browser will save the file to your <strong>Downloads</strong> folder (e.g. <code>backup_sisslgti_….sql</code> or <code>files_backup_….zip</code>).
+            </div>
             
             <!-- Filters Section -->
             <div class="card mb-4 border-0" style="background-color: #f8f9fa;">

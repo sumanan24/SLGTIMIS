@@ -575,7 +575,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff'];
                                         $adminPages[] = 'admin-deleted-students';
                                     }
                                     if ($isAdminUser) {
-                                        $adminPages = array_merge($adminPages, ['admin-users', 'admin-locked-accounts', 'admin-activity-logs', 'admin-backup-db']);
+                                        $adminPages = array_merge($adminPages, ['admin-users', 'admin-locked-accounts', 'admin-activity-logs', 'admin-backup-db', 'admin-backup-files']);
                                     }
                             ?>
                             <!-- Administration Branch -->
@@ -626,9 +626,15 @@ $educationPages = ['departments', 'courses', 'modules', 'staff'];
                                     </li>
                                     <li class="menu-divider-submenu"></li>
                                     <li>
-                                        <a href="<?php echo APP_URL; ?>/admin/backup-db" class="<?php echo (isset($page) && $page === 'admin-backup-db') ? 'active' : ''; ?>">
+                                        <a href="<?php echo APP_URL; ?>/admin/backup-db" class="<?php echo (isset($page) && $page === 'admin-backup-db') ? 'active' : ''; ?>" download>
                                             <i class="fas fa-database"></i>
-                                            <span>SQL Backup</span>
+                                            <span>SQL Backup (PC)</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/admin/backup-files" class="<?php echo (isset($page) && $page === 'admin-backup-files') ? 'active' : ''; ?>" download>
+                                            <i class="fas fa-file-archive"></i>
+                                            <span>Files ZIP (PC)</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
