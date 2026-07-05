@@ -193,6 +193,9 @@ $config = [
                 
                 // Method 1: Try to execute SQL file directly using multi_query (faster and handles constraints better)
                 $sql_content = file_get_contents($config['sql_file']);
+
+                require_once __DIR__ . '/helpers/BackupHelper.php';
+                $sql_content = BackupHelper::sanitizeSqlForImport($sql_content);
                 
                 // Remove DELIMITER statements and empty stored procedures/functions (MySQL command-line only syntax)
                 // Pattern: DROP PROCEDURE/FUNCTION IF EXISTS `name`; DELIMITER ;; ;; DELIMITER ;

@@ -383,6 +383,7 @@ class AdminController extends Controller {
                 $conn = Database::getInstance()->getConnection();
                 $sql = BackupHelper::generateSqlDump($conn, $dbName);
             }
+            $sql = BackupHelper::sanitizeSqlForImport($sql);
 
             require_once BASE_PATH . '/core/ActivityLogger.php';
             $activityLogger = new ActivityLogger();

@@ -88,30 +88,82 @@ class BackupHelper {
             return null;
         }
 
-        $host = escapeshellarg(DB_HOST);
-        $user = escapeshellarg(DB_USER);
-        $pass = escapeshellarg(DB_PASS);
-        $name = escapeshellarg($dbName);
-
-        $cmd = escapeshellarg($mysqldump)
-            . " --host={$host} --user={$user} --password={$pass}"
-            . ' --routines --triggers --events --single-transaction --hex-blob --default-character-set=utf8mb4'
-            . " {$name} 2>&1";
-
-        $output = [];
-        $exitCode = 1;
-        @exec($cmd, $output, $exitCode);
-
-        if ($exitCode !== 0 || $output === []) {
+        $cnfPath = self::writeMysqlClientDefaultsFile();
+        if ($cnfPath === null) {
             return null;
         }
 
-        $sql = implode("\n", $output);
-        if (stripos($sql, 'CREATE TABLE') === false && stripos($sql, 'CREATE DATABASE') === false) {
-            return null;
+        try {
+            $cmd = escapeshellarg($mysqldump)
+                . ' --defaults-extra-file=' . escapeshellarg($cnfPath)
+                . ' --routines --triggers --events --single-transaction --hex-blob'
+                . ' --default-character-set=utf8mb4 --set-gtid-purged=OFF --column-statistics=0'
+                . ' ' . escapeshellarg($dbName);
+
+            $descriptors = [
+                0 => ['pipe', 'r'],
+                1 => ['pipe', 'w'],
+                2 => ['pipe', 'w'],
+            ];
+
+            $proc = @proc_open($cmd, $descriptors, $pipes);
+            if (!is_resource($proc)) {
+                return null;
+            }
+
+            fclose($pipes[0]);
+            $stdout = stream_get_contents($pipes[1]);
+            $stderr = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $exitCode = proc_close($proc);
+
+            if ($exitCode !== 0 || !is_string($stdout) || trim($stdout) === '') {
+                error_log('BackupHelper::tryMysqldump failed (exit ' . $exitCode . '): ' . trim((string) $stderr));
+                return null;
+            }
+
+            $sql = self::sanitizeSqlForImport($stdout);
+            if (stripos($sql, 'CREATE TABLE') === false && stripos($sql, 'CREATE DATABASE') === false) {
+                return null;
+            }
+
+            return $sql;
+        } finally {
+            @unlink($cnfPath);
+        }
+    }
+
+    /**
+     * Remove mysqldump CLI warnings and other junk so SQL imports on another PC/phpMyAdmin.
+     */
+    public static function sanitizeSqlForImport(string $sql): string {
+        // Warning glued to dump header: "mysqldump: [Warning] ... insecure.-- MySQL dump"
+        $sql = preg_replace(
+            '/^mysqldump:\s*(?:\[[^\]]+\]\s*)?(?:Warning:\s*)?.*?insecure\.(?=\s*--\s*MySQL dump|\s*\/\*!)/is',
+            '',
+            $sql
+        );
+
+        // Any other mysqldump stderr lines at the top
+        $sql = preg_replace('/^(?:mysqldump:|Warning:).*?(?:\r?\n|$)/im', '', $sql);
+
+        // Start at the real dump header
+        if (preg_match('/(--\s*MySQL dump|\/\*!40101 SET @OLD_CHARACTER_SET)/i', $sql, $match, PREG_OFFSET_CAPTURE)) {
+            $sql = substr($sql, $match[0][1]);
         }
 
-        return $sql;
+        // GTID can break restore on another server when privileges differ
+        $sql = preg_replace('/^SET\s+@@GLOBAL\.GTID_PURGED\s*=.*?;\s*$/im', '', $sql);
+
+        // DEFINER often missing on a new PC / new MySQL user
+        $sql = preg_replace(
+            '/CREATE\s+DEFINER\s*=\s*`[^`]+`@`[^`]+`\s+/i',
+            'CREATE ',
+            $sql
+        );
+
+        return ltrim($sql);
     }
 
     /**
@@ -360,6 +412,39 @@ class BackupHelper {
             $entryName = $zipPrefix . '/' . str_replace('\\', '/', $relative);
             $zip->addFile($filePath, $entryName);
         }
+    }
+
+    /**
+     * Temporary MySQL client config so password is not passed on the command line (avoids stderr warnings in dump).
+     */
+    private static function writeMysqlClientDefaultsFile(): ?string {
+        $path = tempnam(sys_get_temp_dir(), 'slgti_mycnf_');
+        if ($path === false) {
+            return null;
+        }
+
+        $content = "[client]\n"
+            . 'user=' . self::optionFileValue(DB_USER) . "\n"
+            . 'password=' . self::optionFileValue(DB_PASS) . "\n"
+            . 'host=' . self::optionFileValue(DB_HOST) . "\n";
+
+        if (file_put_contents($path, $content) === false) {
+            @unlink($path);
+            return null;
+        }
+
+        @chmod($path, 0600);
+        return $path;
+    }
+
+    private static function optionFileValue(string $value): string {
+        if ($value === '') {
+            return '""';
+        }
+        if (preg_match('/[\s#";=\']/', $value)) {
+            return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
+        }
+        return $value;
     }
 
     private static function findMysqldumpBinary(): ?string {
