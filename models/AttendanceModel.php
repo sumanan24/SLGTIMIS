@@ -101,11 +101,26 @@ class AttendanceModel extends Model {
                 foreach ($row as $k => $v) {
                     $norm[is_string($k) ? strtolower($k) : $k] = $v;
                 }
-                $data[] = $norm;
+                $data[] = self::formatStudentDisplayNames($norm);
             }
         }
         
         return $data;
+    }
+
+    /**
+     * Title-case student name fields for attendance screens and exports.
+     */
+    private static function formatStudentDisplayNames(array $row): array {
+        require_once BASE_PATH . '/helpers/FormatHelper.php';
+
+        foreach (['student_fullname', 'student_ininame', 'export_name'] as $field) {
+            if (!empty($row[$field]) && is_string($row[$field])) {
+                $row[$field] = FormatHelper::personName($row[$field]);
+            }
+        }
+
+        return $row;
     }
     
     /**
@@ -443,7 +458,7 @@ class AttendanceModel extends Model {
             $row['day_by_day'] = $dayByDayAttendance;
             $row['all_days'] = $workingDaysList;
             
-            $students[] = $row;
+            $students[] = self::formatStudentDisplayNames($row);
         }
         
         $stmt->close();

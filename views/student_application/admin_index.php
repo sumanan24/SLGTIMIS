@@ -49,6 +49,9 @@ $active_view = $active_view === 'dashboard' ? 'dashboard' : 'table';
 $filter_department_id = isset($filter_department_id) && trim((string) $filter_department_id) !== '' ? trim((string) $filter_department_id) : null;
 /** @var string|null $filter_course_id */
 $filter_course_id = isset($filter_course_id) && trim((string) $filter_course_id) !== '' ? trim((string) $filter_course_id) : null;
+/** @var int $filter_course_priority 1, 2, or 3 */
+$filter_course_priority = (int) ($filter_course_priority ?? 1);
+$filter_course_priority = in_array($filter_course_priority, [1, 2, 3], true) ? $filter_course_priority : 1;
 /** @var list<array{department_id: string, department_name: string}> $filter_departments */
 $filter_departments = $filter_departments ?? [];
 /** @var list<array{course_id: string, course_name: string}> $filter_courses */
@@ -87,12 +90,15 @@ $formatSubmitted = static function (?string $createdAt) use ($esc): array {
 };
 
 $listBase = $appBase . '/student-applications';
-$makeListQuery = static function (?string $level, string $tab, int $pn, int $pa, int $pr, ?string $deptId, ?string $courseId, ?string $viewOverride = null) use ($active_view): array {
+$makeListQuery = static function (?string $level, string $tab, int $pn, int $pa, int $pr, ?string $deptId, ?string $courseId, ?string $viewOverride = null, ?int $prio = null) use ($active_view, $filter_course_priority): array {
     $tab = in_array($tab, ['approved', 'rejected'], true) ? $tab : 'new';
     $q = ['tab' => $tab];
     if ($level === '04' || $level === '05') {
         $q['level'] = $level;
     }
+    $prioVal = $prio ?? $filter_course_priority;
+    $prioVal = in_array((int) $prioVal, [1, 2, 3], true) ? (int) $prioVal : 1;
+    $q['prio'] = (string) $prioVal;
     if ($tab === 'new' && $pn > 1) {
         $q['pn'] = $pn;
     }
@@ -114,15 +120,15 @@ $makeListQuery = static function (?string $level, string $tab, int $pn, int $pa,
     }
     return $q;
 };
-$buildListUrl = static function (?string $level, string $tab, int $pn = 1, int $pa = 1, int $pr = 1) use ($listBase, $esc, $makeListQuery, $filter_department_id, $filter_course_id): string {
-    return $esc($listBase . '?' . http_build_query($makeListQuery($level, $tab, $pn, $pa, $pr, $filter_department_id, $filter_course_id, null)));
+$buildListUrl = static function (?string $level, string $tab, int $pn = 1, int $pa = 1, int $pr = 1) use ($listBase, $esc, $makeListQuery, $filter_department_id, $filter_course_id, $filter_course_priority): string {
+    return $esc($listBase . '?' . http_build_query($makeListQuery($level, $tab, $pn, $pa, $pr, $filter_department_id, $filter_course_id, null, $filter_course_priority)));
 };
 $listUrlFromParts = static function (array $q) use ($listBase, $esc): string {
     return $esc($listBase . '?' . http_build_query($q));
 };
 
 $excelBase = $appBase . '/student-applications/export-excel';
-$excelUrl = static function (?string $status, ?string $level) use ($excelBase, $esc, $filter_department_id, $filter_course_id): string {
+$excelUrl = static function (?string $status, ?string $level) use ($excelBase, $esc, $filter_department_id, $filter_course_id, $filter_course_priority): string {
     $q = [];
     if ($status === 'new' || $status === 'approved' || $status === 'rejected') {
         $q['status'] = $status;
@@ -130,6 +136,7 @@ $excelUrl = static function (?string $status, ?string $level) use ($excelBase, $
     if ($level === '04' || $level === '05') {
         $q['level'] = $level;
     }
+    $q['prio'] = (string) $filter_course_priority;
     if ($filter_department_id !== null && $filter_department_id !== '') {
         $q['dept'] = $filter_department_id;
     }
@@ -140,6 +147,26 @@ $excelUrl = static function (?string $status, ?string $level) use ($excelBase, $
     return $esc($excelBase . ($qs !== '' ? '?' . $qs : ''));
 };
 
+$dashPdfBase = $appBase . '/student-applications/export-dashboard-pdf';
+$dashPdfUrl = static function (string $block, ?int $choice = null) use ($dashPdfBase, $esc, $filter_level, $filter_department_id, $filter_course_id, $filter_course_priority): string {
+    $q = ['block' => $block];
+    if ($choice !== null && in_array($choice, [1, 2, 3], true)) {
+        $q['choice'] = (string) $choice;
+    }
+    $q['prio'] = (string) $filter_course_priority;
+    if ($filter_level === '04' || $filter_level === '05') {
+        $q['level'] = $filter_level;
+    }
+    if ($filter_department_id !== null && $filter_department_id !== '') {
+        $q['dept'] = $filter_department_id;
+    }
+    if ($filter_course_id !== null && $filter_course_id !== '') {
+        $q['course'] = $filter_course_id;
+    }
+
+    return $esc($dashPdfBase . '?' . http_build_query($q));
+};
+
 $total = (int) ($dashboard_stats['total'] ?? 0);
 $byStatus = $dashboard_stats['by_status'] ?? ['new' => 0, 'approved' => 0, 'rejected' => 0];
 $byLevel = $dashboard_stats['by_level'] ?? [];
@@ -147,6 +174,12 @@ $byDistrict = $dashboard_stats['by_district'] ?? [];
 $byCourse = $dashboard_stats['by_course'] ?? [];
 $byDepartment = $dashboard_stats['by_department'] ?? [];
 $byGender = $dashboard_stats['by_gender'] ?? [];
+$byCoursePriority = $dashboard_stats['by_course_priority'] ?? [
+    1 => ['course' => [], 'department' => []],
+    2 => ['course' => [], 'department' => []],
+    3 => ['course' => [], 'department' => []],
+];
+$prioLabels = [1 => '1st choice', 2 => '2nd choice', 3 => '3rd choice'];
 $saAdminCss = htmlspecialchars(rtrim(APP_URL, '/') . '/assets/css/student-applications-admin.css', ENT_QUOTES, 'UTF-8');
 
 /** @return list<array{label: string, count: int}> */
@@ -154,17 +187,8 @@ $saDashCapRows = static function (array $rows, int $max = 10): array {
     if (count($rows) <= $max) {
         return $rows;
     }
-    $head = array_slice($rows, 0, $max);
-    $rest = array_slice($rows, $max);
-    $sum = 0;
-    foreach ($rest as $r) {
-        $sum += (int) ($r['count'] ?? 0);
-    }
-    if ($sum > 0) {
-        $head[] = ['label' => 'Other (combined)', 'count' => $sum];
-    }
 
-    return $head;
+    return array_slice($rows, 0, $max);
 };
 $chartDistrictRaw = $byDistrict;
 usort($chartDistrictRaw, static function (array $a, array $b): int {
@@ -190,11 +214,14 @@ if ($filter_department_id !== null) {
 if ($filter_course_id !== null) {
     $ctxParts[] = 'Course';
 }
+if ($filter_course_priority !== 1) {
+    $ctxParts[] = $prioLabels[$filter_course_priority] ?? 'Course choice';
+}
 if ($ctxParts !== []) {
     $filterContextSuffix = ' · ' . implode(' · ', $ctxParts);
 }
 ?>
-<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=18">
+<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=21">
 <div class="sa-admin-page sa-student-apps-index container-fluid py-3 px-lg-4<?php echo $active_view === 'dashboard' ? ' sa-page-dashboard' : ''; ?>">
     <header class="sa-apps-page-header mb-4 pb-2 border-bottom<?php echo $active_view === 'dashboard' ? ' sa-apps-page-header--dash' : ''; ?>">
         <h1 class="h4 mb-0 fw-semibold text-dark"><i class="fas fa-file-alt me-2 text-primary" aria-hidden="true"></i>Online applications</h1>
@@ -230,9 +257,17 @@ if ($ctxParts !== []) {
                         </select>
                     </div>
                     <div class="d-flex flex-column gap-1 sa-apps-filter-field">
+                        <label for="saPrioSelect" class="form-label small text-secondary text-uppercase mb-0 fw-semibold">Course choice</label>
+                        <select id="saPrioSelect" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="Filter by course priority (1st, 2nd, or 3rd choice)">
+                            <?php foreach ([1 => '1st choice', 2 => '2nd choice', 3 => '3rd choice'] as $pv => $plbl): ?>
+                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $filter_department_id, $filter_course_id, null, $pv)); ?>"<?php echo $filter_course_priority === $pv ? ' selected' : ''; ?>><?php echo $esc($plbl); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="d-flex flex-column gap-1 sa-apps-filter-field">
                         <label for="saDeptSelect" class="form-label small text-secondary text-uppercase mb-0 fw-semibold">Department</label>
-                        <select id="saDeptSelect" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="Filter by department (1st course choice)">
-                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, null, null)); ?>"<?php echo $filter_department_id === null ? ' selected' : ''; ?>>All departments</option>
+                        <select id="saDeptSelect" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="Filter by department for selected course choice">
+                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, null, null, null, $filter_course_priority)); ?>"<?php echo $filter_department_id === null ? ' selected' : ''; ?>>All departments</option>
                             <?php foreach ($filter_departments as $fd): ?>
                             <?php
                             $did = (string) ($fd['department_id'] ?? '');
@@ -240,14 +275,14 @@ if ($ctxParts !== []) {
                                 continue;
                             }
                             ?>
-                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $did, null)); ?>"<?php echo $filter_department_id === $did ? ' selected' : ''; ?>><?php echo $esc((string) ($fd['department_name'] ?? '')); ?></option>
+                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $did, null, null, $filter_course_priority)); ?>"<?php echo $filter_department_id === $did ? ' selected' : ''; ?>><?php echo $esc((string) ($fd['department_name'] ?? '')); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="d-flex flex-column gap-1 sa-apps-filter-field">
                         <label for="saCourseSelect" class="form-label small text-secondary text-uppercase mb-0 fw-semibold">Course</label>
-                        <select id="saCourseSelect" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="Filter by first course choice">
-                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $filter_department_id, null)); ?>"<?php echo $filter_course_id === null ? ' selected' : ''; ?>>All courses</option>
+                        <select id="saCourseSelect" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="Filter by course for selected course choice">
+                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $filter_department_id, null, null, $filter_course_priority)); ?>"<?php echo $filter_course_id === null ? ' selected' : ''; ?>>All courses</option>
                             <?php foreach ($filter_courses as $fc): ?>
                             <?php
                             $cid = (string) ($fc['course_id'] ?? '');
@@ -255,7 +290,7 @@ if ($ctxParts !== []) {
                                 continue;
                             }
                             ?>
-                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $filter_department_id, $cid)); ?>"<?php echo $filter_course_id === $cid ? ' selected' : ''; ?>><?php echo $esc((string) ($fc['course_name'] ?? '')); ?></option>
+                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $filter_department_id, $cid, null, $filter_course_priority)); ?>"<?php echo $filter_course_id === $cid ? ' selected' : ''; ?>><?php echo $esc((string) ($fc['course_name'] ?? '')); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -336,7 +371,8 @@ if ($ctxParts !== []) {
                 array $rows,
                 string $defaultBarKey,
                 callable $esc,
-                string $sectionExtraClass = ''
+                string $sectionExtraClass = '',
+                ?string $pdfUrl = null
             ): void {
                 $max = 1;
                 foreach ($rows as $r) {
@@ -346,7 +382,14 @@ if ($ctxParts !== []) {
                 ?>
             <section class="<?php echo $esc($secClass); ?>" aria-labelledby="<?php echo $esc($headingId); ?>">
                 <div class="sa-dash-panel-head" id="<?php echo $esc($headingId); ?>">
-                    <i class="<?php echo $esc($iconClass); ?> me-1" aria-hidden="true"></i><?php echo $esc($title); ?>
+                    <span class="sa-dash-panel-head-title">
+                        <i class="<?php echo $esc($iconClass); ?> me-1" aria-hidden="true"></i><?php echo $esc($title); ?>
+                    </span>
+                    <?php if ($pdfUrl !== null && $pdfUrl !== ''): ?>
+                    <a href="<?php echo $pdfUrl; ?>" class="btn btn-sm btn-outline-secondary sa-dash-pdf-btn" title="Download PDF" download>
+                        <i class="fas fa-file-pdf" aria-hidden="true"></i><span class="visually-hidden"> Download PDF</span>
+                    </a>
+                    <?php endif; ?>
                 </div>
                 <div class="sa-dash-panel-body">
                     <table class="table table-sm sa-dash-table mb-0 align-middle">
@@ -423,13 +466,27 @@ if ($ctxParts !== []) {
                             <?php endif; ?>
                         </div>
                     </div>
-                    <?php $renderDashBreakdownTable('sa-dash-status', 'fas fa-list-check', 'Application status', $statusRowsTable, 'status-new', $esc, 'sa-dash-panel--kpi-side'); ?>
+                    <?php $renderDashBreakdownTable('sa-dash-status', 'fas fa-list-check', 'Application status', $statusRowsTable, 'status-new', $esc, 'sa-dash-panel--kpi-side', $dashPdfUrl('status')); ?>
                 </div>
-                <div class="sa-dashboard-row-charts" role="group" aria-label="Application counts by course, department, district, and gender">
-                    <?php $renderDashBreakdownTable('sa-dash-course', 'fas fa-graduation-cap', 'By 1st course (top ' . count($chartCourse) . ')', $chartCourse, 'course', $esc); ?>
-                    <?php $renderDashBreakdownTable('sa-dash-dept', 'fas fa-building', 'By department (1st course)', $chartDepartment, 'dept', $esc); ?>
-                    <?php $renderDashBreakdownTable('sa-dash-district', 'fas fa-map-marker-alt', 'By district', $chartDistrict, 'district', $esc); ?>
-                    <?php $renderDashBreakdownTable('sa-dash-gender', 'fas fa-venus-mars', 'By gender', $chartGender, 'gender', $esc); ?>
+                <div class="sa-dashboard-row-charts" role="group" aria-label="Application counts by course priority, district, and gender">
+                    <?php foreach ([1, 2, 3] as $prioN): ?>
+                        <?php
+                        $prioCourseRows = $saDashCapRows($byCoursePriority[$prioN]['course'] ?? [], 15);
+                        $prioDeptRows = $saDashCapRows($byCoursePriority[$prioN]['department'] ?? [], 15);
+                        $prioBar = $prioN === 1 ? 'course' : ($prioN === 2 ? 'dept' : 'district');
+                        ?>
+                    <div class="sa-dash-priority-block">
+                        <h3 class="sa-dash-priority-title h6 text-primary fw-bold mb-2">
+                            <i class="fas fa-list-ol me-1" aria-hidden="true"></i><?php echo $esc($prioLabels[$prioN]); ?>
+                        </h3>
+                        <div class="sa-dash-priority-grid">
+                            <?php $renderDashBreakdownTable('sa-dash-course-p' . $prioN, 'fas fa-graduation-cap', 'Courses', $prioCourseRows, $prioBar, $esc, 'sa-dash-panel--compact', $dashPdfUrl('course', $prioN)); ?>
+                            <?php $renderDashBreakdownTable('sa-dash-dept-p' . $prioN, 'fas fa-building', 'Departments', $prioDeptRows, 'dept', $esc, 'sa-dash-panel--compact', $dashPdfUrl('department', $prioN)); ?>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php $renderDashBreakdownTable('sa-dash-district', 'fas fa-map-marker-alt', 'By district', $chartDistrict, 'district', $esc, '', $dashPdfUrl('district')); ?>
+                    <?php $renderDashBreakdownTable('sa-dash-gender', 'fas fa-venus-mars', 'By gender', $chartGender, 'gender', $esc, '', $dashPdfUrl('gender')); ?>
                 </div>
                 <?php endif; ?>
             </div>
@@ -442,7 +499,8 @@ if ($ctxParts !== []) {
                  data-sa-pr="<?php echo (int) $page_rejected; ?>"
                  <?php if ($filter_level !== null): ?>data-sa-level="<?php echo $esc($filter_level); ?>"<?php endif; ?>
                  <?php if ($filter_department_id !== null && $filter_department_id !== ''): ?>data-sa-dept="<?php echo $esc($filter_department_id); ?>"<?php endif; ?>
-                 <?php if ($filter_course_id !== null && $filter_course_id !== ''): ?>data-sa-course="<?php echo $esc($filter_course_id); ?>"<?php endif; ?>>
+                 <?php if ($filter_course_id !== null && $filter_course_id !== ''): ?>data-sa-course="<?php echo $esc($filter_course_id); ?>"<?php endif; ?>
+                 data-sa-prio="<?php echo (int) $filter_course_priority; ?>">
                 <?php
                 $ajax_pagination = true;
                 require BASE_PATH . '/views/student_application/admin_ajax_table_inner.php';
@@ -478,6 +536,8 @@ if ($ctxParts !== []) {
         if (dept) p.set('dept', dept);
         var course = mount.getAttribute('data-sa-course');
         if (course) p.set('course', course);
+        var prio = mount.getAttribute('data-sa-prio') || '1';
+        if (prio) p.set('prio', prio);
         var nicVal = nic.value.trim();
         if (nicVal) p.set('nic', nicVal);
         if (tab === 'new') p.set('pn', mount.getAttribute('data-sa-pn') || '1');

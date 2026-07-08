@@ -22,8 +22,16 @@ function sa_admin_student_applications_render_table(
     callable $formatSubmitted,
     string $statusLabel,
     string $badgeClass,
-    int $rowNumBase = 0
+    int $rowNumBase = 0,
+    int $filterCoursePriority = 1
 ): void {
+    $filterCoursePriority = in_array($filterCoursePriority, [1, 2, 3], true) ? $filterCoursePriority : 1;
+    $choiceThClass = static function (int $n) use ($filterCoursePriority): string {
+        return $n === $filterCoursePriority ? ' sa-apps-col-choice sa-apps-col-choice--active' : ' sa-apps-col-choice';
+    };
+    $choiceTdClass = static function (int $n) use ($filterCoursePriority): string {
+        return $n === $filterCoursePriority ? ' sa-apps-col-choice sa-apps-col-choice--active' : ' sa-apps-col-choice text-muted';
+    };
     ?>
     <div class="table-responsive sa-apps-table-responsive">
         <table class="table table-striped table-hover table-bordered align-middle w-100 mb-0 sa-apps-table">
@@ -34,6 +42,9 @@ function sa_admin_student_applications_render_table(
                     <th scope="col">Status</th>
                     <th scope="col">Full name</th>
                     <th scope="col">NIC</th>
+                    <th scope="col" class="<?php echo trim($choiceThClass(1)); ?>">1st choice</th>
+                    <th scope="col" class="<?php echo trim($choiceThClass(2)); ?>">2nd choice</th>
+                    <th scope="col" class="<?php echo trim($choiceThClass(3)); ?>">3rd choice</th>
                     <th scope="col">District</th>
                     <th scope="col">Email</th>
                     <th scope="col">Phone</th>
@@ -44,7 +55,7 @@ function sa_admin_student_applications_render_table(
             <tbody>
                 <?php if ($rows === []): ?>
                 <tr>
-                    <td colspan="10" class="sa-apps-empty text-secondary text-center py-5 px-3">No <?php echo $esc($statusLabel); ?> applications<?php
+                    <td colspan="13" class="sa-apps-empty text-secondary text-center py-5 px-3">No <?php echo $esc($statusLabel); ?> applications<?php
                         if ($statusLabel === 'new') {
                             echo ' to review';
                         } elseif ($statusLabel === 'rejected') {
@@ -68,6 +79,9 @@ function sa_admin_student_applications_render_table(
                     <td><span class="badge rounded-pill px-2 <?php echo $esc($badgeClass); ?>"><?php echo $esc(ucfirst($statusLabel)); ?></span></td>
                     <td><?php echo $esc((string) ($r['student_full_name'] ?? '')); ?></td>
                     <td><?php echo $esc((string) ($r['student_nic'] ?? '')); ?></td>
+                    <td class="<?php echo trim($choiceTdClass(1)); ?>"><?php echo $esc((string) ($r['course_choice_1'] ?? '')); ?></td>
+                    <td class="<?php echo trim($choiceTdClass(2)); ?>"><?php echo $esc((string) ($r['course_choice_2'] ?? '')); ?></td>
+                    <td class="<?php echo trim($choiceTdClass(3)); ?>"><?php echo $esc((string) ($r['course_choice_3'] ?? '')); ?></td>
                     <td><?php echo $esc((string) ($r['student_district'] ?? '')); ?></td>
                     <td><?php echo $esc((string) ($r['student_email'] ?? '')); ?></td>
                     <td><?php echo $esc((string) ($r['student_phone'] ?? '')); ?></td>

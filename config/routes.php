@@ -224,6 +224,7 @@ return [
     'student-applications/download-document' => 'StudentApplicationController@adminDownloadDocument',
     'student-applications/export-data' => 'StudentApplicationController@adminExportApplicationData',
     'student-applications/export-pdf' => 'StudentApplicationController@adminExportApplicationPdf',
+    'student-applications/export-dashboard-pdf' => 'StudentApplicationController@adminExportDashboardPdf',
     'student-applications/export-excel' => 'StudentApplicationController@adminExportExcel',
     'student-applications/delete' => 'StudentApplicationController@adminDelete',
 ];

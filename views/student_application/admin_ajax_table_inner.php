@@ -31,7 +31,8 @@ if (!function_exists('sa_admin_student_applications_pagination')) {
         $formatSubmitted,
         'new',
         'bg-secondary',
-        ($page_new - 1) * $per_page
+        ($page_new - 1) * $per_page,
+        (int) ($filter_course_priority ?? 1)
     );
     ?>
     <?php if ($max_page_new > 1): ?>
@@ -53,7 +54,8 @@ if (!function_exists('sa_admin_student_applications_pagination')) {
         $formatSubmitted,
         'approved',
         'bg-success',
-        ($page_approved - 1) * $per_page
+        ($page_approved - 1) * $per_page,
+        (int) ($filter_course_priority ?? 1)
     );
     ?>
     <?php if ($max_page_approved > 1): ?>
@@ -75,7 +77,8 @@ if (!function_exists('sa_admin_student_applications_pagination')) {
         $formatSubmitted,
         'rejected',
         'bg-danger',
-        ($page_rejected - 1) * $per_page
+        ($page_rejected - 1) * $per_page,
+        (int) ($filter_course_priority ?? 1)
     );
     ?>
     <?php if ($max_page_rejected > 1): ?>

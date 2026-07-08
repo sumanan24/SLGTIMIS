@@ -1813,13 +1813,15 @@ class StudentApplicationController extends Controller {
     /**
      * NVQ level + department + course filters for staff applications list (shared by admin index + AJAX table).
      *
-     * @return array{level: ?string, dept_id: ?string, course_id: ?string}
+     * @return array{level: ?string, dept_id: ?string, course_id: ?string, priority: int}
      */
     private function studentApplicationsAdminListFilters(): array {
         $levelRaw = trim((string) $this->get('level', ''));
         $filterLevel = in_array($levelRaw, ['04', '05'], true) ? $levelRaw : null;
         $deptRaw = trim((string) $this->get('dept', ''));
         $courseRaw = trim((string) $this->get('course', ''));
+        $prioRaw = (int) $this->get('prio', '1');
+        $filterPriority = in_array($prioRaw, [1, 2, 3], true) ? $prioRaw : 1;
         $filterDeptId = null;
         $filterCourseId = null;
         if ($deptRaw !== '') {
@@ -1840,7 +1842,7 @@ class StudentApplicationController extends Controller {
             }
         }
 
-        return ['level' => $filterLevel, 'dept_id' => $filterDeptId, 'course_id' => $filterCourseId];
+        return ['level' => $filterLevel, 'dept_id' => $filterDeptId, 'course_id' => $filterCourseId, 'priority' => $filterPriority];
     }
 
     /**
@@ -1867,6 +1869,7 @@ class StudentApplicationController extends Controller {
         $filterLevel = $filters['level'];
         $filterDeptId = $filters['dept_id'];
         $filterCourseId = $filters['course_id'];
+        $filterPriority = $filters['priority'];
         $nicRaw = trim((string) $this->get('nic', ''));
 
         $tabRaw = strtolower(trim((string) $this->get('tab', '')));
@@ -1876,9 +1879,9 @@ class StudentApplicationController extends Controller {
         $excludeNicDrafts = $this->staffStudentAppsExcludeNicDrafts($userModel, $uid);
         $perPage = 20;
 
-        $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw);
-        $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw);
-        $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw);
+        $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority);
+        $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority);
+        $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority);
         $maxPageNew = max(1, (int) ceil($countNew / $perPage));
         $maxPageApproved = max(1, (int) ceil($countApproved / $perPage));
         $maxPageRejected = max(1, (int) ceil($countRejected / $perPage));
@@ -1888,13 +1891,13 @@ class StudentApplicationController extends Controller {
         $pageRejected = max(1, min((int) $this->get('pr', 1), $maxPageRejected));
 
         $applicationsNew = $activeTab === 'new'
-            ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw)
+            ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority)
             : [];
         $applicationsApproved = $activeTab === 'approved'
-            ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw)
+            ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority)
             : [];
         $applicationsRejected = $activeTab === 'rejected'
-            ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw)
+            ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority)
             : [];
 
         if (defined('BASE_PATH') && is_file(BASE_PATH . '/models/StudentModel.php')) {
@@ -1923,12 +1926,15 @@ class StudentApplicationController extends Controller {
         };
         $listBase = $appBase . '/student-applications';
         $activeView = 'table';
-        $makeListQuery = static function (?string $level, string $tab, int $pn, int $pa, int $pr, ?string $deptId, ?string $courseId, ?string $viewOverride = null) use ($activeView): array {
+        $makeListQuery = static function (?string $level, string $tab, int $pn, int $pa, int $pr, ?string $deptId, ?string $courseId, ?string $viewOverride = null, ?int $prio = null) use ($activeView, $filterPriority): array {
             $tab = in_array($tab, ['approved', 'rejected'], true) ? $tab : 'new';
             $q = ['tab' => $tab];
             if ($level === '04' || $level === '05') {
                 $q['level'] = $level;
             }
+            $prioVal = $prio ?? $filterPriority;
+            $prioVal = in_array((int) $prioVal, [1, 2, 3], true) ? (int) $prioVal : 1;
+            $q['prio'] = (string) $prioVal;
             if ($tab === 'new' && $pn > 1) {
                 $q['pn'] = $pn;
             }
@@ -1950,13 +1956,21 @@ class StudentApplicationController extends Controller {
             }
             return $q;
         };
-        $buildListUrl = static function (?string $level, string $tab, int $pn = 1, int $pa = 1, int $pr = 1) use ($listBase, $esc, $makeListQuery, $filterDeptId, $filterCourseId): string {
-            return $esc($listBase . '?' . http_build_query($makeListQuery($level, $tab, $pn, $pa, $pr, $filterDeptId, $filterCourseId, null)));
+        $buildListUrl = static function (?string $level, string $tab, int $pn = 1, int $pa = 1, int $pr = 1) use ($listBase, $esc, $makeListQuery, $filterDeptId, $filterCourseId, $filterPriority): string {
+            return $esc($listBase . '?' . http_build_query($makeListQuery($level, $tab, $pn, $pa, $pr, $filterDeptId, $filterCourseId, null, $filterPriority)));
         };
 
         $ctxParts = [];
         if ($filterLevel !== null) {
             $ctxParts[] = 'NVQ Level ' . $esc($filterLevel);
+        }
+        if ($filterPriority !== 1) {
+            $prioLabels = [1 => '1st choice', 2 => '2nd choice', 3 => '3rd choice'];
+            $ctxParts[] = $prioLabels[$filterPriority] ?? 'Course choice';
+        }
+        if ($filterPriority !== 1) {
+            $prioLabels = [1 => '1st choice', 2 => '2nd choice', 3 => '3rd choice'];
+            $ctxParts[] = $prioLabels[$filterPriority] ?? 'Course choice';
         }
         if ($filterDeptId !== null) {
             $ctxParts[] = 'Department';
@@ -1983,6 +1997,7 @@ class StudentApplicationController extends Controller {
         $count_rejected = $countRejected;
         $active_tab = $activeTab;
         $filter_level = $filterLevel;
+        $filter_course_priority = $filterPriority;
         $per_page = $perPage;
         ob_start();
         require BASE_PATH . '/views/student_application/admin_ajax_table_inner.php';
@@ -2024,6 +2039,7 @@ class StudentApplicationController extends Controller {
         $filterLevel = $filters['level'];
         $filterDeptId = $filters['dept_id'];
         $filterCourseId = $filters['course_id'];
+        $filterPriority = $filters['priority'];
         $tabRaw = strtolower(trim((string) $this->get('tab', '')));
         $activeTab = in_array($tabRaw, ['approved', 'rejected'], true) ? $tabRaw : 'new';
 
@@ -2031,12 +2047,12 @@ class StudentApplicationController extends Controller {
         $activeView = $viewRaw === 'dashboard' ? 'dashboard' : 'table';
 
         $perPage = 20;
-        $dashboardStats = $model->getDashboardStats($filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts);
+        $dashboardStats = $model->getDashboardStats($filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority);
 
         if ($activeView === 'table') {
-            $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts);
-            $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts);
-            $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts);
+            $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority);
+            $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority);
+            $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority);
             $maxPageNew = max(1, (int) ceil($countNew / $perPage));
             $maxPageApproved = max(1, (int) ceil($countApproved / $perPage));
             $maxPageRejected = max(1, (int) ceil($countRejected / $perPage));
@@ -2045,13 +2061,13 @@ class StudentApplicationController extends Controller {
             $pageRejected = max(1, min((int) $this->get('pr', 1), $maxPageRejected));
 
             $applicationsNew = $activeTab === 'new'
-                ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts)
+                ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority)
                 : [];
             $applicationsApproved = $activeTab === 'approved'
-                ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts)
+                ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority)
                 : [];
             $applicationsRejected = $activeTab === 'rejected'
-                ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts)
+                ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority)
                 : [];
         } else {
             $countNew = 0;
@@ -2074,6 +2090,7 @@ class StudentApplicationController extends Controller {
             'filter_level' => $filterLevel,
             'filter_department_id' => $filterDeptId,
             'filter_course_id' => $filterCourseId,
+            'filter_course_priority' => $filterPriority,
             'ajax_table_url' => rtrim(APP_URL, '/') . '/student-applications/ajax-table',
             // Filter dropdowns: load full catalogue (not just values used by applications).
             'filter_departments' => $this->model('DepartmentModel')->getAll(),
@@ -2657,6 +2674,130 @@ class StudentApplicationController extends Controller {
     /**
      * Staff: download all applications as Excel (.xlsx) using staff export column order (no document paths).
      */
+    /**
+     * Staff: download one dashboard breakdown card (courses, departments, etc.) as PDF.
+     */
+    public function adminExportDashboardPdf(): void {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        if (!$userModel->canViewOnlineStudentApplications($uid)) {
+            http_response_code(403);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Forbidden';
+            exit;
+        }
+
+        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
+        if (!ExamPdfHelper::dompdfAvailable()) {
+            http_response_code(503);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'PDF export is not available. Run composer install on the server.';
+            exit;
+        }
+
+        $block = strtolower(trim((string) $this->get('block', '')));
+        $choiceRaw = (int) $this->get('choice', '0');
+        $allowedBlocks = ['status', 'course', 'department', 'district', 'gender'];
+        if (!in_array($block, $allowedBlocks, true)) {
+            http_response_code(400);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Invalid dashboard block.';
+            exit;
+        }
+        if (($block === 'course' || $block === 'department') && !in_array($choiceRaw, [1, 2, 3], true)) {
+            http_response_code(400);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Course choice (1–3) is required for this report.';
+            exit;
+        }
+
+        $filters = $this->studentApplicationsAdminListFilters();
+        $filterLevel = $filters['level'];
+        $filterDeptId = $filters['dept_id'];
+        $filterCourseId = $filters['course_id'];
+        $filterPriority = $filters['priority'];
+
+        $model = $this->model('StudentApplicationModel');
+        $excludeNicDrafts = $this->staffStudentAppsExcludeNicDrafts($userModel, $uid);
+        $stats = $model->getDashboardStats($filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority);
+
+        $prioLabels = [1 => '1st choice', 2 => '2nd choice', 3 => '3rd choice'];
+        $rows = [];
+        $reportTitle = '';
+        $categoryLabel = 'Category';
+        $filenameStem = 'applications_dashboard';
+
+        if ($block === 'status') {
+            $byStatus = $stats['by_status'] ?? ['new' => 0, 'approved' => 0, 'rejected' => 0];
+            $rows = [
+                ['label' => 'New', 'count' => (int) ($byStatus['new'] ?? 0)],
+                ['label' => 'Approved', 'count' => (int) ($byStatus['approved'] ?? 0)],
+                ['label' => 'Rejected', 'count' => (int) ($byStatus['rejected'] ?? 0)],
+            ];
+            $reportTitle = 'Application status';
+            $filenameStem = 'applications_status';
+        } elseif ($block === 'course') {
+            $rows = $stats['by_course_priority'][$choiceRaw]['course'] ?? [];
+            $reportTitle = ($prioLabels[$choiceRaw] ?? 'Course choice') . ' — Courses';
+            $categoryLabel = 'Course';
+            if ($choiceRaw === 2) {
+                $filenameStem = 'applications_2nd_choice_courses';
+            } elseif ($choiceRaw === 3) {
+                $filenameStem = 'applications_3rd_choice_courses';
+            } else {
+                $filenameStem = 'applications_1st_choice_courses';
+            }
+        } elseif ($block === 'department') {
+            $rows = $stats['by_course_priority'][$choiceRaw]['department'] ?? [];
+            $reportTitle = ($prioLabels[$choiceRaw] ?? 'Course choice') . ' — Departments';
+            $categoryLabel = 'Department';
+            if ($choiceRaw === 2) {
+                $filenameStem = 'applications_2nd_choice_departments';
+            } elseif ($choiceRaw === 3) {
+                $filenameStem = 'applications_3rd_choice_departments';
+            } else {
+                $filenameStem = 'applications_1st_choice_departments';
+            }
+        } elseif ($block === 'district') {
+            $rows = $stats['by_district'] ?? [];
+            $reportTitle = 'By district';
+            $categoryLabel = 'District';
+            $filenameStem = 'applications_by_district';
+        } else {
+            $rows = $stats['by_gender'] ?? [];
+            $reportTitle = 'By gender';
+            $categoryLabel = 'Gender';
+            $filenameStem = 'applications_by_gender';
+        }
+
+        $summaryParts = ['Filters:'];
+        if ($filterLevel !== null) {
+            $summaryParts[] = 'NVQ Level ' . $filterLevel;
+        }
+        $summaryParts[] = ($prioLabels[$filterPriority] ?? '1st choice');
+        if ($filterDeptId !== null) {
+            $deptModel = $this->model('DepartmentModel');
+            $drow = $deptModel->find($filterDeptId);
+            $summaryParts[] = 'Dept: ' . trim((string) ($drow['department_name'] ?? $filterDeptId));
+        }
+        if ($filterCourseId !== null) {
+            $courseModel = $this->model('CourseModel');
+            $crow = $courseModel->find($filterCourseId);
+            $summaryParts[] = 'Course: ' . trim((string) ($crow['course_name'] ?? $filterCourseId));
+        }
+        $filterSummary = implode(' · ', $summaryParts);
+
+        require_once BASE_PATH . '/helpers/StudentApplicationDashboardPdf.php';
+        $html = StudentApplicationDashboardPdf::buildHtml($reportTitle, $filterSummary, $rows, $categoryLabel);
+        $filename = $filenameStem . '_' . date('Y-m-d') . '.pdf';
+        ExamPdfHelper::streamHtml($html, $filename);
+    }
+
     public function adminExportExcel(): void {
         if (!isset($_SESSION['user_id'])) {
             $this->redirect('login');
@@ -2677,7 +2818,7 @@ class StudentApplicationController extends Controller {
 
         // PhpSpreadsheet has several PHP extension requirements; if any are missing,
         // export as an Excel-readable HTML table (.xls) instead of failing.
-        $xlsFallback = static function (array $rows, array $cols, ?string $exportStatus): void {
+            $xlsFallback = static function (array $rows, array $cols, ?string $exportStatus, array $labels = []) {
             $filename = 'student_applications_' . date('Y-m-d_H-i') . '_' . ($exportStatus ?: 'all') . '.xls';
             header('Content-Type: application/vnd.ms-excel; charset=utf-8');
             header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
@@ -2686,7 +2827,8 @@ class StudentApplicationController extends Controller {
             $esc = static function (string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); };
             echo "<table border=\"1\">\n<thead><tr>";
             foreach ($cols as $h) {
-                echo '<th>' . $esc((string) $h) . '</th>';
+                $label = $labels[$h] ?? $h;
+                echo '<th style="background:#1F4E79;color:#fff;font-weight:bold;padding:6px;">' . $esc((string) $label) . '</th>';
             }
             echo "</tr></thead>\n<tbody>\n";
             foreach ($rows as $row) {
@@ -2708,7 +2850,7 @@ class StudentApplicationController extends Controller {
             // Autoloader missing → fallback.
             $model = $this->model('StudentApplicationModel');
             $rows = $model->getAllForStaffExport(null, null, null, null, $excludeNicDrafts, $exportNicRaw);
-            $xlsFallback($rows, StudentApplicationModel::getStaffExportColumnOrder(), null);
+            $xlsFallback($rows, StudentApplicationModel::getStaffExportColumnOrder(), null, StudentApplicationModel::getStaffExportColumnLabels());
         }
 
         $model = $this->model('StudentApplicationModel');
@@ -2720,6 +2862,8 @@ class StudentApplicationController extends Controller {
         $courseRaw = trim((string) $this->get('course', ''));
         $exportDeptId = null;
         $exportCourseId = null;
+        $prioRaw = (int) $this->get('prio', '1');
+        $exportPriority = in_array($prioRaw, [1, 2, 3], true) ? $prioRaw : 1;
         if ($deptRaw !== '') {
             $deptModel = $this->model('DepartmentModel');
             $drow = $deptModel->find($deptRaw);
@@ -2737,8 +2881,9 @@ class StudentApplicationController extends Controller {
                 }
             }
         }
-        $rows = $model->getAllForStaffExport($exportStatus, $exportLevel, $exportDeptId, $exportCourseId, $excludeNicDrafts, $exportNicRaw);
+        $rows = $model->getAllForStaffExport($exportStatus, $exportLevel, $exportDeptId, $exportCourseId, $excludeNicDrafts, $exportNicRaw, $exportPriority);
         $allCols = StudentApplicationModel::getStaffExportColumnOrder();
+        $colLabels = StudentApplicationModel::getStaffExportColumnLabels();
         $colsParam = trim((string) $this->get('cols', ''));
         $cols = $allCols;
         if ($colsParam !== '') {
@@ -2771,13 +2916,13 @@ class StudentApplicationController extends Controller {
         ];
         foreach ($needs as $ok) {
             if (!$ok) {
-                $xlsFallback($rows, $cols, $exportStatus);
+                $xlsFallback($rows, $cols, $exportStatus, $colLabels);
             }
         }
 
         try {
-            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
-            $sheet = $spreadsheet->getActiveSheet();
+            require_once BASE_PATH . '/helpers/StudentApplicationExportXlsx.php';
+
             $sheetTitle = 'Applications';
             if ($exportStatus === 'new') {
                 $sheetTitle = 'New';
@@ -2789,51 +2934,30 @@ class StudentApplicationController extends Controller {
             if ($exportLevel !== null) {
                 $sheetTitle .= ' L' . $exportLevel;
             }
+
+            $summaryParts = ['Filters:'];
+            if ($exportStatus !== null) {
+                $summaryParts[] = ucfirst($exportStatus);
+            } else {
+                $summaryParts[] = 'All statuses';
+            }
+            if ($exportLevel !== null) {
+                $summaryParts[] = 'NVQ Level ' . $exportLevel;
+            }
+            $prioLabel = [1 => '1st', 2 => '2nd', 3 => '3rd'][$exportPriority] ?? '1st';
+            $summaryParts[] = $prioLabel . ' course choice';
             if ($exportDeptId !== null) {
-                $sheetTitle .= ' Dept';
+                $summaryParts[] = 'Dept ' . $exportDeptId;
             }
             if ($exportCourseId !== null) {
-                $sheetTitle .= ' Course';
+                $summaryParts[] = 'Course ' . $exportCourseId;
             }
-            $sheetTitle = substr(preg_replace('/[^A-Za-z0-9 _-]/', '', $sheetTitle), 0, 31) ?: 'Applications';
-            $sheet->setTitle($sheetTitle);
+            if ($exportNicRaw !== '') {
+                $summaryParts[] = 'NIC contains ' . $exportNicRaw;
+            }
+            $filterSummary = implode(' · ', $summaryParts);
 
-            // Header row (A1-style coordinates; PhpSpreadsheet 1.x / 2.x)
-            $c = 1;
-            foreach ($cols as $colName) {
-                $coord = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c) . '1';
-                $sheet->setCellValue($coord, $colName);
-                $c++;
-            }
-            $sheet->freezePane('A2');
-
-            // Data rows
-            $r = 2;
-            foreach ($rows as $row) {
-                $c = 1;
-                foreach ($cols as $colName) {
-                    $val = isset($row[$colName]) ? (string) $row[$colName] : '';
-                    $val = str_replace(["\r\n", "\r", "\n"], ' | ', $val);
-                    $coord = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c) . $r;
-                    $sheet->setCellValueExplicit(
-                        $coord,
-                        $val,
-                        \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
-                    );
-                    $c++;
-                }
-                $r++;
-            }
-
-            // Simple formatting
-            $sheet->getStyle('1:1')->getFont()->setBold(true);
-            if ($rows !== []) {
-                $sheet->setAutoFilter($sheet->calculateWorksheetDimension());
-            }
-            foreach (range(1, count($cols)) as $colIdx) {
-                $letter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIdx);
-                $sheet->getColumnDimension($letter)->setAutoSize(true);
-            }
+            $spreadsheet = StudentApplicationExportXlsx::buildSpreadsheet($rows, $cols, $colLabels, $sheetTitle, $filterSummary);
 
             $parts = ['student_applications', date('Y-m-d_H-i')];
             if ($exportStatus !== null) {
@@ -2842,6 +2966,7 @@ class StudentApplicationController extends Controller {
             if ($exportLevel !== null) {
                 $parts[] = 'level' . $exportLevel;
             }
+            $parts[] = 'prio' . $exportPriority;
             if ($exportDeptId !== null) {
                 $parts[] = 'dept' . preg_replace('/[^A-Za-z0-9_-]+/', '_', $exportDeptId);
             }
@@ -2850,7 +2975,6 @@ class StudentApplicationController extends Controller {
             }
             $filename = implode('_', $parts) . '.xlsx';
 
-            // Build XLSX on disk first so we never send headers then fail mid-stream; on any failure use HTML/.xls fallback.
             $tmpPath = tempnam(sys_get_temp_dir(), 'slgti_sa_xlsx_');
             if ($tmpPath === false) {
                 throw new RuntimeException('Could not create temp file for XLSX export.');
@@ -2874,7 +2998,7 @@ class StudentApplicationController extends Controller {
                 @unlink($tmpPath);
             }
             error_log('StudentApplicationController::adminExportExcel: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . (string) $e->getLine());
-            $xlsFallback($rows, $cols, $exportStatus);
+            $xlsFallback($rows, $cols, $exportStatus, $colLabels);
         }
     }
 }

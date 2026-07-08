@@ -65,7 +65,8 @@ class StudentApplicationModel extends Model {
 
     /** Staff list at `/student-applications`. */
     private const APPLICATION_LIST_SELECT = '`application_id`, `application_level`, `status`, `student_full_name`, `student_nic`, `student_district`, '
-        . '`student_email`, `student_phone`, `student_whatsapp`, `created_at`';
+        . '`student_email`, `student_phone`, `student_whatsapp`, `created_at`, '
+        . '`course_priority_1`, `course_priority_2`, `course_priority_3`';
 
     public function __construct() {
         parent::__construct();
@@ -449,16 +450,27 @@ class StudentApplicationModel extends Model {
      * @return array{active: bool, join: string, whereSuffix: string, suffixTypes: string, suffixParams: list<string>}
      */
     private function adminListFirstCourseFilterParts(?string $departmentId, ?string $courseId): array {
+        return $this->adminListCoursePreferenceFilterParts($departmentId, $courseId, 1);
+    }
+
+    /**
+     * Course preference (1–3) matches `course` row for list / export filters.
+     *
+     * @return array{active: bool, join: string, whereSuffix: string, suffixTypes: string, suffixParams: list<string>}
+     */
+    private function adminListCoursePreferenceFilterParts(?string $departmentId, ?string $courseId, int $priority = 1): array {
         $dept = $departmentId !== null ? trim((string) $departmentId) : '';
         $crs = $courseId !== null ? trim((string) $courseId) : '';
         if ($dept === '' && $crs === '') {
             return ['active' => false, 'join' => '', 'whereSuffix' => '', 'suffixTypes' => '', 'suffixParams' => []];
         }
+        $priority = $this->normalizeCoursePriority($priority);
+        $fp = 'course_priority_' . $priority;
         $conn = $this->db->getConnection();
         $sepEsc = $conn->real_escape_string(self::legacyCourseIdNameSeparator());
         $join = ' INNER JOIN `course` sa_fc ON ('
-            . self::sqlTrimUtf8mb4('sa_fc', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', 'course_priority_1') . ' OR '
-            . self::sqlLegacyCourseRowConcatLiteral('sa_fc', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', 'course_priority_1') . ')';
+            . self::sqlTrimUtf8mb4('sa_fc', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ' OR '
+            . self::sqlLegacyCourseRowConcatLiteral('sa_fc', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ')';
         $whereSuffix = '';
         $suffixTypes = '';
         $suffixParams = [];
@@ -476,19 +488,107 @@ class StudentApplicationModel extends Model {
     }
 
     /**
-     * EXISTS (…) for staff export query (avoids extra JOIN aliases on `sa`).
+     * Dept/course filter on selected preference, or (for 2nd/3rd choice only) require that preference to be filled.
+     *
+     * @return array{active: bool, join: string, whereSuffix: string, suffixTypes: string, suffixParams: list<string>}
+     */
+    private function adminListCoursePriorityScopeParts(?string $departmentId, ?string $courseId, int $coursePriority): array {
+        $frag = $this->adminListCoursePreferenceFilterParts($departmentId, $courseId, $coursePriority);
+        if ($frag['active']) {
+            return $frag;
+        }
+        $priority = $this->normalizeCoursePriority($coursePriority);
+        if ($priority === 2 || $priority === 3) {
+            $fp = 'course_priority_' . $priority;
+
+            return [
+                'active' => true,
+                'join' => '',
+                'whereSuffix' => ' AND TRIM(IFNULL(`sa`.`' . $fp . '`,\'\')) <> \'\'',
+                'suffixTypes' => '',
+                'suffixParams' => [],
+            ];
+        }
+
+        return $frag;
+    }
+
+    /**
+     * EXISTS scope for dashboard/export — dept/course on preference, or filled 2nd/3rd choice.
+     *
+     * @return array{sql: string, types: string, params: list<string>}
+     */
+    private function adminExportCoursePriorityScopeParts(?string $departmentId, ?string $courseId, int $priority): array {
+        $parts = $this->adminExportCoursePreferenceExistsParts($departmentId, $courseId, $priority);
+        if ($parts['sql'] !== '') {
+            return $parts;
+        }
+        $priority = $this->normalizeCoursePriority($priority);
+        if ($priority === 2 || $priority === 3) {
+            $fp = 'course_priority_' . $priority;
+
+            return ['sql' => ' AND TRIM(IFNULL(sa.`' . $fp . '`,\'\')) <> \'\'', 'types' => '', 'params' => []];
+        }
+
+        return $parts;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private function enrichAdminListRowsWithCourseChoices(array $rows): array {
+        foreach ($rows as &$row) {
+            for ($n = 1; $n <= 3; $n++) {
+                $row['course_choice_' . $n] = self::displayCourseNameFromStoredPreference((string) ($row['course_priority_' . $n] ?? ''));
+            }
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    private function normalizeCoursePriority(?int $priority): int {
+        $p = (int) ($priority ?? 1);
+        return in_array($p, [1, 2, 3], true) ? $p : 1;
+    }
+
+    /**
+     * SQL expression: display label for a stored course_priority_N value.
+     */
+    private function sqlCoursePreferenceLabelExpr(int $priority, string $tableAlias = 'sa'): string {
+        $priority = $this->normalizeCoursePriority($priority);
+        $fp = 'course_priority_' . $priority;
+        $conn = $this->db->getConnection();
+        $sepEsc = $conn->real_escape_string(self::legacyCourseIdNameSeparator());
+        $col = $tableAlias !== '' ? $tableAlias . '.`' . $fp . '`' : '`' . $fp . '`';
+        return "COALESCE(NULLIF(TRIM(IF(LOCATE(CONVERT('{$sepEsc}' USING utf8mb4), TRIM(CONVERT({$col} USING utf8mb4))) > 0, "
+            . "SUBSTRING_INDEX(TRIM(CONVERT({$col} USING utf8mb4)), CONVERT('{$sepEsc}' USING utf8mb4), -1), TRIM(CONVERT({$col} USING utf8mb4)))), ''), '(Not specified)')";
+    }
+
+    /**
+     * EXISTS (…) for staff export / dashboard filters (avoids extra JOIN aliases on `sa`).
      *
      * @return array{sql: string, types: string, params: list<string>}
      */
     private function adminExportFirstPreferenceExistsParts(?string $departmentId, ?string $courseId): array {
-        $parts = $this->adminListFirstCourseFilterParts($departmentId, $courseId);
+        return $this->adminExportCoursePreferenceExistsParts($departmentId, $courseId, 1);
+    }
+
+    /**
+     * @return array{sql: string, types: string, params: list<string>}
+     */
+    private function adminExportCoursePreferenceExistsParts(?string $departmentId, ?string $courseId, int $priority = 1): array {
+        $parts = $this->adminListCoursePreferenceFilterParts($departmentId, $courseId, $priority);
         if (!$parts['active']) {
             return ['sql' => '', 'types' => '', 'params' => []];
         }
+        $priority = $this->normalizeCoursePriority($priority);
+        $fp = 'course_priority_' . $priority;
         $conn = $this->db->getConnection();
         $sepEsc = $conn->real_escape_string(self::legacyCourseIdNameSeparator());
-        $inner = '(' . self::sqlTrimUtf8mb4('sa_fc', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', 'course_priority_1') . ' OR '
-            . self::sqlLegacyCourseRowConcatLiteral('sa_fc', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', 'course_priority_1') . ')';
+        $inner = '(' . self::sqlTrimUtf8mb4('sa_fc', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ' OR '
+            . self::sqlLegacyCourseRowConcatLiteral('sa_fc', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ')';
         $sql = ' AND EXISTS (SELECT 1 FROM `course` sa_fc WHERE ' . $inner . $parts['whereSuffix'] . ')';
         return ['sql' => $sql, 'types' => $parts['suffixTypes'], 'params' => $parts['suffixParams']];
     }
@@ -512,13 +612,13 @@ class StudentApplicationModel extends Model {
     /**
      * Count applications for staff list (optional NVQ level 04 / 05; optional 1st preference department / course).
      */
-    public function countListForAdmin(string $status, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null): int {
+    public function countListForAdmin(string $status, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1): int {
         $this->ensureTable();
         $this->migrateSchema();
         if (!in_array($status, ['new', 'approved', 'rejected'], true)) {
             return 0;
         }
-        $frag = $this->adminListFirstCourseFilterParts($departmentId, $courseId);
+        $frag = $this->adminListCoursePriorityScopeParts($departmentId, $courseId, $coursePriority);
         $sql = "SELECT COUNT(*) AS `c` FROM `{$this->table}` `sa` {$frag['join']} WHERE `sa`.`status` = ?";
         $types = 's';
         $params = [$status];
@@ -564,7 +664,7 @@ class StudentApplicationModel extends Model {
      *
      * @return list<array<string, mixed>>
      */
-    public function getListPageForAdmin(string $status, ?string $level, int $page, int $perPage, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null): array {
+    public function getListPageForAdmin(string $status, ?string $level, int $page, int $perPage, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1): array {
         $this->ensureTable();
         $this->migrateSchema();
         if (!in_array($status, ['new', 'approved', 'rejected'], true)) {
@@ -574,7 +674,7 @@ class StudentApplicationModel extends Model {
         $perPage = max(1, min(100, $perPage));
         $offset = ($page - 1) * $perPage;
 
-        $frag = $this->adminListFirstCourseFilterParts($departmentId, $courseId);
+        $frag = $this->adminListCoursePriorityScopeParts($departmentId, $courseId, $coursePriority);
         $sql = 'SELECT ' . self::APPLICATION_LIST_SELECT . " FROM `{$this->table}` `sa` {$frag['join']} WHERE `sa`.`status` = ?";
         $types = 's';
         $params = [$status];
@@ -619,7 +719,8 @@ class StudentApplicationModel extends Model {
             }
         }
         $stmt->close();
-        return $rows;
+
+        return $this->enrichAdminListRowsWithCourseChoices($rows);
     }
 
     /**
@@ -972,13 +1073,84 @@ class StudentApplicationModel extends Model {
     }
 
     /**
-     * Dashboard aggregates. Optional NVQ level and 1st-preference department/course match the staff list filters.
+     * Human-readable Excel / report headers for staff export columns.
      *
-     * @return array{total: int, by_status: array{new: int, approved: int, rejected: int}, by_level: list<array{level: string, count: int}>, by_district: list<array{label: string, count: int}>, by_course: list<array{label: string, count: int}>, by_department: list<array{label: string, count: int}>, by_gender: list<array{label: string, count: int}>}
+     * @return array<string, string>
      */
-    public function getDashboardStats(?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null): array {
+    public static function getStaffExportColumnLabels(): array {
+        return [
+            'application_id' => 'Application ID',
+            'application_level' => 'NVQ Level',
+            'student_title' => 'Title',
+            'student_full_name' => 'Full Name',
+            'student_initial_name' => 'Name with Initials',
+            'student_gender' => 'Gender',
+            'student_civil_status' => 'Civil Status',
+            'student_email' => 'Email',
+            'student_phone' => 'Phone',
+            'student_whatsapp' => 'WhatsApp',
+            'student_nic' => 'NIC',
+            'student_dob' => 'Date of Birth',
+            'student_language' => 'Language',
+            'student_religion' => 'Religion',
+            'student_blood_group' => 'Blood Group',
+            'student_address' => 'Address',
+            'student_zip_code' => 'Postal Code',
+            'student_district' => 'District',
+            'student_province' => 'Province',
+            'department_1' => '1st Choice — Department',
+            'department_2' => '2nd Choice — Department',
+            'department_3' => '3rd Choice — Department',
+            'course_1' => '1st Choice — Course',
+            'course_2' => '2nd Choice — Course',
+            'course_3' => '3rd Choice — Course',
+            'ol_index_number' => 'O/L Index No.',
+            'ol_exam_year' => 'O/L Year',
+            'ol_subject_name_01' => 'O/L Subject 1',
+            'ol_subject_01_marks' => 'O/L Marks 1',
+            'ol_subject_name_02' => 'O/L Subject 2',
+            'ol_subject_02_marks' => 'O/L Marks 2',
+            'ol_subject_name_03' => 'O/L Subject 3',
+            'ol_subject_03_marks' => 'O/L Marks 3',
+            'ol_subject_name_04' => 'O/L Subject 4',
+            'ol_subject_04_marks' => 'O/L Marks 4',
+            'ol_subject_name_05' => 'O/L Subject 5',
+            'ol_subject_05_marks' => 'O/L Marks 5',
+            'ol_subject_name_06' => 'O/L Subject 6',
+            'ol_subject_06_marks' => 'O/L Marks 6',
+            'ol_subject_name_07' => 'O/L Subject 7',
+            'ol_subject_07_marks' => 'O/L Marks 7',
+            'ol_subject_name_08' => 'O/L Subject 8',
+            'ol_subject_08_marks' => 'O/L Marks 8',
+            'ol_subject_name_09' => 'O/L Subject 9',
+            'ol_subject_09_marks' => 'O/L Marks 9',
+            'al_index_number' => 'A/L Index No.',
+            'al_exam_year' => 'A/L Year',
+            'al_stream' => 'A/L Stream',
+            'al_subject_name_01' => 'A/L Subject 1',
+            'al_subject_01_marks' => 'A/L Marks 1',
+            'al_subject_name_02' => 'A/L Subject 2',
+            'al_subject_02_marks' => 'A/L Marks 2',
+            'al_subject_name_03' => 'A/L Subject 3',
+            'al_subject_03_marks' => 'A/L Marks 3',
+            'nvq_level' => 'NVQ Level (prior)',
+            'nvq_course_name' => 'NVQ Course',
+            'nvq_institute_name' => 'NVQ Institute',
+            'nvq_year_completed' => 'NVQ Year',
+            'status' => 'Status',
+            'created_at' => 'Submitted',
+        ];
+    }
+
+    /**
+     * Dashboard aggregates. Optional NVQ level and course-preference department/course match the staff list filters.
+     *
+     * @return array{total: int, by_status: array{new: int, approved: int, rejected: int}, by_level: list<array{level: string, count: int}>, by_district: list<array{label: string, count: int}>, by_course: list<array{label: string, count: int}>, by_department: list<array{label: string, count: int}>, by_gender: list<array{label: string, count: int}>, by_course_priority: array<int, array{course: list<array{label: string, count: int}>, department: list<array{label: string, count: int}>}>}
+     */
+    public function getDashboardStats(?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1): array {
         $this->ensureTable();
         $this->migrateSchema();
+        $coursePriority = $this->normalizeCoursePriority($coursePriority);
         $out = [
             'total' => 0,
             'by_status' => ['new' => 0, 'approved' => 0, 'rejected' => 0],
@@ -987,12 +1159,18 @@ class StudentApplicationModel extends Model {
             'by_course' => [],
             'by_department' => [],
             'by_gender' => [],
+            'by_course_priority' => [
+                1 => ['course' => [], 'department' => []],
+                2 => ['course' => [], 'department' => []],
+                3 => ['course' => [], 'department' => []],
+            ],
+            'filter_course_priority' => $coursePriority,
         ];
         $t = $this->table;
         $conn = $this->db->getConnection();
         $sepEsc = $conn->real_escape_string(self::legacyCourseIdNameSeparator());
 
-        $existsPart = $this->adminExportFirstPreferenceExistsParts($departmentId, $courseId);
+        $existsPart = $this->adminExportCoursePriorityScopeParts($departmentId, $courseId, $coursePriority);
         $levelPart = '';
         $filterTypes = '';
         $filterParams = [];
@@ -1097,33 +1275,9 @@ class StudentApplicationModel extends Model {
                     ];
                 }
             }
-            $sqlCourse = "SELECT COALESCE(NULLIF(TRIM(IF(LOCATE(CONVERT('{$sepEsc}' USING utf8mb4), TRIM(CONVERT(`course_priority_1` USING utf8mb4))) > 0, "
-                . "SUBSTRING_INDEX(TRIM(CONVERT(`course_priority_1` USING utf8mb4)), CONVERT('{$sepEsc}' USING utf8mb4), -1), TRIM(CONVERT(`course_priority_1` USING utf8mb4)))), ''), '(Not specified)') AS `lbl`, COUNT(*) AS `cnt` "
-                . "FROM `{$t}`{$dw} GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC LIMIT 40";
-            $res = $this->db->query($sqlCourse);
-            if ($res) {
-                while ($row = $res->fetch_assoc()) {
-                    $out['by_course'][] = [
-                        'label' => (string) ($row['lbl'] ?? ''),
-                        'count' => (int) ($row['cnt'] ?? 0),
-                    ];
-                }
-            }
-            $sqlDept = "SELECT COALESCE(NULLIF(TRIM(d.`department_name`), ''), '(Not matched)') AS `lbl`, COUNT(*) AS `cnt` "
-                . "FROM `{$t}` sa "
-                . 'LEFT JOIN `course` c ON (' . self::sqlTrimUtf8mb4('c', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', 'course_priority_1') . ' OR '
-                . self::sqlLegacyCourseRowConcatLiteral('c', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', 'course_priority_1') . ') '
-                . "LEFT JOIN `department` d ON d.`department_id` = c.`department_id` "
-                . "{$dwSa} GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC LIMIT 40";
-            $res = $this->db->query($sqlDept);
-            if ($res) {
-                while ($row = $res->fetch_assoc()) {
-                    $out['by_department'][] = [
-                        'label' => (string) ($row['lbl'] ?? ''),
-                        'count' => (int) ($row['cnt'] ?? 0),
-                    ];
-                }
-            }
+            $this->populateDashboardCoursePriorityBreakdown($out, $coursePriority, function (string $sql) {
+                return $this->db->query($sql);
+            }, $t, $dw, $dwSa, false);
             return $out;
         }
 
@@ -1180,35 +1334,90 @@ class StudentApplicationModel extends Model {
                 ];
             }
         }
-        $sqlCourse = "SELECT COALESCE(NULLIF(TRIM(IF(LOCATE(CONVERT('{$sepEsc}' USING utf8mb4), TRIM(CONVERT(sa.`course_priority_1` USING utf8mb4))) > 0, "
-            . "SUBSTRING_INDEX(TRIM(CONVERT(sa.`course_priority_1` USING utf8mb4)), CONVERT('{$sepEsc}' USING utf8mb4), -1), TRIM(CONVERT(sa.`course_priority_1` USING utf8mb4)))), ''), '(Not specified)') AS `lbl`, COUNT(*) AS `cnt` "
-            . "FROM `{$t}` sa" . $filterTail . ' GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC LIMIT 40';
-        $res = $runFiltered($sqlCourse);
-        if ($res) {
-            while ($row = $res->fetch_assoc()) {
-                $out['by_course'][] = [
-                    'label' => (string) ($row['lbl'] ?? ''),
-                    'count' => (int) ($row['cnt'] ?? 0),
-                ];
-            }
-        }
-        $sqlDept = "SELECT COALESCE(NULLIF(TRIM(d.`department_name`), ''), '(Not matched)') AS `lbl`, COUNT(*) AS `cnt` "
-            . "FROM `{$t}` sa "
-            . 'LEFT JOIN `course` c ON (' . self::sqlTrimUtf8mb4('c', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', 'course_priority_1') . ' OR '
-            . self::sqlLegacyCourseRowConcatLiteral('c', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', 'course_priority_1') . ') '
-            . "LEFT JOIN `department` d ON d.`department_id` = c.`department_id` "
-            . $filterTail . ' GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC LIMIT 40';
-        $res = $runFiltered($sqlDept);
-        if ($res) {
-            while ($row = $res->fetch_assoc()) {
-                $out['by_department'][] = [
-                    'label' => (string) ($row['lbl'] ?? ''),
-                    'count' => (int) ($row['cnt'] ?? 0),
-                ];
-            }
-        }
+        $this->populateDashboardCoursePriorityBreakdown($out, $coursePriority, $runFiltered, $t, $filterTail, '', true);
 
         return $out;
+    }
+
+    /**
+     * Fill by_course_priority (1st / 2nd / 3rd choice) and mirror active filter into by_course / by_department.
+     *
+     * @param callable(string): mysqli_result|false $runQuery
+     */
+    private function populateDashboardCoursePriorityBreakdown(
+        array &$out,
+        int $filterPriority,
+        callable $runQuery,
+        string $table,
+        string $whereSuffix,
+        string $saWhereSuffix,
+        bool $useSaAlias
+    ): void {
+        $filterPriority = $this->normalizeCoursePriority($filterPriority);
+        $conn = $this->db->getConnection();
+        $sepEsc = $conn->real_escape_string(self::legacyCourseIdNameSeparator());
+
+        for ($p = 1; $p <= 3; $p++) {
+            $fp = 'course_priority_' . $p;
+            if ($useSaAlias) {
+                $labelExpr = $this->sqlCoursePreferenceLabelExpr($p, 'sa');
+                $sqlCourse = 'SELECT ' . $labelExpr . " AS `lbl`, COUNT(*) AS `cnt` FROM `{$table}` sa" . $whereSuffix
+                    . ' GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC LIMIT 40';
+                $sqlDept = "SELECT COALESCE(NULLIF(TRIM(d.`department_name`), ''), '(Not matched)') AS `lbl`, COUNT(*) AS `cnt` "
+                    . "FROM `{$table}` sa "
+                    . 'LEFT JOIN `course` c ON (' . self::sqlTrimUtf8mb4('c', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ' OR '
+                    . self::sqlLegacyCourseRowConcatLiteral('c', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ') '
+                    . 'LEFT JOIN `department` d ON d.`department_id` = c.`department_id` '
+                    . $whereSuffix . ' GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC LIMIT 40';
+            } else {
+                $labelExpr = $this->sqlCoursePreferenceLabelExpr($p, '');
+                $sqlCourse = 'SELECT ' . $labelExpr . " AS `lbl`, COUNT(*) AS `cnt` FROM `{$table}`" . $whereSuffix
+                    . ' GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC LIMIT 40';
+                $sqlDept = "SELECT COALESCE(NULLIF(TRIM(d.`department_name`), ''), '(Not matched)') AS `lbl`, COUNT(*) AS `cnt` "
+                    . "FROM `{$table}` sa "
+                    . 'LEFT JOIN `course` c ON (' . self::sqlTrimUtf8mb4('c', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ' OR '
+                    . self::sqlLegacyCourseRowConcatLiteral('c', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ') '
+                    . 'LEFT JOIN `department` d ON d.`department_id` = c.`department_id` '
+                    . ($saWhereSuffix !== '' ? $saWhereSuffix : $whereSuffix)
+                    . ' GROUP BY `lbl` ORDER BY `cnt` DESC, `lbl` ASC LIMIT 40';
+            }
+
+            $courses = [];
+            $res = $runQuery($sqlCourse);
+            if ($res) {
+                while ($row = $res->fetch_assoc()) {
+                    $courses[] = [
+                        'label' => (string) ($row['lbl'] ?? ''),
+                        'count' => (int) ($row['cnt'] ?? 0),
+                    ];
+                }
+            }
+
+            $departments = [];
+            $res = $runQuery($sqlDept);
+            if ($res) {
+                while ($row = $res->fetch_assoc()) {
+                    $departments[] = [
+                        'label' => (string) ($row['lbl'] ?? ''),
+                        'count' => (int) ($row['cnt'] ?? 0),
+                    ];
+                }
+            }
+
+            if ($p === 1) {
+                $courses = array_values(array_filter($courses, static function (array $row): bool {
+                    return ($row['label'] ?? '') !== '(Not specified)';
+                }));
+                $departments = array_values(array_filter($departments, static function (array $row): bool {
+                    return ($row['label'] ?? '') !== '(Not matched)';
+                }));
+            }
+
+            $out['by_course_priority'][$p] = ['course' => $courses, 'department' => $departments];
+        }
+
+        $out['by_course'] = $out['by_course_priority'][$filterPriority]['course'] ?? [];
+        $out['by_department'] = $out['by_course_priority'][$filterPriority]['department'] ?? [];
     }
 
     /**
@@ -1220,7 +1429,7 @@ class StudentApplicationModel extends Model {
      * @param string|null $courseId optional: 1st preference matches this `course`.`course_id`
      * @return list<array<string, mixed>>
      */
-    public function getAllForStaffExport(?string $status = null, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null): array {
+    public function getAllForStaffExport(?string $status = null, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1): array {
         $this->ensureTable();
         $this->migrateSchema();
         $conn = $this->db->getConnection();
@@ -1274,7 +1483,7 @@ class StudentApplicationModel extends Model {
             $types .= 's';
             $params[] = $level;
         }
-        $existsParts = $this->adminExportFirstPreferenceExistsParts($departmentId, $courseId);
+        $existsParts = $this->adminExportCoursePriorityScopeParts($departmentId, $courseId, $coursePriority);
         $sql .= $existsParts['sql'];
         $types .= $existsParts['types'];
         foreach ($existsParts['params'] as $ep) {
