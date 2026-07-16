@@ -50,7 +50,7 @@ class StudentDashboardController extends Controller {
         // Get active roommates (other active allocations in same room)
         $roommates = [];
         if (!empty($hostelAllocation) && !empty($hostelAllocation['room_id'])) {
-            $roomAllocations = $roomAllocationModel->getByRoomId($hostelAllocation['room_id'], 'active');
+            $roomAllocations = $roomAllocationModel->getByRoomId($hostelAllocation['room_id'], ['status' => 'active']);
             if (!empty($roomAllocations)) {
                 foreach ($roomAllocations as $a) {
                     if (!empty($a['student_id']) && $a['student_id'] !== $studentId) {

@@ -9,52 +9,55 @@ class RoomAllocationModel extends Model {
     protected function getPrimaryKey() {
         return 'id';
     }
-    
+
     /**
-     * Get all allocations with student and room info
+     * Enrollment joins required when filtering by department.
      */
-    public function getAllocations($page = 1, $perPage = 20, $filters = []) {
-        $offset = ($page - 1) * $perPage;
-        
-        $sql = "SELECT ha.*, 
-                s.student_id, s.student_fullname, s.student_email, s.student_nic,
-                r.room_no, r.capacity,
-                b.name as block_name,
-                h.name as hostel_name, h.gender as hostel_gender
-                FROM `{$this->table}` ha
-                LEFT JOIN `student` s ON ha.student_id = s.student_id
-                LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
-                LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
-                LEFT JOIN `hostels` h ON b.hostel_id = h.id
-                WHERE 1=1";
-        
-        $params = [];
-        $types = '';
-        
+    private function getDepartmentFilterJoins() {
+        return " LEFT JOIN `student_enroll` se ON s.student_id = se.student_id AND se.student_enroll_status = 'Following'
+                 LEFT JOIN `course` c ON se.course_id = c.course_id";
+    }
+
+    /**
+     * Append shared allocation filter conditions to a query.
+     */
+    private function appendAllocationFilters(&$sql, $filters, &$params, &$types) {
         if (!empty($filters['hostel_id'])) {
             $sql .= " AND b.hostel_id = ?";
             $params[] = $filters['hostel_id'];
             $types .= 's';
         }
-        
+
         if (!empty($filters['room_id'])) {
             $sql .= " AND ha.room_id = ?";
             $params[] = $filters['room_id'];
             $types .= 's';
         }
-        
+
         if (!empty($filters['student_id'])) {
             $sql .= " AND ha.student_id = ?";
             $params[] = $filters['student_id'];
             $types .= 's';
         }
-        
+
         if (!empty($filters['status'])) {
             $sql .= " AND ha.status = ?";
             $params[] = $filters['status'];
             $types .= 's';
         }
-        
+
+        if (!empty($filters['gender'])) {
+            $sql .= " AND s.student_gender = ?";
+            $params[] = $filters['gender'];
+            $types .= 's';
+        }
+
+        if (!empty($filters['department_id'])) {
+            $sql .= " AND c.department_id = ?";
+            $params[] = $filters['department_id'];
+            $types .= 's';
+        }
+
         if (!empty($filters['search'])) {
             $searchTerm = '%' . $filters['search'] . '%';
             $sql .= " AND (s.student_fullname LIKE ? OR s.student_id LIKE ? OR r.room_no LIKE ?)";
@@ -63,6 +66,41 @@ class RoomAllocationModel extends Model {
             $params[] = $searchTerm;
             $types .= 'sss';
         }
+    }
+    
+    /**
+     * Get all allocations with student and room info
+     */
+    public function getAllocations($page = 1, $perPage = 20, $filters = []) {
+        $offset = ($page - 1) * $perPage;
+        
+        $sql = "SELECT ha.*, 
+                s.student_id, s.student_fullname, s.student_email, s.student_nic, s.student_gender,
+                r.room_no, r.capacity,
+                b.name as block_name,
+                h.name as hostel_name, h.gender as hostel_gender,
+                d.department_name
+                FROM `{$this->table}` ha
+                LEFT JOIN `student` s ON ha.student_id = s.student_id
+                LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
+                LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
+                LEFT JOIN `hostels` h ON b.hostel_id = h.id";
+
+        if (!empty($filters['department_id'])) {
+            $sql .= $this->getDepartmentFilterJoins();
+            $sql .= " LEFT JOIN `department` d ON c.department_id = d.department_id";
+        } else {
+            $sql .= " LEFT JOIN `student_enroll` se ON s.student_id = se.student_id AND se.student_enroll_status = 'Following'
+                      LEFT JOIN `course` c ON se.course_id = c.course_id
+                      LEFT JOIN `department` d ON c.department_id = d.department_id";
+        }
+
+        $sql .= " WHERE 1=1";
+        
+        $params = [];
+        $types = '';
+        
+        $this->appendAllocationFilters($sql, $filters, $params, $types);
         
         $sql .= " ORDER BY ha.allocated_at DESC LIMIT ? OFFSET ?";
         $params[] = $perPage;
@@ -93,52 +131,32 @@ class RoomAllocationModel extends Model {
      */
     public function getAllocationsForExport($filters = []) {
         $sql = "SELECT ha.*, 
-                s.student_id, s.student_fullname, s.student_email, s.student_nic,
+                s.student_id, s.student_fullname, s.student_email, s.student_nic, s.student_gender,
                 r.room_no, r.capacity,
                 b.name as block_name,
-                h.name as hostel_name, h.gender as hostel_gender
+                h.name as hostel_name, h.gender as hostel_gender,
+                d.department_name
                 FROM `{$this->table}` ha
                 LEFT JOIN `student` s ON ha.student_id = s.student_id
                 LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
                 LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
-                LEFT JOIN `hostels` h ON b.hostel_id = h.id
-                WHERE 1=1";
+                LEFT JOIN `hostels` h ON b.hostel_id = h.id";
+
+        if (!empty($filters['department_id'])) {
+            $sql .= $this->getDepartmentFilterJoins();
+            $sql .= " LEFT JOIN `department` d ON c.department_id = d.department_id";
+        } else {
+            $sql .= " LEFT JOIN `student_enroll` se ON s.student_id = se.student_id AND se.student_enroll_status = 'Following'
+                      LEFT JOIN `course` c ON se.course_id = c.course_id
+                      LEFT JOIN `department` d ON c.department_id = d.department_id";
+        }
+
+        $sql .= " WHERE 1=1";
         
         $params = [];
         $types = '';
         
-        if (!empty($filters['hostel_id'])) {
-            $sql .= " AND b.hostel_id = ?";
-            $params[] = $filters['hostel_id'];
-            $types .= 's';
-        }
-        
-        if (!empty($filters['room_id'])) {
-            $sql .= " AND ha.room_id = ?";
-            $params[] = $filters['room_id'];
-            $types .= 's';
-        }
-        
-        if (!empty($filters['student_id'])) {
-            $sql .= " AND ha.student_id = ?";
-            $params[] = $filters['student_id'];
-            $types .= 's';
-        }
-        
-        if (!empty($filters['status'])) {
-            $sql .= " AND ha.status = ?";
-            $params[] = $filters['status'];
-            $types .= 's';
-        }
-        
-        if (!empty($filters['search'])) {
-            $searchTerm = '%' . $filters['search'] . '%';
-            $sql .= " AND (s.student_fullname LIKE ? OR s.student_id LIKE ? OR r.room_no LIKE ?)";
-            $params[] = $searchTerm;
-            $params[] = $searchTerm;
-            $params[] = $searchTerm;
-            $types .= 'sss';
-        }
+        $this->appendAllocationFilters($sql, $filters, $params, $types);
         
         $sql .= " ORDER BY ha.allocated_at DESC";
         
@@ -165,47 +183,21 @@ class RoomAllocationModel extends Model {
      * Get total count of allocations
      */
     public function getTotalAllocations($filters = []) {
-        $sql = "SELECT COUNT(*) as total FROM `{$this->table}` ha
+        $sql = "SELECT COUNT(DISTINCT ha.id) as total FROM `{$this->table}` ha
                 LEFT JOIN `student` s ON ha.student_id = s.student_id
                 LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
-                LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
-                WHERE 1=1";
+                LEFT JOIN `hostel_blocks` b ON r.block_id = b.id";
+
+        if (!empty($filters['department_id'])) {
+            $sql .= $this->getDepartmentFilterJoins();
+        }
+
+        $sql .= " WHERE 1=1";
         
         $params = [];
         $types = '';
         
-        if (!empty($filters['hostel_id'])) {
-            $sql .= " AND b.hostel_id = ?";
-            $params[] = $filters['hostel_id'];
-            $types .= 's';
-        }
-        
-        if (!empty($filters['room_id'])) {
-            $sql .= " AND ha.room_id = ?";
-            $params[] = $filters['room_id'];
-            $types .= 's';
-        }
-        
-        if (!empty($filters['student_id'])) {
-            $sql .= " AND ha.student_id = ?";
-            $params[] = $filters['student_id'];
-            $types .= 's';
-        }
-        
-        if (!empty($filters['status'])) {
-            $sql .= " AND ha.status = ?";
-            $params[] = $filters['status'];
-            $types .= 's';
-        }
-        
-        if (!empty($filters['search'])) {
-            $searchTerm = '%' . $filters['search'] . '%';
-            $sql .= " AND (s.student_fullname LIKE ? OR s.student_id LIKE ? OR r.room_no LIKE ?)";
-            $params[] = $searchTerm;
-            $params[] = $searchTerm;
-            $params[] = $searchTerm;
-            $types .= 'sss';
-        }
+        $this->appendAllocationFilters($sql, $filters, $params, $types);
         
         if (!empty($params)) {
             $stmt = $this->db->prepare($sql);
@@ -271,25 +263,45 @@ class RoomAllocationModel extends Model {
     /**
      * Get allocations by room ID
      */
-    public function getByRoomId($roomId, $status = null) {
+    public function getByRoomId($roomId, $filters = []) {
+        if (!is_array($filters)) {
+            $filters = $filters !== null ? ['status' => $filters] : [];
+        }
+
         $sql = "SELECT ha.*, 
                 s.student_id, s.student_fullname, s.student_phone, s.student_nic, s.student_gender,
                 r.room_no, r.capacity,
                 b.name as block_name,
-                h.name as hostel_name
+                h.name as hostel_name,
+                d.department_name
                 FROM `{$this->table}` ha
                 LEFT JOIN `student` s ON ha.student_id = s.student_id
                 LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
                 LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
                 LEFT JOIN `hostels` h ON b.hostel_id = h.id
+                LEFT JOIN `student_enroll` se ON s.student_id = se.student_id AND se.student_enroll_status = 'Following'
+                LEFT JOIN `course` c ON se.course_id = c.course_id
+                LEFT JOIN `department` d ON c.department_id = d.department_id
                 WHERE ha.room_id = ?";
         
         $params = [$roomId];
         $types = 's';
         
-        if ($status !== null) {
+        if (!empty($filters['status'])) {
             $sql .= " AND ha.status = ?";
-            $params[] = $status;
+            $params[] = $filters['status'];
+            $types .= 's';
+        }
+
+        if (!empty($filters['gender'])) {
+            $sql .= " AND s.student_gender = ?";
+            $params[] = $filters['gender'];
+            $types .= 's';
+        }
+
+        if (!empty($filters['department_id'])) {
+            $sql .= " AND c.department_id = ?";
+            $params[] = $filters['department_id'];
             $types .= 's';
         }
         
