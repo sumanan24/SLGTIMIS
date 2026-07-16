@@ -9,6 +9,8 @@
                             'hostel_id' => $hostel_id ?? '',
                             'room_id' => $room_id ?? '',
                             'status' => $status ?? '',
+                            'department_id' => $department_id ?? '',
+                            'gender' => $gender ?? '',
                             'search' => $search ?? ''
                         ]); 
                     ?>" class="btn btn-outline-light btn-sm mt-2 mt-md-0">
@@ -43,7 +45,7 @@
             <div class="card border mb-4 shadow-sm">
                 <div class="card-body">
                     <form method="GET" action="<?php echo APP_URL; ?>/room-allocations" class="row g-3">
-                        <div class="col-md-3">
+                        <div class="col-md-6 col-lg-2">
                             <label class="form-label">Hostel</label>
                             <select name="hostel_id" id="filter_hostel_id" class="form-select" onchange="loadRoomsForFilter(this.value)">
                                 <option value="">All Hostels</option>
@@ -55,7 +57,7 @@
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-6 col-lg-2">
                             <label class="form-label">Room</label>
                             <select name="room_id" id="filter_room_id" class="form-select">
                                 <option value="">All Rooms</option>
@@ -67,7 +69,7 @@
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-6 col-lg-2">
                             <label class="form-label">Status</label>
                             <select name="status" class="form-select">
                                 <option value="">All Status</option>
@@ -75,19 +77,43 @@
                                 <option value="inactive" <?php echo ($status ?? '') === 'inactive' ? 'selected' : ''; ?>>Inactive</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-6 col-lg-3">
+                            <label class="form-label">Department</label>
+                            <select name="department_id" class="form-select">
+                                <option value="">All Departments</option>
+                                <?php foreach ($departments ?? [] as $dept): ?>
+                                    <option value="<?php echo htmlspecialchars($dept['department_id']); ?>"
+                                            <?php echo ($department_id ?? '') === $dept['department_id'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($dept['department_name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6 col-lg-3">
+                            <label class="form-label">Gender</label>
+                            <select name="gender" class="form-select">
+                                <option value="">All Genders</option>
+                                <?php foreach ($genders ?? ['Male', 'Female'] as $genderOption): ?>
+                                    <option value="<?php echo htmlspecialchars($genderOption); ?>"
+                                            <?php echo ($gender ?? '') === $genderOption ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($genderOption); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-10 col-lg-11">
                             <label class="form-label">Search</label>
                             <input type="text" name="search" class="form-control" 
                                    placeholder="Search by student name or ID..." 
                                    value="<?php echo htmlspecialchars($search ?? ''); ?>">
                         </div>
-                        <div class="col-md-1">
+                        <div class="col-md-2 col-lg-1">
                             <label class="form-label">&nbsp;</label>
                             <button type="submit" class="btn btn-primary w-100">
                                 <i class="fas fa-search"></i>
                             </button>
                         </div>
-                        <?php if (!empty($search) || !empty($hostel_id) || !empty($room_id) || !empty($status)): ?>
+                        <?php if (!empty($search) || !empty($hostel_id) || !empty($room_id) || !empty($status) || !empty($department_id) || !empty($gender)): ?>
                             <div class="col-12">
                                 <a href="<?php echo APP_URL; ?>/room-allocations" class="btn btn-outline-secondary btn-sm">
                                     <i class="fas fa-times me-1"></i>Clear Filters
@@ -407,24 +433,34 @@
                 </div>
                 
                 <!-- Pagination -->
-                <?php if ($totalPages > 1): ?>
+                <?php if ($totalPages > 1): 
+                    $paginationQuery = http_build_query(array_filter([
+                        'search' => $search ?? '',
+                        'hostel_id' => $hostel_id ?? '',
+                        'room_id' => $room_id ?? '',
+                        'status' => $status ?? '',
+                        'department_id' => $department_id ?? '',
+                        'gender' => $gender ?? '',
+                    ]));
+                    $paginationSuffix = $paginationQuery ? '&' . $paginationQuery : '';
+                ?>
                     <nav aria-label="Page navigation" class="mt-4">
                         <ul class="pagination justify-content-center">
                             <?php if ($currentPage > 1): ?>
                                 <li class="page-item">
-                                    <a class="page-link" href="?page=<?php echo $currentPage - 1; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?><?php echo !empty($hostel_id) ? '&hostel_id=' . urlencode($hostel_id) : ''; ?><?php echo !empty($room_id) ? '&room_id=' . urlencode($room_id) : ''; ?><?php echo !empty($status) ? '&status=' . urlencode($status) : ''; ?>">Previous</a>
+                                    <a class="page-link" href="?page=<?php echo $currentPage - 1; ?><?php echo $paginationSuffix; ?>">Previous</a>
                                 </li>
                             <?php endif; ?>
                             
                             <?php for ($i = 1; $i <= $totalPages; $i++): ?>
                                 <li class="page-item <?php echo $i == $currentPage ? 'active' : ''; ?>">
-                                    <a class="page-link" href="?page=<?php echo $i; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?><?php echo !empty($hostel_id) ? '&hostel_id=' . urlencode($hostel_id) : ''; ?><?php echo !empty($room_id) ? '&room_id=' . urlencode($room_id) : ''; ?><?php echo !empty($status) ? '&status=' . urlencode($status) : ''; ?>"><?php echo $i; ?></a>
+                                    <a class="page-link" href="?page=<?php echo $i; ?><?php echo $paginationSuffix; ?>"><?php echo $i; ?></a>
                                 </li>
                             <?php endfor; ?>
                             
                             <?php if ($currentPage < $totalPages): ?>
                                 <li class="page-item">
-                                    <a class="page-link" href="?page=<?php echo $currentPage + 1; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?><?php echo !empty($hostel_id) ? '&hostel_id=' . urlencode($hostel_id) : ''; ?><?php echo !empty($room_id) ? '&room_id=' . urlencode($room_id) : ''; ?><?php echo !empty($status) ? '&status=' . urlencode($status) : ''; ?>">Next</a>
+                                    <a class="page-link" href="?page=<?php echo $currentPage + 1; ?><?php echo $paginationSuffix; ?>">Next</a>
                                 </li>
                             <?php endif; ?>
                         </ul>
