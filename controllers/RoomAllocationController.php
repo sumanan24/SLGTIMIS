@@ -26,6 +26,8 @@ class RoomAllocationController extends Controller {
         $hostelId = $this->get('hostel_id', '');
         $roomId = $this->get('room_id', '');
         $status = $this->get('status', '');
+        $departmentId = $this->get('department_id', '');
+        $gender = $this->get('gender', '');
         
         $filters = [];
         if (!empty($search)) {
@@ -40,8 +42,17 @@ class RoomAllocationController extends Controller {
         if (!empty($status)) {
             $filters['status'] = $status;
         }
+        if (!empty($departmentId)) {
+            $filters['department_id'] = $departmentId;
+        }
+        if (!empty($gender)) {
+            $filters['gender'] = $gender;
+        }
         
         $hostels = $hostelModel->getAll();
+        $departmentModel = $this->model('DepartmentModel');
+        $departments = $departmentModel->getAll();
+        $genders = ['Male', 'Female'];
         $roomModel = $this->model('RoomModel');
         
         // Check if user can manage (create/edit/delete) room allocations
@@ -60,14 +71,7 @@ class RoomAllocationController extends Controller {
             $roomAllocations = [];
             foreach ($rooms as $room) {
                 // Get allocations for this room
-                $roomAllocs = $allocationModel->getByRoomId($room['id'], !empty($status) ? $status : null);
-                
-                // Filter by status if specified
-                if (!empty($status)) {
-                    $roomAllocs = array_filter($roomAllocs, function($alloc) use ($status) {
-                        return ($alloc['status'] ?? '') === $status;
-                    });
-                }
+                $roomAllocs = $allocationModel->getByRoomId($room['id'], $filters);
                 
                 // Show all rooms, even empty ones
                 $roomAllocations[$room['id']] = [
@@ -85,7 +89,11 @@ class RoomAllocationController extends Controller {
                 'hostel_id' => $hostelId,
                 'room_id' => $roomId,
                 'status' => $status,
+                'department_id' => $departmentId,
+                'gender' => $gender,
                 'hostels' => $hostels,
+                'departments' => $departments,
+                'genders' => $genders,
                 'rooms' => $rooms,
                 'canManage' => $canManage,
                 'message' => $_SESSION['message'] ?? null,
@@ -115,7 +123,11 @@ class RoomAllocationController extends Controller {
                 'hostel_id' => $hostelId,
                 'room_id' => $roomId,
                 'status' => $status,
+                'department_id' => $departmentId,
+                'gender' => $gender,
                 'hostels' => $hostels,
+                'departments' => $departments,
+                'genders' => $genders,
                 'rooms' => $rooms,
                 'canManage' => $canManage,
                 'message' => $_SESSION['message'] ?? null,
@@ -517,6 +529,8 @@ class RoomAllocationController extends Controller {
         $hostelId = $this->get('hostel_id', '');
         $roomId = $this->get('room_id', '');
         $status = $this->get('status', '');
+        $departmentId = $this->get('department_id', '');
+        $gender = $this->get('gender', '');
         
         if (!empty($search)) {
             $filters['search'] = $search;
@@ -529,6 +543,12 @@ class RoomAllocationController extends Controller {
         }
         if (!empty($status)) {
             $filters['status'] = $status;
+        }
+        if (!empty($departmentId)) {
+            $filters['department_id'] = $departmentId;
+        }
+        if (!empty($gender)) {
+            $filters['gender'] = $gender;
         }
         
         $allocations = $allocationModel->getAllocationsForExport($filters);
