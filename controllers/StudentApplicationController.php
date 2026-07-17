@@ -739,6 +739,17 @@ class StudentApplicationController extends Controller {
             }
         }
 
+        $courseModel = $this->model('CourseModel');
+        for ($i = 1; $i <= 3; $i++) {
+            $courseId = $t('course_priority_' . $i);
+            if ($courseId === '') {
+                continue;
+            }
+            if (!$courseModel->isActiveForStudents($courseId)) {
+                return ['One or more selected courses are not open for enrollment. Please refresh the page and choose again.'];
+            }
+        }
+
         $email = $t('student_email');
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return ['Please type a correct email address.'];
@@ -1768,6 +1779,7 @@ class StudentApplicationController extends Controller {
             $courses = $courseModel->getCoursesWithDepartment([
                 'department_id' => $deptId,
                 'nvq_level' => $nvq,
+                'active_only' => true,
             ]);
         } catch (Throwable $e) {
             error_log('apiCourses: ' . $e->getMessage());

@@ -110,6 +110,18 @@
                         <input type="number" class="form-control" id="course_institute_training" name="course_institute_training"
                                min="1" required placeholder="e.g., 12">
                     </div>
+
+                    <div class="col-12 col-md-6">
+                        <label for="course_status" class="form-label fw-semibold mb-1">
+                            Course Status <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="course_status" name="course_status" required>
+                            <option value="draft" selected>Draft</option>
+                            <option value="active">Active</option>
+                            <option value="deactivated">Deactivated</option>
+                        </select>
+                        <div class="form-text">Only <strong>Active</strong> courses appear in online applications and student enrollment.</div>
+                    </div>
                 </div>
 
                 <div class="course-create-actions d-flex flex-wrap gap-2 mt-4 pt-3 border-top">

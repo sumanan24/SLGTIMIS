@@ -926,6 +926,15 @@ class StudentController extends Controller {
             $courseMode = trim($this->post('course_mode', 'Full Time'));
             $enrollStatus = trim($this->post('student_enroll_status', 'Following'));
             
+            if (!empty($courseId)) {
+                $courseModelCheck = $this->model('CourseModel');
+                if (!$courseModelCheck->isActiveForStudents($courseId)) {
+                    $_SESSION['error'] = 'Selected course is not open for enrollment. Only active courses can be used.';
+                    $this->redirect('students/create');
+                    return;
+                }
+            }
+            
             // If enrollment is being created, Full Name and NIC are mandatory
             if (!empty($courseId) && !empty($academicYear)) {
                 if (empty($data['student_fullname']) || empty($data['student_nic'])) {
@@ -1009,8 +1018,8 @@ class StudentController extends Controller {
             $departmentModel = $this->model('DepartmentModel');
             $academicYearModel = $this->model('StudentModel');
             
-            // Use getCoursesWithDepartment to ensure department_id is included
-            $courses = $courseModel->getCoursesWithDepartment();
+            // Only active courses are available for new student enrollment
+            $courses = $courseModel->getCoursesWithDepartment(['active_only' => true]);
             $departments = $departmentModel->getAll();
             $academicYears = $academicYearModel->getAcademicYears();
             

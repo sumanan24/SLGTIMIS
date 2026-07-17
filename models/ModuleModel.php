@@ -83,26 +83,57 @@ class ModuleModel extends Model {
      * Get all modules with course name, optional filter by course_id and course_version
      */
     public function getAllWithCourse($courseId = null, $courseVersion = null) {
+        $filters = [];
+        if (!empty($courseId)) {
+            $filters['course_id'] = $courseId;
+        }
+        if ($courseVersion !== null && $courseVersion !== '') {
+            $filters['course_version'] = (int) $courseVersion;
+        }
+
+        return $this->getAllWithCourseFiltered($filters);
+    }
+
+    /**
+     * Get modules with course/department info and optional filters.
+     *
+     * @param array{department_id?: string, course_id?: string, course_version?: int} $filters
+     * @return list<array<string, mixed>>
+     */
+    public function getAllWithCourseFiltered(array $filters = []): array {
         $this->ensureModuleVersionColumn();
         $this->ensureModuleCreditColumn();
         $this->ensureModuleSemesterColumn();
-        $sql = "SELECT m.*, c.course_name 
-                FROM `{$this->table}` m 
-                LEFT JOIN `course` c ON c.course_id = m.course_id 
+
+        $sql = "SELECT m.*, c.course_name, c.department_id, d.department_name
+                FROM `{$this->table}` m
+                INNER JOIN `course` c ON c.course_id = m.course_id
+                LEFT JOIN `department` d ON d.department_id = c.department_id
                 WHERE 1=1";
+
         $params = [];
         $types = '';
-        if (!empty($courseId)) {
-            $sql .= " AND m.course_id = ?";
-            $params[] = $courseId;
+
+        if (!empty($filters['department_id'])) {
+            $sql .= " AND c.department_id = ?";
+            $params[] = trim((string) $filters['department_id']);
             $types .= 's';
         }
-        if ($courseVersion !== null && $courseVersion !== '') {
+
+        if (!empty($filters['course_id'])) {
+            $sql .= " AND m.course_id = ?";
+            $params[] = trim((string) $filters['course_id']);
+            $types .= 's';
+        }
+
+        if (array_key_exists('course_version', $filters) && $filters['course_version'] !== null && $filters['course_version'] !== '') {
             $sql .= " AND m.course_version = ?";
-            $params[] = (int)$courseVersion;
+            $params[] = (int) $filters['course_version'];
             $types .= 'i';
         }
-        $sql .= " ORDER BY c.course_name, m.course_version, m.semester, m.module_name, m.module_id";
+
+        $sql .= " ORDER BY d.department_name, c.course_name, m.course_version, m.semester, m.module_name, m.module_id";
+
         if (!empty($params)) {
             $stmt = $this->db->prepare($sql);
             if (!$stmt) {
@@ -114,12 +145,14 @@ class ModuleModel extends Model {
         } else {
             $result = $this->db->query($sql);
         }
+
         $data = [];
         if ($result && $result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
                 $data[] = $row;
             }
         }
+
         return $data;
     }
 
@@ -128,43 +161,16 @@ class ModuleModel extends Model {
      *
      * @return list<array<string, mixed>>
      */
-    public function getAllWithCourseByDepartment(string $departmentId, ?string $courseId = null): array {
-        $this->ensureModuleVersionColumn();
-        $this->ensureModuleCreditColumn();
-        $this->ensureModuleSemesterColumn();
-        $departmentId = trim($departmentId);
-        if ($departmentId === '') {
-            return [];
-        }
-
-        $sql = "SELECT m.*, c.course_name
-                FROM `{$this->table}` m
-                INNER JOIN `course` c ON c.course_id = m.course_id
-                WHERE c.department_id = ?";
-        $params = [$departmentId];
-        $types = 's';
+    public function getAllWithCourseByDepartment(string $departmentId, ?string $courseId = null, $courseVersion = null): array {
+        $filters = ['department_id' => $departmentId];
         if ($courseId !== null && trim($courseId) !== '') {
-            $sql .= " AND m.course_id = ?";
-            $params[] = trim($courseId);
-            $types .= 's';
+            $filters['course_id'] = trim($courseId);
         }
-        $sql .= " ORDER BY c.course_name, m.course_version, m.semester, m.module_name, m.module_id";
+        if ($courseVersion !== null && $courseVersion !== '') {
+            $filters['course_version'] = (int) $courseVersion;
+        }
 
-        $stmt = $this->db->prepare($sql);
-        if (!$stmt) {
-            return [];
-        }
-        $stmt->bind_param($types, ...$params);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        $data = [];
-        if ($result && $result->num_rows > 0) {
-            while ($row = $result->fetch_assoc()) {
-                $data[] = $row;
-            }
-        }
-        return $data;
+        return $this->getAllWithCourseFiltered($filters);
     }
 
     /**

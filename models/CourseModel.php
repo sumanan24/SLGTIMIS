@@ -6,48 +6,143 @@
 class CourseModel extends Model {
     protected $table = 'course';
     protected $courseVersionTable = 'course_version';
+
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_DEACTIVATED = 'deactivated';
     
     protected function getPrimaryKey() {
         return 'course_id';
     }
+
+    /**
+     * @return list<string>
+     */
+    public static function validStatuses(): array {
+        return [
+            self::STATUS_ACTIVE,
+            self::STATUS_DRAFT,
+            self::STATUS_DEACTIVATED,
+        ];
+    }
+
+    public static function statusLabel(string $status): string {
+        $labels = [
+            self::STATUS_ACTIVE => 'Active',
+            self::STATUS_DRAFT => 'Draft',
+            self::STATUS_DEACTIVATED => 'Deactivated',
+        ];
+
+        return $labels[$status] ?? ucfirst($status);
+    }
+
+    public function normalizeStatus(?string $status, string $default = self::STATUS_DRAFT): string {
+        $status = strtolower(trim((string) $status));
+        if ($status === '') {
+            return $default;
+        }
+
+        return in_array($status, self::validStatuses(), true) ? $status : $default;
+    }
+
+    /**
+     * Ensure course_status column exists (active, draft, deactivated).
+     */
+    public function ensureCourseStatusColumn(): void {
+        $conn = $this->db->getConnection();
+        $result = $conn->query("SHOW COLUMNS FROM `{$this->table}` LIKE 'course_status'");
+        if ($result && $result->num_rows > 0) {
+            return;
+        }
+
+        $sql = "ALTER TABLE `{$this->table}`
+                ADD COLUMN `course_status` ENUM('active','draft','deactivated') NOT NULL DEFAULT 'active'
+                COMMENT 'Only active courses are visible for student enrollment'
+                AFTER `course_institute_training`";
+        if (!$conn->query($sql)) {
+            error_log('CourseModel::ensureCourseStatusColumn failed: ' . $conn->error);
+        }
+    }
+
+    public function isActiveForStudents(string $courseId): bool {
+        $this->ensureCourseStatusColumn();
+        $course = $this->find($courseId);
+        if (!$course) {
+            return false;
+        }
+
+        return ($course['course_status'] ?? self::STATUS_ACTIVE) === self::STATUS_ACTIVE;
+    }
     
     /**
-     * Get courses with department info
+     * Build WHERE clause and bind params for course list queries.
+     *
+     * @return array{sql: string, params: array<int, mixed>, types: string}
      */
-    public function getCoursesWithDepartment($filters = []) {
-        $sql = "SELECT c.*, d.`department_name` 
-                FROM `{$this->table}` c 
-                LEFT JOIN `department` d ON c.`department_id` = d.`department_id`
-                WHERE 1=1";
-        
+    private function buildCourseFilterClause(array $filters = [], string $alias = 'c') {
+        $this->ensureCourseStatusColumn();
+
+        $sql = '';
         $params = [];
         $types = '';
-        
-        // Filter by department
+
         if (!empty($filters['department_id'])) {
-            $sql .= " AND c.`department_id` = ?";
+            $sql .= " AND {$alias}.`department_id` = ?";
             $params[] = $filters['department_id'];
             $types .= 's';
         }
-        
-        // Filter by NVQ level
+
         if (!empty($filters['nvq_level'])) {
-            $sql .= " AND c.`course_nvq_level` = ?";
+            $sql .= " AND {$alias}.`course_nvq_level` = ?";
             $params[] = $filters['nvq_level'];
             $types .= 's';
         }
-        
-        // Search by course name or ID
+
         if (!empty($filters['search'])) {
             $search = '%' . $filters['search'] . '%';
-            $sql .= " AND (c.`course_name` LIKE ? OR c.`course_id` LIKE ?)";
+            $sql .= " AND ({$alias}.`course_name` LIKE ? OR {$alias}.`course_id` LIKE ?)";
             $params[] = $search;
             $params[] = $search;
             $types .= 'ss';
         }
-        
-        $sql .= " ORDER BY c.`course_name`";
-        
+
+        if (!empty($filters['course_status'])) {
+            $status = $this->normalizeStatus((string) $filters['course_status'], '');
+            if ($status !== '') {
+                $sql .= " AND {$alias}.`course_status` = ?";
+                $params[] = $status;
+                $types .= 's';
+            }
+        }
+
+        if (!empty($filters['active_only'])) {
+            $sql .= " AND {$alias}.`course_status` = ?";
+            $params[] = self::STATUS_ACTIVE;
+            $types .= 's';
+        }
+
+        return [
+            'sql' => $sql,
+            'params' => $params,
+            'types' => $types,
+        ];
+    }
+
+    /**
+     * Get courses with department info
+     */
+    public function getCoursesWithDepartment($filters = []) {
+        $filterClause = $this->buildCourseFilterClause($filters);
+
+        $sql = "SELECT c.*, d.`department_name`
+                FROM `{$this->table}` c
+                LEFT JOIN `department` d ON c.`department_id` = d.`department_id`
+                WHERE 1=1{$filterClause['sql']}
+                ORDER BY c.`course_name`";
+
+        $params = $filterClause['params'];
+        $types = $filterClause['types'];
+
         if (!empty($params)) {
             $stmt = $this->db->prepare($sql);
             if (!$stmt) {
@@ -60,16 +155,90 @@ class CourseModel extends Model {
         } else {
             $result = $this->db->query($sql);
         }
-        
+
         $data = [];
-        
+
         if ($result && $result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
                 $data[] = $row;
             }
         }
-        
+
         return $data;
+    }
+
+    /**
+     * Get paginated courses with department info
+     */
+    public function getCoursesWithDepartmentPage(array $filters = [], $page = 1, $perPage = 20) {
+        $page = max(1, (int) $page);
+        $perPage = max(1, min(100, (int) $perPage));
+        $offset = ($page - 1) * $perPage;
+        $filterClause = $this->buildCourseFilterClause($filters);
+
+        $sql = "SELECT c.*, d.`department_name`
+                FROM `{$this->table}` c
+                LEFT JOIN `department` d ON c.`department_id` = d.`department_id`
+                WHERE 1=1{$filterClause['sql']}
+                ORDER BY c.`course_name`
+                LIMIT {$perPage} OFFSET {$offset}";
+
+        $params = $filterClause['params'];
+        $types = $filterClause['types'];
+
+        if (!empty($params)) {
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                error_log("SQL Error in getCoursesWithDepartmentPage: " . $this->db->error);
+                return [];
+            }
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+        } else {
+            $result = $this->db->query($sql);
+        }
+
+        $data = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $data[] = $row;
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Count courses matching filters
+     */
+    public function getTotalCoursesWithDepartment(array $filters = []) {
+        $filterClause = $this->buildCourseFilterClause($filters);
+
+        $sql = "SELECT COUNT(*) AS total
+                FROM `{$this->table}` c
+                WHERE 1=1{$filterClause['sql']}";
+
+        $params = $filterClause['params'];
+        $types = $filterClause['types'];
+
+        if (!empty($params)) {
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                return 0;
+            }
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+        } else {
+            $result = $this->db->query($sql);
+        }
+
+        if ($result && ($row = $result->fetch_assoc())) {
+            return (int) ($row['total'] ?? 0);
+        }
+
+        return 0;
     }
     
     /**
@@ -107,6 +276,13 @@ class CourseModel extends Model {
      * Create new course and ensure version 1 exists in course_version.
      */
     public function createCourse($data) {
+        $this->ensureCourseStatusColumn();
+        if (!isset($data['course_status'])) {
+            $data['course_status'] = self::STATUS_DRAFT;
+        } else {
+            $data['course_status'] = $this->normalizeStatus($data['course_status']);
+        }
+
         $ok = $this->create($data);
         if ($ok && !empty($data['course_id'])) {
             $this->ensureCourseVersionTable();
@@ -119,6 +295,11 @@ class CourseModel extends Model {
      * Update course
      */
     public function updateCourse($id, $data) {
+        $this->ensureCourseStatusColumn();
+        if (isset($data['course_status'])) {
+            $data['course_status'] = $this->normalizeStatus($data['course_status']);
+        }
+
         return $this->update($id, $data);
     }
     

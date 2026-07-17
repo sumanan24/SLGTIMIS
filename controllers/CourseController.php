@@ -65,16 +65,23 @@ class CourseController extends Controller {
         $filters = [
             'department_id' => $userDepartmentId ? $userDepartmentId : $this->get('department_id', ''),
             'nvq_level' => $this->get('nvq_level', ''),
-            'search' => $this->get('search', '')
+            'search' => $this->get('search', ''),
+            'course_status' => $this->get('course_status', ''),
         ];
         
         // Remove empty filters
         $filters = array_filter($filters, function($value) {
             return $value !== '';
         });
-        
-        // Get filtered courses
-        $courses = $courseModel->getCoursesWithDepartment($filters);
+
+        $perPage = 20;
+        $page = max(1, (int) $this->get('page', 1));
+        $total = $courseModel->getTotalCoursesWithDepartment($filters);
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $currentPage = min($page, $totalPages);
+
+        // Get filtered courses (paginated)
+        $courses = $courseModel->getCoursesWithDepartmentPage($filters, $currentPage, $perPage);
         
         // Get departments for filter dropdown - only show user's department if department-restricted
         if ($userDepartmentId) {
@@ -99,10 +106,15 @@ class CourseController extends Controller {
             'page' => 'courses',
             'courses' => $courses,
             'departments' => $departments,
+            'currentPage' => $currentPage,
+            'totalPages' => $totalPages,
+            'total' => $total,
+            'perPage' => $perPage,
             'filters' => [
                 'department_id' => $this->get('department_id', ''),
                 'nvq_level' => $this->get('nvq_level', ''),
-                'search' => $this->get('search', '')
+                'search' => $this->get('search', ''),
+                'course_status' => $this->get('course_status', ''),
             ],
             'isHOD' => $isHOD,
             'canEdit' => $canEdit,
@@ -157,6 +169,7 @@ class CourseController extends Controller {
             $course_ojt_duration = (int)$this->post('course_ojt_duration', 0);
             $course_institute_training = (int)$this->post('course_institute_training', 0);
             $department_id = trim($this->post('department_id', ''));
+            $course_status = trim($this->post('course_status', CourseModel::STATUS_DRAFT));
             
             // For HOD users, force their department
             if ($hodDepartmentId) {
@@ -192,7 +205,8 @@ class CourseController extends Controller {
                 'course_nvq_level' => $course_nvq_level,
                 'course_ojt_duration' => $course_ojt_duration,
                 'course_institute_training' => $course_institute_training,
-                'department_id' => $department_id
+                'department_id' => $department_id,
+                'course_status' => $courseModel->normalizeStatus($course_status),
             ];
             
             $result = $courseModel->createCourse($courseData);
@@ -299,6 +313,7 @@ class CourseController extends Controller {
             $course_ojt_duration = (int)$this->post('course_ojt_duration', 0);
             $course_institute_training = (int)$this->post('course_institute_training', 0);
             $department_id = trim($this->post('department_id', ''));
+            $course_status = trim($this->post('course_status', CourseModel::STATUS_DRAFT));
             
             // For HOD users, force their department
             if ($hodDepartmentId) {
@@ -326,7 +341,8 @@ class CourseController extends Controller {
                 'course_nvq_level' => $course_nvq_level,
                 'course_ojt_duration' => $course_ojt_duration,
                 'course_institute_training' => $course_institute_training,
-                'department_id' => $department_id
+                'department_id' => $department_id,
+                'course_status' => $courseModel->normalizeStatus($course_status),
             ]);
             
             if ($result) {

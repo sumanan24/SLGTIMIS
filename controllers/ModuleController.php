@@ -266,36 +266,89 @@ class ModuleController extends Controller {
         }
         $moduleModel = $this->model('ModuleModel');
         $courseModel = $this->model('CourseModel');
-        $courseId = trim($this->get('course_id', ''));
-        $deptId = $this->getUserDepartment();
-        if ($deptId) {
-            // Department-restricted roles (HOD / IN1 / IN2 / IN3) can only see their department courses/modules
-            $courses = $courseModel->getCoursesWithDepartment(['department_id' => $deptId]);
-            if ($courseId !== '') {
-                $c = $courseModel->getById($courseId);
-                if (!$c || !isset($c['department_id']) || $c['department_id'] !== $deptId) {
-                    $_SESSION['error'] = 'Access denied. You can only view modules for courses in your department.';
-                    $courseId = '';
-                }
+        $departmentModel = $this->model('DepartmentModel');
+
+        $userDeptId = $this->getUserDepartment();
+        $filterDepartmentId = trim($this->get('department_id', ''));
+        $filterCourseId = trim($this->get('course_id', ''));
+        $filterVersionRaw = $this->get('course_version', null);
+
+        if ($userDeptId) {
+            $filterDepartmentId = $userDeptId;
+        }
+
+        if ($filterCourseId !== '') {
+            $courseCheck = $courseModel->getById($filterCourseId);
+            if (!$courseCheck) {
+                $_SESSION['error'] = 'Selected course was not found.';
+                $filterCourseId = '';
+            } elseif ($filterDepartmentId !== '' && ($courseCheck['department_id'] ?? '') !== $filterDepartmentId) {
+                $_SESSION['error'] = 'Selected course does not belong to the chosen department.';
+                $filterCourseId = '';
+            } elseif ($userDeptId && ($courseCheck['department_id'] ?? '') !== $userDeptId) {
+                $_SESSION['error'] = 'Access denied. You can only view modules for courses in your department.';
+                $filterCourseId = '';
             }
-            $modules = $moduleModel->getAllWithCourseByDepartment($deptId, $courseId !== '' ? $courseId : null);
+        }
+
+        $queryFilters = [];
+        if ($filterDepartmentId !== '') {
+            $queryFilters['department_id'] = $filterDepartmentId;
+        }
+        if ($filterCourseId !== '') {
+            $queryFilters['course_id'] = $filterCourseId;
+        }
+        if ($filterVersionRaw !== null && $filterVersionRaw !== '') {
+            $queryFilters['course_version'] = (int) $filterVersionRaw;
+        }
+
+        $modules = $moduleModel->getAllWithCourseFiltered($queryFilters);
+
+        if ($userDeptId) {
+            $dept = $departmentModel->getById($userDeptId);
+            $departments = $dept ? [$dept] : [];
+            $courses = $courseModel->getCoursesWithDepartment(['department_id' => $userDeptId]);
         } else {
-            $modules = $moduleModel->getAllWithCourse($courseId !== '' ? $courseId : null);
+            $departments = $departmentModel->getAll();
             $courses = $courseModel->getCoursesWithDepartment([]);
         }
+
+        $versionsByCourse = [];
+        foreach ($courses as $c) {
+            $cid = $c['course_id'] ?? '';
+            if ($cid === '') {
+                continue;
+            }
+            $versions = [0];
+            $rows = $courseModel->getVersionsForCourse($cid);
+            foreach ($rows as $v) {
+                $versions[] = (int) ($v['version_no'] ?? 0);
+            }
+            $versions = array_values(array_unique($versions));
+            sort($versions, SORT_NUMERIC);
+            $versionsByCourse[$cid] = $versions;
+        }
+
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
-        $isHOD = $this->isHOD();
         $canCreate = $isADM || $this->isDepartmentRestricted();
         $canEdit = $canCreate;
+
+        $filterCourseVersion = ($filterVersionRaw !== null && $filterVersionRaw !== '') ? (int) $filterVersionRaw : '';
+
         $data = [
             'title' => 'Modules',
             'page' => 'modules',
             'modules' => $modules,
             'courses' => $courses,
-            'filter_course_id' => $courseId,
+            'departments' => $departments,
+            'versionsByCourse' => $versionsByCourse,
+            'filter_department_id' => $filterDepartmentId,
+            'filter_course_id' => $filterCourseId,
+            'filter_course_version' => $filterCourseVersion,
+            'isDepartmentRestricted' => (bool) $userDeptId,
             'canCreate' => $canCreate,
             'canEdit' => $canEdit,
             'message' => $_SESSION['message'] ?? null,

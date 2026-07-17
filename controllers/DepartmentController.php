@@ -18,14 +18,22 @@ class DepartmentController extends Controller {
         }
         
         $departmentModel = $this->model('DepartmentModel');
+        $perPage = 20;
+        $page = max(1, (int) $this->get('page', 1));
         
         // Get user's department if user is HOD, IN1, IN2, or IN3 - show only their department
         $userDepartmentId = $this->getUserDepartment();
         if ($userDepartmentId) {
             $dept = $departmentModel->getById($userDepartmentId);
             $departments = $dept ? [$dept] : [];
+            $total = count($departments);
+            $totalPages = 1;
+            $currentPage = 1;
         } else {
-            $departments = $departmentModel->getAll();
+            $total = $departmentModel->getTotalDepartments();
+            $totalPages = max(1, (int) ceil($total / $perPage));
+            $currentPage = min($page, $totalPages);
+            $departments = $departmentModel->getDepartmentsPage($currentPage, $perPage);
         }
         
         // Check if user is ADM for edit permissions
@@ -38,6 +46,10 @@ class DepartmentController extends Controller {
             'title' => 'Departments',
             'page' => 'departments',
             'departments' => $departments,
+            'currentPage' => $currentPage,
+            'totalPages' => $totalPages,
+            'total' => $total,
+            'perPage' => $perPage,
             'isHOD' => $userDepartmentId ? true : false,
             'hodDepartmentId' => $userDepartmentId,
             'isADM' => $isADM,
