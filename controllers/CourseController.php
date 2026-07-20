@@ -170,14 +170,14 @@ class CourseController extends Controller {
             $course_institute_training = (int)$this->post('course_institute_training', 0);
             $department_id = trim($this->post('department_id', ''));
             $course_status = trim($this->post('course_status', CourseModel::STATUS_DRAFT));
-            
+
             // For HOD users, force their department
             if ($hodDepartmentId) {
                 $department_id = $hodDepartmentId;
             }
-            
+
             // Validation
-            if (empty($course_id) || empty($course_name) || empty($course_nvq_level) || 
+            if (empty($course_id) || empty($course_name) || empty($course_nvq_level) ||
                 empty($department_id) || $course_ojt_duration <= 0 || $course_institute_training <= 0) {
                 $_SESSION['error'] = 'All fields are required and must be valid.';
                 $this->redirect('courses/create');

@@ -68,6 +68,7 @@
                             $hasGroupAccess = false;
                             $canStaffDeviceAttendanceMenu = false;
                             $canViewStudentApplications = false;
+                            $canViewApplicationAdmissionSchedules = false;
                             $canAccessExamsModule = false;
                             if (isset($_SESSION['user_id'])) {
                                 require_once BASE_PATH . '/models/UserModel.php';
@@ -94,6 +95,7 @@
                                 // Staff device (Hikvision) menu: ADM/Admin/HRO full module; DIR, REG, FIN, ACC, HOD see dashboard + month only
                                 $canStaffDeviceAttendanceMenu = !$isSAO && $userModel->canViewStaffDeviceDashboardMonth($_SESSION['user_id']);
                                 $canViewStudentApplications = $userModel->canViewOnlineStudentApplications($_SESSION['user_id']);
+                                $canViewApplicationAdmissionSchedules = $userModel->canViewApplicationAdmissionSchedules($_SESSION['user_id']);
                                 $canAccessExamsModule = $userModel->canAccessExamsModule($_SESSION['user_id']);
                                 // Bus Season processing & payments: SAO, DIR (view), ADM, Admin
                                 $canProcessBusSeasonMenu = $userModel->canViewBusSeasonOperations($_SESSION['user_id']);
@@ -234,6 +236,9 @@ $educationPages = ['departments', 'courses', 'modules', 'staff'];
                             if (!empty($canViewStudentApplications)) {
                                 $studentAffairsPages[] = 'student-applications';
                             }
+                            if (!empty($canViewApplicationAdmissionSchedules)) {
+                                $studentAffairsPages[] = 'application-admission';
+                            }
                             if ($hasGroupAccess) {
                                 $studentAffairsPages[] = 'groups';
                             }
@@ -275,6 +280,14 @@ $educationPages = ['departments', 'courses', 'modules', 'staff'];
                                         <a href="<?php echo APP_URL; ?>/student-applications" class="<?php echo (isset($page) && $page === 'student-applications') ? 'active' : ''; ?>">
                                             <i class="fas fa-file-signature"></i>
                                             <span>Online applications</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
+                                    <?php if (!empty($canViewApplicationAdmissionSchedules)): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/application-admission" class="<?php echo (isset($page) && $page === 'application-admission') ? 'active' : ''; ?>">
+                                            <i class="fas fa-calendar-check"></i>
+                                            <span>Exam &amp; interview schedules</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>

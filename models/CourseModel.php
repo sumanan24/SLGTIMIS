@@ -10,6 +10,9 @@ class CourseModel extends Model {
     public const STATUS_ACTIVE = 'active';
     public const STATUS_DRAFT = 'draft';
     public const STATUS_DEACTIVATED = 'deactivated';
+
+    public const ADMISSION_PATH_ENTRANCE_AND_INTERVIEW = 'entrance_and_interview';
+    public const ADMISSION_PATH_INTERVIEW_ONLY = 'interview_only';
     
     protected function getPrimaryKey() {
         return 'course_id';
@@ -62,6 +65,75 @@ class CourseModel extends Model {
         if (!$conn->query($sql)) {
             error_log('CourseModel::ensureCourseStatusColumn failed: ' . $conn->error);
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function validAdmissionPaths(): array {
+        return [
+            self::ADMISSION_PATH_ENTRANCE_AND_INTERVIEW,
+            self::ADMISSION_PATH_INTERVIEW_ONLY,
+        ];
+    }
+
+    public static function admissionPathLabel(string $path): string {
+        $labels = [
+            self::ADMISSION_PATH_ENTRANCE_AND_INTERVIEW => 'Entrance exam, then interview',
+            self::ADMISSION_PATH_INTERVIEW_ONLY => 'Interview only (no entrance exam)',
+        ];
+
+        return $labels[$path] ?? ucfirst(str_replace('_', ' ', $path));
+    }
+
+    public function normalizeAdmissionPath(?string $path, string $default = self::ADMISSION_PATH_ENTRANCE_AND_INTERVIEW): string {
+        $path = strtolower(trim((string) $path));
+        if ($path === '') {
+            return $default;
+        }
+
+        return in_array($path, self::validAdmissionPaths(), true) ? $path : $default;
+    }
+
+    public function ensureAdmissionPathColumn(): void {
+        $this->ensureCourseStatusColumn();
+        $conn = $this->db->getConnection();
+        $result = $conn->query("SHOW COLUMNS FROM `{$this->table}` LIKE 'admission_path'");
+        if ($result && $result->num_rows > 0) {
+            if ($result) {
+                $result->free();
+            }
+            return;
+        }
+        if ($result) {
+            $result->free();
+        }
+
+        $sql = "ALTER TABLE `{$this->table}`
+                ADD COLUMN `admission_path` ENUM('entrance_and_interview','interview_only') NOT NULL DEFAULT 'entrance_and_interview'
+                COMMENT 'entrance_and_interview = exam then interview; interview_only = skip entrance exam'
+                AFTER `course_status`";
+        if (!$conn->query($sql)) {
+            error_log('CourseModel::ensureAdmissionPathColumn failed: ' . $conn->error);
+        }
+    }
+
+    /**
+     * Whether applicants must pass an entrance exam before interview scheduling.
+     */
+    public function courseRequiresEntranceExam(string $courseId): bool {
+        $this->ensureAdmissionPathColumn();
+        $courseId = trim($courseId);
+        if ($courseId === '') {
+            return true;
+        }
+        $course = $this->find($courseId);
+        if (!$course) {
+            return true;
+        }
+        $path = $this->normalizeAdmissionPath($course['admission_path'] ?? null);
+
+        return $path === self::ADMISSION_PATH_ENTRANCE_AND_INTERVIEW;
     }
 
     public function isActiveForStudents(string $courseId): bool {
@@ -277,10 +349,14 @@ class CourseModel extends Model {
      */
     public function createCourse($data) {
         $this->ensureCourseStatusColumn();
+        $this->ensureAdmissionPathColumn();
         if (!isset($data['course_status'])) {
             $data['course_status'] = self::STATUS_DRAFT;
         } else {
             $data['course_status'] = $this->normalizeStatus($data['course_status']);
+        }
+        if (isset($data['admission_path'])) {
+            $data['admission_path'] = $this->normalizeAdmissionPath($data['admission_path']);
         }
 
         $ok = $this->create($data);
@@ -296,8 +372,12 @@ class CourseModel extends Model {
      */
     public function updateCourse($id, $data) {
         $this->ensureCourseStatusColumn();
+        $this->ensureAdmissionPathColumn();
         if (isset($data['course_status'])) {
             $data['course_status'] = $this->normalizeStatus($data['course_status']);
+        }
+        if (isset($data['admission_path'])) {
+            $data['admission_path'] = $this->normalizeAdmissionPath($data['admission_path']);
         }
 
         return $this->update($id, $data);

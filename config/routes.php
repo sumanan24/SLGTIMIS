@@ -227,5 +227,26 @@ return [
     'student-applications/export-dashboard-pdf' => 'StudentApplicationController@adminExportDashboardPdf',
     'student-applications/export-excel' => 'StudentApplicationController@adminExportExcel',
     'student-applications/delete' => 'StudentApplicationController@adminDelete',
+
+    // Application entrance exam / interview schedules (SAO, REG, ADM; DIR view)
+    'application-admission' => 'ApplicationAdmissionController@index',
+    'application-admission/create' => 'ApplicationAdmissionController@create',
+    'application-admission/edit' => 'ApplicationAdmissionController@edit',
+    'application-admission/store' => 'ApplicationAdmissionController@store',
+    'application-admission/update' => 'ApplicationAdmissionController@update',
+    'application-admission/delete' => 'ApplicationAdmissionController@deleteSchedule',
+    'application-admission/publish' => 'ApplicationAdmissionController@publish',
+    'application-admission/entries' => 'ApplicationAdmissionController@entries',
+    'application-admission/entries-save' => 'ApplicationAdmissionController@entriesSave',
+    'application-admission/mark-whatsapp-sent' => 'ApplicationAdmissionController@markWhatsappSent',
+    'application-admission/selection' => 'ApplicationAdmissionController@selection',
+    'application-admission/selection-save' => 'ApplicationAdmissionController@selectionSave',
+    'application-admission/pdf-schedule' => 'ApplicationAdmissionController@pdfSchedule',
+    'application-admission/pdf-selection' => 'ApplicationAdmissionController@pdfSelection',
+    'application-admission/public/{token}' => 'ApplicationAdmissionController@publicLanding',
+    'application-admission/public/{token}/schedule-pdf' => 'ApplicationAdmissionController@publicPdfSchedule',
+    'application-admission/public/{token}/selection-pdf' => 'ApplicationAdmissionController@publicPdfSelection',
+    'application-admission/public/{token}/admission-slip' => 'ApplicationAdmissionController@publicAdmissionSlip',
+    'application-admission/public/{token}/interview-slip' => 'ApplicationAdmissionController@publicInterviewSlip',
 ];
 

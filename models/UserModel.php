@@ -330,6 +330,34 @@ class UserModel extends Model {
     }
 
     /**
+     * Entrance exam / interview schedules: SAO/RSA, REG, DIR (view), ADM / system admin.
+     */
+    public function canViewApplicationAdmissionSchedules($userId): bool {
+        if ($this->isSAO($userId) || $this->isAdminOrADM($userId)) {
+            return true;
+        }
+        $role = $this->getUserRole($userId);
+        return in_array($role, ['REG', 'DIR'], true);
+    }
+
+    /**
+     * Create / edit schedules, entries: SAO/RSA, REG, ADM / system admin (DIR view-only).
+     */
+    public function canManageApplicationAdmissionSchedules($userId): bool {
+        if ($this->isSAO($userId) || $this->isAdminOrADM($userId)) {
+            return true;
+        }
+        return $this->getUserRole($userId) === 'REG';
+    }
+
+    /**
+     * Interview selection list (selected / not selected / waitlist): SAO/RSA and ADM / system admin only.
+     */
+    public function canUpdateApplicationAdmissionSelection($userId): bool {
+        return $this->isSAO($userId) || $this->isAdminOrADM($userId);
+    }
+
+    /**
      * Edit stored application fields (same gate as delete): system admin or ADM only — not SAO/RSA.
      */
     public function canEditOnlineStudentApplications($userId): bool {
