@@ -15,9 +15,65 @@ $pathwayMax = (int) ($pathwayDefaultMaxApplicants ?? ApplicationAdmissionSchedul
 $selectedPathway = $selectedPathway ?? ApplicationAdmissionScheduleModel::PATHWAY_EXAM_AND_INTERVIEW;
 $pathExam = ApplicationAdmissionScheduleModel::PATHWAY_EXAM_AND_INTERVIEW;
 $pathInterviewOnly = ApplicationAdmissionScheduleModel::PATHWAY_INTERVIEW_ONLY;
+$languageOptions = $languageOptions ?? StudentApplicationModel::STAFF_LANGUAGE_FILTER_VALUES;
+$selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
 ?>
-<div class="container-fluid px-3 px-md-4" style="max-width:720px;margin:0 auto;">
-    <h1 class="h4 mb-3"><?php echo $isEdit ? 'Edit' : 'Create'; ?> <?php echo $e($typeLabel); ?></h1>
+<style>
+.admission-form-page-wrap {
+    max-width: 820px;
+    margin: 0 auto;
+}
+.admission-form-page-wrap .page-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+.admission-form-card {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    background: #fff;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.04);
+}
+.admission-form-card .card-body {
+    padding: 1.25rem 1.5rem;
+}
+.admission-form-card .form-label {
+    font-weight: 500;
+    font-size: 0.875rem;
+    margin-bottom: 0.35rem;
+}
+.admission-form-card .form-select,
+.admission-form-card .form-control {
+    font-size: 0.9375rem;
+}
+.admission-form-section {
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #e9ecef;
+}
+.admission-form-section:last-of-type {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+.admission-form-section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6c757d;
+    margin-bottom: 0.75rem;
+}
+.admission-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-top: 0.25rem;
+}
+</style>
+<div class="container-fluid px-3 px-md-4 admission-form-page-wrap">
+    <h1 class="page-title h4 mb-1"><?php echo $isEdit ? 'Edit' : 'Create'; ?> <?php echo $e($typeLabel); ?></h1>
+    <p class="text-muted small mb-3">Set NVQ level, language, course, and schedule details. Applicant lists use the selected language only.</p>
 
     <?php if (!empty($_SESSION['error'])): ?>
         <div class="alert alert-danger"><?php echo $e($_SESSION['error']); unset($_SESSION['error']); ?></div>
@@ -29,37 +85,54 @@ $pathInterviewOnly = ApplicationAdmissionScheduleModel::PATHWAY_INTERVIEW_ONLY;
     </div>
     <?php endif; ?>
 
-    <form method="post" action="<?php echo APP_URL . '/' . ltrim($formAction ?? 'application-admission/store', '/'); ?>" class="card border-0 shadow-sm" id="admission-schedule-form">
-        <div class="card-body p-4">
+    <form method="post" action="<?php echo APP_URL . '/' . ltrim($formAction ?? 'application-admission/store', '/'); ?>" class="admission-form-card" id="admission-schedule-form">
+        <div class="card-body">
             <input type="hidden" name="schedule_type" value="<?php echo $e($type); ?>">
             <?php if (!$isInterview): ?>
             <input type="hidden" name="admission_pathway" value="<?php echo $e($pathExam); ?>">
             <?php endif; ?>
-            <div class="mb-3">
-                <label class="form-label">NVQ level <span class="text-danger">*</span></label>
-                <select name="application_level" id="application_level" class="form-select" required>
-                    <option value="">Select…</option>
-                    <option value="04" <?php echo $selectedLevel === '04' ? 'selected' : ''; ?>>Level 04</option>
-                    <option value="05" <?php echo $selectedLevel === '05' ? 'selected' : ''; ?>>Level 05</option>
-                </select>
-            </div>
-            <div class="mb-3">
-                <label class="form-label" for="filter_department_id">Department <span class="text-danger">*</span></label>
-                <select id="filter_department_id" class="form-select" required disabled>
-                    <option value="">— Select NVQ level first —</option>
-                </select>
-                <div class="form-text">Choose department, then select the course.</div>
-            </div>
-            <div class="mb-3" id="course-field-wrap">
-                <label class="form-label" for="course_id">Course <span class="text-danger">*</span></label>
-                <select name="course_id" id="course_id" class="form-select" disabled required>
-                    <option value="">— Select department first —</option>
-                </select>
-                <div class="form-text">Only approved applicants whose <strong>1st course preference</strong> matches appear on this schedule.</div>
+
+            <div class="admission-form-section">
+                <div class="admission-form-section-title">Course scope</div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="application_level">NVQ level <span class="text-danger">*</span></label>
+                        <select name="application_level" id="application_level" class="form-select" required>
+                            <option value="">Select…</option>
+                            <option value="04" <?php echo $selectedLevel === '04' ? 'selected' : ''; ?>>Level 04</option>
+                            <option value="05" <?php echo $selectedLevel === '05' ? 'selected' : ''; ?>>Level 05</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="student_language">Language <span class="text-danger">*</span></label>
+                        <select name="student_language" id="student_language" class="form-select" required>
+                            <option value="">Select language…</option>
+                            <?php foreach ($languageOptions as $langOpt): ?>
+                            <option value="<?php echo $e($langOpt); ?>" <?php echo $selectedStudentLanguage === $langOpt ? 'selected' : ''; ?>><?php echo $e($langOpt); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text">Only approved applicants with this language appear in counts and on the schedule.</div>
+                    </div>
+                </div>
+                <div class="row g-3 mt-0">
+                    <div class="col-md-6">
+                        <label class="form-label" for="filter_department_id">Department <span class="text-danger">*</span></label>
+                        <select id="filter_department_id" class="form-select" required disabled>
+                            <option value="">— Select NVQ level first —</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6" id="course-field-wrap">
+                        <label class="form-label" for="course_id">Course <span class="text-danger">*</span></label>
+                        <select name="course_id" id="course_id" class="form-select" disabled required>
+                            <option value="">— Select department first —</option>
+                        </select>
+                        <div class="form-text">1st course preference must match; counts reflect the language above and exclude applicants already on another entrance exam for this course.</div>
+                    </div>
+                </div>
             </div>
 
             <?php if ($isInterview): ?>
-            <div class="mb-3" id="pathway-field-wrap">
+            <div class="admission-form-section mb-3" id="pathway-field-wrap">
                 <label class="form-label d-block">Admission pathway <span class="text-danger">*</span></label>
                 <div id="pathway-count-banner" class="alert alert-light border small py-2 mb-2 d-none"></div>
                 <div class="form-check mb-2">
@@ -82,34 +155,37 @@ $pathInterviewOnly = ApplicationAdmissionScheduleModel::PATHWAY_INTERVIEW_ONLY;
             </div>
             <?php endif; ?>
 
-            <div class="mb-3">
-                <label class="form-label">Title <span class="text-danger">*</span></label>
-                <input type="text" name="title" id="schedule_title" class="form-control" required maxlength="200"
-                       value="<?php echo $e($s['title'] ?? ''); ?>" placeholder="e.g. 2026 — Motor Mechanic entrance exam">
-            </div>
-            <div class="row g-3 mb-3">
-                <div class="col-md-4">
-                    <label class="form-label">Date <span class="text-danger">*</span></label>
-                    <input type="date" name="schedule_date" class="form-control" required value="<?php echo $e($s['schedule_date'] ?? ''); ?>">
+            <div class="admission-form-section">
+                <div class="admission-form-section-title">Schedule details</div>
+                <div class="mb-3">
+                    <label class="form-label" for="schedule_title">Title <span class="text-danger">*</span></label>
+                    <input type="text" name="title" id="schedule_title" class="form-control" required maxlength="200"
+                           value="<?php echo $e($s['title'] ?? ''); ?>" placeholder="e.g. 2026 — Motor Mechanic entrance exam">
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label">Start time</label>
-                    <input type="time" name="start_time" class="form-control" value="<?php echo $e(substr((string) ($s['start_time'] ?? ''), 0, 5)); ?>">
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-4">
+                        <label class="form-label">Date <span class="text-danger">*</span></label>
+                        <input type="date" name="schedule_date" class="form-control" required value="<?php echo $e($s['schedule_date'] ?? ''); ?>">
+                    </div>
+                    <div class="col-sm-4">
+                        <label class="form-label">Start time</label>
+                        <input type="time" name="start_time" class="form-control" value="<?php echo $e(substr((string) ($s['start_time'] ?? ''), 0, 5)); ?>">
+                    </div>
+                    <div class="col-sm-4">
+                        <label class="form-label">End time</label>
+                        <input type="time" name="end_time" class="form-control" value="<?php echo $e(substr((string) ($s['end_time'] ?? ''), 0, 5)); ?>">
+                    </div>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label">End time</label>
-                    <input type="time" name="end_time" class="form-control" value="<?php echo $e(substr((string) ($s['end_time'] ?? ''), 0, 5)); ?>">
+                <div class="mb-3">
+                    <label class="form-label">Venue <span class="text-danger">*</span></label>
+                    <input type="text" name="venue" class="form-control" required maxlength="255" value="<?php echo $e($s['venue'] ?? ''); ?>">
+                </div>
+                <div class="mb-0">
+                    <label class="form-label">Instructions (shown on PDF / public page)</label>
+                    <textarea name="instructions" class="form-control" rows="4"><?php echo $e($s['instructions'] ?? ''); ?></textarea>
                 </div>
             </div>
-            <div class="mb-3">
-                <label class="form-label">Venue <span class="text-danger">*</span></label>
-                <input type="text" name="venue" class="form-control" required maxlength="255" value="<?php echo $e($s['venue'] ?? ''); ?>">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Instructions (shown on PDF / public page)</label>
-                <textarea name="instructions" class="form-control" rows="4"><?php echo $e($s['instructions'] ?? ''); ?></textarea>
-            </div>
-            <div class="d-flex gap-2">
+            <div class="admission-form-actions">
                 <button type="submit" class="btn btn-primary">Save</button>
                 <a href="<?php echo APP_URL; ?>/application-admission" class="btn btn-outline-secondary">Cancel</a>
             </div>
@@ -128,6 +204,7 @@ $pathInterviewOnly = ApplicationAdmissionScheduleModel::PATHWAY_INTERVIEW_ONLY;
     var pathInterviewOnly = <?php echo json_encode($pathInterviewOnly); ?>;
     var userPickedPathway = <?php echo $isEdit ? 'true' : 'false'; ?>;
     var levelEl = document.getElementById('application_level');
+    var langEl = document.getElementById('student_language');
     var deptEl = document.getElementById('filter_department_id');
     var courseEl = document.getElementById('course_id');
     var titleEl = document.getElementById('schedule_title');
@@ -137,6 +214,20 @@ $pathInterviewOnly = ApplicationAdmissionScheduleModel::PATHWAY_INTERVIEW_ONLY;
 
     function defaultPathwayForCount(count) {
         return count > pathwayMax ? pathExam : pathInterviewOnly;
+    }
+
+    function approvedCountForCourse(course) {
+        if (!course) {
+            return 0;
+        }
+        var lang = langEl ? langEl.value : '';
+        if (lang && course.approved_counts_by_language && course.approved_counts_by_language[lang] != null) {
+            return parseInt(course.approved_counts_by_language[lang], 10) || 0;
+        }
+        if (course.approved_application_count != null) {
+            return parseInt(course.approved_application_count, 10) || 0;
+        }
+        return 0;
     }
 
     function updatePathwayFromCourse() {
@@ -149,15 +240,12 @@ $pathInterviewOnly = ApplicationAdmissionScheduleModel::PATHWAY_INTERVIEW_ONLY;
         var level = levelEl.value;
         var list = coursesByLevel[level] || [];
         var course = list.find(function (c) { return String(c.course_id) === String(courseEl.value); });
-        var count = course && course.approved_application_count != null ? parseInt(course.approved_application_count, 10) : 0;
-        if (isNaN(count)) {
-            count = 0;
-        }
+        var count = approvedCountForCourse(course);
         if (pathwayBanner) {
             pathwayBanner.classList.remove('d-none');
             var suggested = defaultPathwayForCount(count);
             var suggestedLabel = suggested === pathExam ? 'Exam and interview' : 'Interview only';
-            pathwayBanner.innerHTML = '<strong>' + count + '</strong> approved application(s) for this course at this level. Suggested pathway: <strong>' + suggestedLabel + '</strong>.';
+            pathwayBanner.innerHTML = '<strong>' + count + '</strong> approved application(s) for this course, language, and level. Suggested pathway: <strong>' + suggestedLabel + '</strong>.';
         }
         if (!userPickedPathway && pathwayExamEl && pathwayInterviewEl) {
             var pick = defaultPathwayForCount(count);
@@ -251,7 +339,7 @@ $pathInterviewOnly = ApplicationAdmissionScheduleModel::PATHWAY_INTERVIEW_ONLY;
         list.forEach(function (c) {
             var opt = document.createElement('option');
             opt.value = c.course_id;
-            var cnt = c.approved_application_count != null ? c.approved_application_count : 0;
+            var cnt = approvedCountForCourse(c);
             opt.textContent = (c.course_name || c.course_id) + ' (' + cnt + ' approved)';
             courseEl.appendChild(opt);
         });
@@ -266,6 +354,12 @@ $pathInterviewOnly = ApplicationAdmissionScheduleModel::PATHWAY_INTERVIEW_ONLY;
         updatePathwayFromCourse();
     }
 
+    if (langEl) {
+        langEl.addEventListener('change', function () {
+            userPickedPathway = false;
+            rebuildCourses();
+        });
+    }
     levelEl.addEventListener('change', function () {
         selectedCourseId = '';
         selectedDepartmentId = '';

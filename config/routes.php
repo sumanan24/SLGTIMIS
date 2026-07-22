@@ -221,6 +221,7 @@ return [
     'student-applications/edit' => 'StudentApplicationController@adminEdit',
     'student-applications/approve' => 'StudentApplicationController@adminApprove',
     'student-applications/reject' => 'StudentApplicationController@adminReject',
+    'student-applications/update-rejection-reason' => 'StudentApplicationController@adminUpdateRejectionReason',
     'student-applications/download-document' => 'StudentApplicationController@adminDownloadDocument',
     'student-applications/export-data' => 'StudentApplicationController@adminExportApplicationData',
     'student-applications/export-pdf' => 'StudentApplicationController@adminExportApplicationPdf',

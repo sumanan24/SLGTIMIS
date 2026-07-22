@@ -11,6 +11,12 @@ $applications_rejected = $applications_rejected ?? [];
 $can_delete = (bool) ($can_delete ?? false);
 /** @var bool $can_edit ADM / system admin — edit application fields */
 $can_edit = (bool) ($can_edit ?? false);
+/** @var bool $can_update_rejection_reason SAO / ADM — edit rejection reason on rejected tab */
+$can_update_rejection_reason = (bool) ($can_update_rejection_reason ?? false);
+/** @var string $update_reason_action POST URL for rejection reason updates */
+$update_reason_action = isset($update_reason_action) ? (string) $update_reason_action : '';
+/** @var string $rejection_reason_return_path Relative redirect after updating reason (no leading slash) */
+$rejection_reason_return_path = isset($rejection_reason_return_path) ? (string) $rejection_reason_return_path : 'student-applications?tab=rejected';
 /** @var array{url: string, display: string}|null $staff_whatsapp */
 $staff_whatsapp = isset($staff_whatsapp) && is_array($staff_whatsapp) && !empty($staff_whatsapp['url'])
     ? $staff_whatsapp
@@ -52,6 +58,11 @@ $filter_course_id = isset($filter_course_id) && trim((string) $filter_course_id)
 /** @var int $filter_course_priority 1, 2, or 3 */
 $filter_course_priority = (int) ($filter_course_priority ?? 1);
 $filter_course_priority = in_array($filter_course_priority, [1, 2, 3], true) ? $filter_course_priority : 1;
+/** @var string|null $filter_language Tamil, Sinhala, English, or null */
+$filter_language = isset($filter_language) && $filter_language !== '' ? (string) $filter_language : null;
+if ($filter_language !== null && !in_array($filter_language, StudentApplicationModel::STAFF_LANGUAGE_FILTER_VALUES, true)) {
+    $filter_language = null;
+}
 /** @var list<array{department_id: string, department_name: string}> $filter_departments */
 $filter_departments = $filter_departments ?? [];
 /** @var list<array{course_id: string, course_name: string}> $filter_courses */
@@ -61,6 +72,9 @@ $ajax_table_url = isset($ajax_table_url) && trim((string) $ajax_table_url) !== '
 
 if (defined('BASE_PATH') && is_file(BASE_PATH . '/models/StudentModel.php')) {
     require_once BASE_PATH . '/models/StudentModel.php';
+}
+if (!class_exists('StudentApplicationModel', false) && defined('BASE_PATH')) {
+    require_once BASE_PATH . '/models/StudentApplicationModel.php';
 }
 
 $esc = static function (string $s): string {
@@ -90,7 +104,7 @@ $formatSubmitted = static function (?string $createdAt) use ($esc): array {
 };
 
 $listBase = $appBase . '/student-applications';
-$makeListQuery = static function (?string $level, string $tab, int $pn, int $pa, int $pr, ?string $deptId, ?string $courseId, ?string $viewOverride = null, ?int $prio = null) use ($active_view, $filter_course_priority): array {
+$makeListQuery = static function (?string $level, string $tab, int $pn, int $pa, int $pr, ?string $deptId, ?string $courseId, ?string $viewOverride = null, ?int $prio = null, ?string $language = null) use ($active_view, $filter_course_priority, $filter_language): array {
     $tab = in_array($tab, ['approved', 'rejected'], true) ? $tab : 'new';
     $q = ['tab' => $tab];
     if ($level === '04' || $level === '05') {
@@ -114,21 +128,25 @@ $makeListQuery = static function (?string $level, string $tab, int $pn, int $pa,
     if ($courseId !== null && $courseId !== '') {
         $q['course'] = $courseId;
     }
+    $langVal = $language ?? $filter_language;
+    if ($langVal !== null && $langVal !== '') {
+        $q['lang'] = $langVal;
+    }
     $effView = $viewOverride !== null ? $viewOverride : $active_view;
     if ($effView === 'dashboard') {
         $q['view'] = 'dashboard';
     }
     return $q;
 };
-$buildListUrl = static function (?string $level, string $tab, int $pn = 1, int $pa = 1, int $pr = 1) use ($listBase, $esc, $makeListQuery, $filter_department_id, $filter_course_id, $filter_course_priority): string {
-    return $esc($listBase . '?' . http_build_query($makeListQuery($level, $tab, $pn, $pa, $pr, $filter_department_id, $filter_course_id, null, $filter_course_priority)));
+$buildListUrl = static function (?string $level, string $tab, int $pn = 1, int $pa = 1, int $pr = 1) use ($listBase, $esc, $makeListQuery, $filter_department_id, $filter_course_id, $filter_course_priority, $filter_language): string {
+    return $esc($listBase . '?' . http_build_query($makeListQuery($level, $tab, $pn, $pa, $pr, $filter_department_id, $filter_course_id, null, $filter_course_priority, $filter_language)));
 };
 $listUrlFromParts = static function (array $q) use ($listBase, $esc): string {
     return $esc($listBase . '?' . http_build_query($q));
 };
 
 $excelBase = $appBase . '/student-applications/export-excel';
-$excelUrl = static function (?string $status, ?string $level) use ($excelBase, $esc, $filter_department_id, $filter_course_id, $filter_course_priority): string {
+$excelUrl = static function (?string $status, ?string $level) use ($excelBase, $esc, $filter_department_id, $filter_course_id, $filter_course_priority, $filter_language): string {
     $q = [];
     if ($status === 'new' || $status === 'approved' || $status === 'rejected') {
         $q['status'] = $status;
@@ -143,12 +161,15 @@ $excelUrl = static function (?string $status, ?string $level) use ($excelBase, $
     if ($filter_course_id !== null && $filter_course_id !== '') {
         $q['course'] = $filter_course_id;
     }
+    if ($filter_language !== null && $filter_language !== '') {
+        $q['lang'] = $filter_language;
+    }
     $qs = http_build_query($q);
     return $esc($excelBase . ($qs !== '' ? '?' . $qs : ''));
 };
 
 $dashPdfBase = $appBase . '/student-applications/export-dashboard-pdf';
-$dashPdfUrl = static function (string $block, ?int $choice = null) use ($dashPdfBase, $esc, $filter_level, $filter_department_id, $filter_course_id, $filter_course_priority): string {
+$dashPdfUrl = static function (string $block, ?int $choice = null) use ($dashPdfBase, $esc, $filter_level, $filter_department_id, $filter_course_id, $filter_course_priority, $filter_language): string {
     $q = ['block' => $block];
     if ($choice !== null && in_array($choice, [1, 2, 3], true)) {
         $q['choice'] = (string) $choice;
@@ -162,6 +183,9 @@ $dashPdfUrl = static function (string $block, ?int $choice = null) use ($dashPdf
     }
     if ($filter_course_id !== null && $filter_course_id !== '') {
         $q['course'] = $filter_course_id;
+    }
+    if ($filter_language !== null && $filter_language !== '') {
+        $q['lang'] = $filter_language;
     }
 
     return $esc($dashPdfBase . '?' . http_build_query($q));
@@ -217,11 +241,14 @@ if ($filter_course_id !== null) {
 if ($filter_course_priority !== 1) {
     $ctxParts[] = $prioLabels[$filter_course_priority] ?? 'Course choice';
 }
+if ($filter_language !== null && $filter_language !== '') {
+    $ctxParts[] = $esc($filter_language);
+}
 if ($ctxParts !== []) {
     $filterContextSuffix = ' · ' . implode(' · ', $ctxParts);
 }
 ?>
-<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=21">
+<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=23">
 <div class="sa-admin-page sa-student-apps-index container-fluid py-3 px-lg-4<?php echo $active_view === 'dashboard' ? ' sa-page-dashboard' : ''; ?>">
     <header class="sa-apps-page-header mb-4 pb-2 border-bottom<?php echo $active_view === 'dashboard' ? ' sa-apps-page-header--dash' : ''; ?>">
         <h1 class="h4 mb-0 fw-semibold text-dark"><i class="fas fa-file-alt me-2 text-primary" aria-hidden="true"></i>Online applications</h1>
@@ -294,6 +321,15 @@ if ($ctxParts !== []) {
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <div class="d-flex flex-column gap-1 sa-apps-filter-field">
+                        <label for="saLangSelect" class="form-label small text-secondary text-uppercase mb-0 fw-semibold">Language</label>
+                        <select id="saLangSelect" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="Filter by applicant language">
+                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $filter_department_id, $filter_course_id, null, $filter_course_priority, null)); ?>"<?php echo $filter_language === null ? ' selected' : ''; ?>>All languages</option>
+                            <?php foreach (StudentApplicationModel::STAFF_LANGUAGE_FILTER_VALUES as $langOpt): ?>
+                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $filter_department_id, $filter_course_id, null, $filter_course_priority, $langOpt)); ?>"<?php echo $filter_language === $langOpt ? ' selected' : ''; ?>><?php echo $esc($langOpt); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                     <?php if ($active_view === 'table'): ?>
                     <div class="d-flex flex-column gap-1 sa-apps-filter-field sa-apps-filter-nic">
                         <label for="saNicFilter" class="form-label small text-secondary text-uppercase mb-0 fw-semibold">NIC</label>
@@ -309,11 +345,11 @@ if ($ctxParts !== []) {
                         WhatsApp <span class="small opacity-90"><?php echo $esc($staff_whatsapp['display']); ?></span>
                     </a>
                     <?php endif; ?>
-                    <div class="dropdown flex-shrink-0 align-self-md-center">
-                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-file-excel me-1 text-success" aria-hidden="true"></i>Export Excel
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
+                    <div class="dropdown flex-shrink-0">
+                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-file-excel me-1 text-success" aria-hidden="true"></i>Export Excel
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
                         <li><h6 class="dropdown-header">All levels</h6></li>
                         <li><a class="dropdown-item sa-excel-export-item" href="<?php echo $excelUrl(null, null); ?>">All applications</a></li>
                         <li><a class="dropdown-item sa-excel-export-item" href="<?php echo $excelUrl('new', null); ?>">New only</a></li>
@@ -327,8 +363,8 @@ if ($ctxParts !== []) {
                         <li><a class="dropdown-item sa-excel-export-item" href="<?php echo $excelUrl('approved', $filter_level); ?>">Approved</a></li>
                         <li><a class="dropdown-item sa-excel-export-item" href="<?php echo $excelUrl('rejected', $filter_level); ?>">Rejected</a></li>
                         <?php endif; ?>
-                    </ul>
-                </div>
+                        </ul>
+                    </div>
                 </div>
             </div>
             <?php if ($active_view === 'table'): ?>
@@ -500,9 +536,16 @@ if ($ctxParts !== []) {
                  <?php if ($filter_level !== null): ?>data-sa-level="<?php echo $esc($filter_level); ?>"<?php endif; ?>
                  <?php if ($filter_department_id !== null && $filter_department_id !== ''): ?>data-sa-dept="<?php echo $esc($filter_department_id); ?>"<?php endif; ?>
                  <?php if ($filter_course_id !== null && $filter_course_id !== ''): ?>data-sa-course="<?php echo $esc($filter_course_id); ?>"<?php endif; ?>
-                 data-sa-prio="<?php echo (int) $filter_course_priority; ?>">
+                 data-sa-prio="<?php echo (int) $filter_course_priority; ?>"
+                 <?php if ($filter_language !== null && $filter_language !== ''): ?>data-sa-lang="<?php echo $esc($filter_language); ?>"<?php endif; ?>>
                 <?php
                 $ajax_pagination = true;
+                $rejection_reason_return_path = 'student-applications?' . http_build_query(
+                    $makeListQuery($filter_level, 'rejected', $page_new, $page_approved, $page_rejected, $filter_department_id, $filter_course_id, null, $filter_course_priority, $filter_language)
+                );
+                if ($update_reason_action === '') {
+                    $update_reason_action = $appBase . '/student-applications/update-rejection-reason';
+                }
                 require BASE_PATH . '/views/student_application/admin_ajax_table_inner.php';
                 ?>
             </div>
@@ -538,6 +581,8 @@ if ($ctxParts !== []) {
         if (course) p.set('course', course);
         var prio = mount.getAttribute('data-sa-prio') || '1';
         if (prio) p.set('prio', prio);
+        var lang = mount.getAttribute('data-sa-lang');
+        if (lang) p.set('lang', lang);
         var nicVal = nic.value.trim();
         if (nicVal) p.set('nic', nicVal);
         if (tab === 'new') p.set('pn', mount.getAttribute('data-sa-pn') || '1');

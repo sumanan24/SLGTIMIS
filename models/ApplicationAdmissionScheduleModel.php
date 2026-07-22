@@ -110,6 +110,20 @@ class ApplicationAdmissionScheduleModel extends Model {
                     error_log('ApplicationAdmissionScheduleModel::migrateSchema admission_pathway: ' . $conn->error);
                 }
             }
+            $colLang = $conn->query("SHOW COLUMNS FROM `{$this->table}` LIKE 'student_language'");
+            $hasLang = $colLang && $colLang->num_rows > 0;
+            if ($colLang) {
+                $colLang->free();
+            }
+            if (!$hasLang) {
+                if (!$conn->query(
+                    "ALTER TABLE `{$this->table}` ADD COLUMN `student_language` VARCHAR(50) DEFAULT NULL "
+                    . "COMMENT 'Tamil/Sinhala/English — only matching approved applicants on this schedule' "
+                    . "AFTER `admission_pathway`"
+                )) {
+                    error_log('ApplicationAdmissionScheduleModel::migrateSchema student_language: ' . $conn->error);
+                }
+            }
         } catch (Throwable $e) {
             error_log('ApplicationAdmissionScheduleModel::migrateSchema: ' . $e->getMessage());
         }
@@ -189,8 +203,15 @@ class ApplicationAdmissionScheduleModel extends Model {
 
     /**
      * Approved online applications whose 1st preference matches the course.
+     *
+     * @param array<int, true>|null $excludeApplicationIds Already on another entrance exam (same course).
      */
-    public function countApprovedApplicationsForCourse(string $level, string $courseId): int {
+    public function countApprovedApplicationsForCourse(
+        string $level,
+        string $courseId,
+        ?string $studentLanguage = null,
+        ?array $excludeApplicationIds = null
+    ): int {
         $this->ensureTables();
         $courseId = trim($courseId);
         if ($courseId === '' || !in_array($level, ['04', '05'], true)) {
@@ -202,18 +223,69 @@ class ApplicationAdmissionScheduleModel extends Model {
         if (!$course) {
             return 0;
         }
+        $lang = StudentApplicationModel::normalizedStaffLanguageFilter($studentLanguage);
         $sql = 'SELECT sa.`application_id`, sa.`course_priority_1` FROM `student_applications` sa '
             . 'WHERE sa.`application_level` = ? AND sa.`status` = ?';
-        $rows = $this->fetchAllPrepared($sql, 'ss', [$level, 'approved']);
+        $types = 'ss';
+        $params = [$level, 'approved'];
+        if ($lang !== null) {
+            $sql .= ' AND TRIM(IFNULL(sa.`student_language`, \'\')) = ?';
+            $types .= 's';
+            $params[] = $lang;
+        }
+        $rows = $this->fetchAllPrepared($sql, $types, $params);
         $appModel = new StudentApplicationModel();
         $n = 0;
         foreach ($rows as $row) {
+            $appId = (int) ($row['application_id'] ?? 0);
+            if ($excludeApplicationIds !== null && $appId > 0 && isset($excludeApplicationIds[$appId])) {
+                continue;
+            }
             if (self::applicationMatchesCourse($row, $courseId, $course, $appModel)) {
                 $n++;
             }
         }
 
         return $n;
+    }
+
+    /**
+     * Applicants already on an entrance exam schedule for this NVQ level, grouped by course.
+     *
+     * @return array<string, array<int, true>> course_id => application_id => true
+     */
+    public function entranceScheduledApplicationIdsByCourse(string $level, ?int $exceptScheduleId = null): array {
+        $this->ensureTables();
+        if (!in_array($level, ['04', '05'], true)) {
+            return [];
+        }
+        $sql = 'SELECT TRIM(s.`course_id`) AS course_id, e.`application_id` '
+            . 'FROM `application_admission_schedule_entry` e '
+            . 'INNER JOIN `application_admission_schedule` s ON s.`schedule_id` = e.`schedule_id` '
+            . 'WHERE s.`schedule_type` = ? AND s.`application_level` = ? '
+            . 'AND TRIM(IFNULL(s.`course_id`, \'\')) <> \'\'';
+        $types = 'ss';
+        $params = [self::TYPE_ENTRANCE, $level];
+        if ($exceptScheduleId !== null && $exceptScheduleId > 0) {
+            $sql .= ' AND s.`schedule_id` <> ?';
+            $types .= 'i';
+            $params[] = $exceptScheduleId;
+        }
+        $rows = $this->fetchAllPrepared($sql, $types, $params);
+        $byCourse = [];
+        foreach ($rows as $row) {
+            $cid = trim((string) ($row['course_id'] ?? ''));
+            $aid = (int) ($row['application_id'] ?? 0);
+            if ($cid === '' || $aid <= 0) {
+                continue;
+            }
+            if (!isset($byCourse[$cid])) {
+                $byCourse[$cid] = [];
+            }
+            $byCourse[$cid][$aid] = true;
+        }
+
+        return $byCourse;
     }
 
     /**
@@ -384,7 +456,8 @@ class ApplicationAdmissionScheduleModel extends Model {
         bool $onlySubmittedForStaff = false,
         ?string $courseId = null,
         ?string $scheduleType = null,
-        ?string $admissionPathway = null
+        ?string $admissionPathway = null,
+        ?string $studentLanguage = null
     ): array {
         $this->ensureTables();
         if (!in_array($level, ['04', '05'], true)) {
@@ -402,8 +475,17 @@ class ApplicationAdmissionScheduleModel extends Model {
                 . " AND TRIM(IFNULL(sa.`nic_document_path`, '')) <> ''"
                 . " AND TRIM(IFNULL(sa.`birth_certificate_path`, '')) <> '' ";
         }
+        require_once BASE_PATH . '/models/StudentApplicationModel.php';
+        $lang = StudentApplicationModel::normalizedStaffLanguageFilter($studentLanguage);
+        $types = 'ssi';
+        $params = [$level, 'approved', $scheduleId];
+        if ($lang !== null) {
+            $sql .= ' AND TRIM(IFNULL(sa.`student_language`, \'\')) = ?';
+            $types .= 's';
+            $params[] = $lang;
+        }
         $sql .= 'ORDER BY sa.`student_full_name` ASC';
-        $rows = $this->fetchAllPrepared($sql, 'ssi', [$level, 'approved', $scheduleId]);
+        $rows = $this->fetchAllPrepared($sql, $types, $params);
         $courseIdTrim = $courseId !== null ? trim($courseId) : '';
         if ($courseIdTrim !== '') {
             require_once BASE_PATH . '/models/StudentApplicationModel.php';
@@ -417,6 +499,21 @@ class ApplicationAdmissionScheduleModel extends Model {
             $rows = array_values(array_filter($rows, function (array $row) use ($appModel, $courseIdTrim, $course): bool {
                 return self::applicationMatchesCourse($row, $courseIdTrim, $course, $appModel);
             }));
+        }
+
+        if (($scheduleType ?? '') === self::TYPE_ENTRANCE && $courseIdTrim !== '') {
+            $onEntrance = $this->entranceScheduledApplicationIdsByCourse(
+                $level,
+                $scheduleId > 0 ? $scheduleId : null
+            );
+            $excludeSet = $onEntrance[$courseIdTrim] ?? [];
+            if ($excludeSet !== []) {
+                $rows = array_values(array_filter($rows, function (array $row) use ($excludeSet): bool {
+                    $appId = (int) ($row['application_id'] ?? 0);
+
+                    return $appId <= 0 || !isset($excludeSet[$appId]);
+                }));
+            }
         }
 
         return $this->filterInterviewPickerRows($rows, $level, $courseIdTrim !== '' ? $courseIdTrim : null, $scheduleType, $admissionPathway);
@@ -526,6 +623,22 @@ class ApplicationAdmissionScheduleModel extends Model {
      */
     public function addApplications(int $scheduleId, array $applicationIds): int {
         $this->ensureTables();
+        $schedule = $this->findSchedule($scheduleId);
+        if ($schedule !== null
+            && ($schedule['schedule_type'] ?? '') === self::TYPE_ENTRANCE
+        ) {
+            $courseId = trim((string) ($schedule['course_id'] ?? ''));
+            $level = (string) ($schedule['application_level'] ?? '');
+            if ($courseId !== '' && in_array($level, ['04', '05'], true)) {
+                $onEntrance = $this->entranceScheduledApplicationIdsByCourse($level, $scheduleId);
+                $exclude = $onEntrance[$courseId] ?? [];
+                if ($exclude !== []) {
+                    $applicationIds = array_values(array_filter($applicationIds, function ($id) use ($exclude): bool {
+                        return !isset($exclude[(int) $id]);
+                    }));
+                }
+            }
+        }
         $added = 0;
         $maxOrder = 0;
         $rows = $this->fetchAllPrepared(

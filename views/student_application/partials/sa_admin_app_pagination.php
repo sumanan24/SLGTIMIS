@@ -41,12 +41,16 @@ function sa_admin_student_applications_pagination(
             echo '<li class="page-item disabled"><span class="page-link">' . $esc($label) . '</span></li>';
             return;
         }
-        echo '<li class="page-item"><button type="button" class="page-link sa-nic-ajax-pag text-decoration-none border-0 bg-transparent w-100 py-2 px-3"'
+        echo '<li class="page-item"><button type="button" class="page-link sa-nic-ajax-pag"'
             . ' data-sa-tab="' . $tabEsc . '" data-sa-pn="' . $pnAttr . '">' . $esc($label) . '</button></li>';
     };
     ?>
-    <nav class="sa-apps-pagination pt-3 px-3 border-top mt-3" aria-label="<?php echo $esc($aria); ?>">
-        <ul class="pagination pagination-sm justify-content-center flex-wrap mb-0">
+    <nav class="sa-apps-pagination border-top mt-0" aria-label="<?php echo $esc($aria); ?>">
+        <div class="sa-apps-pagination-inner d-flex flex-wrap align-items-center justify-content-between gap-2 py-3 px-3">
+            <p class="sa-apps-pagination-meta small text-muted mb-0 order-2 order-md-1">
+                Page <strong class="text-body"><?php echo (int) $page; ?></strong> of <strong class="text-body"><?php echo (int) $maxPage; ?></strong>
+            </p>
+            <ul class="pagination pagination-sm justify-content-center justify-content-md-end flex-wrap mb-0 order-1 order-md-2 sa-apps-pagination-list">
             <?php if ($ajaxMode): ?>
                 <?php $ajaxBtn('Previous', max(1, $page - 1), $page <= 1, $pagTab, $esc); ?>
             <?php else: ?>
@@ -68,7 +72,7 @@ function sa_admin_student_applications_pagination(
                     <?php if ($p === $page): ?>
                 <span class="page-link"><?php echo (int) $p; ?></span>
                     <?php else: ?>
-                <button type="button" class="page-link sa-nic-ajax-pag border-0 bg-transparent" data-sa-tab="<?php echo $esc($pagTab); ?>" data-sa-pn="<?php echo (int) $p; ?>"><?php echo (int) $p; ?></button>
+                <button type="button" class="page-link sa-nic-ajax-pag" data-sa-tab="<?php echo $esc($pagTab); ?>" data-sa-pn="<?php echo (int) $p; ?>"><?php echo (int) $p; ?></button>
                     <?php endif; ?>
                 <?php else: ?>
                 <a class="page-link" href="<?php echo $esc($pagTab === 'new' ? $buildListUrl($filter_level, 'new', $p, 1, 1) : ($pagTab === 'approved' ? $buildListUrl($filter_level, 'approved', 1, $p, 1) : $buildListUrl($filter_level, 'rejected', 1, 1, $p))); ?>"><?php echo (int) $p; ?></a>
@@ -91,6 +95,7 @@ function sa_admin_student_applications_pagination(
             </li>
             <?php endif; ?>
         </ul>
+        </div>
     </nav>
     <?php
 }

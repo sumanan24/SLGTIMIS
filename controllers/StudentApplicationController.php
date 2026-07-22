@@ -1825,7 +1825,7 @@ class StudentApplicationController extends Controller {
     /**
      * NVQ level + department + course filters for staff applications list (shared by admin index + AJAX table).
      *
-     * @return array{level: ?string, dept_id: ?string, course_id: ?string, priority: int}
+     * @return array{level: ?string, dept_id: ?string, course_id: ?string, priority: int, language: ?string}
      */
     private function studentApplicationsAdminListFilters(): array {
         $levelRaw = trim((string) $this->get('level', ''));
@@ -1834,6 +1834,8 @@ class StudentApplicationController extends Controller {
         $courseRaw = trim((string) $this->get('course', ''));
         $prioRaw = (int) $this->get('prio', '1');
         $filterPriority = in_array($prioRaw, [1, 2, 3], true) ? $prioRaw : 1;
+        require_once BASE_PATH . '/models/StudentApplicationModel.php';
+        $filterLanguage = StudentApplicationModel::normalizedStaffLanguageFilter($this->get('lang', ''));
         $filterDeptId = null;
         $filterCourseId = null;
         if ($deptRaw !== '') {
@@ -1854,7 +1856,49 @@ class StudentApplicationController extends Controller {
             }
         }
 
-        return ['level' => $filterLevel, 'dept_id' => $filterDeptId, 'course_id' => $filterCourseId, 'priority' => $filterPriority];
+        return ['level' => $filterLevel, 'dept_id' => $filterDeptId, 'course_id' => $filterCourseId, 'priority' => $filterPriority, 'language' => $filterLanguage];
+    }
+
+    /**
+     * Relative URL for redirect back to the staff applications list (preserves tab filters).
+     */
+    private function studentApplicationsAdminListReturnPath(
+        string $tab,
+        ?string $filterLevel,
+        ?string $filterDeptId,
+        ?string $filterCourseId,
+        int $filterPriority,
+        int $pageNew = 1,
+        int $pageApproved = 1,
+        int $pageRejected = 1,
+        ?string $filterLanguage = null
+    ): string {
+        $tab = in_array($tab, ['approved', 'rejected'], true) ? $tab : 'new';
+        $q = ['tab' => $tab];
+        if ($filterLevel === '04' || $filterLevel === '05') {
+            $q['level'] = $filterLevel;
+        }
+        $filterPriority = in_array($filterPriority, [1, 2, 3], true) ? $filterPriority : 1;
+        $q['prio'] = (string) $filterPriority;
+        if ($tab === 'new' && $pageNew > 1) {
+            $q['pn'] = $pageNew;
+        }
+        if ($tab === 'approved' && $pageApproved > 1) {
+            $q['pa'] = $pageApproved;
+        }
+        if ($tab === 'rejected' && $pageRejected > 1) {
+            $q['pr'] = $pageRejected;
+        }
+        if ($filterDeptId !== null && $filterDeptId !== '') {
+            $q['dept'] = $filterDeptId;
+        }
+        if ($filterCourseId !== null && $filterCourseId !== '') {
+            $q['course'] = $filterCourseId;
+        }
+        if ($filterLanguage !== null && $filterLanguage !== '') {
+            $q['lang'] = $filterLanguage;
+        }
+        return 'student-applications?' . http_build_query($q);
     }
 
     /**
@@ -1882,6 +1926,7 @@ class StudentApplicationController extends Controller {
         $filterDeptId = $filters['dept_id'];
         $filterCourseId = $filters['course_id'];
         $filterPriority = $filters['priority'];
+        $filterLanguage = $filters['language'];
         $nicRaw = trim((string) $this->get('nic', ''));
 
         $tabRaw = strtolower(trim((string) $this->get('tab', '')));
@@ -1891,9 +1936,9 @@ class StudentApplicationController extends Controller {
         $excludeNicDrafts = $this->staffStudentAppsExcludeNicDrafts($userModel, $uid);
         $perPage = 20;
 
-        $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority);
-        $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority);
-        $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority);
+        $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage);
+        $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage);
+        $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage);
         $maxPageNew = max(1, (int) ceil($countNew / $perPage));
         $maxPageApproved = max(1, (int) ceil($countApproved / $perPage));
         $maxPageRejected = max(1, (int) ceil($countRejected / $perPage));
@@ -1903,13 +1948,13 @@ class StudentApplicationController extends Controller {
         $pageRejected = max(1, min((int) $this->get('pr', 1), $maxPageRejected));
 
         $applicationsNew = $activeTab === 'new'
-            ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority)
+            ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage)
             : [];
         $applicationsApproved = $activeTab === 'approved'
-            ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority)
+            ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage)
             : [];
         $applicationsRejected = $activeTab === 'rejected'
-            ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority)
+            ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage)
             : [];
 
         if (defined('BASE_PATH') && is_file(BASE_PATH . '/models/StudentModel.php')) {
@@ -1938,7 +1983,7 @@ class StudentApplicationController extends Controller {
         };
         $listBase = $appBase . '/student-applications';
         $activeView = 'table';
-        $makeListQuery = static function (?string $level, string $tab, int $pn, int $pa, int $pr, ?string $deptId, ?string $courseId, ?string $viewOverride = null, ?int $prio = null) use ($activeView, $filterPriority): array {
+        $makeListQuery = static function (?string $level, string $tab, int $pn, int $pa, int $pr, ?string $deptId, ?string $courseId, ?string $viewOverride = null, ?int $prio = null, ?string $language = null) use ($activeView, $filterPriority, $filterLanguage): array {
             $tab = in_array($tab, ['approved', 'rejected'], true) ? $tab : 'new';
             $q = ['tab' => $tab];
             if ($level === '04' || $level === '05') {
@@ -1962,14 +2007,18 @@ class StudentApplicationController extends Controller {
             if ($courseId !== null && $courseId !== '') {
                 $q['course'] = $courseId;
             }
+            $langVal = $language ?? $filterLanguage;
+            if ($langVal !== null && $langVal !== '') {
+                $q['lang'] = $langVal;
+            }
             $effView = $viewOverride !== null ? $viewOverride : $activeView;
             if ($effView === 'dashboard') {
                 $q['view'] = 'dashboard';
             }
             return $q;
         };
-        $buildListUrl = static function (?string $level, string $tab, int $pn = 1, int $pa = 1, int $pr = 1) use ($listBase, $esc, $makeListQuery, $filterDeptId, $filterCourseId, $filterPriority): string {
-            return $esc($listBase . '?' . http_build_query($makeListQuery($level, $tab, $pn, $pa, $pr, $filterDeptId, $filterCourseId, null, $filterPriority)));
+        $buildListUrl = static function (?string $level, string $tab, int $pn = 1, int $pa = 1, int $pr = 1) use ($listBase, $esc, $makeListQuery, $filterDeptId, $filterCourseId, $filterPriority, $filterLanguage): string {
+            return $esc($listBase . '?' . http_build_query($makeListQuery($level, $tab, $pn, $pa, $pr, $filterDeptId, $filterCourseId, null, $filterPriority, $filterLanguage)));
         };
 
         $ctxParts = [];
@@ -1990,11 +2039,27 @@ class StudentApplicationController extends Controller {
         if ($filterCourseId !== null) {
             $ctxParts[] = 'Course';
         }
+        if ($filterLanguage !== null && $filterLanguage !== '') {
+            $ctxParts[] = $esc($filterLanguage);
+        }
         $filterContextSuffix = $ctxParts !== [] ? ' · ' . implode(' · ', $ctxParts) : '';
 
         $ajax_pagination = true;
         $can_delete = $userModel->isAdminOrADM($uid);
         $can_edit = $userModel->canEditOnlineStudentApplications($uid);
+        $can_update_rejection_reason = $userModel->canDecideOnlineStudentApplications($uid);
+        $update_reason_action = $esc($appBase . '/student-applications/update-rejection-reason');
+        $rejection_reason_return_path = $this->studentApplicationsAdminListReturnPath(
+            'rejected',
+            $filterLevel,
+            $filterDeptId,
+            $filterCourseId,
+            $filterPriority,
+            $pageNew,
+            $pageApproved,
+            $pageRejected,
+            $filterLanguage
+        );
         $applications_new = $applicationsNew;
         $applications_approved = $applicationsApproved;
         $applications_rejected = $applicationsRejected;
@@ -2052,6 +2117,7 @@ class StudentApplicationController extends Controller {
         $filterDeptId = $filters['dept_id'];
         $filterCourseId = $filters['course_id'];
         $filterPriority = $filters['priority'];
+        $filterLanguage = $filters['language'];
         $tabRaw = strtolower(trim((string) $this->get('tab', '')));
         $activeTab = in_array($tabRaw, ['approved', 'rejected'], true) ? $tabRaw : 'new';
 
@@ -2059,12 +2125,12 @@ class StudentApplicationController extends Controller {
         $activeView = $viewRaw === 'dashboard' ? 'dashboard' : 'table';
 
         $perPage = 20;
-        $dashboardStats = $model->getDashboardStats($filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority);
+        $dashboardStats = $model->getDashboardStats($filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage);
 
         if ($activeView === 'table') {
-            $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority);
-            $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority);
-            $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority);
+            $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage);
+            $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage);
+            $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage);
             $maxPageNew = max(1, (int) ceil($countNew / $perPage));
             $maxPageApproved = max(1, (int) ceil($countApproved / $perPage));
             $maxPageRejected = max(1, (int) ceil($countRejected / $perPage));
@@ -2073,13 +2139,13 @@ class StudentApplicationController extends Controller {
             $pageRejected = max(1, min((int) $this->get('pr', 1), $maxPageRejected));
 
             $applicationsNew = $activeTab === 'new'
-                ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority)
+                ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage)
                 : [];
             $applicationsApproved = $activeTab === 'approved'
-                ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority)
+                ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage)
                 : [];
             $applicationsRejected = $activeTab === 'rejected'
-                ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority)
+                ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage)
                 : [];
         } else {
             $countNew = 0;
@@ -2103,6 +2169,7 @@ class StudentApplicationController extends Controller {
             'filter_department_id' => $filterDeptId,
             'filter_course_id' => $filterCourseId,
             'filter_course_priority' => $filterPriority,
+            'filter_language' => $filterLanguage,
             'ajax_table_url' => rtrim(APP_URL, '/') . '/student-applications/ajax-table',
             // Filter dropdowns: load full catalogue (not just values used by applications).
             'filter_departments' => $this->model('DepartmentModel')->getAll(),
@@ -2129,6 +2196,19 @@ class StudentApplicationController extends Controller {
             'dashboard_stats' => $dashboardStats,
             'can_delete' => $userModel->isAdminOrADM($uid),
             'can_edit' => $userModel->canEditOnlineStudentApplications($uid),
+            'can_update_rejection_reason' => $userModel->canDecideOnlineStudentApplications($uid),
+            'update_reason_action' => rtrim(APP_URL, '/') . '/student-applications/update-rejection-reason',
+            'rejection_reason_return_path' => $this->studentApplicationsAdminListReturnPath(
+                'rejected',
+                $filterLevel,
+                $filterDeptId,
+                $filterCourseId,
+                $filterPriority,
+                $pageNew,
+                $pageApproved,
+                $pageRejected,
+                $filterLanguage
+            ),
             'staff_whatsapp' => $this->staffOnlineApplicationsWhatsAppShortcut(),
             'use_public_layout' => false,
         ]);
@@ -2181,7 +2261,7 @@ class StudentApplicationController extends Controller {
     }
 
     /**
-     * ADM / system admin: edit stored application fields (uploads unchanged — use view page to open files).
+     * SAO / ADM: edit stored application fields and optionally replace uploads.
      */
     public function adminEdit() {
         if (!isset($_SESSION['user_id'])) {
@@ -2192,7 +2272,7 @@ class StudentApplicationController extends Controller {
         $userModel = new UserModel();
         $uid = (int) $_SESSION['user_id'];
         if (!$userModel->canEditOnlineStudentApplications($uid)) {
-            $_SESSION['error'] = 'Only Administrators (ADM) and system admins can edit applications.';
+            $_SESSION['error'] = 'You cannot edit applications.';
             $this->redirect('student-applications');
             return;
         }
@@ -2214,6 +2294,10 @@ class StudentApplicationController extends Controller {
             return;
         }
 
+        $this->redirectIfSaoCannotViewIncomplete($userModel, $uid, $app);
+
+        $canChangeStatus = $userModel->isAdminOrADM($uid);
+
         if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $post = $this->post();
             $postArr = is_array($post) ? $post : [];
@@ -2222,9 +2306,24 @@ class StudentApplicationController extends Controller {
                 $this->redirect('student-applications/edit?id=' . $id);
                 return;
             }
+            if (!$canChangeStatus) {
+                unset($postArr['status']);
+            }
             $snapshotBefore = $app;
             $err = null;
             $ok = $model->updateApplicationFromStaffPost($id, $postArr, $err);
+            $uploadErr = null;
+            if ($ok) {
+                $appFresh = $model->findById($id);
+                $nicForUpload = trim((string) ($appFresh['student_nic'] ?? $app['student_nic'] ?? ''));
+                if ($nicForUpload !== '') {
+                    $uploadErr = $this->processStaffOptionalDocumentUploads($id, $nicForUpload);
+                    if ($uploadErr !== null && $uploadErr !== '') {
+                        $ok = false;
+                        $err = $uploadErr;
+                    }
+                }
+            }
             if ($ok) {
                 $appAfter = $model->findById($id);
                 $this->logActivity(
@@ -2256,8 +2355,54 @@ class StudentApplicationController extends Controller {
             'app' => $app,
             'application_id' => $id,
             'course_prefs_old' => $coursePrefsOld,
+            'can_change_status' => $canChangeStatus,
             'use_public_layout' => false,
         ]);
+    }
+
+    /**
+     * Optional document replacements on staff edit (only fields with a new upload are saved).
+     *
+     * @return string|null Error message, or null on success / no uploads
+     */
+    private function processStaffOptionalDocumentUploads(int $applicationId, string $nic): ?string {
+        $fileKeys = [
+            'nic_document',
+            'birth_certificate',
+            'ol_certificate',
+            'al_certificate',
+            'nvq_certificate',
+            'bank_receipt',
+        ];
+        $updates = [];
+        foreach ($fileKeys as $fileKey) {
+            if (!$this->isSuccessfulClientUpload($fileKey)) {
+                continue;
+            }
+            $dbCol = $this->studentApplicationUploadColumnForField($fileKey);
+            if ($dbCol === null) {
+                continue;
+            }
+            try {
+                $path = $this->handleUpload($fileKey, $applicationId, $fileKey, $nic);
+            } catch (Throwable $e) {
+                return $e->getMessage();
+            }
+            if ($path !== null) {
+                $updates[$dbCol] = $path;
+            }
+        }
+        if ($updates === []) {
+            return null;
+        }
+        $model = $this->model('StudentApplicationModel');
+        $sqlErr = null;
+        $ok = $model->update((string) $applicationId, $updates, $sqlErr);
+        if (!$ok) {
+            $msg = $sqlErr !== null && $sqlErr !== '' ? $sqlErr : 'Could not save uploaded documents.';
+            return $msg;
+        }
+        return null;
     }
 
     /**
@@ -2383,7 +2528,7 @@ class StudentApplicationController extends Controller {
     }
 
     /**
-     * Staff (SAO, ADM, admin): reject an application (status = rejected; only from new).
+     * Staff (SAO, ADM, admin): reject an application (status = rejected; new or approved; reason required).
      */
     public function adminReject(): void {
         if (!isset($_SESSION['user_id'])) {
@@ -2421,15 +2566,27 @@ class StudentApplicationController extends Controller {
         $this->redirectIfSaoCannotViewIncomplete($userModel, $uid, $app);
 
         $st = strtolower(trim((string) ($app['status'] ?? '')));
-        if ($st !== 'new') {
-            $_SESSION['error'] = 'Only new applications can be rejected.';
+        if (!in_array($st, ['new', 'approved'], true)) {
+            $_SESSION['error'] = 'Only new or approved applications can be rejected.';
+            $this->redirect('student-applications/view?id=' . $id);
+            return;
+        }
+
+        $reason = trim((string) $this->post('rejection_reason', ''));
+        if ($reason === '') {
+            $_SESSION['error'] = 'Please enter a reason for rejection.';
+            $this->redirect('student-applications/view?id=' . $id);
+            return;
+        }
+        if (strlen($reason) > 2000) {
+            $_SESSION['error'] = 'Rejection reason must be 2000 characters or fewer.';
             $this->redirect('student-applications/view?id=' . $id);
             return;
         }
 
         $ok = false;
         try {
-            $ok = $model->setStatus($id, 'rejected');
+            $ok = $model->setRejected($id, $reason);
         } catch (Throwable $e) {
             error_log('StudentApplicationController::adminReject: ' . $e->getMessage());
             $ok = false;
@@ -2441,6 +2598,103 @@ class StudentApplicationController extends Controller {
             $_SESSION['error'] = 'Could not reject application.';
         }
         $this->redirect('student-applications/view?id=' . $id);
+    }
+
+    /**
+     * Staff (SAO, ADM, admin): update rejection reason on an already-rejected application.
+     */
+    public function adminUpdateRejectionReason(): void {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        if (!$userModel->canDecideOnlineStudentApplications($uid)) {
+            $_SESSION['error'] = 'You cannot update rejection reasons.';
+            $this->redirect('dashboard');
+            return;
+        }
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            $this->redirect('student-applications?tab=rejected');
+            return;
+        }
+
+        $id = (int) $this->post('application_id', 0);
+        if ($id < 1) {
+            $_SESSION['error'] = 'Invalid application.';
+            $this->redirect('student-applications?tab=rejected');
+            return;
+        }
+
+        $reason = trim((string) $this->post('rejection_reason', ''));
+        if ($reason === '') {
+            $_SESSION['error'] = 'Please enter a rejection reason.';
+            $this->redirect($this->safeStudentApplicationsListReturnPath());
+            return;
+        }
+        if (strlen($reason) > 2000) {
+            $_SESSION['error'] = 'Rejection reason must be 2000 characters or fewer.';
+            $this->redirect($this->safeStudentApplicationsListReturnPath());
+            return;
+        }
+
+        $model = $this->model('StudentApplicationModel');
+        $app = $model->findById($id);
+        if (!$app) {
+            $_SESSION['error'] = 'That application was not found.';
+            $this->redirect('student-applications?tab=rejected');
+            return;
+        }
+
+        $this->redirectIfSaoCannotViewIncomplete($userModel, $uid, $app);
+
+        if (strtolower(trim((string) ($app['status'] ?? ''))) !== 'rejected') {
+            $_SESSION['error'] = 'Only rejected applications can have their reason updated here.';
+            $this->redirect('student-applications/view?id=' . $id);
+            return;
+        }
+
+        $ok = false;
+        try {
+            $ok = $model->updateRejectionReason($id, $reason);
+        } catch (Throwable $e) {
+            error_log('StudentApplicationController::adminUpdateRejectionReason: ' . $e->getMessage());
+            $ok = false;
+        }
+
+        if ($ok) {
+            $this->logActivity(
+                'UPDATE',
+                'student_application',
+                (string) $id,
+                'Staff updated rejection reason for application #' . $id . '.',
+                ['rejection_reason' => $app['rejection_reason'] ?? null],
+                ['rejection_reason' => $reason]
+            );
+            $_SESSION['message'] = 'Rejection reason saved for application #' . $id . '.';
+        } else {
+            $_SESSION['error'] = 'Could not save rejection reason.';
+        }
+        $this->redirect($this->safeStudentApplicationsListReturnPath());
+    }
+
+    /**
+     * Redirect target after list actions (rejects open redirect; only student-applications paths).
+     */
+    private function safeStudentApplicationsListReturnPath(): string {
+        $raw = trim((string) $this->post('return_path', ''));
+        if ($raw === '') {
+            return 'student-applications?tab=rejected';
+        }
+        if (strpos($raw, 'student-applications') !== 0) {
+            return 'student-applications?tab=rejected';
+        }
+        if (preg_match('#[\r\n]#', $raw) || strpos($raw, '//') !== false) {
+            return 'student-applications?tab=rejected';
+        }
+        return $raw;
     }
 
     /**
@@ -2733,10 +2987,11 @@ class StudentApplicationController extends Controller {
         $filterDeptId = $filters['dept_id'];
         $filterCourseId = $filters['course_id'];
         $filterPriority = $filters['priority'];
+        $filterLanguage = $filters['language'];
 
         $model = $this->model('StudentApplicationModel');
         $excludeNicDrafts = $this->staffStudentAppsExcludeNicDrafts($userModel, $uid);
-        $stats = $model->getDashboardStats($filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority);
+        $stats = $model->getDashboardStats($filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage);
 
         $prioLabels = [1 => '1st choice', 2 => '2nd choice', 3 => '3rd choice'];
         $rows = [];
@@ -2876,6 +3131,7 @@ class StudentApplicationController extends Controller {
         $exportCourseId = null;
         $prioRaw = (int) $this->get('prio', '1');
         $exportPriority = in_array($prioRaw, [1, 2, 3], true) ? $prioRaw : 1;
+        $exportLanguage = StudentApplicationModel::normalizedStaffLanguageFilter($this->get('lang', ''));
         if ($deptRaw !== '') {
             $deptModel = $this->model('DepartmentModel');
             $drow = $deptModel->find($deptRaw);
@@ -2893,7 +3149,7 @@ class StudentApplicationController extends Controller {
                 }
             }
         }
-        $rows = $model->getAllForStaffExport($exportStatus, $exportLevel, $exportDeptId, $exportCourseId, $excludeNicDrafts, $exportNicRaw, $exportPriority);
+        $rows = $model->getAllForStaffExport($exportStatus, $exportLevel, $exportDeptId, $exportCourseId, $excludeNicDrafts, $exportNicRaw, $exportPriority, $exportLanguage);
         $allCols = StudentApplicationModel::getStaffExportColumnOrder();
         $colLabels = StudentApplicationModel::getStaffExportColumnLabels();
         $colsParam = trim((string) $this->get('cols', ''));

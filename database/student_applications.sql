@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS `student_applications` (
 
     /* Workflow */
     `status`                  ENUM('new','approved','rejected') NOT NULL DEFAULT 'new' COMMENT 'Application workflow status',
+    `rejection_reason`        TEXT DEFAULT NULL COMMENT 'Required when staff reject; cleared on approve',
 
     `created_at`               TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 

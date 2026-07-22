@@ -102,7 +102,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
 .admission-entries-table col.col-course { width: 22%; }
 .admission-entries-table col.col-roll { width: 11%; }
 .admission-entries-table col.col-room { width: 10%; }
-.admission-entries-table col.col-wa { width: 52px; }
+.admission-entries-table col.col-whatsapp { width: 11rem; }
 .admission-entries-table col.col-sent { width: 80px; }
 
 .admission-entries-table-readonly col.col-no { width: 48px; }
@@ -185,10 +185,20 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
     font-size: 0.8125rem;
 }
 
-.admission-entries-table .col-wa,
+.admission-entries-table .col-whatsapp,
 .admission-entries-table .col-sent,
 .admission-entries-table .col-remove {
     text-align: center;
+    vertical-align: middle;
+}
+
+.admission-entries-table .col-whatsapp .wa-number {
+    display: block;
+    font-size: 0.75rem;
+    color: #495057;
+    word-break: break-all;
+    line-height: 1.25;
+    margin-bottom: 0.2rem;
 }
 
 .admission-entries-table .btn-wa-outline {
@@ -244,6 +254,9 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
                 <span class="meta-chip">NVQ <?php echo $e($sch['application_level'] ?? ''); ?></span>
                 <?php if (!empty($sch['course_name'])): ?>
                 <span class="meta-chip"><?php echo $e($sch['course_name']); ?></span>
+                <?php endif; ?>
+                <?php if (!empty($sch['student_language'])): ?>
+                <span class="meta-chip"><i class="fas fa-language me-1"></i><?php echo $e($sch['student_language']); ?></span>
                 <?php endif; ?>
                 <span class="meta-chip"><?php echo $e(ApplicationAdmissionScheduleModel::pathwayLabel(
                     ApplicationAdmissionScheduleModel::normalizePathway($sch['admission_pathway'] ?? null)
@@ -345,7 +358,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
             <table class="table admission-entries-table mb-0">
                 <colgroup>
                     <col class="col-remove"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-course">
-                    <col class="col-roll"><col class="col-room"><col class="col-wa"><col class="col-sent">
+                    <col class="col-roll"><col class="col-room"><col class="col-whatsapp"><col class="col-sent">
                 </colgroup>
                 <thead>
                     <tr>
@@ -356,7 +369,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
                         <th class="col-course">Course</th>
                         <th class="col-roll">Roll / Index</th>
                         <th class="col-room"><?php echo $isInterview ? 'Panel' : 'Hall'; ?></th>
-                        <th class="col-wa">WA</th>
+                        <th class="col-whatsapp">WhatsApp</th>
                         <th class="col-sent">Sent</th>
                     </tr>
                 </thead>
@@ -376,13 +389,27 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
                         <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($row['course_priority_1'] ?? ''); ?></td>
                         <td class="col-roll"><input type="text" class="form-control form-control-sm roll-index-input" name="entries[<?php echo (int) $row['entry_id']; ?>][roll_number]" value="<?php echo $e($rollDisplay); ?>" data-seq="<?php echo $i; ?>"></td>
                         <td class="col-room"><input type="text" class="form-control form-control-sm" name="entries[<?php echo (int) $row['entry_id']; ?>][room_or_panel]" value="<?php echo $e($row['room_or_panel'] ?? ''); ?>"></td>
-                        <td class="col-wa">
+                        <td class="col-whatsapp">
                             <?php
                             $waRow = $waByEntry[(int) ($row['entry_id'] ?? 0)] ?? null;
-                            if (!empty($sch['is_published']) && $waRow && !empty($waRow['url'])): ?>
-                            <a href="<?php echo $e($waRow['url']); ?>" class="btn btn-wa-outline btn-sm" target="_blank" rel="noopener noreferrer" title="WhatsApp"><i class="fab fa-whatsapp"></i></a>
+                            $waDisplay = $waRow['display_phone'] ?? '';
+                            if ($waDisplay === '') {
+                                $waDisplay = trim((string) ($row['student_whatsapp'] ?? ''));
+                                if ($waDisplay === '') {
+                                    $waDisplay = trim((string) ($row['student_phone'] ?? ''));
+                                }
+                            }
+                            if ($waDisplay !== ''): ?>
+                            <span class="wa-number"><?php echo $e($waDisplay); ?></span>
+                            <?php endif; ?>
+                            <?php if (!empty($sch['is_published']) && $waRow && !empty($waRow['url'])): ?>
+                            <a href="<?php echo $e($waRow['url']); ?>" class="btn btn-wa-outline btn-sm" target="_blank" rel="noopener noreferrer" title="Open WhatsApp with schedule and PDF download links"><i class="fab fa-whatsapp" aria-hidden="true"></i><span class="visually-hidden"> Share links</span></a>
+                            <?php elseif (empty($sch['is_published'])): ?>
+                            <span class="text-muted small d-block" title="Publish the schedule before sharing links">Publish first</span>
+                            <?php elseif ($waDisplay === ''): ?>
+                            <span class="text-muted small d-block" title="Add phone or WhatsApp on the online application">No number</span>
                             <?php else: ?>
-                            <span class="text-muted">—</span>
+                            <span class="text-muted small d-block" title="Check phone / WhatsApp format on application">Invalid number</span>
                             <?php endif; ?>
                         </td>
                         <td class="col-sent admission-wa-sent-cell">
@@ -402,7 +429,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
         <div class="admission-entries-toolbar">
             <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i> Save applicants</button>
             <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-renumber-rolls"><i class="fas fa-sort-numeric-down me-1"></i> Renumber</button>
-            <p class="toolbar-hint mb-0"><i class="fab fa-whatsapp text-success"></i> Open chat, tick <strong>Sent</strong> (auto-saves).</p>
+            <p class="toolbar-hint mb-0"><i class="fab fa-whatsapp text-success"></i> Use <strong>WhatsApp</strong> to send schedule + PDF download links, then tick <strong>Sent</strong> (auto-saves).</p>
         </div>
     </form>
 
@@ -430,7 +457,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
         <table class="table admission-entries-table admission-entries-table-readonly mb-0">
             <colgroup>
                 <col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-course">
-                <col class="col-roll"><col class="col-room"><col class="col-sent">
+                <col class="col-roll"><col class="col-room"><col class="col-whatsapp"><col class="col-sent">
             </colgroup>
             <thead>
                 <tr>
@@ -440,15 +467,21 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
                     <th class="col-course">Course</th>
                     <th class="col-roll">Roll / Index</th>
                     <th class="col-room"><?php echo $isInterview ? 'Panel' : 'Hall'; ?></th>
+                    <th class="col-whatsapp">WhatsApp</th>
                     <th class="col-sent">Sent</th>
                 </tr>
             </thead>
             <tbody>
             <?php if (empty($entries)): ?>
-                <tr><td colspan="7" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
+                <tr><td colspan="8" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
             <?php else: ?>
                 <?php $i = 0; foreach ($entries as $row): $i++;
                     $rollOut = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $i);
+                    $waRow = $waByEntry[(int) ($row['entry_id'] ?? 0)] ?? null;
+                    $waDisplay = $waRow['display_phone'] ?? trim((string) ($row['student_whatsapp'] ?? ''));
+                    if ($waDisplay === '') {
+                        $waDisplay = trim((string) ($row['student_phone'] ?? ''));
+                    }
                 ?>
                 <tr class="<?php echo !empty($row['whatsapp_sent']) ? 'admission-wa-sent' : ''; ?>">
                     <td class="col-no"><?php echo $i; ?></td>
@@ -457,6 +490,16 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
                     <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($row['course_priority_1'] ?? ''); ?></td>
                     <td class="col-roll"><code class="small"><?php echo $e($rollOut); ?></code></td>
                     <td class="col-room"><?php echo $e($row['room_or_panel'] ?? '—'); ?></td>
+                    <td class="col-whatsapp">
+                        <?php if ($waDisplay !== ''): ?>
+                        <span class="wa-number"><?php echo $e($waDisplay); ?></span>
+                        <?php endif; ?>
+                        <?php if (!empty($sch['is_published']) && $waRow && !empty($waRow['url'])): ?>
+                        <a href="<?php echo $e($waRow['url']); ?>" class="btn btn-wa-outline btn-sm" target="_blank" rel="noopener noreferrer" title="Open WhatsApp with download links"><i class="fab fa-whatsapp" aria-hidden="true"></i></a>
+                        <?php elseif ($waDisplay === ''): ?>
+                        <span class="text-muted small">—</span>
+                        <?php endif; ?>
+                    </td>
                     <td class="col-sent"><?php if (!empty($row['whatsapp_sent'])): ?><i class="fas fa-check text-success" title="Sent"></i><?php else: ?><span class="text-muted">—</span><?php endif; ?></td>
                 </tr>
                 <?php endforeach; ?>

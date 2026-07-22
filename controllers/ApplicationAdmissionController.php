@@ -236,13 +236,14 @@ class ApplicationAdmissionController extends Controller {
                 $onlyStaff,
                 $this->scheduleCourseIdOrNull($schedule),
                 (string) ($schedule['schedule_type'] ?? ''),
-                (string) ($schedule['admission_pathway'] ?? ApplicationAdmissionScheduleModel::PATHWAY_EXAM_AND_INTERVIEW)
+                (string) ($schedule['admission_pathway'] ?? ApplicationAdmissionScheduleModel::PATHWAY_EXAM_AND_INTERVIEW),
+                (string) ($schedule['student_language'] ?? '')
             )
             : [];
 
-        $pickerHint = $this->interviewPickerHint($schedule);
+        $pickerHint = $this->schedulePickerHint($schedule);
 
-        $publicUrl = APP_URL . '/application-admission/public/' . rawurlencode((string) $schedule['public_token']);
+        $publicUrl = rtrim(APP_URL, '/') . '/application-admission/public/' . rawurlencode((string) $schedule['public_token']);
         $rollCourseCode = ApplicationAdmissionScheduleModel::rollIndexCourseCodeFromSchedule($schedule);
 
         return $this->view('application_admission/entries', [
@@ -610,6 +611,12 @@ class ApplicationAdmissionController extends Controller {
                 return null;
             }
         }
+        require_once BASE_PATH . '/models/StudentApplicationModel.php';
+        $studentLanguage = StudentApplicationModel::normalizedStaffLanguageFilter($this->post('student_language', ''));
+        if ($studentLanguage === null) {
+            $_SESSION['error'] = 'Select the language of instruction for this schedule (Tamil, Sinhala, or English).';
+            return null;
+        }
         $data = [
             'schedule_type' => $type,
             'application_level' => $level,
@@ -619,6 +626,7 @@ class ApplicationAdmissionController extends Controller {
             'end_time' => $end,
             'venue' => $venue,
             'instructions' => trim((string) $this->post('instructions', '')),
+            'student_language' => $studentLanguage,
         ];
         if ($courseId !== '') {
             $data['course_id'] = $courseId;
@@ -650,7 +658,10 @@ class ApplicationAdmissionController extends Controller {
             }
         }
         $isInterview = $type === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW;
+        $isEntrance = $type === ApplicationAdmissionScheduleModel::TYPE_ENTRANCE;
+        $exceptScheduleId = $schedule !== null ? (int) ($schedule['schedule_id'] ?? 0) : 0;
         $pathwayMax = ApplicationAdmissionScheduleModel::INTERVIEW_ONLY_DEFAULT_MAX_APPLICANTS;
+        require_once BASE_PATH . '/models/StudentApplicationModel.php';
 
         return [
             'page' => 'application-admission',
@@ -658,8 +669,8 @@ class ApplicationAdmissionController extends Controller {
             'scheduleType' => $type,
             'formAction' => $formAction,
             'coursesByLevel' => [
-                '04' => $this->coursesForApplicationLevel('04'),
-                '05' => $this->coursesForApplicationLevel('05'),
+                '04' => $this->coursesForApplicationLevel('04', $isEntrance, $exceptScheduleId > 0 ? $exceptScheduleId : null),
+                '05' => $this->coursesForApplicationLevel('05', $isEntrance, $exceptScheduleId > 0 ? $exceptScheduleId : null),
             ],
             'departmentsByLevel' => [
                 '04' => $this->departmentsForApplicationLevel('04'),
@@ -673,6 +684,10 @@ class ApplicationAdmissionController extends Controller {
                 $schedule['admission_pathway'] ?? null,
                 ApplicationAdmissionScheduleModel::PATHWAY_EXAM_AND_INTERVIEW
             ),
+            'languageOptions' => StudentApplicationModel::STAFF_LANGUAGE_FILTER_VALUES,
+            'selectedStudentLanguage' => StudentApplicationModel::normalizedStaffLanguageFilter(
+                $schedule['student_language'] ?? null
+            ) ?? '',
         ];
     }
 
@@ -691,7 +706,11 @@ class ApplicationAdmissionController extends Controller {
     /**
      * @return list<array<string, mixed>>
      */
-    private function coursesForApplicationLevel(string $applicationLevel): array {
+    private function coursesForApplicationLevel(
+        string $applicationLevel,
+        bool $excludeAlreadyOnEntranceExam = false,
+        ?int $exceptEntranceScheduleId = null
+    ): array {
         if (!in_array($applicationLevel, ['04', '05'], true)) {
             return [];
         }
@@ -702,10 +721,23 @@ class ApplicationAdmissionController extends Controller {
             'active_only' => true,
         ]);
         $scheduleModel = $this->scheduleModel();
+        require_once BASE_PATH . '/models/StudentApplicationModel.php';
+        $languageOptions = StudentApplicationModel::STAFF_LANGUAGE_FILTER_VALUES;
+        $onEntranceByCourse = $excludeAlreadyOnEntranceExam
+            ? $scheduleModel->entranceScheduledApplicationIdsByCourse($applicationLevel, $exceptEntranceScheduleId)
+            : [];
         foreach ($courses as &$course) {
             $cid = trim((string) ($course['course_id'] ?? ''));
+            $excludeIds = ($cid !== '' && isset($onEntranceByCourse[$cid])) ? $onEntranceByCourse[$cid] : null;
+            $countsByLang = [];
+            foreach ($languageOptions as $lang) {
+                $countsByLang[$lang] = $cid !== ''
+                    ? $scheduleModel->countApprovedApplicationsForCourse($applicationLevel, $cid, $lang, $excludeIds)
+                    : 0;
+            }
+            $course['approved_counts_by_language'] = $countsByLang;
             $course['approved_application_count'] = $cid !== ''
-                ? $scheduleModel->countApprovedApplicationsForCourse($applicationLevel, $cid)
+                ? array_sum($countsByLang)
                 : 0;
         }
         unset($course);
@@ -728,6 +760,23 @@ class ApplicationAdmissionController extends Controller {
     /**
      * @param array<string, mixed> $schedule
      */
+    private function schedulePickerHint(array $schedule): string {
+        if (($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_ENTRANCE) {
+            $hint = 'Applicants already on another entrance exam for this course are not listed.';
+            $lang = trim((string) ($schedule['student_language'] ?? ''));
+            if ($lang !== '') {
+                return 'Only approved ' . $lang . ' applicants (1st preference match). ' . $hint;
+            }
+
+            return 'Approved applicants with matching 1st preference. ' . $hint;
+        }
+
+        return $this->interviewPickerHint($schedule);
+    }
+
+    /**
+     * @param array<string, mixed> $schedule
+     */
     private function interviewPickerHint(array $schedule): string {
         if (($schedule['schedule_type'] ?? '') !== ApplicationAdmissionScheduleModel::TYPE_INTERVIEW) {
             return '';
@@ -742,10 +791,16 @@ class ApplicationAdmissionController extends Controller {
             return 'This interview is set to: ' . $pathLabel . '. Select a course to add applicants.';
         }
         if ($pathway === ApplicationAdmissionScheduleModel::PATHWAY_INTERVIEW_ONLY) {
-            return 'Interview only: approved applicants with matching 1st preference can be added (no entrance exam step for this schedule).';
+            $hint = 'Interview only: approved applicants with matching 1st preference can be added (no entrance exam step for this schedule).';
+        } else {
+            $hint = 'Exam and interview: only applicants marked Selected on an entrance examination for this course can be added.';
+        }
+        $lang = trim((string) ($schedule['student_language'] ?? ''));
+        if ($lang !== '') {
+            $hint .= ' Only applicants with language ' . $lang . ' are listed.';
         }
 
-        return 'Exam and interview: only applicants marked Selected on an entrance examination for this course can be added.';
+        return $hint;
     }
 
     /**
@@ -778,19 +833,25 @@ class ApplicationAdmissionController extends Controller {
     private function buildWhatsAppRecipients(array $schedule, array $entries, string $publicUrl): array {
         require_once BASE_PATH . '/models/StudentModel.php';
         $isInterview = ($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW;
+        $downloadUrls = $this->publicScheduleDownloadUrls($schedule);
         $recipients = [];
         $n = 0;
         foreach ($entries as $row) {
             $n++;
             $roll = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($schedule, $row, $n);
             $digits = StudentModel::digitsForWhatsAppMe($row);
-            $message = $this->whatsappScheduleMessage($schedule, $publicUrl, $row, $roll, $isInterview);
+            $displayPhone = trim((string) ($row['student_whatsapp'] ?? ''));
+            if ($displayPhone === '') {
+                $displayPhone = trim((string) ($row['student_phone'] ?? ''));
+            }
+            $message = $this->whatsappScheduleMessage($schedule, $publicUrl, $row, $roll, $isInterview, $downloadUrls);
             $recipients[] = [
                 'entry_id' => (int) ($row['entry_id'] ?? 0),
                 'name' => (string) ($row['student_full_name'] ?? ''),
                 'nic' => (string) ($row['student_nic'] ?? ''),
                 'roll' => $roll,
                 'digits' => $digits,
+                'display_phone' => $displayPhone,
                 'has_phone' => $digits !== null,
                 'url' => $digits !== null ? 'https://wa.me/' . $digits . '?text=' . rawurlencode($message) : null,
             ];
@@ -800,16 +861,47 @@ class ApplicationAdmissionController extends Controller {
     }
 
     /**
+     * Public PDF / slip URLs for a published schedule (token-based).
+     *
+     * @param array<string, mixed> $schedule
+     * @return array{schedule_pdf: string, slip_base: string}
+     */
+    private function publicScheduleDownloadUrls(array $schedule): array {
+        $tokenEsc = rawurlencode((string) ($schedule['public_token'] ?? ''));
+        $base = rtrim(APP_URL, '/') . '/application-admission/public/' . $tokenEsc;
+        $isInterview = ($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW;
+        $slipSeg = $isInterview ? 'interview-slip' : 'admission-slip';
+
+        return [
+            'schedule_pdf' => $base . '/schedule-pdf',
+            'slip_base' => $base . '/' . $slipSeg,
+        ];
+    }
+
+    /**
      * @param array<string, mixed> $schedule
      * @param array<string, mixed> $entry
+     * @param array{schedule_pdf: string, slip_base: string} $downloadUrls
      */
-    private function whatsappScheduleMessage(array $schedule, string $publicUrl, array $entry, string $roll, bool $isInterview): string {
+    private function whatsappScheduleMessage(
+        array $schedule,
+        string $publicUrl,
+        array $entry,
+        string $roll,
+        bool $isInterview,
+        array $downloadUrls
+    ): string {
         $name = trim((string) ($entry['student_full_name'] ?? ''));
         $greeting = $name !== '' ? "Dear {$name},\n\n" : '';
         $title = trim((string) ($schedule['title'] ?? 'SLGTI schedule'));
         $date = trim((string) ($schedule['schedule_date'] ?? ''));
         $venue = trim((string) ($schedule['venue'] ?? ''));
         $course = trim((string) ($schedule['course_name'] ?? ''));
+        $nic = trim((string) ($entry['student_nic'] ?? ''));
+        $slipLink = $downloadUrls['slip_base'];
+        if ($nic !== '') {
+            $slipLink .= '?nic=' . rawurlencode($nic);
+        }
         $lines = [$greeting];
         if ($isInterview) {
             $lines[] = 'Your interview schedule at Sri Lanka German Training Institute (SLGTI) is published.';
@@ -829,7 +921,13 @@ class ApplicationAdmissionController extends Controller {
         }
         $lines[] = 'Index / Roll no.: ' . $roll;
         $lines[] = '';
-        $lines[] = 'Open this link to download the full schedule and your personal admission slip (enter your NIC on the page):';
+        $lines[] = 'Download full schedule (PDF):';
+        $lines[] = $downloadUrls['schedule_pdf'];
+        $lines[] = '';
+        $lines[] = 'Download your personal slip (PDF):';
+        $lines[] = $slipLink;
+        $lines[] = '';
+        $lines[] = 'Or open this page for all download options (enter NIC if needed):';
         $lines[] = $publicUrl;
         $lines[] = '';
         $lines[] = '— SLGTI Student Affairs';

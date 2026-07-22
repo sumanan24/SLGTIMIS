@@ -13,6 +13,14 @@ if (!function_exists('sa_admin_student_applications_render_table')) {
 if (!function_exists('sa_admin_student_applications_pagination')) {
     require_once __DIR__ . '/partials/sa_admin_app_pagination.php';
 }
+$can_update_rejection_reason = (bool) ($can_update_rejection_reason ?? false);
+$update_reason_action = isset($update_reason_action) ? (string) $update_reason_action : '';
+$rejection_reason_return_path = isset($rejection_reason_return_path) ? (string) $rejection_reason_return_path : 'student-applications?tab=rejected';
+$tableExtraArgs = [
+    $can_update_rejection_reason,
+    $update_reason_action,
+    $rejection_reason_return_path,
+];
 ?>
 <div class="sa-apps-table-mount-inner">
     <?php if ($active_tab === 'new'): ?>
@@ -32,7 +40,8 @@ if (!function_exists('sa_admin_student_applications_pagination')) {
         'new',
         'bg-secondary',
         ($page_new - 1) * $per_page,
-        (int) ($filter_course_priority ?? 1)
+        (int) ($filter_course_priority ?? 1),
+        ...$tableExtraArgs
     );
     ?>
     <?php if ($max_page_new > 1): ?>
@@ -55,7 +64,8 @@ if (!function_exists('sa_admin_student_applications_pagination')) {
         'approved',
         'bg-success',
         ($page_approved - 1) * $per_page,
-        (int) ($filter_course_priority ?? 1)
+        (int) ($filter_course_priority ?? 1),
+        ...$tableExtraArgs
     );
     ?>
     <?php if ($max_page_approved > 1): ?>
@@ -78,7 +88,8 @@ if (!function_exists('sa_admin_student_applications_pagination')) {
         'rejected',
         'bg-danger',
         ($page_rejected - 1) * $per_page,
-        (int) ($filter_course_priority ?? 1)
+        (int) ($filter_course_priority ?? 1),
+        ...$tableExtraArgs
     );
     ?>
     <?php if ($max_page_rejected > 1): ?>

@@ -358,10 +358,10 @@ class UserModel extends Model {
     }
 
     /**
-     * Edit stored application fields (same gate as delete): system admin or ADM only — not SAO/RSA.
+     * Edit stored application fields and replace uploads: SAO/RSA and ADM / system admin (DIR is view-only).
      */
     public function canEditOnlineStudentApplications($userId): bool {
-        return $this->isAdminOrADM($userId);
+        return $this->isSAO($userId) || $this->isAdminOrADM($userId);
     }
 
     /**

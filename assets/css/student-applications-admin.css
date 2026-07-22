@@ -108,35 +108,111 @@
     vertical-align: middle;
 }
 
-.sa-admin-page .sa-apps-table th:nth-child(1),
-.sa-admin-page .sa-apps-table td:nth-child(1) {
+/* Column alignment — class-based (new / approved / rejected share markup; no nth-child) */
+.sa-admin-page .sa-apps-table .sa-apps-col-num,
+.sa-admin-page .sa-apps-table th.sa-apps-col-num,
+.sa-admin-page .sa-apps-table td.sa-apps-col-num {
+    width: 3rem;
     text-align: end;
+    font-variant-numeric: tabular-nums;
+    color: var(--bs-secondary-color, #6c757d);
+}
+
+.sa-admin-page .sa-apps-table .sa-apps-col-level,
+.sa-admin-page .sa-apps-table th.sa-apps-col-level,
+.sa-admin-page .sa-apps-table td.sa-apps-col-level {
     width: 3.25rem;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.sa-admin-page .sa-apps-table .sa-apps-col-status,
+.sa-admin-page .sa-apps-table th.sa-apps-col-status,
+.sa-admin-page .sa-apps-table td.sa-apps-col-status {
+    text-align: center;
+    white-space: nowrap;
+    width: 5.75rem;
+}
+
+.sa-admin-page .sa-apps-table .sa-apps-col-name,
+.sa-admin-page .sa-apps-table th.sa-apps-col-name,
+.sa-admin-page .sa-apps-table td.sa-apps-col-name {
+    text-align: start;
+    max-width: 12rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sa-admin-page .sa-apps-table .sa-apps-col-nic,
+.sa-admin-page .sa-apps-table th.sa-apps-col-nic,
+.sa-admin-page .sa-apps-table td.sa-apps-col-nic {
+    text-align: start;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+.sa-admin-page .sa-apps-table .sa-apps-col-district,
+.sa-admin-page .sa-apps-table th.sa-apps-col-district,
+.sa-admin-page .sa-apps-table td.sa-apps-col-district {
+    text-align: start;
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sa-admin-page .sa-apps-table .sa-apps-col-email,
+.sa-admin-page .sa-apps-table th.sa-apps-col-email,
+.sa-admin-page .sa-apps-table td.sa-apps-col-email {
+    text-align: start;
+    max-width: 11rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sa-admin-page .sa-apps-table .sa-apps-col-phone,
+.sa-admin-page .sa-apps-table th.sa-apps-col-phone,
+.sa-admin-page .sa-apps-table td.sa-apps-col-phone {
+    text-align: start;
+    white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
 
-.sa-admin-page .sa-apps-table th:nth-child(2),
-.sa-admin-page .sa-apps-table td:nth-child(2) {
-    text-align: center;
-    width: 4rem;
-}
-
-.sa-admin-page .sa-apps-table th:nth-child(11),
-.sa-admin-page .sa-apps-table td:nth-child(11) {
+.sa-admin-page .sa-apps-table .sa-apps-col-date,
+.sa-admin-page .sa-apps-table th.sa-apps-col-date,
+.sa-admin-page .sa-apps-table td.sa-apps-col-date {
+    text-align: end;
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    width: 1%;
 }
 
-.sa-admin-page .sa-apps-table th:nth-child(12),
-.sa-admin-page .sa-apps-table td:nth-child(12) {
+.sa-admin-page .sa-apps-table .sa-apps-col-actions,
+.sa-admin-page .sa-apps-table th.sa-apps-col-actions,
+.sa-admin-page .sa-apps-table td.sa-apps-col-actions {
     text-align: end;
     white-space: nowrap;
     width: 1%;
+    vertical-align: middle;
+}
+
+.sa-admin-page .sa-apps-table td.sa-apps-col-actions .sa-apps-table-actions {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
 }
 
 .sa-admin-page .sa-apps-col-choice {
     min-width: 7rem;
     max-width: 11rem;
     font-size: 0.8125rem;
+    text-align: start;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .sa-admin-page .sa-apps-col-choice--active {
@@ -451,7 +527,32 @@
 }
 
 .sa-student-apps-index .sa-apps-card-body .sa-apps-table-responsive {
-    padding: 0 1.25rem;
+    padding: 0 1rem 0.25rem;
+    margin-top: 0;
+}
+
+@media (min-width: 992px) {
+    .sa-student-apps-index .sa-apps-card-body .sa-apps-table-responsive {
+        padding-left: 1.25rem;
+        padding-right: 1.25rem;
+    }
+}
+
+.sa-student-apps-index .sa-apps-table {
+    margin-bottom: 0;
+}
+
+.sa-student-apps-index .sa-apps-table thead th {
+    vertical-align: middle;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+}
+
+.sa-student-apps-index .sa-apps-table tbody td {
+    vertical-align: middle;
 }
 
 .sa-student-apps-index .sa-apps-panel-lead {
@@ -468,31 +569,126 @@
 
 .sa-student-apps-index .sa-apps-pagination {
     background-color: #fff;
+    margin-top: 0;
+}
+
+/* Override global style.css `.pagination` (flex + gap + heavy borders on `a`) — use Bootstrap page items */
+.sa-student-apps-index .sa-apps-pagination .sa-apps-pagination-list.pagination,
+.sa-admin-page .sa-apps-pagination .pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-left: 0;
+    list-style: none;
+}
+
+.sa-student-apps-index .sa-apps-pagination-inner {
+    width: 100%;
+}
+
+.sa-student-apps-index .sa-apps-pagination-meta {
+    flex: 1 1 auto;
+    min-width: 8rem;
+}
+
+@media (min-width: 768px) {
+    .sa-student-apps-index .sa-apps-pagination-inner {
+        flex-wrap: nowrap;
+    }
+
+    .sa-student-apps-index .sa-apps-pagination-meta {
+        text-align: start;
+    }
+
+    .sa-student-apps-index .sa-apps-pagination .sa-apps-pagination-list {
+        flex: 0 1 auto;
+        justify-content: flex-end;
+    }
+}
+
+.sa-student-apps-index .sa-apps-pagination .page-item {
+    display: flex;
+    align-items: stretch;
+}
+
+.sa-student-apps-index .sa-apps-pagination .page-link,
+.sa-admin-page .sa-apps-pagination .page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.125rem;
+    min-height: 2rem;
+    padding: 0.35rem 0.65rem;
+    line-height: 1.25;
+    text-decoration: none;
+    border-radius: var(--bs-pagination-border-radius, 0.25rem);
+    transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+}
+
+.sa-student-apps-index .sa-apps-pagination a.page-link {
+    border: var(--bs-pagination-border-width, 1px) solid var(--bs-pagination-border-color, #dee2e6);
+    color: var(--bs-pagination-color, #0d6efd);
+    background-color: var(--bs-pagination-bg, #fff);
+}
+
+.sa-student-apps-index .sa-apps-pagination a.page-link:hover {
+    background-color: var(--bs-pagination-hover-bg, #e9ecef);
+    border-color: var(--bs-pagination-hover-border-color, #dee2e6);
+    color: var(--bs-pagination-hover-color, #0a58ca);
+}
+
+.sa-student-apps-index .sa-apps-pagination button.page-link.sa-nic-ajax-pag {
+    appearance: none;
+    cursor: pointer;
+    font: inherit;
+    border: var(--bs-pagination-border-width, 1px) solid var(--bs-pagination-border-color, #dee2e6);
+    color: var(--bs-pagination-color, #0d6efd);
+    background-color: var(--bs-pagination-bg, #fff);
+}
+
+.sa-student-apps-index .sa-apps-pagination button.page-link.sa-nic-ajax-pag:hover:not(:disabled) {
+    background-color: var(--bs-pagination-hover-bg, #e9ecef);
+    border-color: var(--bs-pagination-hover-border-color, #dee2e6);
+    color: var(--bs-pagination-hover-color, #0a58ca);
+}
+
+.sa-student-apps-index .sa-apps-pagination .page-item.active .page-link {
+    z-index: 3;
+    color: var(--bs-pagination-active-color, #fff);
+    background-color: var(--bs-pagination-active-bg, #0d6efd);
+    border-color: var(--bs-pagination-active-border-color, #0d6efd);
+}
+
+.sa-student-apps-index .sa-apps-pagination .page-item.disabled .page-link,
+.sa-student-apps-index .sa-apps-pagination .page-item.disabled .page-link:hover {
+    color: var(--bs-pagination-disabled-color, #6c757d);
+    background-color: var(--bs-pagination-disabled-bg, #fff);
+    border-color: var(--bs-pagination-disabled-border-color, #dee2e6);
+    pointer-events: none;
+    cursor: default;
 }
 
 .sa-student-apps-index .sa-apps-pagination .pagination {
     margin-bottom: 0;
 }
 
-/* Status column + name column alignment */
-.sa-student-apps-index .sa-apps-table th:nth-child(3),
-.sa-student-apps-index .sa-apps-table td:nth-child(3) {
-    text-align: center;
-    white-space: nowrap;
+.sa-student-apps-index .sa-apps-toolbar {
+    align-items: flex-end;
 }
 
-.sa-student-apps-index .sa-apps-table th:nth-child(4),
-.sa-student-apps-index .sa-apps-table td:nth-child(4) {
-    text-align: start;
+.sa-student-apps-index .sa-apps-toolbar .sa-apps-filter-field {
+    min-width: 0;
 }
 
-.sa-student-apps-index .sa-apps-table th:nth-child(5),
-.sa-student-apps-index .sa-apps-table td:nth-child(5) {
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+.sa-student-apps-index .sa-apps-toolbar > .d-flex:last-child {
+    align-self: flex-end;
 }
 
-/* ——— Application dashboard: one stacked list, full rows, page scroll only ——— */
+.sa-apps-col-reason {
 .sa-page-dashboard.sa-student-apps-index {
     padding-top: 0.4rem !important;
     padding-bottom: 0.4rem !important;
@@ -883,4 +1079,21 @@
     .sa-dashboard-row-kpi {
         grid-template-columns: 1fr;
     }
+}
+
+.sa-apps-col-reason {
+    min-width: 10rem;
+    max-width: 18rem;
+    vertical-align: top;
+    text-align: start;
+}
+
+.sa-apps-col-reason .sa-reason-text {
+    display: block;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.sa-apps-col-reason .sa-reason-update summary {
+    font-size: 0.8125rem;
 }

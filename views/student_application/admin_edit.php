@@ -1,16 +1,18 @@
 <?php
 /**
- * ADM / system admin: edit stored `student_applications` row (document paths not edited here).
+ * SAO / ADM: edit stored `student_applications` row; optional document replacements on save.
  *
  * @var array<string, mixed> $app
  * @var int $application_id
  * @var array<string, string> $course_prefs_old Dept + course keys for course preference script (from API-style flatten).
+ * @var bool $can_change_status ADM / system admin may change workflow status (not reject — use View)
  */
 declare(strict_types=1);
 
 $app = $app ?? [];
 $application_id = (int) ($application_id ?? 0);
 $course_prefs_old = isset($course_prefs_old) && is_array($course_prefs_old) ? $course_prefs_old : [];
+$can_change_status = (bool) ($can_change_status ?? false);
 
 if (!class_exists('StudentApplicationModel', false)) {
     require_once BASE_PATH . '/models/StudentApplicationModel.php';
@@ -35,7 +37,7 @@ for ($n = 1; $n <= 3; $n++) {
 
 $selectOptions = [
     'application_level' => ['04' => 'Level 04', '05' => 'Level 05'],
-    'status' => ['new' => 'New', 'approved' => 'Approved', 'rejected' => 'Rejected'],
+    'status' => ['new' => 'New', 'approved' => 'Approved'],
     'student_title' => ['' => '—', 'Mr' => 'Mr', 'Miss' => 'Miss', 'Mrs' => 'Mrs'],
     'student_gender' => ['' => '—', 'Male' => 'Male', 'Female' => 'Female', 'Other' => 'Other'],
     'student_civil_status' => ['' => '—', 'Single' => 'Single', 'Married' => 'Married'],
@@ -56,6 +58,15 @@ $selectOptions = [
 
 $saAdminCss = htmlspecialchars($base . '/assets/css/student-applications-admin.css', ENT_QUOTES, 'UTF-8');
 $nvqJs = (isset($app['application_level']) && (string) $app['application_level'] === '05') ? '5' : '4';
+
+$staffDocFields = [
+    'nic_document' => ['col' => 'nic_document_path', 'label' => 'NIC copy'],
+    'birth_certificate' => ['col' => 'birth_certificate_path', 'label' => 'Birth certificate'],
+    'ol_certificate' => ['col' => 'ol_certificate_path', 'label' => 'O/L certificate'],
+    'al_certificate' => ['col' => 'al_certificate_path', 'label' => 'A/L certificate'],
+    'nvq_certificate' => ['col' => 'nvq_certificate_path', 'label' => 'NVQ certificate'],
+    'bank_receipt' => ['col' => 'bank_receipt_path', 'label' => 'Bank receipt'],
+];
 ?>
 <link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=18">
 <div class="sa-admin-page sa-admin-edit container-fluid py-3">
@@ -64,12 +75,12 @@ $nvqJs = (isset($app['application_level']) && (string) $app['application_level']
             <a href="<?php echo $esc($listUrl); ?>" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1" aria-hidden="true"></i>Applications</a>
             <a href="<?php echo $esc($viewUrl); ?>" class="btn btn-outline-primary btn-sm"><i class="fas fa-eye me-1" aria-hidden="true"></i>View #<?php echo (int) $application_id; ?></a>
         </div>
-        <span class="badge bg-info text-dark">ADM · Edit stored fields</span>
+        <span class="badge bg-info text-dark"><?php echo $can_change_status ? 'ADM · Edit fields & status' : 'SAO · Edit fields & documents'; ?></span>
     </div>
     <h1 class="h4 mb-3">Edit application #<?php echo (int) $application_id; ?></h1>
-    <p class="text-muted small mb-4">Uploaded documents are not changed here. Use <strong>View</strong> to open or download files. Changing NIC or email must stay unique per NVQ level. Course choices use the same department and course lists as the public application form.</p>
+    <p class="text-muted small mb-4">Attach new PDF, JPG, or PNG files below to replace stored documents (5 MB max each). Leave a file empty to keep the current upload. Changing NIC or email must stay unique per NVQ level. To <strong>reject</strong>, use <strong>View</strong> and enter a reason. Course choices use the same department and course lists as the public application form.</p>
 
-    <form method="post" action="<?php echo $esc($formAction); ?>" class="card shadow-sm border-0" id="saAdminAppEditForm">
+    <form method="post" action="<?php echo $esc($formAction); ?>" enctype="multipart/form-data" class="card shadow-sm border-0" id="saAdminAppEditForm">
         <div class="card-body">
             <input type="hidden" name="application_id" value="<?php echo (int) $application_id; ?>">
             <div class="table-responsive">
@@ -86,6 +97,9 @@ $nvqJs = (isset($app['application_level']) && (string) $app['application_level']
                             if (in_array($col, $courseCols, true)) {
                                 continue;
                             }
+                            if ($col === 'status' && !$can_change_status) {
+                                continue;
+                            }
                             $val = array_key_exists($col, $app) && $app[$col] !== null ? (string) $app[$col] : '';
                             $label = str_replace('_', ' ', $col);
                             ?>
@@ -97,6 +111,9 @@ $nvqJs = (isset($app['application_level']) && (string) $app['application_level']
                                     <?php foreach ($selectOptions[$col] as $optVal => $optLabel): ?>
                                     <option value="<?php echo $esc((string) $optVal); ?>"<?php echo $val === (string) $optVal ? ' selected' : ''; ?>><?php echo $esc($optLabel); ?></option>
                                     <?php endforeach; ?>
+                                    <?php if ($col === 'status' && $val === 'rejected'): ?>
+                                    <option value="rejected" selected>Rejected (use View → Reject to change)</option>
+                                    <?php endif; ?>
                                 </select>
                                 <?php if ($col === 'application_level'): ?>
                                 <p class="form-text small mb-0 mt-1">If you change NVQ level, course lists reload; pick departments and courses again if needed.</p>
@@ -138,6 +155,44 @@ $nvqJs = (isset($app['application_level']) && (string) $app['application_level']
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+            <div class="mt-4 pt-3 border-top">
+                <h2 class="h6 fw-semibold mb-3"><i class="fas fa-paperclip me-2" aria-hidden="true"></i>Replace uploaded documents</h2>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">Document</th>
+                                <th scope="col">Current file</th>
+                                <th scope="col">New upload</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($staffDocFields as $inputName => $meta): ?>
+                                <?php
+                                $pathCol = (string) $meta['col'];
+                                $stored = trim((string) ($app[$pathCol] ?? ''));
+                                $storedUrl = $stored !== '' && class_exists('StudentApplicationModel', false)
+                                    ? StudentApplicationModel::storedUploadPublicUrl($stored)
+                                    : null;
+                                ?>
+                            <tr>
+                                <th scope="row" class="small fw-semibold"><?php echo $esc($meta['label']); ?></th>
+                                <td class="small">
+                                    <?php if ($storedUrl): ?>
+                                    <a href="<?php echo $esc($storedUrl); ?>" target="_blank" rel="noopener">View current</a>
+                                    <?php else: ?>
+                                    <span class="text-muted">Not uploaded</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <input type="file" class="form-control form-control-sm" name="<?php echo $esc($inputName); ?>" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
             <div class="d-flex flex-wrap gap-2 mt-4 pt-3 border-top">
                 <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1" aria-hidden="true"></i>Save changes</button>

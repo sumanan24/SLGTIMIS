@@ -22,7 +22,7 @@ class StudentApplicationModel extends Model {
         . '`al_subject_name_01`, `al_subject_01_marks`, `al_subject_name_02`, `al_subject_02_marks`, `al_subject_name_03`, `al_subject_03_marks`, '
         . '`nvq_level`, `nvq_course_name`, `nvq_institute_name`, `nvq_year_completed`, '
         . '`nic_document_path`, `birth_certificate_path`, `ol_certificate_path`, `al_certificate_path`, `nvq_certificate_path`, `bank_receipt_path`, '
-        . '`status`, `created_at`';
+        . '`status`, `rejection_reason`, `created_at`';
 
     /** NIC-step draft rows (`insert_draft.php`) until the applicant enters a real name. */
     public const DRAFT_FULL_NAME_PLACEHOLDER = '(Pending)';
@@ -64,9 +64,38 @@ class StudentApplicationModel extends Model {
     }
 
     /** Staff list at `/student-applications`. */
-    private const APPLICATION_LIST_SELECT = '`application_id`, `application_level`, `status`, `student_full_name`, `student_nic`, `student_district`, '
-        . '`student_email`, `student_phone`, `student_whatsapp`, `created_at`, '
+    private const APPLICATION_LIST_SELECT = '`application_id`, `application_level`, `status`, `rejection_reason`, `student_full_name`, `student_nic`, `student_district`, '
+        . '`student_email`, `student_phone`, `student_whatsapp`, `student_language`, `created_at`, '
         . '`course_priority_1`, `course_priority_2`, `course_priority_3`';
+
+    /** Applicant language values allowed on online applications (filter + staff edit). */
+    public const STAFF_LANGUAGE_FILTER_VALUES = ['Tamil', 'Sinhala', 'English'];
+
+    /**
+     * Normalize `lang` query param for staff list / export filters.
+     */
+    public static function normalizedStaffLanguageFilter(?string $raw): ?string {
+        $s = trim((string) ($raw ?? ''));
+        if ($s === '') {
+            return null;
+        }
+        return in_array($s, self::STAFF_LANGUAGE_FILTER_VALUES, true) ? $s : null;
+    }
+
+    /**
+     * @return array{sql: string, types: string, params: list<string>}
+     */
+    private function adminLanguageFilterParts(?string $language): array {
+        $lang = self::normalizedStaffLanguageFilter($language);
+        if ($lang === null) {
+            return ['sql' => '', 'types' => '', 'params' => []];
+        }
+        return [
+            'sql' => ' AND TRIM(IFNULL(`sa`.`student_language`, \'\')) = ?',
+            'types' => 's',
+            'params' => [$lang],
+        ];
+    }
 
     public function __construct() {
         parent::__construct();
@@ -198,6 +227,15 @@ class StudentApplicationModel extends Model {
                 $ix->free();
             }
 
+            $colRr = $conn->query("SHOW COLUMNS FROM `student_applications` LIKE 'rejection_reason'");
+            $hasRr = $colRr && $colRr->num_rows > 0;
+            if ($colRr) {
+                $colRr->free();
+            }
+            if (!$hasRr) {
+                $conn->query("ALTER TABLE `student_applications` ADD COLUMN `rejection_reason` TEXT DEFAULT NULL COMMENT 'Required when staff reject; cleared on approve' AFTER `status`");
+            }
+
             // Same as /level05application/: NIC and email are unique per `application_level` (04 vs 05), not globally.
             // Level 04 hits this model only; without this call, older DBs may keep a single-column NIC unique.
             $helperPath = BASE_PATH . DIRECTORY_SEPARATOR . 'level05application' . DIRECTORY_SEPARATOR . 'helpers.php';
@@ -219,12 +257,70 @@ class StudentApplicationModel extends Model {
         if (!in_array($status, ['new', 'approved', 'rejected'], true)) {
             return false;
         }
-        $sql = "UPDATE `{$this->table}` SET `status` = ? WHERE `application_id` = ? LIMIT 1";
+        if ($status === 'rejected') {
+            return false;
+        }
+        $clearReason = ($status === 'approved' || $status === 'new') ? 1 : 0;
+        if ($clearReason) {
+            $sql = "UPDATE `{$this->table}` SET `status` = ?, `rejection_reason` = NULL WHERE `application_id` = ? LIMIT 1";
+        } else {
+            $sql = "UPDATE `{$this->table}` SET `status` = ? WHERE `application_id` = ? LIMIT 1";
+        }
         $stmt = $this->db->prepare($sql);
         if (!$stmt) {
             return false;
         }
         $stmt->bind_param('si', $status, $id);
+        $ok = $stmt->execute();
+        $stmt->close();
+        return (bool) $ok;
+    }
+
+    /**
+     * Reject with a mandatory reason (staff workflow).
+     */
+    public function setRejected(int $id, string $reason): bool {
+        $this->ensureTable();
+        $this->migrateSchema();
+        $reason = trim($reason);
+        if ($reason === '') {
+            return false;
+        }
+        $status = 'rejected';
+        $sql = "UPDATE `{$this->table}` SET `status` = ?, `rejection_reason` = ? WHERE `application_id` = ? LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param('ssi', $status, $reason, $id);
+        $ok = $stmt->execute();
+        $stmt->close();
+        return (bool) $ok;
+    }
+
+    /**
+     * Update stored rejection reason (application must already be rejected).
+     */
+    public function updateRejectionReason(int $id, string $reason): bool {
+        $this->ensureTable();
+        $this->migrateSchema();
+        $reason = trim($reason);
+        if ($reason === '' || strlen($reason) > 2000) {
+            return false;
+        }
+        $existing = $this->findById($id);
+        if (!$existing) {
+            return false;
+        }
+        if (strtolower(trim((string) ($existing['status'] ?? ''))) !== 'rejected') {
+            return false;
+        }
+        $sql = "UPDATE `{$this->table}` SET `rejection_reason` = ? WHERE `application_id` = ? AND `status` = 'rejected' LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param('si', $reason, $id);
         $ok = $stmt->execute();
         $stmt->close();
         return (bool) $ok;
@@ -296,6 +392,12 @@ class StudentApplicationModel extends Model {
                 }
                 if (!in_array($s, ['new', 'approved', 'rejected'], true)) {
                     return [false, null, 'Status must be new, approved, or rejected.'];
+                }
+                if ($s === 'rejected') {
+                    if ($prevStr === 'rejected') {
+                        return [true, 'rejected', ''];
+                    }
+                    return [false, null, 'To reject an application, use Reject on the View page and enter a reason.'];
                 }
                 return [true, $s, ''];
 
@@ -612,7 +714,7 @@ class StudentApplicationModel extends Model {
     /**
      * Count applications for staff list (optional NVQ level 04 / 05; optional 1st preference department / course).
      */
-    public function countListForAdmin(string $status, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1): int {
+    public function countListForAdmin(string $status, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null): int {
         $this->ensureTable();
         $this->migrateSchema();
         if (!in_array($status, ['new', 'approved', 'rejected'], true)) {
@@ -636,6 +738,12 @@ class StudentApplicationModel extends Model {
         $sql .= $nicFrag['sql'];
         $types .= $nicFrag['types'];
         foreach ($nicFrag['params'] as $p) {
+            $params[] = $p;
+        }
+        $langFrag = $this->adminLanguageFilterParts($languageFilter);
+        $sql .= $langFrag['sql'];
+        $types .= $langFrag['types'];
+        foreach ($langFrag['params'] as $p) {
             $params[] = $p;
         }
         if ($onlySubmittedForStaff) {
@@ -664,7 +772,7 @@ class StudentApplicationModel extends Model {
      *
      * @return list<array<string, mixed>>
      */
-    public function getListPageForAdmin(string $status, ?string $level, int $page, int $perPage, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1): array {
+    public function getListPageForAdmin(string $status, ?string $level, int $page, int $perPage, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null): array {
         $this->ensureTable();
         $this->migrateSchema();
         if (!in_array($status, ['new', 'approved', 'rejected'], true)) {
@@ -692,6 +800,12 @@ class StudentApplicationModel extends Model {
         $sql .= $nicFrag['sql'];
         $types .= $nicFrag['types'];
         foreach ($nicFrag['params'] as $p) {
+            $params[] = $p;
+        }
+        $langFrag = $this->adminLanguageFilterParts($languageFilter);
+        $sql .= $langFrag['sql'];
+        $types .= $langFrag['types'];
+        foreach ($langFrag['params'] as $p) {
             $params[] = $p;
         }
         if ($onlySubmittedForStaff) {
@@ -1147,7 +1261,7 @@ class StudentApplicationModel extends Model {
      *
      * @return array{total: int, by_status: array{new: int, approved: int, rejected: int}, by_level: list<array{level: string, count: int}>, by_district: list<array{label: string, count: int}>, by_course: list<array{label: string, count: int}>, by_department: list<array{label: string, count: int}>, by_gender: list<array{label: string, count: int}>, by_course_priority: array<int, array{course: list<array{label: string, count: int}>, department: list<array{label: string, count: int}>}>}
      */
-    public function getDashboardStats(?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1): array {
+    public function getDashboardStats(?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null): array {
         $this->ensureTable();
         $this->migrateSchema();
         $coursePriority = $this->normalizeCoursePriority($coursePriority);
@@ -1190,10 +1304,16 @@ class StudentApplicationModel extends Model {
         foreach ($nicPart['params'] as $np) {
             $filterParams[] = $np;
         }
+        $langPart = $this->adminLanguageFilterParts($languageFilter);
+        $filterTail .= $langPart['sql'];
+        $filterTypes .= $langPart['types'];
+        foreach ($langPart['params'] as $lp) {
+            $filterParams[] = $lp;
+        }
         if ($onlySubmittedForStaff) {
             $filterTail .= ' AND (' . self::sqlStaffAffairsListPredicate('sa') . ')';
         }
-        $filtered = ($levelPart !== '' || $existsPart['sql'] !== '' || $nicPart['sql'] !== '');
+        $filtered = ($levelPart !== '' || $existsPart['sql'] !== '' || $nicPart['sql'] !== '' || $langPart['sql'] !== '');
 
         $db = $this->db;
         $self = $this;
@@ -1429,7 +1549,7 @@ class StudentApplicationModel extends Model {
      * @param string|null $courseId optional: 1st preference matches this `course`.`course_id`
      * @return list<array<string, mixed>>
      */
-    public function getAllForStaffExport(?string $status = null, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1): array {
+    public function getAllForStaffExport(?string $status = null, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null): array {
         $this->ensureTable();
         $this->migrateSchema();
         $conn = $this->db->getConnection();
@@ -1496,6 +1616,12 @@ class StudentApplicationModel extends Model {
         $sql .= $nicFrag['sql'];
         $types .= $nicFrag['types'];
         foreach ($nicFrag['params'] as $p) {
+            $params[] = $p;
+        }
+        $langFrag = $this->adminLanguageFilterParts($languageFilter);
+        $sql .= $langFrag['sql'];
+        $types .= $langFrag['types'];
+        foreach ($langFrag['params'] as $p) {
             $params[] = $p;
         }
         $sql .= ' ORDER BY sa.`created_at` DESC';

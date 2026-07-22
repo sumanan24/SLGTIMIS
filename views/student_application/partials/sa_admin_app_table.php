@@ -10,6 +10,9 @@
  * @param bool $can_delete
  * @param bool $can_edit
  * @param callable(?string):array{order:string,display:string} $formatSubmitted
+ * @param bool $can_update_rejection_reason
+ * @param string $update_reason_action
+ * @param string $rejection_reason_return_path
  */
 function sa_admin_student_applications_render_table(
     array $rows,
@@ -23,9 +26,14 @@ function sa_admin_student_applications_render_table(
     string $statusLabel,
     string $badgeClass,
     int $rowNumBase = 0,
-    int $filterCoursePriority = 1
+    int $filterCoursePriority = 1,
+    bool $can_update_rejection_reason = false,
+    string $update_reason_action = '',
+    string $rejection_reason_return_path = 'student-applications?tab=rejected'
 ): void {
     $filterCoursePriority = in_array($filterCoursePriority, [1, 2, 3], true) ? $filterCoursePriority : 1;
+    $isRejectedTab = ($statusLabel === 'rejected');
+    $colCount = $isRejectedTab ? 14 : 13;
     $choiceThClass = static function (int $n) use ($filterCoursePriority): string {
         return $n === $filterCoursePriority ? ' sa-apps-col-choice sa-apps-col-choice--active' : ' sa-apps-col-choice';
     };
@@ -34,28 +42,49 @@ function sa_admin_student_applications_render_table(
     };
     ?>
     <div class="table-responsive sa-apps-table-responsive">
-        <table class="table table-striped table-hover table-bordered align-middle w-100 mb-0 sa-apps-table">
+        <table class="table table-striped table-hover table-bordered align-middle w-100 mb-0 sa-apps-table<?php echo $isRejectedTab ? ' sa-apps-table--rejected' : ''; ?>">
+            <colgroup>
+                <col class="sa-apps-col-num">
+                <col class="sa-apps-col-level">
+                <col class="sa-apps-col-status">
+                <?php if ($isRejectedTab): ?>
+                <col class="sa-apps-col-reason">
+                <?php endif; ?>
+                <col class="sa-apps-col-name">
+                <col class="sa-apps-col-nic">
+                <col class="sa-apps-col-choice">
+                <col class="sa-apps-col-choice">
+                <col class="sa-apps-col-choice">
+                <col class="sa-apps-col-district">
+                <col class="sa-apps-col-email">
+                <col class="sa-apps-col-phone">
+                <col class="sa-apps-col-date">
+                <col class="sa-apps-col-actions">
+            </colgroup>
             <thead class="table-light">
                 <tr>
-                    <th scope="col" class="text-end sa-apps-col-num">#</th>
-                    <th scope="col">Level</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Full name</th>
-                    <th scope="col">NIC</th>
-                    <th scope="col" class="<?php echo trim($choiceThClass(1)); ?>">1st choice</th>
-                    <th scope="col" class="<?php echo trim($choiceThClass(2)); ?>">2nd choice</th>
-                    <th scope="col" class="<?php echo trim($choiceThClass(3)); ?>">3rd choice</th>
-                    <th scope="col">District</th>
-                    <th scope="col">Email</th>
-                    <th scope="col">Phone</th>
-                    <th scope="col">Date sent</th>
-                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                    <th scope="col" class="sa-apps-col-num">#</th>
+                    <th scope="col" class="sa-apps-col-level">Level</th>
+                    <th scope="col" class="sa-apps-col-status">Status</th>
+                    <?php if ($isRejectedTab): ?>
+                    <th scope="col" class="sa-apps-col-reason">Rejection reason</th>
+                    <?php endif; ?>
+                    <th scope="col" class="sa-apps-col-name">Full name</th>
+                    <th scope="col" class="sa-apps-col-nic">NIC</th>
+                    <th scope="col" class="<?php echo trim('sa-apps-col-choice' . $choiceThClass(1)); ?>">1st choice</th>
+                    <th scope="col" class="<?php echo trim('sa-apps-col-choice' . $choiceThClass(2)); ?>">2nd choice</th>
+                    <th scope="col" class="<?php echo trim('sa-apps-col-choice' . $choiceThClass(3)); ?>">3rd choice</th>
+                    <th scope="col" class="sa-apps-col-district">District</th>
+                    <th scope="col" class="sa-apps-col-email">Email</th>
+                    <th scope="col" class="sa-apps-col-phone">Phone</th>
+                    <th scope="col" class="sa-apps-col-date">Date sent</th>
+                    <th scope="col" class="sa-apps-col-actions"><span class="visually-hidden">Actions</span></th>
                 </tr>
             </thead>
             <tbody>
                 <?php if ($rows === []): ?>
                 <tr>
-                    <td colspan="13" class="sa-apps-empty text-secondary text-center py-5 px-3">No <?php echo $esc($statusLabel); ?> applications<?php
+                    <td colspan="<?php echo (int) $colCount; ?>" class="sa-apps-empty text-secondary text-center py-5 px-3">No <?php echo $esc($statusLabel); ?> applications<?php
                         if ($statusLabel === 'new') {
                             echo ' to review';
                         } elseif ($statusLabel === 'rejected') {
@@ -72,21 +101,47 @@ function sa_admin_student_applications_render_table(
                         $seq = $rowNumBase + $rowIx;
                         $submitted = $formatSubmitted(isset($r['created_at']) ? (string) $r['created_at'] : null);
                         $waDigits = StudentModel::digitsForWhatsAppMe($r);
+                        $rejectReason = trim((string) ($r['rejection_reason'] ?? ''));
+                        $reasonPreview = $rejectReason;
+                        if (strlen($reasonPreview) > 120) {
+                            $reasonPreview = substr($reasonPreview, 0, 117) . '…';
+                        }
                         ?>
                 <tr>
-                    <td class="text-muted text-end sa-apps-col-num"><?php echo (int) $seq; ?></td>
-                    <td><?php echo $esc((string) ($r['application_level'] ?? '')); ?></td>
-                    <td><span class="badge rounded-pill px-2 <?php echo $esc($badgeClass); ?>"><?php echo $esc(ucfirst($statusLabel)); ?></span></td>
-                    <td><?php echo $esc((string) ($r['student_full_name'] ?? '')); ?></td>
-                    <td><?php echo $esc((string) ($r['student_nic'] ?? '')); ?></td>
-                    <td class="<?php echo trim($choiceTdClass(1)); ?>"><?php echo $esc((string) ($r['course_choice_1'] ?? '')); ?></td>
-                    <td class="<?php echo trim($choiceTdClass(2)); ?>"><?php echo $esc((string) ($r['course_choice_2'] ?? '')); ?></td>
-                    <td class="<?php echo trim($choiceTdClass(3)); ?>"><?php echo $esc((string) ($r['course_choice_3'] ?? '')); ?></td>
-                    <td><?php echo $esc((string) ($r['student_district'] ?? '')); ?></td>
-                    <td><?php echo $esc((string) ($r['student_email'] ?? '')); ?></td>
-                    <td><?php echo $esc((string) ($r['student_phone'] ?? '')); ?></td>
-                    <td data-order="<?php echo $submitted['order']; ?>"><?php echo $submitted['display']; ?></td>
-                    <td>
+                    <td class="sa-apps-col-num"><?php echo (int) $seq; ?></td>
+                    <td class="sa-apps-col-level"><?php echo $esc((string) ($r['application_level'] ?? '')); ?></td>
+                    <td class="sa-apps-col-status"><span class="badge rounded-pill px-2 <?php echo $esc($badgeClass); ?>"><?php echo $esc(ucfirst($statusLabel)); ?></span></td>
+                    <?php if ($isRejectedTab): ?>
+                    <td class="sa-apps-col-reason small">
+                        <?php if ($rejectReason !== ''): ?>
+                        <span class="sa-reason-text" title="<?php echo $esc($rejectReason); ?>"><?php echo $esc($reasonPreview); ?></span>
+                        <?php else: ?>
+                        <span class="badge bg-warning text-dark">Missing reason</span>
+                        <?php endif; ?>
+                        <?php if ($can_update_rejection_reason && $update_reason_action !== ''): ?>
+                        <details class="sa-reason-update mt-1">
+                            <summary class="text-primary user-select-none" style="cursor:pointer;">Update reason</summary>
+                            <form method="post" action="<?php echo $esc($update_reason_action); ?>" class="mt-2">
+                                <input type="hidden" name="application_id" value="<?php echo $id; ?>">
+                                <input type="hidden" name="return_path" value="<?php echo $esc($rejection_reason_return_path); ?>">
+                                <label class="visually-hidden" for="sa-reason-<?php echo $id; ?>">Rejection reason</label>
+                                <textarea class="form-control form-control-sm mb-1" name="rejection_reason" id="sa-reason-<?php echo $id; ?>" rows="3" required maxlength="2000" placeholder="Enter rejection reason…"><?php echo $esc($rejectReason); ?></textarea>
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Save reason</button>
+                            </form>
+                        </details>
+                        <?php endif; ?>
+                    </td>
+                    <?php endif; ?>
+                    <td class="sa-apps-col-name" title="<?php echo $esc((string) ($r['student_full_name'] ?? '')); ?>"><?php echo $esc((string) ($r['student_full_name'] ?? '')); ?></td>
+                    <td class="sa-apps-col-nic"><?php echo $esc((string) ($r['student_nic'] ?? '')); ?></td>
+                    <td class="<?php echo trim('sa-apps-col-choice' . $choiceTdClass(1)); ?>" title="<?php echo $esc((string) ($r['course_choice_1'] ?? '')); ?>"><?php echo $esc((string) ($r['course_choice_1'] ?? '')); ?></td>
+                    <td class="<?php echo trim('sa-apps-col-choice' . $choiceTdClass(2)); ?>" title="<?php echo $esc((string) ($r['course_choice_2'] ?? '')); ?>"><?php echo $esc((string) ($r['course_choice_2'] ?? '')); ?></td>
+                    <td class="<?php echo trim('sa-apps-col-choice' . $choiceTdClass(3)); ?>" title="<?php echo $esc((string) ($r['course_choice_3'] ?? '')); ?>"><?php echo $esc((string) ($r['course_choice_3'] ?? '')); ?></td>
+                    <td class="sa-apps-col-district"><?php echo $esc((string) ($r['student_district'] ?? '')); ?></td>
+                    <td class="sa-apps-col-email" title="<?php echo $esc((string) ($r['student_email'] ?? '')); ?>"><?php echo $esc((string) ($r['student_email'] ?? '')); ?></td>
+                    <td class="sa-apps-col-phone"><?php echo $esc((string) ($r['student_phone'] ?? '')); ?></td>
+                    <td class="sa-apps-col-date" data-order="<?php echo $submitted['order']; ?>"><?php echo $submitted['display']; ?></td>
+                    <td class="sa-apps-col-actions">
                         <?php if ($can_delete): ?>
                         <form id="sa-app-del-<?php echo $id; ?>" method="post" action="<?php echo $deleteAction; ?>" class="d-none"
                               onsubmit="return confirm('Delete application #<?php echo $id; ?>? This will also remove uploaded documents on the server.');">

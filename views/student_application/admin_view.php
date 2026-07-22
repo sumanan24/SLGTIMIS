@@ -43,7 +43,6 @@ $docLabels = [
     'bank_receipt_path' => 'Bank receipt',
 ];
 
-$listUrl = rtrim(APP_URL, '/') . '/student-applications?tab=new';
 $appId = (int) ($app['application_id'] ?? 0);
 $appLevel = (string) ($app['application_level'] ?? '');
 $waDigits = StudentModel::digitsForWhatsAppMe($app);
@@ -112,7 +111,12 @@ $renderDocumentCell = static function (string $relativePath, string $title, call
 $saAdminCss = htmlspecialchars(rtrim(APP_URL, '/') . '/assets/css/student-applications-admin.css', ENT_QUOTES, 'UTF-8');
 $exportPdfUrl = rtrim(APP_URL, '/') . '/student-applications/export-pdf?id=' . $appId;
 $editUrl = rtrim(APP_URL, '/') . '/student-applications/edit?id=' . $appId;
+$updateReasonAction = rtrim(APP_URL, '/') . '/student-applications/update-rejection-reason';
 $st = strtolower(trim((string) ($app['status'] ?? 'new')));
+$rejectionReason = trim((string) ($app['rejection_reason'] ?? ''));
+$listUrl = $st === 'rejected'
+    ? rtrim(APP_URL, '/') . '/student-applications?tab=rejected'
+    : rtrim(APP_URL, '/') . '/student-applications?tab=new';
 /** @var bool $can_edit ADM / system admin */
 $can_edit = (bool) ($can_edit ?? false);
 ?>
@@ -121,9 +125,28 @@ $can_edit = (bool) ($can_edit ?? false);
     <form id="sa-view-form-approve" method="post" action="<?php echo $esc($approveAction); ?>" class="d-none" onsubmit="return confirm('Approve application #<?php echo $appId; ?>?');">
         <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
     </form>
-    <form id="sa-view-form-reject" method="post" action="<?php echo $esc($rejectAction); ?>" class="d-none" onsubmit="return confirm('Reject application #<?php echo $appId; ?>?');">
-        <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
-    </form>
+    <?php if ($can_decide && in_array($st, ['new', 'approved'], true)): ?>
+    <div class="modal fade" id="saRejectModal" tabindex="-1" aria-labelledby="saRejectModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <form id="sa-view-form-reject" method="post" action="<?php echo $esc($rejectAction); ?>" class="modal-content">
+                <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="saRejectModalLabel">Reject application #<?php echo $appId; ?></h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-2">The applicant may be notified separately. This reason is stored on the application record.</p>
+                    <label class="form-label fw-semibold" for="sa_rejection_reason">Reason for rejection <span class="text-danger">*</span></label>
+                    <textarea class="form-control" name="rejection_reason" id="sa_rejection_reason" rows="4" required maxlength="2000" placeholder="Enter a clear reason…"><?php echo $esc(trim((string) ($app['rejection_reason'] ?? ''))); ?></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Reject application</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <?php endif; ?>
     <?php if ($can_delete): ?>
     <form id="sa-view-form-delete" method="post" action="<?php echo $esc($_deleteAction); ?>" class="d-none" onsubmit="return confirm('Delete application #<?php echo $appId; ?>? This will also remove uploaded documents on the server.');">
         <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
@@ -155,7 +178,9 @@ $can_edit = (bool) ($can_edit ?? false);
                 <button type="submit" form="sa-view-form-approve" class="btn btn-primary" title="Approve application">
                     <i class="fas fa-check me-1" aria-hidden="true"></i>Approve
                 </button>
-                <button type="submit" form="sa-view-form-reject" class="btn btn-outline-warning" title="Reject application">
+                <?php endif; ?>
+                <?php if ($can_decide && in_array($st, ['new', 'approved'], true)): ?>
+                <button type="button" class="btn btn-outline-warning" title="Reject application" data-bs-toggle="modal" data-bs-target="#saRejectModal">
                     <i class="fas fa-times me-1" aria-hidden="true"></i>Reject
                 </button>
                 <?php endif; ?>
@@ -179,6 +204,36 @@ $can_edit = (bool) ($can_edit ?? false);
     <?php elseif ($staff_exclude_incomplete_drafts === false && !StudentApplicationModel::hasNicAndBirthCertificateUploaded($app)): ?>
     <div class="alert alert-warning py-2 px-3 mb-3 small" role="status">
         <strong>Missing identity documents:</strong> NIC copy and/or birth certificate is not uploaded. Student Affairs staff do not see this application until both are present; Administrators (ADM) can review it anyway.
+    </div>
+    <?php endif; ?>
+    <?php if ($st === 'rejected'): ?>
+    <div class="alert alert-danger border-danger mb-3 sa-view-rejection-reason" role="status">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+            <div class="flex-grow-1">
+                <h2 class="h6 alert-heading mb-2"><i class="fas fa-ban me-1" aria-hidden="true"></i>Rejection reason</h2>
+                <?php if ($rejectionReason !== ''): ?>
+                <div class="sa-rejection-reason-body mb-0"><?php echo nl2br($esc($rejectionReason)); ?></div>
+                <?php else: ?>
+                <p class="mb-0 text-danger-emphasis"><em>No reason was recorded.</em> Add one below or from the <a href="<?php echo $esc(rtrim(APP_URL, '/') . '/student-applications?tab=rejected'); ?>" class="alert-link">Rejected</a> applications list.</p>
+                <?php endif; ?>
+            </div>
+            <?php if ($can_decide): ?>
+            <button type="button" class="btn btn-sm btn-outline-dark" data-bs-toggle="collapse" data-bs-target="#saUpdateRejectionReason" aria-expanded="false" aria-controls="saUpdateRejectionReason">
+                <?php echo $rejectionReason !== '' ? 'Update reason' : 'Add reason'; ?>
+            </button>
+            <?php endif; ?>
+        </div>
+        <?php if ($can_decide): ?>
+        <div class="collapse mt-3<?php echo $rejectionReason === '' ? ' show' : ''; ?>" id="saUpdateRejectionReason">
+            <form method="post" action="<?php echo $esc($updateReasonAction); ?>" class="border-top border-danger border-opacity-25 pt-3">
+                <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
+                <input type="hidden" name="return_path" value="<?php echo $esc('student-applications/view?id=' . $appId); ?>">
+                <label class="form-label fw-semibold small" for="sa_view_rejection_reason">Reason for rejection</label>
+                <textarea class="form-control form-control-sm mb-2" name="rejection_reason" id="sa_view_rejection_reason" rows="4" required maxlength="2000" placeholder="Enter a clear reason…"><?php echo $esc($rejectionReason); ?></textarea>
+                <button type="submit" class="btn btn-sm btn-danger">Save reason</button>
+            </form>
+        </div>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
     <div class="sa-view-heading">
