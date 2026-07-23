@@ -122,7 +122,12 @@ $can_edit = (bool) ($can_edit ?? false);
 ?>
 <link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=7">
 <div class="sa-admin-page sa-admin-view container-fluid py-3">
-    <form id="sa-view-form-approve" method="post" action="<?php echo $esc($approveAction); ?>" class="d-none" onsubmit="return confirm('Approve application #<?php echo $appId; ?>?');">
+    <?php
+    $approveConfirm = $st === 'rejected'
+        ? 'Approve application #' . $appId . '? This will clear the stored rejection reason.'
+        : 'Approve application #' . $appId . '?';
+    ?>
+    <form id="sa-view-form-approve" method="post" action="<?php echo $esc($approveAction); ?>" class="d-none" onsubmit="return confirm(<?php echo json_encode($approveConfirm, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>);">
         <input type="hidden" name="application_id" value="<?php echo $appId; ?>">
     </form>
     <?php if ($can_decide && in_array($st, ['new', 'approved'], true)): ?>
@@ -174,7 +179,7 @@ $can_edit = (bool) ($can_edit ?? false);
                     <i class="fab fa-whatsapp" aria-hidden="true"></i><span class="visually-hidden"> WhatsApp applicant</span>
                 </a>
                 <?php endif; ?>
-                <?php if ($can_decide && $st === 'new'): ?>
+                <?php if ($can_decide && in_array($st, ['new', 'rejected'], true)): ?>
                 <button type="submit" form="sa-view-form-approve" class="btn btn-primary" title="Approve application">
                     <i class="fas fa-check me-1" aria-hidden="true"></i>Approve
                 </button>

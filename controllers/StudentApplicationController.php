@@ -2511,6 +2511,18 @@ class StudentApplicationController extends Controller {
 
         $this->redirectIfSaoCannotViewIncomplete($userModel, $uid, $app);
 
+        $st = strtolower(trim((string) ($app['status'] ?? '')));
+        if ($st === 'approved') {
+            $_SESSION['message'] = 'Application #' . $id . ' is already approved.';
+            $this->redirect('student-applications/view?id=' . $id);
+            return;
+        }
+        if (!in_array($st, ['new', 'rejected'], true)) {
+            $_SESSION['error'] = 'Only new or rejected applications can be approved.';
+            $this->redirect('student-applications/view?id=' . $id);
+            return;
+        }
+
         $ok = false;
         try {
             $ok = $model->setStatus($id, 'approved');
