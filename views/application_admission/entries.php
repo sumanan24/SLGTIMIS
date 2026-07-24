@@ -3,7 +3,22 @@ $e = static fn (?string $s): string => htmlspecialchars((string) ($s ?? ''), ENT
 $sch = $schedule ?? [];
 $isInterview = ($sch['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW;
 $rollCourseCode = $rollCourseCode ?? ApplicationAdmissionScheduleModel::rollIndexCourseCodeFromSchedule($sch);
+$rollFormatPrefix = $rollFormatPrefix ?? ApplicationAdmissionScheduleModel::rollNumberPrefixFromSchedule($sch);
+$rollFormatSample = $rollFormatSample ?? ApplicationAdmissionScheduleModel::rollNumberFormatSampleFromSchedule($sch);
 $entryCount = is_array($entries ?? null) ? count($entries) : 0;
+$filterProvince = ApplicationAdmissionScheduleModel::normalizedProvinceFilter($filter_province ?? null);
+$provinceOptions = is_array($province_options ?? null) ? $province_options : [];
+$pickerCount = is_array($picker ?? null) ? count($picker) : 0;
+$pickerUnfilteredCount = (int) ($picker_unfiltered_count ?? $pickerCount);
+$entriesUrl = rtrim(APP_URL, '/') . '/application-admission/entries?id=' . (int) ($sch['schedule_id'] ?? 0);
+$appBase = rtrim(APP_URL, '/');
+$admissionCardsBulkUrl = $appBase . '/application-admission/admission-cards-bulk?id=' . (int) ($sch['schedule_id'] ?? 0);
+if ($filterProvince !== null) {
+    $admissionCardsBulkUrl .= '&province=' . rawurlencode($filterProvince);
+}
+$admissionCardUrl = static function (int $entryId) use ($appBase, $sch): string {
+    return $appBase . '/application-admission/admission-card?id=' . (int) ($sch['schedule_id'] ?? 0) . '&entry_id=' . $entryId;
+};
 $waByEntry = [];
 foreach ($whatsAppRecipients ?? [] as $wr) {
     if (!empty($wr['entry_id'])) {
@@ -88,36 +103,70 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
 
 .admission-entries-table,
 .admission-picker-table {
-    table-layout: fixed;
+    table-layout: auto;
     width: 100%;
     margin-bottom: 0;
     border-collapse: separate;
     border-spacing: 0;
 }
 
-.admission-entries-table col.col-remove { width: 40px; }
-.admission-entries-table col.col-no { width: 48px; }
-.admission-entries-table col.col-name { width: 20%; }
-.admission-entries-table col.col-nic { width: 11%; }
-.admission-entries-table col.col-course { width: 22%; }
-.admission-entries-table col.col-roll { width: 11%; }
-.admission-entries-table col.col-room { width: 10%; }
-.admission-entries-table col.col-whatsapp { width: 11rem; }
-.admission-entries-table col.col-sent { width: 80px; }
+.admission-entries-table {
+    min-width: 72rem;
+}
 
-.admission-entries-table-readonly col.col-no { width: 48px; }
-.admission-entries-table-readonly col.col-name { width: 24%; }
-.admission-entries-table-readonly col.col-nic { width: 12%; }
-.admission-entries-table-readonly col.col-course { width: 26%; }
-.admission-entries-table-readonly col.col-roll { width: 12%; }
-.admission-entries-table-readonly col.col-room { width: 12%; }
-.admission-entries-table-readonly col.col-sent { width: 64px; }
+.admission-entries-table col.col-remove { width: 2.5rem; }
+.admission-entries-table col.col-no { width: 3rem; }
+.admission-entries-table col.col-name { width: 14%; min-width: 9rem; }
+.admission-entries-table col.col-nic { width: 8.5rem; }
+.admission-entries-table col.col-course { width: 12%; min-width: 8rem; }
+.admission-entries-table col.col-province { width: 7rem; }
+.admission-entries-table col.col-roll { width: 13.5rem; min-width: 13.5rem; }
+.admission-entries-table col.col-card { width: 4.25rem; }
+.admission-entries-table col.col-whatsapp { width: 11rem; }
+.admission-entries-table col.col-sent { width: 4.5rem; }
+
+.admission-entries-table-readonly {
+    min-width: 66rem;
+}
+
+.admission-entries-table-readonly col.col-no { width: 3rem; }
+.admission-entries-table-readonly col.col-name { width: 16%; min-width: 9rem; }
+.admission-entries-table-readonly col.col-nic { width: 8.5rem; }
+.admission-entries-table-readonly col.col-course { width: 14%; min-width: 8rem; }
+.admission-entries-table-readonly col.col-province { width: 7rem; }
+.admission-entries-table-readonly col.col-roll { width: 13.5rem; min-width: 13.5rem; }
+.admission-entries-table-readonly col.col-card { width: 4.25rem; }
+.admission-entries-table-readonly col.col-sent { width: 4rem; }
 
 .admission-picker-table col.col-pick { width: 40px; }
 .admission-picker-table col.col-no { width: 48px; }
-.admission-picker-table col.col-name { width: 32%; }
-.admission-picker-table col.col-nic { width: 18%; }
+.admission-picker-table col.col-name { width: 26%; }
+.admission-picker-table col.col-nic { width: 14%; }
+.admission-picker-table col.col-province { width: 14%; }
 .admission-picker-table col.col-course { width: auto; }
+
+.admission-province-filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+}
+
+.admission-province-filter label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.admission-province-filter .form-select {
+    min-width: 12rem;
+    font-size: 0.875rem;
+}
 
 .admission-entries-table thead th,
 .admission-picker-table thead th {
@@ -179,15 +228,63 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
     white-space: nowrap;
 }
 
+.admission-entries-summary code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    word-break: normal;
+    padding: 0.15rem 0.4rem;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+}
+
+.admission-entries-table .col-roll,
+.admission-entries-table-readonly .col-roll {
+    vertical-align: middle;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.admission-entries-table thead th.col-roll {
+    white-space: nowrap;
+}
+
+.admission-entries-table .col-roll input.roll-index-input {
+    display: block;
+    width: 100%;
+    min-width: 12.75rem;
+    max-width: none;
+    box-sizing: border-box;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+    line-height: 1.35;
+    padding: 0.4rem 0.5rem;
+    white-space: nowrap;
+    overflow-x: auto;
+}
+
+.admission-entries-table-readonly .col-roll .roll-index-readout {
+    display: inline-block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+    line-height: 1.35;
+    white-space: nowrap;
+    padding: 0.15rem 0;
+    color: #212529;
+}
+
 .admission-entries-table .col-roll input,
 .admission-entries-table .col-room input {
-    max-width: 100%;
     font-size: 0.8125rem;
 }
 
 .admission-entries-table .col-whatsapp,
 .admission-entries-table .col-sent,
-.admission-entries-table .col-remove {
+.admission-entries-table .col-remove,
+.admission-entries-table .col-card {
     text-align: center;
     vertical-align: middle;
 }
@@ -241,7 +338,9 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
 .admission-entries-table-wrap {
     border: 1px solid #dee2e6;
     border-radius: 0.375rem;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
 }
 </style>
 
@@ -273,6 +372,9 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
         <div class="admission-entries-actions d-flex flex-wrap gap-2">
             <a href="<?php echo APP_URL; ?>/application-admission" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i> Back</a>
             <a href="<?php echo APP_URL; ?>/application-admission/pdf-schedule?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>" class="btn btn-sm btn-outline-dark"><i class="fas fa-file-pdf me-1"></i> Schedule PDF</a>
+            <?php if ($entryCount > 0): ?>
+            <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" title="Download postal admission cards (name &amp; address on top)"><i class="fas fa-id-card me-1"></i> Admission cards<?php echo $filterProvince !== null ? ' (' . $e($filterProvince) . ')' : ''; ?></a>
+            <?php endif; ?>
             <?php if ($isInterview): ?>
             <a href="<?php echo APP_URL; ?>/application-admission/selection?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>" class="btn btn-sm btn-outline-info"><i class="fas fa-list-check me-1"></i> Selection</a>
             <?php else: ?>
@@ -299,12 +401,39 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
 
     <div class="admission-entries-summary">
         <span><strong><?php echo (int) $entryCount; ?></strong> applicant<?php echo $entryCount === 1 ? '' : 's'; ?> on schedule</span>
-        <span class="text-muted">Roll format: <code><?php echo $e($rollCourseCode); ?>-001</code></span>
+        <?php if ($filterProvince !== null): ?>
+        <span class="text-muted">Showing province: <strong><?php echo $e($filterProvince); ?></strong></span>
+        <?php endif; ?>
+        <?php if ($canManage && $filterProvince !== null && $pickerUnfilteredCount !== $pickerCount): ?>
+        <span class="text-muted"><?php echo (int) $pickerCount; ?> to add (of <?php echo (int) $pickerUnfilteredCount; ?> eligible)</span>
+        <?php endif; ?>
+        <span class="text-muted">Roll format: <code><?php echo $e($rollFormatSample); ?></code></span>
     </div>
+
+    <?php if ($provinceOptions !== []): ?>
+    <form method="get" action="<?php echo $e($entriesUrl); ?>" class="admission-province-filter">
+        <input type="hidden" name="id" value="<?php echo (int) ($sch['schedule_id'] ?? 0); ?>">
+        <div>
+            <label for="admission_filter_province">Filter by province</label>
+            <select name="province" id="admission_filter_province" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">All provinces</option>
+                <?php foreach ($provinceOptions as $provinceOpt): ?>
+                <option value="<?php echo $e($provinceOpt); ?>" <?php echo $filterProvince !== null && strcasecmp($filterProvince, $provinceOpt) === 0 ? 'selected' : ''; ?>><?php echo $e($provinceOpt); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php if ($filterProvince !== null): ?>
+        <a href="<?php echo $e($entriesUrl); ?>" class="btn btn-outline-secondary btn-sm">Clear filter</a>
+        <?php endif; ?>
+    </form>
+    <?php endif; ?>
 
     <?php if (!empty($canManage)): ?>
     <form method="post" action="<?php echo APP_URL; ?>/application-admission/entries-save">
         <input type="hidden" name="schedule_id" value="<?php echo (int) ($sch['schedule_id'] ?? 0); ?>">
+        <?php if ($filterProvince !== null): ?>
+        <input type="hidden" name="filter_province" value="<?php echo $e($filterProvince); ?>">
+        <?php endif; ?>
 
         <?php if (!empty($pickerHint)): ?>
         <div class="alert alert-light border small py-2 mb-3"><?php echo $pickerHint; ?></div>
@@ -324,7 +453,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
             <div class="admission-picker-scroll">
                 <table class="table admission-picker-table mb-0">
                     <colgroup>
-                        <col class="col-pick"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-course">
+                        <col class="col-pick"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-course">
                     </colgroup>
                     <thead>
                         <tr>
@@ -332,6 +461,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
                             <th class="col-no">No.</th>
                             <th class="col-name">Name</th>
                             <th class="col-nic">NIC</th>
+                            <th class="col-province">Province</th>
                             <th class="col-course">Course (1st pref.)</th>
                         </tr>
                     </thead>
@@ -342,6 +472,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
                         <td class="col-no"><?php echo $pickNo; ?></td>
                         <td class="col-name"><?php echo $e($p['student_full_name'] ?? ''); ?></td>
                         <td class="col-nic"><?php echo $e($p['student_nic'] ?? ''); ?></td>
+                        <td class="col-province"><?php echo $e($p['student_province'] ?? '—'); ?></td>
                         <td class="col-course" title="<?php echo $e($p['course_priority_1'] ?? ''); ?>"><?php echo $e($p['course_priority_1'] ?? ''); ?></td>
                     </tr>
                     <?php endforeach; ?>
@@ -351,7 +482,9 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
         </div>
         <?php else: ?>
         <p class="text-muted small mb-3"><?php
-            if (!empty($has_entrance_schedule) && (int) ($entrance_selected_count ?? 0) === 0) {
+            if ($filterProvince !== null) {
+                echo 'No eligible applicants to add for province ' . $e($filterProvince) . '.';
+            } elseif (!empty($has_entrance_schedule) && (int) ($entrance_selected_count ?? 0) === 0) {
                 echo 'No eligible applicants yet. Open the entrance exam for this course, mark candidates as Selected, then return here.';
             } elseif (!empty($pickerHint)) {
                 echo 'No eligible applicants to add yet.';
@@ -364,8 +497,8 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
         <div class="admission-entries-table-wrap" id="admission-entries-table">
             <table class="table admission-entries-table mb-0">
                 <colgroup>
-                    <col class="col-remove"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-course">
-                    <col class="col-roll"><col class="col-room"><col class="col-whatsapp"><col class="col-sent">
+                    <col class="col-remove"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-course">
+                    <col class="col-roll"><col class="col-card"><col class="col-whatsapp"><col class="col-sent">
                 </colgroup>
                 <thead>
                     <tr>
@@ -373,29 +506,34 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
                         <th class="col-no">No.</th>
                         <th class="col-name">Name</th>
                         <th class="col-nic">NIC</th>
+                        <th class="col-province">Province</th>
                         <th class="col-course">Course</th>
                         <th class="col-roll">Roll / Index</th>
-                        <th class="col-room"><?php echo $isInterview ? 'Panel' : 'Hall'; ?></th>
+                        <th class="col-card"><span class="visually-hidden">Card</span></th>
                         <th class="col-whatsapp">WhatsApp</th>
                         <th class="col-sent">Sent</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if (empty($entries)): ?>
-                    <tr><td colspan="9" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
+                    <tr><td colspan="10" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
                 <?php else: ?>
                     <?php $i = 0; foreach ($entries as $row): $i++;
                         $rollDisplay = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $i);
                         $waSent = !empty($row['whatsapp_sent']);
+                        $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvince);
                     ?>
-                    <tr class="<?php echo $waSent ? 'admission-wa-sent' : ''; ?>">
+                    <tr class="<?php echo trim(($waSent ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>">
                         <td class="col-remove"><input type="checkbox" class="form-check-input" name="remove_entry_ids[]" value="<?php echo (int) $row['entry_id']; ?>" title="Remove"></td>
                         <td class="col-no"><?php echo $i; ?></td>
                         <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
                         <td class="col-nic"><?php echo $e($row['student_nic'] ?? ''); ?></td>
+                        <td class="col-province"><?php echo $e($row['student_province'] ?? '—'); ?></td>
                         <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($row['course_priority_1'] ?? ''); ?></td>
                         <td class="col-roll"><input type="text" class="form-control form-control-sm roll-index-input" name="entries[<?php echo (int) $row['entry_id']; ?>][roll_number]" value="<?php echo $e($rollDisplay); ?>" data-seq="<?php echo $i; ?>"></td>
-                        <td class="col-room"><input type="text" class="form-control form-control-sm" name="entries[<?php echo (int) $row['entry_id']; ?>][room_or_panel]" value="<?php echo $e($row['room_or_panel'] ?? ''); ?>"></td>
+                        <td class="col-card">
+                            <a href="<?php echo $e($admissionCardUrl((int) ($row['entry_id'] ?? 0))); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" title="Download postal admission card"><i class="fas fa-id-card" aria-hidden="true"></i><span class="visually-hidden"> Card</span></a>
+                        </td>
                         <td class="col-whatsapp">
                             <?php
                             $waRow = $waByEntry[(int) ($row['entry_id'] ?? 0)] ?? null;
@@ -436,7 +574,10 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
         <div class="admission-entries-toolbar">
             <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i> Save applicants</button>
             <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-renumber-rolls"><i class="fas fa-sort-numeric-down me-1"></i> Renumber</button>
-            <p class="toolbar-hint mb-0"><i class="fab fa-whatsapp text-success"></i> Use <strong>WhatsApp</strong> to send schedule + PDF download links, then tick <strong>Sent</strong> (auto-saves).</p>
+            <?php if ($entryCount > 0): ?>
+            <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener"><i class="fas fa-id-card me-1"></i> Download admission cards<?php echo $filterProvince !== null ? ' (' . $e($filterProvince) . ')' : ''; ?></a>
+            <?php endif; ?>
+            <p class="toolbar-hint mb-0"><i class="fab fa-whatsapp text-success"></i> Use <strong>WhatsApp</strong> for links, or <strong>Admission cards</strong> for postal mail (name &amp; address printed on top).</p>
         </div>
     </form>
 
@@ -463,24 +604,25 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
     <div class="admission-entries-table-wrap">
         <table class="table admission-entries-table admission-entries-table-readonly mb-0">
             <colgroup>
-                <col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-course">
-                <col class="col-roll"><col class="col-room"><col class="col-whatsapp"><col class="col-sent">
+                <col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-course">
+                <col class="col-roll"><col class="col-card"><col class="col-whatsapp"><col class="col-sent">
             </colgroup>
             <thead>
                 <tr>
                     <th class="col-no">No.</th>
                     <th class="col-name">Name</th>
                     <th class="col-nic">NIC</th>
+                    <th class="col-province">Province</th>
                     <th class="col-course">Course</th>
                     <th class="col-roll">Roll / Index</th>
-                    <th class="col-room"><?php echo $isInterview ? 'Panel' : 'Hall'; ?></th>
+                    <th class="col-card"><span class="visually-hidden">Card</span></th>
                     <th class="col-whatsapp">WhatsApp</th>
                     <th class="col-sent">Sent</th>
                 </tr>
             </thead>
             <tbody>
             <?php if (empty($entries)): ?>
-                <tr><td colspan="8" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
+                <tr><td colspan="9" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
             <?php else: ?>
                 <?php $i = 0; foreach ($entries as $row): $i++;
                     $rollOut = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $i);
@@ -489,14 +631,18 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
                     if ($waDisplay === '') {
                         $waDisplay = trim((string) ($row['student_phone'] ?? ''));
                     }
+                    $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvince);
                 ?>
-                <tr class="<?php echo !empty($row['whatsapp_sent']) ? 'admission-wa-sent' : ''; ?>">
+                <tr class="<?php echo trim((!empty($row['whatsapp_sent']) ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>">
                     <td class="col-no"><?php echo $i; ?></td>
                     <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
                     <td class="col-nic"><?php echo $e($row['student_nic'] ?? ''); ?></td>
+                    <td class="col-province"><?php echo $e($row['student_province'] ?? '—'); ?></td>
                     <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($row['course_priority_1'] ?? ''); ?></td>
-                    <td class="col-roll"><code class="small"><?php echo $e($rollOut); ?></code></td>
-                    <td class="col-room"><?php echo $e($row['room_or_panel'] ?? '—'); ?></td>
+                    <td class="col-roll"><span class="roll-index-readout"><?php echo $e($rollOut); ?></span></td>
+                    <td class="col-card">
+                        <a href="<?php echo $e($admissionCardUrl((int) ($row['entry_id'] ?? 0))); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" title="Download postal admission card"><i class="fas fa-id-card" aria-hidden="true"></i></a>
+                    </td>
                     <td class="col-whatsapp">
                         <?php if ($waDisplay !== ''): ?>
                         <span class="wa-number"><?php echo $e($waDisplay); ?></span>
@@ -521,7 +667,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
 <script>
 (function () {
     var saveUrl = <?php echo json_encode(rtrim(APP_URL, '/') . '/application-admission/mark-whatsapp-sent'); ?>;
-    var rollCourseCode = <?php echo json_encode($rollCourseCode); ?>;
+    var rollFormatPrefix = <?php echo json_encode($rollFormatPrefix); ?>;
 
     function formatRollIndex(seq) {
         var n = Math.max(1, parseInt(seq, 10) || 1);
@@ -529,8 +675,8 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
         while (num.length < 3) {
             num = '0' + num;
         }
-        var code = (rollCourseCode || '').replace(/[^A-Za-z0-9._-]+/g, '').toUpperCase();
-        return code ? (code + '-' + num) : num;
+        var prefix = (rollFormatPrefix || '').replace(/\/+$/, '');
+        return prefix ? (prefix + '/' + num) : num;
     }
 
     var selectAll = document.getElementById('picker-select-all');

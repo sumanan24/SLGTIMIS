@@ -124,6 +124,18 @@ class ApplicationAdmissionScheduleModel extends Model {
                     error_log('ApplicationAdmissionScheduleModel::migrateSchema student_language: ' . $conn->error);
                 }
             }
+            $colRoll = $conn->query("SHOW COLUMNS FROM `application_admission_schedule_entry` LIKE 'roll_number'");
+            if ($colRoll && ($rollCol = $colRoll->fetch_assoc()) && stripos((string) ($rollCol['Type'] ?? ''), 'varchar(30)') !== false) {
+                if (!$conn->query(
+                    "ALTER TABLE `application_admission_schedule_entry` MODIFY COLUMN `roll_number` VARCHAR(64) DEFAULT NULL "
+                    . "COMMENT 'SLGTI/venue/dept/level/medium/serial'"
+                )) {
+                    error_log('ApplicationAdmissionScheduleModel::migrateSchema roll_number width: ' . $conn->error);
+                }
+            }
+            if ($colRoll) {
+                $colRoll->free();
+            }
         } catch (Throwable $e) {
             error_log('ApplicationAdmissionScheduleModel::migrateSchema: ' . $e->getMessage());
         }
@@ -134,7 +146,90 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
-     * Roll / index label: course code + sequential number (e.g. ICT-001).
+     * Roll / index: SLGTI / venue (2 letters) / dept / level / medium letter / serial (e.g. SLGTI/SL/AUT/04/T/001).
+     */
+    public static function formatRollNumberForSchedule(array $schedule, int $sequence): string {
+        $sequence = max(1, $sequence);
+        $num = str_pad((string) $sequence, 3, '0', STR_PAD_LEFT);
+
+        return self::rollNumberPrefixFromSchedule($schedule) . '/' . $num;
+    }
+
+    /**
+     * Prefix through medium letter, without the serial (e.g. SLGTI/SL/AUT/04/T).
+     *
+     * @param array<string, mixed> $schedule
+     */
+    public static function rollNumberPrefixFromSchedule(array $schedule): string {
+        $level = trim((string) ($schedule['application_level'] ?? ''));
+        if (!in_array($level, ['04', '05'], true)) {
+            $level = '00';
+        }
+
+        return 'SLGTI/'
+            . self::venueCodeFromSchedule($schedule) . '/'
+            . self::departmentCodeFromSchedule($schedule) . '/'
+            . $level . '/'
+            . self::mediumLetterFromSchedule($schedule);
+    }
+
+    /**
+     * @param array<string, mixed> $schedule
+     */
+    public static function rollNumberFormatSampleFromSchedule(array $schedule): string {
+        return self::formatRollNumberForSchedule($schedule, 1);
+    }
+
+    /**
+     * @param array<string, mixed> $schedule
+     */
+    public static function venueCodeFromSchedule(array $schedule): string {
+        $venue = strtoupper(preg_replace('/[^A-Za-z0-9]+/', '', trim((string) ($schedule['venue'] ?? ''))));
+        if (strlen($venue) >= 2) {
+            return substr($venue, 0, 2);
+        }
+
+        return $venue !== '' ? $venue : 'XX';
+    }
+
+    /**
+     * @param array<string, mixed> $schedule
+     */
+    public static function departmentCodeFromSchedule(array $schedule): string {
+        $dept = trim((string) ($schedule['department_id'] ?? ''));
+        if ($dept === '') {
+            $cid = trim((string) ($schedule['course_id'] ?? ''));
+            if ($cid !== '') {
+                require_once BASE_PATH . '/models/CourseModel.php';
+                $course = (new CourseModel())->find($cid);
+                if ($course) {
+                    $dept = trim((string) ($course['department_id'] ?? ''));
+                }
+            }
+        }
+        $dept = strtoupper(preg_replace('/[^A-Za-z0-9._-]+/', '', $dept));
+
+        return $dept !== '' ? $dept : 'GEN';
+    }
+
+    /**
+     * @param array<string, mixed> $schedule
+     */
+    public static function mediumLetterFromSchedule(array $schedule): string {
+        require_once BASE_PATH . '/models/StudentApplicationModel.php';
+        $lang = StudentApplicationModel::normalizedStaffLanguageFilter($schedule['student_language'] ?? null);
+        if ($lang === null) {
+            $lang = trim((string) ($schedule['student_language'] ?? ''));
+        }
+        if ($lang === '') {
+            return 'X';
+        }
+
+        return strtoupper(substr($lang, 0, 1));
+    }
+
+    /**
+     * @deprecated Use formatRollNumberForSchedule() — kept for legacy roll values only.
      */
     public static function formatRollIndex(string $courseCode, int $sequence): string {
         $sequence = max(1, $sequence);
@@ -173,7 +268,7 @@ class ApplicationAdmissionScheduleModel extends Model {
             return $existing;
         }
 
-        return self::formatRollIndex(self::rollIndexCourseCodeFromSchedule($schedule), $sequence);
+        return self::formatRollNumberForSchedule($schedule, $sequence);
     }
 
     public static function defaultPathwayForApplicationCount(int $count): string {
@@ -199,6 +294,38 @@ class ApplicationAdmissionScheduleModel extends Model {
         $valid = [self::PATHWAY_EXAM_AND_INTERVIEW, self::PATHWAY_INTERVIEW_ONLY];
 
         return in_array($pathway, $valid, true) ? $pathway : $default;
+    }
+
+    public static function normalizedProvinceFilter(?string $raw): ?string {
+        $province = trim((string) $raw);
+        return $province !== '' ? $province : null;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $pickerRows
+     * @param list<array<string, mixed>> $entryRows
+     * @return list<string>
+     */
+    public static function collectProvinceOptions(array $pickerRows, array $entryRows): array {
+        $provinces = [];
+        foreach (array_merge($pickerRows, $entryRows) as $row) {
+            $province = trim((string) ($row['student_province'] ?? ''));
+            if ($province === '') {
+                continue;
+            }
+            $provinces[$province] = true;
+        }
+        $out = array_keys($provinces);
+        natcasesort($out);
+
+        return array_values($out);
+    }
+
+    public static function rowMatchesProvinceFilter(array $row, ?string $provinceFilter): bool {
+        if ($provinceFilter === null) {
+            return true;
+        }
+        return strcasecmp(trim((string) ($row['student_province'] ?? '')), $provinceFilter) === 0;
     }
 
     /**
@@ -325,10 +452,12 @@ class ApplicationAdmissionScheduleModel extends Model {
             $cid = trim((string) ($row['course_id'] ?? ''));
             if ($cid === '') {
                 $row['course_name'] = '';
+                $row['department_id'] = '';
                 continue;
             }
             $course = $courseModel->find($cid);
             $row['course_name'] = $course ? trim((string) ($course['course_name'] ?? '')) : $cid;
+            $row['department_id'] = $course ? trim((string) ($course['department_id'] ?? '')) : '';
         }
         unset($row);
         return $rows;
@@ -437,6 +566,7 @@ class ApplicationAdmissionScheduleModel extends Model {
         $this->ensureTables();
         $this->migrateSchema();
         $sql = 'SELECT e.*, sa.`student_full_name`, sa.`student_nic`, sa.`student_phone`, sa.`student_whatsapp`, sa.`student_email`, '
+            . 'sa.`student_address`, sa.`student_district`, sa.`student_province`, sa.`student_zip_code`, '
             . 'sa.`course_priority_1`, sa.`course_priority_2`, sa.`course_priority_3`, sa.`application_level`, sa.`status` AS application_status '
             . 'FROM `application_admission_schedule_entry` e '
             . 'INNER JOIN `student_applications` sa ON sa.`application_id` = e.`application_id` '
@@ -457,13 +587,14 @@ class ApplicationAdmissionScheduleModel extends Model {
         ?string $courseId = null,
         ?string $scheduleType = null,
         ?string $admissionPathway = null,
-        ?string $studentLanguage = null
+        ?string $studentLanguage = null,
+        ?string $studentProvince = null
     ): array {
         $this->ensureTables();
         if (!in_array($level, ['04', '05'], true)) {
             return [];
         }
-        $sql = 'SELECT sa.`application_id`, sa.`student_full_name`, sa.`student_nic`, sa.`course_priority_1`, sa.`course_priority_2`, sa.`course_priority_3`, sa.`status` '
+        $sql = 'SELECT sa.`application_id`, sa.`student_full_name`, sa.`student_nic`, sa.`student_province`, sa.`course_priority_1`, sa.`course_priority_2`, sa.`course_priority_3`, sa.`status` '
             . 'FROM `student_applications` sa '
             . 'WHERE sa.`application_level` = ? AND sa.`status` = ? '
             . 'AND sa.`application_id` NOT IN ('
@@ -477,6 +608,7 @@ class ApplicationAdmissionScheduleModel extends Model {
         }
         require_once BASE_PATH . '/models/StudentApplicationModel.php';
         $lang = StudentApplicationModel::normalizedStaffLanguageFilter($studentLanguage);
+        $province = self::normalizedProvinceFilter($studentProvince);
         $types = 'ssi';
         $params = [$level, 'approved', $scheduleId];
         if ($lang !== null) {
@@ -484,7 +616,12 @@ class ApplicationAdmissionScheduleModel extends Model {
             $types .= 's';
             $params[] = $lang;
         }
-        $sql .= ' ORDER BY sa.`student_full_name` ASC';
+        if ($province !== null) {
+            $sql .= ' AND TRIM(IFNULL(sa.`student_province`, \'\')) = ?';
+            $types .= 's';
+            $params[] = $province;
+        }
+        $sql .= ' ORDER BY sa.`student_province` ASC, sa.`student_full_name` ASC';
         $rows = $this->fetchAllPrepared($sql, $types, $params);
         $courseIdTrim = $courseId !== null ? trim($courseId) : '';
         if ($courseIdTrim !== '') {
