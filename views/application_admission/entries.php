@@ -309,6 +309,11 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
         <?php if (!empty($pickerHint)): ?>
         <div class="alert alert-light border small py-2 mb-3"><?php echo $pickerHint; ?></div>
         <?php endif; ?>
+        <?php if (!empty($picker_entrance_fallback) && !empty($picker)): ?>
+        <div class="alert alert-warning py-2 small mb-3">
+            <strong>No entrance exam yet.</strong> Showing all approved applicants for this course because no entrance examination schedule exists. Create an entrance exam and mark <em>Selected</em> candidates when you want this interview list to follow exam results.
+        </div>
+        <?php endif; ?>
 
         <?php if (!empty($picker)): ?>
         <div class="admission-picker-card">
@@ -346,7 +351,9 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
         </div>
         <?php else: ?>
         <p class="text-muted small mb-3"><?php
-            if (!empty($pickerHint)) {
+            if (!empty($has_entrance_schedule) && (int) ($entrance_selected_count ?? 0) === 0) {
+                echo 'No eligible applicants yet. Open the entrance exam for this course, mark candidates as Selected, then return here.';
+            } elseif (!empty($pickerHint)) {
                 echo 'No eligible applicants to add yet.';
             } else {
                 echo 'No more approved applicants to add for this course/level.';

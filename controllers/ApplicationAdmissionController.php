@@ -243,6 +243,23 @@ class ApplicationAdmissionController extends Controller {
 
         $pickerHint = $this->schedulePickerHint($schedule);
 
+        $courseIdForPicker = $this->scheduleCourseIdOrNull($schedule);
+        $pickerEntranceFallback = false;
+        $hasEntranceSchedule = false;
+        $entranceSelectedCount = 0;
+        if (($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW
+            && $courseIdForPicker !== null
+            && ApplicationAdmissionScheduleModel::normalizePathway(
+                $schedule['admission_pathway'] ?? null,
+                ApplicationAdmissionScheduleModel::PATHWAY_EXAM_AND_INTERVIEW
+            ) === ApplicationAdmissionScheduleModel::PATHWAY_EXAM_AND_INTERVIEW
+        ) {
+            $levelForPicker = (string) ($schedule['application_level'] ?? '');
+            $hasEntranceSchedule = $model->hasEntranceScheduleForCourse($levelForPicker, $courseIdForPicker);
+            $entranceSelectedCount = count($model->getPassedEntranceApplicationIds($levelForPicker, $courseIdForPicker));
+            $pickerEntranceFallback = !$hasEntranceSchedule && $entranceSelectedCount === 0;
+        }
+
         $publicUrl = rtrim(APP_URL, '/') . '/application-admission/public/' . rawurlencode((string) $schedule['public_token']);
         $rollCourseCode = ApplicationAdmissionScheduleModel::rollIndexCourseCodeFromSchedule($schedule);
 
@@ -256,6 +273,9 @@ class ApplicationAdmissionController extends Controller {
             'rollCourseCode' => $rollCourseCode,
             'whatsAppRecipients' => $this->buildWhatsAppRecipients($schedule, $entries, $publicUrl),
             'pickerHint' => $pickerHint,
+            'picker_entrance_fallback' => $pickerEntranceFallback,
+            'has_entrance_schedule' => $hasEntranceSchedule,
+            'entrance_selected_count' => $entranceSelectedCount,
         ]);
     }
 
@@ -792,6 +812,16 @@ class ApplicationAdmissionController extends Controller {
         }
         if ($pathway === ApplicationAdmissionScheduleModel::PATHWAY_INTERVIEW_ONLY) {
             $hint = 'Interview only: approved applicants with matching 1st preference can be added (no entrance exam step for this schedule).';
+        } elseif (!$this->scheduleModel()->hasEntranceScheduleForCourse(
+            (string) ($schedule['application_level'] ?? ''),
+            $courseId
+        )) {
+            $hint = 'Exam and interview: no entrance exam schedule exists for this course yet, so all matching approved applicants are listed. After you create an entrance exam and mark Selected candidates, only those candidates will appear here.';
+        } elseif (count($this->scheduleModel()->getPassedEntranceApplicationIds(
+            (string) ($schedule['application_level'] ?? ''),
+            $courseId
+        )) === 0) {
+            $hint = 'Exam and interview: an entrance exam exists for this course but no applicant is marked Selected yet. Mark results on the entrance exam selection page, or change this schedule to Interview only.';
         } else {
             $hint = 'Exam and interview: only applicants marked Selected on an entrance examination for this course can be added.';
         }

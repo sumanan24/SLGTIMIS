@@ -484,7 +484,7 @@ class ApplicationAdmissionScheduleModel extends Model {
             $types .= 's';
             $params[] = $lang;
         }
-        $sql .= 'ORDER BY sa.`student_full_name` ASC';
+        $sql .= ' ORDER BY sa.`student_full_name` ASC';
         $rows = $this->fetchAllPrepared($sql, $types, $params);
         $courseIdTrim = $courseId !== null ? trim($courseId) : '';
         if ($courseIdTrim !== '') {
@@ -554,6 +554,22 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
+     * Whether an entrance exam schedule exists for this NVQ level and course.
+     */
+    public function hasEntranceScheduleForCourse(string $level, string $courseId): bool {
+        $this->ensureTables();
+        $courseId = trim($courseId);
+        if ($courseId === '' || !in_array($level, ['04', '05'], true)) {
+            return false;
+        }
+        $sql = 'SELECT 1 FROM `application_admission_schedule` '
+            . 'WHERE `schedule_type` = ? AND `application_level` = ? AND `course_id` = ? LIMIT 1';
+        $rows = $this->fetchAllPrepared($sql, 'sss', [self::TYPE_ENTRANCE, $level, $courseId]);
+
+        return $rows !== [];
+    }
+
+    /**
      * Filter interview picker to entrance-qualified applicants when the course requires an exam.
      *
      * @param list<array<string, mixed>> $rows
@@ -575,13 +591,17 @@ class ApplicationAdmissionScheduleModel extends Model {
             return $rows;
         }
         $allowed = array_flip($this->getPassedEntranceApplicationIds($level, $courseId));
-        if ($allowed === []) {
-            return [];
+        if ($allowed !== []) {
+            return array_values(array_filter($rows, function (array $row) use ($allowed): bool {
+                return isset($allowed[(int) ($row['application_id'] ?? 0)]);
+            }));
+        }
+        // No selected entrance candidates yet — if no entrance exam was created, allow picking approved applicants.
+        if (!$this->hasEntranceScheduleForCourse($level, $courseId)) {
+            return $rows;
         }
 
-        return array_values(array_filter($rows, function (array $row) use ($allowed): bool {
-            return isset($allowed[(int) ($row['application_id'] ?? 0)]);
-        }));
+        return [];
     }
 
     /**
