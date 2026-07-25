@@ -6,6 +6,7 @@ $type = $scheduleType ?? ApplicationAdmissionScheduleModel::TYPE_ENTRANCE;
 $isInterview = !empty($isInterviewSchedule);
 $typeLabel = $isInterview ? 'Interview schedule' : 'Entrance exam schedule';
 $requireCourse = !empty($requireCourse);
+$showCourseFields = !empty($showCourseFields);
 $coursesByLevel = $coursesByLevel ?? ['04' => [], '05' => []];
 $departmentsByLevel = $departmentsByLevel ?? ['04' => [], '05' => []];
 $selectedCourseId = trim((string) ($s['course_id'] ?? ''));
@@ -73,7 +74,7 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
 </style>
 <div class="container-fluid px-3 px-md-4 admission-form-page-wrap">
     <h1 class="page-title h4 mb-1"><?php echo $isEdit ? 'Edit' : 'Create'; ?> <?php echo $e($typeLabel); ?></h1>
-    <p class="text-muted small mb-3">Set NVQ level, language, course, and schedule details. Applicant lists use the selected language only.</p>
+    <p class="text-muted small mb-3"><?php if ($showCourseFields): ?>Set NVQ level, language, course, and schedule details. Applicant lists use the selected language only.<?php else: ?>Set NVQ level, language, and schedule details for this exam centre. Assign department and course later when you edit the schedule.<?php endif; ?></p>
 
     <?php if (!empty($_SESSION['error'])): ?>
         <div class="alert alert-danger"><?php echo $e($_SESSION['error']); unset($_SESSION['error']); ?></div>
@@ -93,7 +94,7 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
             <?php endif; ?>
 
             <div class="admission-form-section">
-                <div class="admission-form-section-title">Course scope</div>
+                <div class="admission-form-section-title"><?php echo $showCourseFields ? 'Course scope' : 'Exam scope'; ?></div>
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label" for="application_level">NVQ level <span class="text-danger">*</span></label>
@@ -114,21 +115,25 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
                         <div class="form-text">Only approved applicants with this language appear in counts and on the schedule.</div>
                     </div>
                 </div>
+                <?php if ($showCourseFields): ?>
                 <div class="row g-3 mt-0">
                     <div class="col-md-6">
-                        <label class="form-label" for="filter_department_id">Department <span class="text-danger">*</span></label>
-                        <select id="filter_department_id" class="form-select" required disabled>
+                        <label class="form-label" for="filter_department_id">Department <?php if ($requireCourse): ?><span class="text-danger">*</span><?php endif; ?></label>
+                        <select id="filter_department_id" class="form-select" <?php echo $requireCourse ? 'required' : ''; ?> disabled>
                             <option value="">— Select NVQ level first —</option>
                         </select>
                     </div>
                     <div class="col-md-6" id="course-field-wrap">
-                        <label class="form-label" for="course_id">Course <span class="text-danger">*</span></label>
-                        <select name="course_id" id="course_id" class="form-select" disabled required>
+                        <label class="form-label" for="course_id">Course <?php if ($requireCourse): ?><span class="text-danger">*</span><?php endif; ?></label>
+                        <select name="course_id" id="course_id" class="form-select" disabled <?php echo $requireCourse ? 'required' : ''; ?>>
                             <option value="">— Select department first —</option>
                         </select>
-                        <div class="form-text">1st course preference must match; counts reflect the language above and exclude applicants already on another entrance exam for this course.</div>
+                        <div class="form-text"><?php echo $isInterview
+                            ? '1st course preference must match; counts reflect the language above.'
+                            : 'Optional for this venue. When set, only matching 1st preferences are listed and applicants already on another entrance exam for this course are excluded.'; ?></div>
                     </div>
                 </div>
+                <?php endif; ?>
             </div>
 
             <?php if ($isInterview): ?>
@@ -194,6 +199,10 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
 </div>
 <script>
 (function () {
+    var showCourseFields = <?php echo $showCourseFields ? 'true' : 'false'; ?>;
+    if (!showCourseFields) {
+        return;
+    }
     var coursesByLevel = <?php echo json_encode($coursesByLevel, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     var departmentsByLevel = <?php echo json_encode($departmentsByLevel, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     var selectedCourseId = <?php echo json_encode($selectedCourseId); ?>;

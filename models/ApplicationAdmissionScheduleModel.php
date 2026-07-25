@@ -156,6 +156,142 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
+     * Roll number for one applicant; department comes from 1st course preference when available.
+     *
+     * @param array<string, mixed> $schedule
+     * @param array<string, mixed> $entry
+     */
+    public static function formatRollNumberForEntry(array $schedule, array $entry, int $sequence): string {
+        $sequence = max(1, $sequence);
+        $num = str_pad((string) $sequence, 3, '0', STR_PAD_LEFT);
+
+        return self::rollNumberPrefixForEntry($schedule, $entry) . '/' . $num;
+    }
+
+    /**
+     * Prefix through medium letter for one applicant (e.g. SLGTI/SL/AUT/04/T).
+     *
+     * @param array<string, mixed> $schedule
+     * @param array<string, mixed> $entry
+     */
+    public static function rollNumberPrefixForEntry(array $schedule, array $entry): string {
+        $level = trim((string) ($schedule['application_level'] ?? ''));
+        if (!in_array($level, ['04', '05'], true)) {
+            $level = '00';
+        }
+
+        return 'SLGTI/'
+            . self::venueCodeFromSchedule($schedule) . '/'
+            . self::departmentCodeFromEntry($entry) . '/'
+            . $level . '/'
+            . self::mediumLetterFromSchedule($schedule);
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     */
+    public static function departmentCodeFromEntry(array $entry): string {
+        $stored = trim((string) ($entry['course_priority_1'] ?? ''));
+        if ($stored === '') {
+            return 'GEN';
+        }
+        require_once BASE_PATH . '/models/StudentApplicationModel.php';
+        $resolved = (new StudentApplicationModel())->resolveCourseDepartmentForPreference($stored);
+        $dept = trim((string) ($resolved['department_id'] ?? ''));
+        $dept = strtoupper(preg_replace('/[^A-Za-z0-9._-]+/', '', $dept));
+
+        return $dept !== '' ? $dept : 'GEN';
+    }
+
+    /**
+     * Normalized course key for sorting and per-course roll serials.
+     *
+     * @param array<string, mixed> $row
+     */
+    public static function courseSortKeyFromEntry(array $row): string {
+        require_once BASE_PATH . '/models/StudentApplicationModel.php';
+        $stored = trim((string) ($row['course_priority_1'] ?? ''));
+        if ($stored === '') {
+            return '';
+        }
+        $resolved = (new StudentApplicationModel())->resolveCourseDepartmentForPreference($stored);
+        $name = trim((string) ($resolved['course_name'] ?? ''));
+        if ($name !== '') {
+            return mb_strtolower($name, 'UTF-8');
+        }
+
+        return mb_strtolower($stored, 'UTF-8');
+    }
+
+    /**
+     * Sort applicants by course (1st preference), province, then name.
+     *
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    public static function sortEntryRowsByCourseAndProvince(array $rows): array {
+        usort($rows, static function (array $a, array $b): int {
+            $courseCmp = strnatcasecmp(
+                self::courseSortKeyFromEntry($a),
+                self::courseSortKeyFromEntry($b)
+            );
+            if ($courseCmp !== 0) {
+                return $courseCmp;
+            }
+            $provCmp = strnatcasecmp(
+                trim((string) ($a['student_province'] ?? '')),
+                trim((string) ($b['student_province'] ?? ''))
+            );
+            if ($provCmp !== 0) {
+                return $provCmp;
+            }
+            $statusOrder = static function (array $row): int {
+                $status = strtolower(trim((string) ($row['status'] ?? $row['application_status'] ?? '')));
+                if ($status === 'approved') {
+                    return 0;
+                }
+                if ($status === 'rejected') {
+                    return 1;
+                }
+
+                return 2;
+            };
+            $statusCmp = $statusOrder($a) <=> $statusOrder($b);
+            if ($statusCmp !== 0) {
+                return $statusCmp;
+            }
+
+            return strnatcasecmp(
+                trim((string) ($a['student_full_name'] ?? '')),
+                trim((string) ($b['student_full_name'] ?? ''))
+            );
+        });
+
+        return $rows;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $entries
+     * @return array<int, int> entry_id => course-wise serial
+     */
+    public static function courseWiseSequenceMap(array $entries): array {
+        $sorted = self::sortEntryRowsByCourseAndProvince($entries);
+        $courseSeq = [];
+        $map = [];
+        foreach ($sorted as $entry) {
+            $entryId = (int) ($entry['entry_id'] ?? 0);
+            if ($entryId <= 0) {
+                continue;
+            }
+            $courseKey = self::courseSortKeyFromEntry($entry);
+            $courseSeq[$courseKey] = ($courseSeq[$courseKey] ?? 0) + 1;
+            $map[$entryId] = $courseSeq[$courseKey];
+        }
+
+        return $map;
+    }
+
+    /**
      * Prefix through medium letter, without the serial (e.g. SLGTI/SL/AUT/04/T).
      *
      * @param array<string, mixed> $schedule
@@ -268,7 +404,7 @@ class ApplicationAdmissionScheduleModel extends Model {
             return $existing;
         }
 
-        return self::formatRollNumberForSchedule($schedule, $sequence);
+        return self::formatRollNumberForEntry($schedule, $entry, $sequence);
     }
 
     public static function defaultPathwayForApplicationCount(int $count): string {
@@ -302,6 +438,43 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
+     * @param mixed $raw string, list<string>, or null
+     * @return list<string>
+     */
+    public static function normalizedProvinceFilters($raw): array {
+        $items = [];
+        if (is_array($raw)) {
+            $items = $raw;
+        } elseif (is_string($raw) && trim($raw) !== '') {
+            $items = preg_split('/\s*,\s*/', trim($raw)) ?: [trim($raw)];
+        }
+        $out = [];
+        foreach ($items as $item) {
+            $province = trim((string) $item);
+            if ($province === '') {
+                continue;
+            }
+            $key = mb_strtolower($province, 'UTF-8');
+            if (!isset($out[$key])) {
+                $out[$key] = $province;
+            }
+        }
+
+        return array_values($out);
+    }
+
+    /**
+     * @param list<string> $provinces
+     */
+    public static function provinceFilterLabel(array $provinces): string {
+        if ($provinces === []) {
+            return '';
+        }
+
+        return implode(', ', $provinces);
+    }
+
+    /**
      * @param list<array<string, mixed>> $pickerRows
      * @param list<array<string, mixed>> $entryRows
      * @return list<string>
@@ -321,11 +494,29 @@ class ApplicationAdmissionScheduleModel extends Model {
         return array_values($out);
     }
 
-    public static function rowMatchesProvinceFilter(array $row, ?string $provinceFilter): bool {
-        if ($provinceFilter === null) {
+    /**
+     * @param array<string, mixed> $row
+     * @param string|list<string>|null $provinceFilter
+     */
+    public static function rowMatchesProvinceFilter(array $row, $provinceFilter): bool {
+        if ($provinceFilter === null || $provinceFilter === '') {
             return true;
         }
-        return strcasecmp(trim((string) ($row['student_province'] ?? '')), $provinceFilter) === 0;
+        if (is_array($provinceFilter)) {
+            if ($provinceFilter === []) {
+                return true;
+            }
+            $rowProvince = trim((string) ($row['student_province'] ?? ''));
+            foreach ($provinceFilter as $province) {
+                if (strcasecmp($rowProvince, trim((string) $province)) === 0) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return strcasecmp(trim((string) ($row['student_province'] ?? '')), (string) $provinceFilter) === 0;
     }
 
     /**
@@ -571,12 +762,12 @@ class ApplicationAdmissionScheduleModel extends Model {
             . 'FROM `application_admission_schedule_entry` e '
             . 'INNER JOIN `student_applications` sa ON sa.`application_id` = e.`application_id` '
             . 'WHERE e.`schedule_id` = ? '
-            . 'ORDER BY e.`sort_order` ASC, e.`roll_number` ASC, sa.`student_full_name` ASC';
+            . 'ORDER BY sa.`course_priority_1` ASC, sa.`student_province` ASC, FIELD(sa.`status`, \'approved\', \'rejected\') ASC, sa.`student_full_name` ASC';
         return $this->fetchAllPrepared($sql, 'i', [$scheduleId]);
     }
 
     /**
-     * Approved applications eligible to add (same NVQ level, not already on this schedule).
+     * Approved or rejected applications eligible to add (same NVQ level, not already on this schedule).
      *
      * @return list<array<string, mixed>>
      */
@@ -588,7 +779,7 @@ class ApplicationAdmissionScheduleModel extends Model {
         ?string $scheduleType = null,
         ?string $admissionPathway = null,
         ?string $studentLanguage = null,
-        ?string $studentProvince = null
+        ?array $studentProvinces = null
     ): array {
         $this->ensureTables();
         if (!in_array($level, ['04', '05'], true)) {
@@ -596,7 +787,7 @@ class ApplicationAdmissionScheduleModel extends Model {
         }
         $sql = 'SELECT sa.`application_id`, sa.`student_full_name`, sa.`student_nic`, sa.`student_province`, sa.`course_priority_1`, sa.`course_priority_2`, sa.`course_priority_3`, sa.`status` '
             . 'FROM `student_applications` sa '
-            . 'WHERE sa.`application_level` = ? AND sa.`status` = ? '
+            . 'WHERE sa.`application_level` = ? AND sa.`status` IN (\'approved\', \'rejected\') '
             . 'AND sa.`application_id` NOT IN ('
             . 'SELECT `application_id` FROM `application_admission_schedule_entry` WHERE `schedule_id` = ?'
             . ') ';
@@ -608,20 +799,23 @@ class ApplicationAdmissionScheduleModel extends Model {
         }
         require_once BASE_PATH . '/models/StudentApplicationModel.php';
         $lang = StudentApplicationModel::normalizedStaffLanguageFilter($studentLanguage);
-        $province = self::normalizedProvinceFilter($studentProvince);
-        $types = 'ssi';
-        $params = [$level, 'approved', $scheduleId];
+        $provinces = self::normalizedProvinceFilters($studentProvinces);
+        $types = 'si';
+        $params = [$level, $scheduleId];
         if ($lang !== null) {
             $sql .= ' AND TRIM(IFNULL(sa.`student_language`, \'\')) = ?';
             $types .= 's';
             $params[] = $lang;
         }
-        if ($province !== null) {
-            $sql .= ' AND TRIM(IFNULL(sa.`student_province`, \'\')) = ?';
-            $types .= 's';
-            $params[] = $province;
+        if ($provinces !== []) {
+            $placeholders = implode(', ', array_fill(0, count($provinces), '?'));
+            $sql .= ' AND TRIM(IFNULL(sa.`student_province`, \'\')) IN (' . $placeholders . ')';
+            foreach ($provinces as $province) {
+                $types .= 's';
+                $params[] = $province;
+            }
         }
-        $sql .= ' ORDER BY sa.`student_province` ASC, sa.`student_full_name` ASC';
+        $sql .= ' ORDER BY sa.`course_priority_1` ASC, sa.`student_province` ASC, FIELD(sa.`status`, \'approved\', \'rejected\') ASC, sa.`student_full_name` ASC';
         $rows = $this->fetchAllPrepared($sql, $types, $params);
         $courseIdTrim = $courseId !== null ? trim($courseId) : '';
         if ($courseIdTrim !== '') {

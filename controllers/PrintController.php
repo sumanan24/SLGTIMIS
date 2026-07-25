@@ -507,10 +507,11 @@ class PrintController extends Controller {
     }
 
     /**
-     * Logo for PDF header. Primary: assets/img/slgtilogo.png (institute artwork).
+     * Logo for PDF header. Primary: assets/img/logo.png (black on white for print).
      */
     private function admissionLogoDataUri(): string {
         $paths = [
+            BASE_PATH . '/assets/img/logo.png',
             BASE_PATH . '/assets/img/slgtilogo.png',
             BASE_PATH . '/public/images/slgti-logo.png',
             BASE_PATH . '/public/images/slgti-logo.svg',

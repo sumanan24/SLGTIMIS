@@ -52,6 +52,7 @@ class ApplicationAdmissionController extends Controller {
 
     private function admissionLogoDataUri(): string {
         $paths = [
+            BASE_PATH . '/assets/img/logo.png',
             BASE_PATH . '/assets/img/slgtilogo.png',
             BASE_PATH . '/public/images/slgti-logo.png',
         ];
@@ -228,8 +229,11 @@ class ApplicationAdmissionController extends Controller {
             $this->redirect('application-admission');
         }
         $onlyStaff = $userModel->usesLimitedStudentApplicationList($uid);
-        $entries = $model->getEntriesWithApplications($id);
-        $filterProvince = ApplicationAdmissionScheduleModel::normalizedProvinceFilter($this->get('province', ''));
+        $entries = ApplicationAdmissionScheduleModel::sortEntryRowsByCourseAndProvince(
+            $model->getEntriesWithApplications($id)
+        );
+        $courseWiseRollSeq = ApplicationAdmissionScheduleModel::courseWiseSequenceMap($entries);
+        $filterProvinces = ApplicationAdmissionScheduleModel::normalizedProvinceFilters($this->get('province', ''));
         $pickerArgs = [
             (string) $schedule['application_level'],
             $id,
@@ -240,12 +244,16 @@ class ApplicationAdmissionController extends Controller {
             (string) ($schedule['student_language'] ?? ''),
         ];
         $pickerUnfiltered = $canManage
-            ? $model->getPickerApplications(...array_merge($pickerArgs, [null]))
+            ? ApplicationAdmissionScheduleModel::sortEntryRowsByCourseAndProvince(
+                $model->getPickerApplications(...array_merge($pickerArgs, [null]))
+            )
             : [];
         $provinceOptions = ApplicationAdmissionScheduleModel::collectProvinceOptions($pickerUnfiltered, $entries);
         $picker = $canManage
-            ? ($filterProvince !== null
-                ? $model->getPickerApplications(...array_merge($pickerArgs, [$filterProvince]))
+            ? ($filterProvinces !== []
+                ? ApplicationAdmissionScheduleModel::sortEntryRowsByCourseAndProvince(
+                    $model->getPickerApplications(...array_merge($pickerArgs, [$filterProvinces]))
+                )
                 : $pickerUnfiltered)
             : [];
 
@@ -271,7 +279,9 @@ class ApplicationAdmissionController extends Controller {
         $publicUrl = rtrim(APP_URL, '/') . '/application-admission/public/' . rawurlencode((string) $schedule['public_token']);
         $rollCourseCode = ApplicationAdmissionScheduleModel::rollIndexCourseCodeFromSchedule($schedule);
         $rollFormatPrefix = ApplicationAdmissionScheduleModel::rollNumberPrefixFromSchedule($schedule);
-        $rollFormatSample = ApplicationAdmissionScheduleModel::rollNumberFormatSampleFromSchedule($schedule);
+        $rollFormatSample = $entries !== []
+            ? ApplicationAdmissionScheduleModel::formatRollNumberForEntry($schedule, $entries[0], 1)
+            : ApplicationAdmissionScheduleModel::rollNumberFormatSampleFromSchedule($schedule);
 
         return $this->view('application_admission/entries', [
             'page' => 'application-admission',
@@ -283,12 +293,13 @@ class ApplicationAdmissionController extends Controller {
             'rollCourseCode' => $rollCourseCode,
             'rollFormatPrefix' => $rollFormatPrefix,
             'rollFormatSample' => $rollFormatSample,
-            'whatsAppRecipients' => $this->buildWhatsAppRecipients($schedule, $entries, $publicUrl),
+            'courseWiseRollSeq' => $courseWiseRollSeq,
+            'whatsAppRecipients' => $this->buildWhatsAppRecipients($schedule, $entries, $publicUrl, $courseWiseRollSeq),
             'pickerHint' => $pickerHint,
             'picker_entrance_fallback' => $pickerEntranceFallback,
             'has_entrance_schedule' => $hasEntranceSchedule,
             'entrance_selected_count' => $entranceSelectedCount,
-            'filter_province' => $filterProvince,
+            'filter_provinces' => $filterProvinces,
             'province_options' => $provinceOptions,
             'picker_unfiltered_count' => count($pickerUnfiltered),
         ]);
@@ -343,7 +354,11 @@ class ApplicationAdmissionController extends Controller {
         $_SESSION['success'] = $added > 0
             ? "Saved. {$added} applicant(s) added."
             : 'Applicant list saved.';
-        $this->redirect($this->entriesRedirectUrl($id, $this->post('filter_province', '')));
+        $filterProvinces = $this->post('filter_provinces', []);
+        if (!is_array($filterProvinces)) {
+            $filterProvinces = [$filterProvinces];
+        }
+        $this->redirect($this->entriesRedirectUrl($id, $filterProvinces));
     }
 
     public function markWhatsappSent() {
@@ -465,7 +480,7 @@ class ApplicationAdmissionController extends Controller {
             $_SESSION['error'] = 'Invalid schedule or applicant.';
             $this->redirect('application-admission');
         }
-        $this->streamAdmissionCardsPdf($scheduleId, $entryId, null);
+        $this->streamAdmissionCardsPdf($scheduleId, $entryId, []);
     }
 
     /**
@@ -479,8 +494,18 @@ class ApplicationAdmissionController extends Controller {
             $_SESSION['error'] = 'Invalid schedule.';
             $this->redirect('application-admission');
         }
-        $province = ApplicationAdmissionScheduleModel::normalizedProvinceFilter($this->get('province', ''));
-        $this->streamAdmissionCardsPdf($scheduleId, null, $province);
+        $provinces = ApplicationAdmissionScheduleModel::normalizedProvinceFilters($this->get('province', ''));
+        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
+        if (!ExamPdfHelper::dompdfAvailable()) {
+            $_SESSION['error'] = 'PDF engine not installed. Run: composer install.';
+            $this->redirect($this->entriesRedirectUrl($scheduleId, $provinces));
+        }
+        try {
+            $this->streamAdmissionCardsPdf($scheduleId, null, $provinces);
+        } catch (RuntimeException $e) {
+            $_SESSION['error'] = $e->getMessage();
+            $this->redirect($this->entriesRedirectUrl($scheduleId, $provinces));
+        }
     }
 
     /** Public landing — no login */
@@ -638,38 +663,42 @@ class ApplicationAdmissionController extends Controller {
         ApplicationAdmissionPdfHelper::streamHtml($html, $pdfName, 'A4', 'landscape');
     }
 
-    private function streamAdmissionCardsPdf(int $scheduleId, ?int $entryId, ?string $province): void {
+    private function streamAdmissionCardsPdf(int $scheduleId, ?int $entryId, ?array $provinces = null): void {
+        $provinces = ApplicationAdmissionScheduleModel::normalizedProvinceFilters($provinces);
         $model = $this->scheduleModel();
         $schedule = $model->findSchedule($scheduleId);
         if (!$schedule) {
             $_SESSION['error'] = 'Schedule not found.';
             $this->redirect('application-admission');
         }
-        $entries = $model->getEntriesWithApplications($scheduleId);
+        $entries = ApplicationAdmissionScheduleModel::sortEntryRowsByCourseAndProvince(
+            $model->getEntriesWithApplications($scheduleId)
+        );
+        $courseWiseRollSeq = ApplicationAdmissionScheduleModel::courseWiseSequenceMap($entries);
         if ($entryId !== null && $entryId > 0) {
             $entries = array_values(array_filter($entries, static function (array $row) use ($entryId): bool {
                 return (int) ($row['entry_id'] ?? 0) === $entryId;
             }));
-        } elseif ($province !== null) {
-            $entries = array_values(array_filter($entries, static function (array $row) use ($province): bool {
-                return ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $province);
+        } elseif ($provinces !== []) {
+            $entries = array_values(array_filter($entries, static function (array $row) use ($provinces): bool {
+                return ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $provinces);
             }));
         }
         if ($entries === []) {
             $_SESSION['error'] = $entryId !== null && $entryId > 0
                 ? 'Applicant not found on this schedule.'
                 : 'No applicants on this schedule for admission cards.';
-            $this->redirect($this->entriesRedirectUrl($scheduleId, $province));
+            $this->redirect($this->entriesRedirectUrl($scheduleId, $provinces));
         }
 
         require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
         $isInterview = ($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW;
-        $cardTitle = $isInterview ? 'Interview — Admission Card' : 'Entrance Examination — Admission Card';
+        $cardTitle = $isInterview ? 'Interview — Admission Card' : 'Selection Examination — Admission Card';
         $parts = [];
-        $n = 0;
         foreach ($entries as $entry) {
-            $n++;
-            $roll = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($schedule, $entry, $n);
+            $entryIdForRoll = (int) ($entry['entry_id'] ?? 0);
+            $seq = $courseWiseRollSeq[$entryIdForRoll] ?? 1;
+            $roll = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($schedule, $entry, $seq);
             if (trim((string) ($entry['roll_number'] ?? '')) === '') {
                 $entry['roll_number'] = $roll;
             }
@@ -683,28 +712,24 @@ class ApplicationAdmissionController extends Controller {
                 'isInterview' => $isInterview,
             ]);
         }
-        $html = ApplicationAdmissionPdfHelper::wrapPostalAdmissionCardsDocument(implode('', $parts));
         if ($entryId !== null && $entryId > 0) {
             $nic = preg_replace('/[^0-9A-Za-z]+/', '', (string) ($entries[0]['student_nic'] ?? ''));
             $filename = ($isInterview ? 'interview' : 'admission') . '-card-' . $scheduleId . '-' . ($nic !== '' ? $nic : (string) $entryId) . '.pdf';
-        } else {
-            $suffix = $province !== null
-                ? '-' . preg_replace('/[^A-Za-z0-9]+/', '_', $province)
-                : '';
-            $filename = ($isInterview ? 'interview' : 'admission') . '-cards-' . $scheduleId . $suffix . '.pdf';
+            $html = ApplicationAdmissionPdfHelper::wrapPostalAdmissionCardsDocument(implode('', $parts));
+            ApplicationAdmissionPdfHelper::streamHtml($html, $filename);
         }
-        ApplicationAdmissionPdfHelper::streamHtml($html, $filename);
+        $suffix = $provinces !== []
+            ? '-' . preg_replace('/[^A-Za-z0-9]+/', '_', ApplicationAdmissionScheduleModel::provinceFilterLabel($provinces))
+            : '';
+        $filename = ($isInterview ? 'interview' : 'admission') . '-cards-' . $scheduleId . $suffix . '.pdf';
+        ApplicationAdmissionPdfHelper::streamPostalAdmissionCardsMerged($parts, $filename);
     }
 
     /**
      * @param array<string, mixed> $entry
-     * @return array{name: string, address: string, city_line: string, phone: string}
+     * @return array{name: string, address: string, city_line: string}
      */
     private function formatEntryMailingBlock(array $entry): array {
-        $phone = trim((string) ($entry['student_whatsapp'] ?? ''));
-        if ($phone === '') {
-            $phone = trim((string) ($entry['student_phone'] ?? ''));
-        }
         $district = trim((string) ($entry['student_district'] ?? ''));
         $province = trim((string) ($entry['student_province'] ?? ''));
         $zip = trim((string) ($entry['student_zip_code'] ?? ''));
@@ -716,7 +741,6 @@ class ApplicationAdmissionController extends Controller {
             'name' => trim((string) ($entry['student_full_name'] ?? '')),
             'address' => trim((string) ($entry['student_address'] ?? '')),
             'city_line' => implode(', ', $cityParts),
-            'phone' => $phone,
         ];
     }
 
@@ -744,10 +768,6 @@ class ApplicationAdmissionController extends Controller {
         $start = trim((string) $this->post('start_time', ''));
         $end = trim((string) $this->post('end_time', ''));
         $courseId = trim((string) $this->post('course_id', ''));
-        if ($type === ApplicationAdmissionScheduleModel::TYPE_ENTRANCE && $courseId === '') {
-            $_SESSION['error'] = 'Select the course for this entrance examination.';
-            return null;
-        }
         if ($type === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW && $courseId === '') {
             $_SESSION['error'] = 'Select the course for this interview schedule.';
             return null;
@@ -810,21 +830,24 @@ class ApplicationAdmissionController extends Controller {
         $pathwayMax = ApplicationAdmissionScheduleModel::INTERVIEW_ONLY_DEFAULT_MAX_APPLICANTS;
         require_once BASE_PATH . '/models/StudentApplicationModel.php';
 
+        $showCourseFields = $isInterview || ($isEntrance && $schedule !== null);
+
         return [
             'page' => 'application-admission',
             'schedule' => $schedule,
             'scheduleType' => $type,
             'formAction' => $formAction,
-            'coursesByLevel' => [
+            'coursesByLevel' => $showCourseFields ? [
                 '04' => $this->coursesForApplicationLevel('04', $isEntrance, $exceptScheduleId > 0 ? $exceptScheduleId : null),
                 '05' => $this->coursesForApplicationLevel('05', $isEntrance, $exceptScheduleId > 0 ? $exceptScheduleId : null),
-            ],
-            'departmentsByLevel' => [
+            ] : ['04' => [], '05' => []],
+            'departmentsByLevel' => $showCourseFields ? [
                 '04' => $this->departmentsForApplicationLevel('04'),
                 '05' => $this->departmentsForApplicationLevel('05'),
-            ],
+            ] : ['04' => [], '05' => []],
             'selectedDepartmentId' => $selectedDepartmentId,
-            'requireCourse' => true,
+            'requireCourse' => $isInterview,
+            'showCourseFields' => $showCourseFields,
             'isInterviewSchedule' => $isInterview,
             'pathwayDefaultMaxApplicants' => $pathwayMax,
             'selectedPathway' => ApplicationAdmissionScheduleModel::normalizePathway(
@@ -909,13 +932,23 @@ class ApplicationAdmissionController extends Controller {
      */
     private function schedulePickerHint(array $schedule): string {
         if (($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_ENTRANCE) {
+            $courseId = $this->scheduleCourseIdOrNull($schedule);
+            if ($courseId === null) {
+                $hint = 'Assign department and course on Edit schedule for this exam centre/venue. Until then, all approved and rejected applicants for this NVQ level and language are listed.';
+                $lang = trim((string) ($schedule['student_language'] ?? ''));
+                if ($lang !== '') {
+                    return 'Approved and rejected ' . $lang . ' applicants. ' . $hint;
+                }
+
+                return $hint;
+            }
             $hint = 'Applicants already on another entrance exam for this course are not listed.';
             $lang = trim((string) ($schedule['student_language'] ?? ''));
             if ($lang !== '') {
-                return 'Only approved ' . $lang . ' applicants (1st preference match). ' . $hint;
+                return 'Approved and rejected ' . $lang . ' applicants (1st preference match). ' . $hint;
             }
 
-            return 'Approved applicants with matching 1st preference. ' . $hint;
+            return 'Approved and rejected applicants with matching 1st preference. ' . $hint;
         }
 
         return $this->interviewPickerHint($schedule);
@@ -938,12 +971,12 @@ class ApplicationAdmissionController extends Controller {
             return 'This interview is set to: ' . $pathLabel . '. Select a course to add applicants.';
         }
         if ($pathway === ApplicationAdmissionScheduleModel::PATHWAY_INTERVIEW_ONLY) {
-            $hint = 'Interview only: approved applicants with matching 1st preference can be added (no entrance exam step for this schedule).';
+            $hint = 'Interview only: approved and rejected applicants with matching 1st preference can be added (no entrance exam step for this schedule).';
         } elseif (!$this->scheduleModel()->hasEntranceScheduleForCourse(
             (string) ($schedule['application_level'] ?? ''),
             $courseId
         )) {
-            $hint = 'Exam and interview: no entrance exam schedule exists for this course yet, so all matching approved applicants are listed. After you create an entrance exam and mark Selected candidates, only those candidates will appear here.';
+            $hint = 'Exam and interview: no entrance exam schedule exists for this course yet, so all matching approved and rejected applicants are listed. After you create an entrance exam and mark Selected candidates, only those candidates will appear here.';
         } elseif (count($this->scheduleModel()->getPassedEntranceApplicationIds(
             (string) ($schedule['application_level'] ?? ''),
             $courseId
@@ -968,26 +1001,31 @@ class ApplicationAdmissionController extends Controller {
         return $cid !== '' ? $cid : null;
     }
 
-    private function entriesRedirectUrl(int $scheduleId, ?string $province = null): string {
+    private function entriesRedirectUrl(int $scheduleId, $provinces = null): string {
         $url = 'application-admission/entries?id=' . $scheduleId;
-        $province = ApplicationAdmissionScheduleModel::normalizedProvinceFilter($province);
-        if ($province !== null) {
-            $url .= '&province=' . rawurlencode($province);
+        foreach (ApplicationAdmissionScheduleModel::normalizedProvinceFilters($provinces) as $province) {
+            $url .= '&province[]=' . rawurlencode($province);
         }
 
         return $url;
     }
 
     private function assignSequentialRollNumbersWhereEmpty(ApplicationAdmissionScheduleModel $model, int $scheduleId, array $schedule): void {
-        $entries = $model->getEntriesWithApplications($scheduleId);
-        $n = 0;
+        $entries = ApplicationAdmissionScheduleModel::sortEntryRowsByCourseAndProvince(
+            $model->getEntriesWithApplications($scheduleId)
+        );
+        $seqMap = ApplicationAdmissionScheduleModel::courseWiseSequenceMap($entries);
         foreach ($entries as $entry) {
-            $n++;
             if (trim((string) ($entry['roll_number'] ?? '')) !== '') {
                 continue;
             }
-            $model->updateEntry((int) $entry['entry_id'], $scheduleId, [
-                'roll_number' => ApplicationAdmissionScheduleModel::formatRollNumberForSchedule($schedule, $n),
+            $entryId = (int) ($entry['entry_id'] ?? 0);
+            if ($entryId <= 0) {
+                continue;
+            }
+            $seq = $seqMap[$entryId] ?? 1;
+            $model->updateEntry($entryId, $scheduleId, [
+                'roll_number' => ApplicationAdmissionScheduleModel::formatRollNumberForEntry($schedule, $entry, $seq),
             ]);
         }
     }
@@ -996,15 +1034,18 @@ class ApplicationAdmissionController extends Controller {
      * @param list<array<string, mixed>> $entries
      * @return list<array<string, mixed>>
      */
-    private function buildWhatsAppRecipients(array $schedule, array $entries, string $publicUrl): array {
+    private function buildWhatsAppRecipients(array $schedule, array $entries, string $publicUrl, ?array $courseWiseRollSeq = null): array {
         require_once BASE_PATH . '/models/StudentModel.php';
         $isInterview = ($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW;
         $downloadUrls = $this->publicScheduleDownloadUrls($schedule);
+        if ($courseWiseRollSeq === null) {
+            $courseWiseRollSeq = ApplicationAdmissionScheduleModel::courseWiseSequenceMap($entries);
+        }
         $recipients = [];
-        $n = 0;
         foreach ($entries as $row) {
-            $n++;
-            $roll = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($schedule, $row, $n);
+            $entryId = (int) ($row['entry_id'] ?? 0);
+            $seq = $courseWiseRollSeq[$entryId] ?? 1;
+            $roll = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($schedule, $row, $seq);
             $digits = StudentModel::digitsForWhatsAppMe($row);
             $displayPhone = trim((string) ($row['student_whatsapp'] ?? ''));
             if ($displayPhone === '') {

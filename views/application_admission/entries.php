@@ -6,18 +6,50 @@ $rollCourseCode = $rollCourseCode ?? ApplicationAdmissionScheduleModel::rollInde
 $rollFormatPrefix = $rollFormatPrefix ?? ApplicationAdmissionScheduleModel::rollNumberPrefixFromSchedule($sch);
 $rollFormatSample = $rollFormatSample ?? ApplicationAdmissionScheduleModel::rollNumberFormatSampleFromSchedule($sch);
 $entryCount = is_array($entries ?? null) ? count($entries) : 0;
-$filterProvince = ApplicationAdmissionScheduleModel::normalizedProvinceFilter($filter_province ?? null);
+$filterProvinces = ApplicationAdmissionScheduleModel::normalizedProvinceFilters($filter_provinces ?? null);
+$provinceFilterLabel = ApplicationAdmissionScheduleModel::provinceFilterLabel($filterProvinces);
+$provinceFilterActive = $filterProvinces !== [];
+$provinceIsSelected = static function (string $name) use ($filterProvinces): bool {
+    foreach ($filterProvinces as $province) {
+        if (strcasecmp($province, $name) === 0) {
+            return true;
+        }
+    }
+
+    return false;
+};
 $provinceOptions = is_array($province_options ?? null) ? $province_options : [];
 $pickerCount = is_array($picker ?? null) ? count($picker) : 0;
 $pickerUnfilteredCount = (int) ($picker_unfiltered_count ?? $pickerCount);
 $entriesUrl = rtrim(APP_URL, '/') . '/application-admission/entries?id=' . (int) ($sch['schedule_id'] ?? 0);
+$entriesUrlWithProvinces = static function (array $provinces) use ($entriesUrl): string {
+    $url = $entriesUrl;
+    foreach ($provinces as $province) {
+        $url .= '&province[]=' . rawurlencode($province);
+    }
+
+    return $url;
+};
 $appBase = rtrim(APP_URL, '/');
 $admissionCardsBulkUrl = $appBase . '/application-admission/admission-cards-bulk?id=' . (int) ($sch['schedule_id'] ?? 0);
-if ($filterProvince !== null) {
-    $admissionCardsBulkUrl .= '&province=' . rawurlencode($filterProvince);
+if ($filterProvinces !== []) {
+    foreach ($filterProvinces as $province) {
+        $admissionCardsBulkUrl .= '&province[]=' . rawurlencode($province);
+    }
 }
 $admissionCardUrl = static function (int $entryId) use ($appBase, $sch): string {
     return $appBase . '/application-admission/admission-card?id=' . (int) ($sch['schedule_id'] ?? 0) . '&entry_id=' . $entryId;
+};
+$applicationStatusLabel = static function (array $row) use ($e): string {
+    $status = strtolower(trim((string) ($row['status'] ?? $row['application_status'] ?? '')));
+    if ($status === 'approved') {
+        return 'Approved';
+    }
+    if ($status === 'rejected') {
+        return 'Rejected';
+    }
+
+    return $status !== '' ? ucfirst($status) : '—';
 };
 $waByEntry = [];
 foreach ($whatsAppRecipients ?? [] as $wr) {
@@ -25,6 +57,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
         $waByEntry[(int) $wr['entry_id']] = $wr;
     }
 }
+$courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq : [];
 ?>
 <style>
 .admission-entries-page-wrap {
@@ -143,7 +176,30 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
 .admission-picker-table col.col-name { width: 26%; }
 .admission-picker-table col.col-nic { width: 14%; }
 .admission-picker-table col.col-province { width: 14%; }
-.admission-picker-table col.col-course { width: auto; }
+.admission-picker-table col.col-status { width: 5.5rem; }
+.admission-entries-table col.col-status { width: 5.5rem; }
+.admission-entries-table-readonly col.col-status { width: 5.5rem; }
+
+.admission-status-badge {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: capitalize;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.admission-status-approved {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+
+.admission-status-rejected {
+    background: #f8d7da;
+    color: #842029;
+}
 
 .admission-province-filter {
     display: flex;
@@ -166,6 +222,24 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
 .admission-province-filter .form-select {
     min-width: 12rem;
     font-size: 0.875rem;
+}
+
+.admission-province-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+    margin-top: 0.35rem;
+}
+
+.admission-province-checkboxes .form-check {
+    margin: 0;
+    min-height: auto;
+}
+
+.admission-province-checkboxes .form-check-label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
 }
 
 .admission-entries-table thead th,
@@ -371,9 +445,12 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
         </div>
         <div class="admission-entries-actions d-flex flex-wrap gap-2">
             <a href="<?php echo APP_URL; ?>/application-admission" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i> Back</a>
+            <?php if (!empty($canManage)): ?>
+            <a href="<?php echo APP_URL; ?>/application-admission/edit?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit me-1"></i> Edit schedule</a>
+            <?php endif; ?>
             <a href="<?php echo APP_URL; ?>/application-admission/pdf-schedule?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>" class="btn btn-sm btn-outline-dark"><i class="fas fa-file-pdf me-1"></i> Schedule PDF</a>
             <?php if ($entryCount > 0): ?>
-            <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" title="Download postal admission cards (name &amp; address on top)"><i class="fas fa-id-card me-1"></i> Admission cards<?php echo $filterProvince !== null ? ' (' . $e($filterProvince) . ')' : ''; ?></a>
+            <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" title="Download postal admission cards (name &amp; address on top)"><i class="fas fa-id-card me-1"></i> Admission cards<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <?php endif; ?>
             <?php if ($isInterview): ?>
             <a href="<?php echo APP_URL; ?>/application-admission/selection?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>" class="btn btn-sm btn-outline-info"><i class="fas fa-list-check me-1"></i> Selection</a>
@@ -401,38 +478,47 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
 
     <div class="admission-entries-summary">
         <span><strong><?php echo (int) $entryCount; ?></strong> applicant<?php echo $entryCount === 1 ? '' : 's'; ?> on schedule</span>
-        <?php if ($filterProvince !== null): ?>
-        <span class="text-muted">Showing province: <strong><?php echo $e($filterProvince); ?></strong></span>
+        <?php if ($provinceFilterActive): ?>
+        <span class="text-muted">Showing province<?php echo count($filterProvinces) === 1 ? '' : 's'; ?>: <strong><?php echo $e($provinceFilterLabel); ?></strong></span>
         <?php endif; ?>
-        <?php if ($canManage && $filterProvince !== null && $pickerUnfilteredCount !== $pickerCount): ?>
+        <?php if ($canManage && $provinceFilterActive && $pickerUnfilteredCount !== $pickerCount): ?>
         <span class="text-muted"><?php echo (int) $pickerCount; ?> to add (of <?php echo (int) $pickerUnfilteredCount; ?> eligible)</span>
         <?php endif; ?>
-        <span class="text-muted">Roll format: <code><?php echo $e($rollFormatSample); ?></code></span>
+        <span class="text-muted">Roll format: <code><?php echo $e($rollFormatSample); ?></code> <span class="text-muted">(serial restarts per course)</span></span>
     </div>
 
     <?php if ($provinceOptions !== []): ?>
-    <form method="get" action="<?php echo $e($entriesUrl); ?>" class="admission-province-filter">
-        <input type="hidden" name="id" value="<?php echo (int) ($sch['schedule_id'] ?? 0); ?>">
+    <div class="admission-province-filter">
         <div>
-            <label for="admission_filter_province">Filter by province</label>
-            <select name="province" id="admission_filter_province" class="form-select form-select-sm" onchange="this.form.submit()">
-                <option value="">All provinces</option>
+            <label class="d-block">Filter by province</label>
+            <div class="form-text mb-1">Tick one or more provinces to load only those students. Applicants are sorted by course, then province.</div>
+            <div class="admission-province-checkboxes" id="admission-province-checkboxes">
+                <div class="form-check">
+                    <input class="form-check-input province-filter-cb" type="checkbox" id="province_filter_all" value="" <?php echo !$provinceFilterActive ? 'checked' : ''; ?>>
+                    <label class="form-check-label" for="province_filter_all">All provinces</label>
+                </div>
                 <?php foreach ($provinceOptions as $provinceOpt): ?>
-                <option value="<?php echo $e($provinceOpt); ?>" <?php echo $filterProvince !== null && strcasecmp($filterProvince, $provinceOpt) === 0 ? 'selected' : ''; ?>><?php echo $e($provinceOpt); ?></option>
+                <div class="form-check">
+                    <input class="form-check-input province-filter-cb province-filter-item" type="checkbox" id="province_filter_<?php echo $e(preg_replace('/[^A-Za-z0-9]+/', '_', $provinceOpt)); ?>" value="<?php echo $e($provinceOpt); ?>" <?php echo $provinceIsSelected($provinceOpt) ? 'checked' : ''; ?>>
+                    <label class="form-check-label" for="province_filter_<?php echo $e(preg_replace('/[^A-Za-z0-9]+/', '_', $provinceOpt)); ?>"><?php echo $e($provinceOpt); ?></label>
+                </div>
                 <?php endforeach; ?>
-            </select>
+            </div>
         </div>
-        <?php if ($filterProvince !== null): ?>
-        <a href="<?php echo $e($entriesUrl); ?>" class="btn btn-outline-secondary btn-sm">Clear filter</a>
-        <?php endif; ?>
-    </form>
+    </div>
     <?php endif; ?>
 
     <?php if (!empty($canManage)): ?>
     <form method="post" action="<?php echo APP_URL; ?>/application-admission/entries-save">
         <input type="hidden" name="schedule_id" value="<?php echo (int) ($sch['schedule_id'] ?? 0); ?>">
-        <?php if ($filterProvince !== null): ?>
-        <input type="hidden" name="filter_province" value="<?php echo $e($filterProvince); ?>">
+        <?php foreach ($filterProvinces as $filterProvinceItem): ?>
+        <input type="hidden" name="filter_provinces[]" value="<?php echo $e($filterProvinceItem); ?>">
+        <?php endforeach; ?>
+
+        <?php if (!$isInterview && empty($sch['course_name']) && !empty($canManage)): ?>
+        <div class="alert alert-warning py-2 small mb-3">
+            <strong>Department and course not set.</strong> Use <a href="<?php echo APP_URL; ?>/application-admission/edit?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>">Edit schedule</a> to assign them for this exam centre/venue before filtering applicants by course.
+        </div>
         <?php endif; ?>
 
         <?php if (!empty($pickerHint)): ?>
@@ -440,20 +526,20 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
         <?php endif; ?>
         <?php if (!empty($picker_entrance_fallback) && !empty($picker)): ?>
         <div class="alert alert-warning py-2 small mb-3">
-            <strong>No entrance exam yet.</strong> Showing all approved applicants for this course because no entrance examination schedule exists. Create an entrance exam and mark <em>Selected</em> candidates when you want this interview list to follow exam results.
+            <strong>No entrance exam yet.</strong> Showing all approved and rejected applicants for this course because no entrance examination schedule exists. Create an entrance exam and mark <em>Selected</em> candidates when you want this interview list to follow exam results.
         </div>
         <?php endif; ?>
 
         <?php if (!empty($picker)): ?>
         <div class="admission-picker-card">
             <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <span>Add approved applicants</span>
+                <span>Add applicants (approved or rejected)</span>
                 <label class="small mb-0 fw-normal"><input type="checkbox" id="picker-select-all" class="form-check-input me-1"> Select all</label>
             </div>
             <div class="admission-picker-scroll">
                 <table class="table admission-picker-table mb-0">
                     <colgroup>
-                        <col class="col-pick"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-course">
+                        <col class="col-pick"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-course">
                     </colgroup>
                     <thead>
                         <tr>
@@ -462,6 +548,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
                             <th class="col-name">Name</th>
                             <th class="col-nic">NIC</th>
                             <th class="col-province">Province</th>
+                            <th class="col-status">Status</th>
                             <th class="col-course">Course (1st pref.)</th>
                         </tr>
                     </thead>
@@ -473,6 +560,10 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
                         <td class="col-name"><?php echo $e($p['student_full_name'] ?? ''); ?></td>
                         <td class="col-nic"><?php echo $e($p['student_nic'] ?? ''); ?></td>
                         <td class="col-province"><?php echo $e($p['student_province'] ?? '—'); ?></td>
+                        <td class="col-status"><?php
+                            $pStatus = strtolower(trim((string) ($p['status'] ?? '')));
+                            $pStatusClass = $pStatus === 'approved' ? 'admission-status-approved' : ($pStatus === 'rejected' ? 'admission-status-rejected' : '');
+                        ?><span class="admission-status-badge <?php echo $e($pStatusClass); ?>"><?php echo $e($applicationStatusLabel($p)); ?></span></td>
                         <td class="col-course" title="<?php echo $e($p['course_priority_1'] ?? ''); ?>"><?php echo $e($p['course_priority_1'] ?? ''); ?></td>
                     </tr>
                     <?php endforeach; ?>
@@ -482,14 +573,14 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
         </div>
         <?php else: ?>
         <p class="text-muted small mb-3"><?php
-            if ($filterProvince !== null) {
-                echo 'No eligible applicants to add for province ' . $e($filterProvince) . '.';
+            if ($provinceFilterActive) {
+                echo 'No eligible applicants to add for ' . (count($filterProvinces) === 1 ? 'province ' : 'provinces ') . $e($provinceFilterLabel) . '.';
             } elseif (!empty($has_entrance_schedule) && (int) ($entrance_selected_count ?? 0) === 0) {
                 echo 'No eligible applicants yet. Open the entrance exam for this course, mark candidates as Selected, then return here.';
             } elseif (!empty($pickerHint)) {
                 echo 'No eligible applicants to add yet.';
             } else {
-                echo 'No more approved applicants to add for this course/level.';
+                echo 'No more approved or rejected applicants to add for this course/level.';
             }
         ?></p>
         <?php endif; ?>
@@ -497,7 +588,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
         <div class="admission-entries-table-wrap" id="admission-entries-table">
             <table class="table admission-entries-table mb-0">
                 <colgroup>
-                    <col class="col-remove"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-course">
+                    <col class="col-remove"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-course">
                     <col class="col-roll"><col class="col-card"><col class="col-whatsapp"><col class="col-sent">
                 </colgroup>
                 <thead>
@@ -507,6 +598,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
                         <th class="col-name">Name</th>
                         <th class="col-nic">NIC</th>
                         <th class="col-province">Province</th>
+                        <th class="col-status">Status</th>
                         <th class="col-course">Course</th>
                         <th class="col-roll">Roll / Index</th>
                         <th class="col-card"><span class="visually-hidden">Card</span></th>
@@ -516,21 +608,29 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
                 </thead>
                 <tbody>
                 <?php if (empty($entries)): ?>
-                    <tr><td colspan="10" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
+                    <tr><td colspan="11" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
                 <?php else: ?>
                     <?php $i = 0; foreach ($entries as $row): $i++;
-                        $rollDisplay = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $i);
+                        $entryId = (int) ($row['entry_id'] ?? 0);
+                        $rollSeq = (int) ($courseWiseRollSeq[$entryId] ?? 1);
+                        $rollDisplay = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $rollSeq);
+                        $rollPrefix = ApplicationAdmissionScheduleModel::rollNumberPrefixForEntry($sch, $row);
+                        $courseKey = ApplicationAdmissionScheduleModel::courseSortKeyFromEntry($row);
                         $waSent = !empty($row['whatsapp_sent']);
-                        $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvince);
+                        $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvinces);
                     ?>
-                    <tr class="<?php echo trim(($waSent ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>">
+                    <tr class="<?php echo trim(($waSent ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-course-key="<?php echo $e($courseKey); ?>">
                         <td class="col-remove"><input type="checkbox" class="form-check-input" name="remove_entry_ids[]" value="<?php echo (int) $row['entry_id']; ?>" title="Remove"></td>
                         <td class="col-no"><?php echo $i; ?></td>
                         <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
                         <td class="col-nic"><?php echo $e($row['student_nic'] ?? ''); ?></td>
                         <td class="col-province"><?php echo $e($row['student_province'] ?? '—'); ?></td>
+                        <td class="col-status"><?php
+                            $rowStatus = strtolower(trim((string) ($row['application_status'] ?? $row['status'] ?? '')));
+                            $rowStatusClass = $rowStatus === 'approved' ? 'admission-status-approved' : ($rowStatus === 'rejected' ? 'admission-status-rejected' : '');
+                        ?><span class="admission-status-badge <?php echo $e($rowStatusClass); ?>"><?php echo $e($applicationStatusLabel($row)); ?></span></td>
                         <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($row['course_priority_1'] ?? ''); ?></td>
-                        <td class="col-roll"><input type="text" class="form-control form-control-sm roll-index-input" name="entries[<?php echo (int) $row['entry_id']; ?>][roll_number]" value="<?php echo $e($rollDisplay); ?>" data-seq="<?php echo $i; ?>"></td>
+                        <td class="col-roll"><input type="text" class="form-control form-control-sm roll-index-input" name="entries[<?php echo (int) $row['entry_id']; ?>][roll_number]" value="<?php echo $e($rollDisplay); ?>" data-seq="<?php echo $rollSeq; ?>" data-roll-prefix="<?php echo $e($rollPrefix); ?>" data-course-key="<?php echo $e($courseKey); ?>"></td>
                         <td class="col-card">
                             <a href="<?php echo $e($admissionCardUrl((int) ($row['entry_id'] ?? 0))); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" title="Download postal admission card"><i class="fas fa-id-card" aria-hidden="true"></i><span class="visually-hidden"> Card</span></a>
                         </td>
@@ -575,7 +675,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
             <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i> Save applicants</button>
             <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-renumber-rolls"><i class="fas fa-sort-numeric-down me-1"></i> Renumber</button>
             <?php if ($entryCount > 0): ?>
-            <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener"><i class="fas fa-id-card me-1"></i> Download admission cards<?php echo $filterProvince !== null ? ' (' . $e($filterProvince) . ')' : ''; ?></a>
+            <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener"><i class="fas fa-id-card me-1"></i> Download admission cards<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <?php endif; ?>
             <p class="toolbar-hint mb-0"><i class="fab fa-whatsapp text-success"></i> Use <strong>WhatsApp</strong> for links, or <strong>Admission cards</strong> for postal mail (name &amp; address printed on top).</p>
         </div>
@@ -604,7 +704,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
     <div class="admission-entries-table-wrap">
         <table class="table admission-entries-table admission-entries-table-readonly mb-0">
             <colgroup>
-                <col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-course">
+                <col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-course">
                 <col class="col-roll"><col class="col-card"><col class="col-whatsapp"><col class="col-sent">
             </colgroup>
             <thead>
@@ -613,6 +713,7 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
                     <th class="col-name">Name</th>
                     <th class="col-nic">NIC</th>
                     <th class="col-province">Province</th>
+                    <th class="col-status">Status</th>
                     <th class="col-course">Course</th>
                     <th class="col-roll">Roll / Index</th>
                     <th class="col-card"><span class="visually-hidden">Card</span></th>
@@ -622,22 +723,28 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
             </thead>
             <tbody>
             <?php if (empty($entries)): ?>
-                <tr><td colspan="9" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
+                <tr><td colspan="10" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
             <?php else: ?>
                 <?php $i = 0; foreach ($entries as $row): $i++;
-                    $rollOut = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $i);
+                    $entryId = (int) ($row['entry_id'] ?? 0);
+                    $rollSeq = (int) ($courseWiseRollSeq[$entryId] ?? 1);
+                    $rollOut = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $rollSeq);
                     $waRow = $waByEntry[(int) ($row['entry_id'] ?? 0)] ?? null;
                     $waDisplay = $waRow['display_phone'] ?? trim((string) ($row['student_whatsapp'] ?? ''));
                     if ($waDisplay === '') {
                         $waDisplay = trim((string) ($row['student_phone'] ?? ''));
                     }
-                    $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvince);
+                    $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvinces);
                 ?>
                 <tr class="<?php echo trim((!empty($row['whatsapp_sent']) ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>">
                     <td class="col-no"><?php echo $i; ?></td>
                     <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
                     <td class="col-nic"><?php echo $e($row['student_nic'] ?? ''); ?></td>
                     <td class="col-province"><?php echo $e($row['student_province'] ?? '—'); ?></td>
+                    <td class="col-status"><?php
+                        $rowStatus = strtolower(trim((string) ($row['application_status'] ?? $row['status'] ?? '')));
+                        $rowStatusClass = $rowStatus === 'approved' ? 'admission-status-approved' : ($rowStatus === 'rejected' ? 'admission-status-rejected' : '');
+                    ?><span class="admission-status-badge <?php echo $e($rowStatusClass); ?>"><?php echo $e($applicationStatusLabel($row)); ?></span></td>
                     <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($row['course_priority_1'] ?? ''); ?></td>
                     <td class="col-roll"><span class="roll-index-readout"><?php echo $e($rollOut); ?></span></td>
                     <td class="col-card">
@@ -667,16 +774,67 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
 <script>
 (function () {
     var saveUrl = <?php echo json_encode(rtrim(APP_URL, '/') . '/application-admission/mark-whatsapp-sent'); ?>;
-    var rollFormatPrefix = <?php echo json_encode($rollFormatPrefix); ?>;
+    var entriesUrl = <?php echo json_encode($entriesUrl); ?>;
 
-    function formatRollIndex(seq) {
+    function formatRollIndex(prefix, seq) {
         var n = Math.max(1, parseInt(seq, 10) || 1);
         var num = String(n);
         while (num.length < 3) {
             num = '0' + num;
         }
-        var prefix = (rollFormatPrefix || '').replace(/\/+$/, '');
+        prefix = (prefix || '').replace(/\/+$/, '');
         return prefix ? (prefix + '/' + num) : num;
+    }
+
+    var provinceBox = document.getElementById('admission-province-checkboxes');
+    if (provinceBox) {
+        function buildProvinceFilterUrl() {
+            var provinces = [];
+            provinceBox.querySelectorAll('.province-filter-item:checked').forEach(function (cb) {
+                if (cb.value) {
+                    provinces.push(cb.value);
+                }
+            });
+            if (provinces.length === 0) {
+                return entriesUrl;
+            }
+            var url = entriesUrl;
+            provinces.forEach(function (province) {
+                url += '&province[]=' + encodeURIComponent(province);
+            });
+            return url;
+        }
+
+        provinceBox.addEventListener('change', function (ev) {
+            var target = ev.target;
+            if (!target || !target.classList || !target.classList.contains('province-filter-cb')) {
+                return;
+            }
+            if (target.id === 'province_filter_all') {
+                if (target.checked) {
+                    provinceBox.querySelectorAll('.province-filter-item').forEach(function (cb) {
+                        cb.checked = false;
+                    });
+                    window.location.href = entriesUrl;
+                } else if (provinceBox.querySelectorAll('.province-filter-item:checked').length === 0) {
+                    target.checked = true;
+                }
+                return;
+            }
+            var allCb = document.getElementById('province_filter_all');
+            if (target.checked) {
+                if (allCb) {
+                    allCb.checked = false;
+                }
+            } else if (provinceBox.querySelectorAll('.province-filter-item:checked').length === 0) {
+                if (allCb) {
+                    allCb.checked = true;
+                }
+                window.location.href = entriesUrl;
+                return;
+            }
+            window.location.href = buildProvinceFilterUrl();
+        });
     }
 
     var selectAll = document.getElementById('picker-select-all');
@@ -690,11 +848,20 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
     var renumberBtn = document.getElementById('btn-renumber-rolls');
     if (renumberBtn) {
         renumberBtn.addEventListener('click', function () {
+            var byCourse = {};
             document.querySelectorAll('.roll-index-input').forEach(function (inp) {
-                var seq = inp.getAttribute('data-seq');
-                if (seq) {
-                    inp.value = formatRollIndex(seq);
+                var key = inp.getAttribute('data-course-key') || '';
+                if (!byCourse[key]) {
+                    byCourse[key] = [];
                 }
+                byCourse[key].push(inp);
+            });
+            Object.keys(byCourse).forEach(function (key) {
+                byCourse[key].forEach(function (inp, idx) {
+                    var prefix = inp.getAttribute('data-roll-prefix') || '';
+                    inp.value = formatRollIndex(prefix, idx + 1);
+                    inp.setAttribute('data-seq', String(idx + 1));
+                });
             });
         });
     }
