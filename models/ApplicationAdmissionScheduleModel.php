@@ -204,7 +204,7 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
-     * Normalized course key for sorting and per-course roll serials.
+     * Normalized course key for sorting within a department.
      *
      * @param array<string, mixed> $row
      */
@@ -224,68 +224,108 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
-     * Sort applicants by course (1st preference), province, then name.
+     * Department + course sort keys from one preference resolve.
+     *
+     * @param array<string, mixed> $row
+     * @return array{dept: string, course: string}
+     */
+    public static function departmentAndCourseSortKeysFromEntry(array $row): array {
+        require_once BASE_PATH . '/models/StudentApplicationModel.php';
+        $stored = trim((string) ($row['course_priority_1'] ?? ''));
+        if ($stored === '') {
+            return ['dept' => 'GEN', 'course' => ''];
+        }
+        $resolved = (new StudentApplicationModel())->resolveCourseDepartmentForPreference($stored);
+        $dept = trim((string) ($resolved['department_id'] ?? ''));
+        $dept = strtoupper(preg_replace('/[^A-Za-z0-9._-]+/', '', $dept));
+        $name = trim((string) ($resolved['course_name'] ?? ''));
+        $course = $name !== ''
+            ? mb_strtolower($name, 'UTF-8')
+            : mb_strtolower($stored, 'UTF-8');
+
+        return [
+            'dept' => $dept !== '' ? $dept : 'GEN',
+            'course' => $course,
+        ];
+    }
+
+    /**
+     * Sort applicants by department, then course (1st preference), province, then name.
      *
      * @param list<array<string, mixed>> $rows
      * @return list<array<string, mixed>>
      */
     public static function sortEntryRowsByCourseAndProvince(array $rows): array {
-        usort($rows, static function (array $a, array $b): int {
-            $courseCmp = strnatcasecmp(
-                self::courseSortKeyFromEntry($a),
-                self::courseSortKeyFromEntry($b)
-            );
+        $sortMeta = [];
+        foreach ($rows as $idx => $row) {
+            $keys = self::departmentAndCourseSortKeysFromEntry($row);
+            $status = strtolower(trim((string) ($row['status'] ?? $row['application_status'] ?? '')));
+            if ($status === 'approved') {
+                $statusRank = 0;
+            } elseif ($status === 'rejected') {
+                $statusRank = 1;
+            } else {
+                $statusRank = 2;
+            }
+            $sortMeta[$idx] = [
+                'dept' => $keys['dept'],
+                'course' => $keys['course'],
+                'province' => trim((string) ($row['student_province'] ?? '')),
+                'status' => $statusRank,
+                'name' => trim((string) ($row['student_full_name'] ?? '')),
+            ];
+        }
+
+        $indexes = array_keys($rows);
+        usort($indexes, static function (int $ia, int $ib) use ($sortMeta): int {
+            $a = $sortMeta[$ia];
+            $b = $sortMeta[$ib];
+            $deptCmp = strnatcasecmp($a['dept'], $b['dept']);
+            if ($deptCmp !== 0) {
+                return $deptCmp;
+            }
+            $courseCmp = strnatcasecmp($a['course'], $b['course']);
             if ($courseCmp !== 0) {
                 return $courseCmp;
             }
-            $provCmp = strnatcasecmp(
-                trim((string) ($a['student_province'] ?? '')),
-                trim((string) ($b['student_province'] ?? ''))
-            );
+            $provCmp = strnatcasecmp($a['province'], $b['province']);
             if ($provCmp !== 0) {
                 return $provCmp;
             }
-            $statusOrder = static function (array $row): int {
-                $status = strtolower(trim((string) ($row['status'] ?? $row['application_status'] ?? '')));
-                if ($status === 'approved') {
-                    return 0;
-                }
-                if ($status === 'rejected') {
-                    return 1;
-                }
-
-                return 2;
-            };
-            $statusCmp = $statusOrder($a) <=> $statusOrder($b);
+            $statusCmp = $a['status'] <=> $b['status'];
             if ($statusCmp !== 0) {
                 return $statusCmp;
             }
 
-            return strnatcasecmp(
-                trim((string) ($a['student_full_name'] ?? '')),
-                trim((string) ($b['student_full_name'] ?? ''))
-            );
+            return strnatcasecmp($a['name'], $b['name']);
         });
 
-        return $rows;
+        $sorted = [];
+        foreach ($indexes as $idx) {
+            $sorted[] = $rows[$idx];
+        }
+
+        return $sorted;
     }
 
     /**
+     * Roll serials continue across courses in the same department; reset when department changes.
+     *
      * @param list<array<string, mixed>> $entries
-     * @return array<int, int> entry_id => course-wise serial
+     * @return array<int, int> entry_id => department-wise serial
      */
     public static function courseWiseSequenceMap(array $entries): array {
         $sorted = self::sortEntryRowsByCourseAndProvince($entries);
-        $courseSeq = [];
+        $deptSeq = [];
         $map = [];
         foreach ($sorted as $entry) {
             $entryId = (int) ($entry['entry_id'] ?? 0);
             if ($entryId <= 0) {
                 continue;
             }
-            $courseKey = self::courseSortKeyFromEntry($entry);
-            $courseSeq[$courseKey] = ($courseSeq[$courseKey] ?? 0) + 1;
-            $map[$entryId] = $courseSeq[$courseKey];
+            $deptKey = self::departmentCodeFromEntry($entry);
+            $deptSeq[$deptKey] = ($deptSeq[$deptKey] ?? 0) + 1;
+            $map[$entryId] = $deptSeq[$deptKey];
         }
 
         return $map;
@@ -395,15 +435,13 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
+     * Department-wise roll for display/PDF. Always uses the given sequence so serials
+     * continue across courses in the same department (saved per-course values are ignored).
+     *
      * @param array<string, mixed> $schedule
      * @param array<string, mixed> $entry
      */
     public static function defaultRollIndexForEntry(array $schedule, array $entry, int $sequence): string {
-        $existing = trim((string) ($entry['roll_number'] ?? ''));
-        if ($existing !== '') {
-            return $existing;
-        }
-
         return self::formatRollNumberForEntry($schedule, $entry, $sequence);
     }
 

@@ -484,14 +484,14 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
         <?php if ($canManage && $provinceFilterActive && $pickerUnfilteredCount !== $pickerCount): ?>
         <span class="text-muted"><?php echo (int) $pickerCount; ?> to add (of <?php echo (int) $pickerUnfilteredCount; ?> eligible)</span>
         <?php endif; ?>
-        <span class="text-muted">Roll format: <code><?php echo $e($rollFormatSample); ?></code> <span class="text-muted">(serial restarts per course)</span></span>
+        <span class="text-muted">Roll format: <code><?php echo $e($rollFormatSample); ?></code> <span class="text-muted">(serial continues within department; restarts when department changes)</span></span>
     </div>
 
     <?php if ($provinceOptions !== []): ?>
     <div class="admission-province-filter">
         <div>
             <label class="d-block">Filter by province</label>
-            <div class="form-text mb-1">Tick one or more provinces to load only those students. Applicants are sorted by course, then province.</div>
+            <div class="form-text mb-1">Tick one or more provinces to load only those students. Applicants are sorted by department, then course, then province.</div>
             <div class="admission-province-checkboxes" id="admission-province-checkboxes">
                 <div class="form-check">
                     <input class="form-check-input province-filter-cb" type="checkbox" id="province_filter_all" value="" <?php echo !$provinceFilterActive ? 'checked' : ''; ?>>
@@ -613,13 +613,13 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                     <?php $i = 0; foreach ($entries as $row): $i++;
                         $entryId = (int) ($row['entry_id'] ?? 0);
                         $rollSeq = (int) ($courseWiseRollSeq[$entryId] ?? 1);
-                        $rollDisplay = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $rollSeq);
+                        $rollDisplay = ApplicationAdmissionScheduleModel::formatRollNumberForEntry($sch, $row, $rollSeq);
                         $rollPrefix = ApplicationAdmissionScheduleModel::rollNumberPrefixForEntry($sch, $row);
-                        $courseKey = ApplicationAdmissionScheduleModel::courseSortKeyFromEntry($row);
+                        $deptKey = ApplicationAdmissionScheduleModel::departmentCodeFromEntry($row);
                         $waSent = !empty($row['whatsapp_sent']);
                         $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvinces);
                     ?>
-                    <tr class="<?php echo trim(($waSent ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-course-key="<?php echo $e($courseKey); ?>">
+                    <tr class="<?php echo trim(($waSent ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-dept-key="<?php echo $e($deptKey); ?>">
                         <td class="col-remove"><input type="checkbox" class="form-check-input" name="remove_entry_ids[]" value="<?php echo (int) $row['entry_id']; ?>" title="Remove"></td>
                         <td class="col-no"><?php echo $i; ?></td>
                         <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
@@ -630,7 +630,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                             $rowStatusClass = $rowStatus === 'approved' ? 'admission-status-approved' : ($rowStatus === 'rejected' ? 'admission-status-rejected' : '');
                         ?><span class="admission-status-badge <?php echo $e($rowStatusClass); ?>"><?php echo $e($applicationStatusLabel($row)); ?></span></td>
                         <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($row['course_priority_1'] ?? ''); ?></td>
-                        <td class="col-roll"><input type="text" class="form-control form-control-sm roll-index-input" name="entries[<?php echo (int) $row['entry_id']; ?>][roll_number]" value="<?php echo $e($rollDisplay); ?>" data-seq="<?php echo $rollSeq; ?>" data-roll-prefix="<?php echo $e($rollPrefix); ?>" data-course-key="<?php echo $e($courseKey); ?>"></td>
+                        <td class="col-roll"><input type="text" class="form-control form-control-sm roll-index-input" name="entries[<?php echo (int) $row['entry_id']; ?>][roll_number]" value="<?php echo $e($rollDisplay); ?>" data-seq="<?php echo $rollSeq; ?>" data-roll-prefix="<?php echo $e($rollPrefix); ?>" data-dept-key="<?php echo $e($deptKey); ?>"></td>
                         <td class="col-card">
                             <a href="<?php echo $e($admissionCardUrl((int) ($row['entry_id'] ?? 0))); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" title="Download postal admission card"><i class="fas fa-id-card" aria-hidden="true"></i><span class="visually-hidden"> Card</span></a>
                         </td>
@@ -728,7 +728,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                 <?php $i = 0; foreach ($entries as $row): $i++;
                     $entryId = (int) ($row['entry_id'] ?? 0);
                     $rollSeq = (int) ($courseWiseRollSeq[$entryId] ?? 1);
-                    $rollOut = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $rollSeq);
+                    $rollOut = ApplicationAdmissionScheduleModel::formatRollNumberForEntry($sch, $row, $rollSeq);
                     $waRow = $waByEntry[(int) ($row['entry_id'] ?? 0)] ?? null;
                     $waDisplay = $waRow['display_phone'] ?? trim((string) ($row['student_whatsapp'] ?? ''));
                     if ($waDisplay === '') {
@@ -848,16 +848,16 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
     var renumberBtn = document.getElementById('btn-renumber-rolls');
     if (renumberBtn) {
         renumberBtn.addEventListener('click', function () {
-            var byCourse = {};
+            var byDept = {};
             document.querySelectorAll('.roll-index-input').forEach(function (inp) {
-                var key = inp.getAttribute('data-course-key') || '';
-                if (!byCourse[key]) {
-                    byCourse[key] = [];
+                var key = inp.getAttribute('data-dept-key') || '';
+                if (!byDept[key]) {
+                    byDept[key] = [];
                 }
-                byCourse[key].push(inp);
+                byDept[key].push(inp);
             });
-            Object.keys(byCourse).forEach(function (key) {
-                byCourse[key].forEach(function (inp, idx) {
+            Object.keys(byDept).forEach(function (key) {
+                byDept[key].forEach(function (inp, idx) {
                     var prefix = inp.getAttribute('data-roll-prefix') || '';
                     inp.value = formatRollIndex(prefix, idx + 1);
                     inp.setAttribute('data-seq', String(idx + 1));

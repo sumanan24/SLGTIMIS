@@ -698,10 +698,7 @@ class ApplicationAdmissionController extends Controller {
         foreach ($entries as $entry) {
             $entryIdForRoll = (int) ($entry['entry_id'] ?? 0);
             $seq = $courseWiseRollSeq[$entryIdForRoll] ?? 1;
-            $roll = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($schedule, $entry, $seq);
-            if (trim((string) ($entry['roll_number'] ?? '')) === '') {
-                $entry['roll_number'] = $roll;
-            }
+            $entry['roll_number'] = ApplicationAdmissionScheduleModel::formatRollNumberForEntry($schedule, $entry, $seq);
             $parts[] = ApplicationAdmissionPdfHelper::renderTemplate('postal_admission_card.php', [
                 'schedule' => $schedule,
                 'entry' => $entry,
@@ -1010,15 +1007,16 @@ class ApplicationAdmissionController extends Controller {
         return $url;
     }
 
+    /**
+     * Always rewrite rolls department-wise: serial continues across courses in the same
+     * department and restarts only when the department changes.
+     */
     private function assignSequentialRollNumbersWhereEmpty(ApplicationAdmissionScheduleModel $model, int $scheduleId, array $schedule): void {
         $entries = ApplicationAdmissionScheduleModel::sortEntryRowsByCourseAndProvince(
             $model->getEntriesWithApplications($scheduleId)
         );
         $seqMap = ApplicationAdmissionScheduleModel::courseWiseSequenceMap($entries);
         foreach ($entries as $entry) {
-            if (trim((string) ($entry['roll_number'] ?? '')) !== '') {
-                continue;
-            }
             $entryId = (int) ($entry['entry_id'] ?? 0);
             if ($entryId <= 0) {
                 continue;
