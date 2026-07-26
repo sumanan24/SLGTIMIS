@@ -931,11 +931,14 @@ class ApplicationAdmissionController extends Controller {
         if (($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_ENTRANCE) {
             $courseId = $this->scheduleCourseIdOrNull($schedule);
             if ($courseId === null) {
-                $hint = 'Assign department and course on Edit schedule for this exam centre/venue. Until then, all approved and rejected applicants for this NVQ level and language are listed.';
+                $level = trim((string) ($schedule['application_level'] ?? ''));
                 $lang = trim((string) ($schedule['student_language'] ?? ''));
+                $hint = 'Level-only schedule: loading approved and rejected applicants for NVQ '
+                    . ($level !== '' ? $level : 'level');
                 if ($lang !== '') {
-                    return 'Approved and rejected ' . $lang . ' applicants. ' . $hint;
+                    $hint .= ' (' . $lang . ' medium)';
                 }
+                $hint .= '. Course filter is optional — set a course on Edit schedule only if you want 1st-preference filtering.';
 
                 return $hint;
             }

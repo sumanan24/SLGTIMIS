@@ -837,7 +837,9 @@ class ApplicationAdmissionScheduleModel extends Model {
         if (!in_array($level, ['04', '05'], true)) {
             return [];
         }
-        $sql = 'SELECT sa.`application_id`, sa.`student_full_name`, sa.`student_nic`, sa.`student_province`, sa.`course_priority_1`, sa.`course_priority_2`, sa.`course_priority_3`, sa.`status` '
+        $sql = 'SELECT sa.`application_id`, sa.`student_full_name`, sa.`student_nic`, sa.`student_province`, '
+            . 'sa.`course_priority_1`, sa.`course_priority_2`, sa.`course_priority_3`, '
+            . 'sa.`application_level`, sa.`student_language`, sa.`status` '
             . 'FROM `student_applications` sa '
             . 'WHERE sa.`application_level` = ? AND sa.`status` IN (\'approved\', \'rejected\') '
             . 'AND sa.`application_id` NOT IN ('

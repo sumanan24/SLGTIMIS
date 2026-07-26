@@ -1076,6 +1076,12 @@ class StudentApplicationModel extends Model {
             . ')) COLLATE ' . $coll;
     }
 
+    /** @var array<string, array{department_id: string, department_name: string, course_name: string}> */
+    private static $resolveCourseDeptCache = [];
+
+    /** @var list<array<string, mixed>>|null */
+    private static $courseCatalogCache = null;
+
     /**
      * Resolve department + course name from stored `course_priority_N` (course name only, or legacy "id — name").
      * Falls back to whitespace-normalized and token match so labels like
@@ -1090,6 +1096,12 @@ class StudentApplicationModel extends Model {
         if ($stored === '') {
             return $empty;
         }
+        $levelKey = trim((string) $applicationLevel);
+        $cacheKey = $stored . "\0" . $levelKey;
+        if (isset(self::$resolveCourseDeptCache[$cacheKey])) {
+            return self::$resolveCourseDeptCache[$cacheKey];
+        }
+
         $displayName = self::displayCourseNameFromStoredPreference($stored);
         $sep = self::legacyCourseIdNameSeparator();
         $sql = 'SELECT c.`department_id`, c.`course_name`, d.`department_name` FROM `course` c '
@@ -1107,16 +1119,16 @@ class StudentApplicationModel extends Model {
             $stmt->close();
             $mapped = self::mapResolvedCourseRow($row, $displayName);
             if ($mapped !== null) {
-                return $mapped;
+                return self::$resolveCourseDeptCache[$cacheKey] = $mapped;
             }
         }
 
         $fuzzy = $this->resolveCourseDepartmentByFuzzyName($displayName !== '' ? $displayName : $stored, $applicationLevel);
         if ($fuzzy !== null) {
-            return $fuzzy;
+            return self::$resolveCourseDeptCache[$cacheKey] = $fuzzy;
         }
 
-        return [
+        return self::$resolveCourseDeptCache[$cacheKey] = [
             'department_id' => '',
             'department_name' => '',
             'course_name' => $displayName,
@@ -1158,19 +1170,25 @@ class StudentApplicationModel extends Model {
             return null;
         }
 
-        $sql = 'SELECT c.`course_id`, c.`department_id`, c.`course_name`, d.`department_name` FROM `course` c '
-            . 'LEFT JOIN `department` d ON d.`department_id` = c.`department_id`';
-        $res = $this->db->query($sql);
-        if (!$res) {
+        $catalog = $this->courseCatalogForResolve();
+        if ($catalog === []) {
             return null;
         }
 
-        $level = trim((string) $applicationLevel);
+        $expectedNvq = self::courseNvqLevelFromApplicationLevel($applicationLevel);
         $best = null;
         $bestScore = 0.0;
-        while ($row = $res->fetch_assoc()) {
+        foreach ($catalog as $row) {
+            // Never map a Level 04 preference onto a Level 05 catalog course (or vice versa).
+            if ($expectedNvq !== null) {
+                $rowNvq = trim((string) ($row['course_nvq_level'] ?? ''));
+                if ($rowNvq !== '' && $rowNvq !== $expectedNvq) {
+                    continue;
+                }
+            }
+
             $courseName = trim((string) ($row['course_name'] ?? ''));
-            $courseNorm = self::normalizeCourseLabel($courseName);
+            $courseNorm = (string) ($row['_norm'] ?? '');
             if ($courseNorm === '') {
                 continue;
             }
@@ -1178,7 +1196,8 @@ class StudentApplicationModel extends Model {
             if ($prefNorm !== '' && $courseNorm === $prefNorm) {
                 $score = 100.0;
             } else {
-                $courseTokens = self::significantCourseTokens($courseName);
+                /** @var list<string> $courseTokens */
+                $courseTokens = $row['_tokens'] ?? [];
                 if ($prefTokens === [] || $courseTokens === []) {
                     continue;
                 }
@@ -1188,26 +1207,17 @@ class StudentApplicationModel extends Model {
                 }
                 $union = count(array_unique(array_merge($prefTokens, $courseTokens)));
                 $jaccard = $union > 0 ? ($overlap / $union) : 0.0;
-                // Require a meaningful overlap (e.g. Automotive Technician ↔ Technician in Automotive Technology).
+                // Require a meaningful overlap (e.g. Automobile Technician ↔ Technician in Automotive Technology).
                 if ($overlap < 2 && $jaccard < 0.5) {
                     continue;
                 }
                 $score = ($jaccard * 80.0) + ($overlap * 5.0);
-            }
-            if ($level !== '' && isset($row['course_id'])) {
-                $cid = strtoupper(trim((string) $row['course_id']));
-                if ($cid !== '' && strpos($cid, $level) === 0) {
-                    $score += 8.0;
-                } elseif ($cid !== '' && preg_match('/^[0-9]/', $cid) && strpos($cid, $level) !== 0) {
-                    $score -= 4.0;
-                }
             }
             if ($score > $bestScore) {
                 $bestScore = $score;
                 $best = $row;
             }
         }
-        $res->free();
 
         if ($best === null || $bestScore < 40.0) {
             return null;
@@ -1216,9 +1226,52 @@ class StudentApplicationModel extends Model {
         return self::mapResolvedCourseRow($best, $preferenceName);
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function courseCatalogForResolve(): array {
+        if (self::$courseCatalogCache !== null) {
+            return self::$courseCatalogCache;
+        }
+        self::$courseCatalogCache = [];
+        $sql = 'SELECT c.`course_id`, c.`department_id`, c.`course_name`, c.`course_nvq_level`, d.`department_name` '
+            . 'FROM `course` c '
+            . 'LEFT JOIN `department` d ON d.`department_id` = c.`department_id`';
+        $res = $this->db->query($sql);
+        if (!$res) {
+            return self::$courseCatalogCache;
+        }
+        while ($row = $res->fetch_assoc()) {
+            $courseName = trim((string) ($row['course_name'] ?? ''));
+            $row['_norm'] = self::normalizeCourseLabel($courseName);
+            $row['_tokens'] = self::significantCourseTokens($courseName);
+            self::$courseCatalogCache[] = $row;
+        }
+        $res->free();
+
+        return self::$courseCatalogCache;
+    }
+
+    /**
+     * Map application level 04/05 → course.course_nvq_level 4/5.
+     */
+    private static function courseNvqLevelFromApplicationLevel(?string $applicationLevel): ?string {
+        $level = trim((string) $applicationLevel);
+        if ($level === '04' || $level === '4') {
+            return '4';
+        }
+        if ($level === '05' || $level === '5') {
+            return '5';
+        }
+
+        return null;
+    }
+
     private static function normalizeCourseLabel(string $label): string {
         $label = mb_strtolower(trim($label), 'UTF-8');
         $label = preg_replace('/\s+/u', ' ', $label) ?? $label;
+        // Applications often say "Automotive"; catalog may say "Automobile".
+        $label = str_replace('automotive', 'automobile', $label);
 
         return $label;
     }
