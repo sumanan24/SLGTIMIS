@@ -74,7 +74,7 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
 </style>
 <div class="container-fluid px-3 px-md-4 admission-form-page-wrap">
     <h1 class="page-title h4 mb-1"><?php echo $isEdit ? 'Edit' : 'Create'; ?> <?php echo $e($typeLabel); ?></h1>
-    <p class="text-muted small mb-3"><?php if ($showCourseFields): ?>Set NVQ level, language, course, and schedule details. Applicant lists use the selected language only.<?php else: ?>Set NVQ level, language, and schedule details for this exam centre. Assign department and course later when you edit the schedule.<?php endif; ?></p>
+    <p class="text-muted small mb-3"><?php if ($showCourseFields): ?>Set NVQ level, language, course, and schedule details. Level 04 lists use the selected language; Level 05 is English medium and includes all applicants.<?php else: ?>Set NVQ level, language, and schedule details for this exam centre. Level 05 is English medium for all applicants. Assign department and course later when you edit the schedule.<?php endif; ?></p>
 
     <?php if (!empty($_SESSION['error'])): ?>
         <div class="alert alert-danger"><?php echo $e($_SESSION['error']); unset($_SESSION['error']); ?></div>
@@ -104,15 +104,16 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
                             <option value="05" <?php echo $selectedLevel === '05' ? 'selected' : ''; ?>>Level 05</option>
                         </select>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label" for="student_language">Language <span class="text-danger">*</span></label>
+                    <div class="col-md-6" id="student-language-wrap">
+                        <label class="form-label" for="student_language">Language <span class="text-danger" id="student-language-req">*</span></label>
                         <select name="student_language" id="student_language" class="form-select" required>
                             <option value="">Select language…</option>
                             <?php foreach ($languageOptions as $langOpt): ?>
                             <option value="<?php echo $e($langOpt); ?>" <?php echo $selectedStudentLanguage === $langOpt ? 'selected' : ''; ?>><?php echo $e($langOpt); ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <div class="form-text">Only approved applicants with this language appear in counts and on the schedule.</div>
+                        <div class="form-text" id="student-language-help">Only approved applicants with this language appear in counts and on the schedule.</div>
+                        <div class="form-text d-none" id="student-language-help-l05">Level 05 entrance exams are English medium. All approved applicants are included (Tamil, Sinhala, and English).</div>
                     </div>
                 </div>
                 <?php if ($showCourseFields): ?>
@@ -200,6 +201,62 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
 <script>
 (function () {
     var showCourseFields = <?php echo $showCourseFields ? 'true' : 'false'; ?>;
+    var levelEl = document.getElementById('application_level');
+    var langEl = document.getElementById('student_language');
+    var scheduleForm = document.getElementById('admission-schedule-form');
+
+    function isLevel05() {
+        return levelEl && levelEl.value === '05';
+    }
+
+    function syncLanguageForLevel() {
+        if (!langEl) {
+            return;
+        }
+        var helpL04 = document.getElementById('student-language-help');
+        var helpL05 = document.getElementById('student-language-help-l05');
+        var reqMark = document.getElementById('student-language-req');
+        if (isLevel05()) {
+            langEl.value = 'English';
+            langEl.disabled = true;
+            langEl.removeAttribute('required');
+            if (reqMark) {
+                reqMark.classList.add('d-none');
+            }
+            if (helpL04) {
+                helpL04.classList.add('d-none');
+            }
+            if (helpL05) {
+                helpL05.classList.remove('d-none');
+            }
+        } else {
+            langEl.disabled = false;
+            langEl.setAttribute('required', 'required');
+            if (reqMark) {
+                reqMark.classList.remove('d-none');
+            }
+            if (helpL04) {
+                helpL04.classList.remove('d-none');
+            }
+            if (helpL05) {
+                helpL05.classList.add('d-none');
+            }
+        }
+    }
+
+    if (levelEl) {
+        levelEl.addEventListener('change', syncLanguageForLevel);
+    }
+    if (scheduleForm && langEl) {
+        scheduleForm.addEventListener('submit', function () {
+            if (isLevel05()) {
+                langEl.disabled = false;
+                langEl.value = 'English';
+            }
+        });
+    }
+    syncLanguageForLevel();
+
     if (!showCourseFields) {
         return;
     }
@@ -212,8 +269,6 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
     var pathExam = <?php echo json_encode($pathExam); ?>;
     var pathInterviewOnly = <?php echo json_encode($pathInterviewOnly); ?>;
     var userPickedPathway = <?php echo $isEdit ? 'true' : 'false'; ?>;
-    var levelEl = document.getElementById('application_level');
-    var langEl = document.getElementById('student_language');
     var deptEl = document.getElementById('filter_department_id');
     var courseEl = document.getElementById('course_id');
     var titleEl = document.getElementById('schedule_title');
@@ -228,6 +283,12 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
     function approvedCountForCourse(course) {
         if (!course) {
             return 0;
+        }
+        // Level 05: count every language (English medium exam for all).
+        if (isLevel05()) {
+            if (course.approved_application_count != null) {
+                return parseInt(course.approved_application_count, 10) || 0;
+            }
         }
         var lang = langEl ? langEl.value : '';
         if (lang && course.approved_counts_by_language && course.approved_counts_by_language[lang] != null) {
@@ -254,7 +315,9 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
             pathwayBanner.classList.remove('d-none');
             var suggested = defaultPathwayForCount(count);
             var suggestedLabel = suggested === pathExam ? 'Exam and interview' : 'Interview only';
-            pathwayBanner.innerHTML = '<strong>' + count + '</strong> approved application(s) for this course, language, and level. Suggested pathway: <strong>' + suggestedLabel + '</strong>.';
+            pathwayBanner.innerHTML = isLevel05()
+                ? '<strong>' + count + '</strong> approved application(s) for this course and Level 05 (all languages, English medium). Suggested pathway: <strong>' + suggestedLabel + '</strong>.'
+                : '<strong>' + count + '</strong> approved application(s) for this course, language, and level. Suggested pathway: <strong>' + suggestedLabel + '</strong>.';
         }
         if (!userPickedPathway && pathwayExamEl && pathwayInterviewEl) {
             var pick = defaultPathwayForCount(count);

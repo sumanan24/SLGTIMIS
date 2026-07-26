@@ -234,6 +234,9 @@ class ApplicationAdmissionController extends Controller {
         );
         $courseWiseRollSeq = ApplicationAdmissionScheduleModel::courseWiseSequenceMap($entries);
         $filterProvinces = ApplicationAdmissionScheduleModel::normalizedProvinceFilters($this->get('province', ''));
+        $pickerLanguage = ApplicationAdmissionScheduleModel::scheduleIgnoresApplicantLanguage($schedule)
+            ? null
+            : (string) ($schedule['student_language'] ?? '');
         $pickerArgs = [
             (string) $schedule['application_level'],
             $id,
@@ -241,7 +244,7 @@ class ApplicationAdmissionController extends Controller {
             $this->scheduleCourseIdOrNull($schedule),
             (string) ($schedule['schedule_type'] ?? ''),
             (string) ($schedule['admission_pathway'] ?? ApplicationAdmissionScheduleModel::PATHWAY_EXAM_AND_INTERVIEW),
-            (string) ($schedule['student_language'] ?? ''),
+            $pickerLanguage,
         ];
         $pickerUnfiltered = $canManage
             ? ApplicationAdmissionScheduleModel::sortEntryRowsByCourseAndProvince(
@@ -777,10 +780,15 @@ class ApplicationAdmissionController extends Controller {
             }
         }
         require_once BASE_PATH . '/models/StudentApplicationModel.php';
-        $studentLanguage = StudentApplicationModel::normalizedStaffLanguageFilter($this->post('student_language', ''));
-        if ($studentLanguage === null) {
-            $_SESSION['error'] = 'Select the language of instruction for this schedule (Tamil, Sinhala, or English).';
-            return null;
+        // Level 05 exams are English medium for every applicant (no language filter).
+        if ($level === '05') {
+            $studentLanguage = 'English';
+        } else {
+            $studentLanguage = StudentApplicationModel::normalizedStaffLanguageFilter($this->post('student_language', ''));
+            if ($studentLanguage === null) {
+                $_SESSION['error'] = 'Select the language of instruction for this schedule (Tamil, Sinhala, or English).';
+                return null;
+            }
         }
         $data = [
             'schedule_type' => $type,
@@ -931,8 +939,15 @@ class ApplicationAdmissionController extends Controller {
     private function schedulePickerHint(array $schedule): string {
         if (($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_ENTRANCE) {
             $courseId = $this->scheduleCourseIdOrNull($schedule);
+            $level = trim((string) ($schedule['application_level'] ?? ''));
+            if ($level === '05') {
+                if ($courseId === null) {
+                    return 'Level 05 English medium: loading all approved and rejected applicants (every application language). Course filter is optional — set a course on Edit schedule only if you want 1st-preference filtering.';
+                }
+
+                return 'Level 05 English medium: all approved and rejected applicants with matching 1st preference (every application language). Applicants already on another entrance exam for this course are not listed.';
+            }
             if ($courseId === null) {
-                $level = trim((string) ($schedule['application_level'] ?? ''));
                 $lang = trim((string) ($schedule['student_language'] ?? ''));
                 $hint = 'Level-only schedule: loading approved and rejected applicants for NVQ '
                     . ($level !== '' ? $level : 'level');
@@ -986,9 +1001,13 @@ class ApplicationAdmissionController extends Controller {
         } else {
             $hint = 'Exam and interview: only applicants marked Selected on an entrance examination for this course can be added.';
         }
-        $lang = trim((string) ($schedule['student_language'] ?? ''));
-        if ($lang !== '') {
-            $hint .= ' Only applicants with language ' . $lang . ' are listed.';
+        if (!ApplicationAdmissionScheduleModel::scheduleIgnoresApplicantLanguage($schedule)) {
+            $lang = trim((string) ($schedule['student_language'] ?? ''));
+            if ($lang !== '') {
+                $hint .= ' Only applicants with language ' . $lang . ' are listed.';
+            }
+        } else {
+            $hint .= ' Level 05 English medium: applicants of every language are listed.';
         }
 
         return $hint;

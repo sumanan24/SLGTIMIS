@@ -528,8 +528,12 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
         <?php if (!$isInterview && empty($sch['course_name']) && !empty($canManage)): ?>
         <div class="alert alert-info py-2 small mb-3">
             <strong>Level-only load.</strong> Showing approved/rejected applicants for NVQ <?php echo $e($sch['application_level'] ?? ''); ?><?php
-                $schLang = trim((string) ($sch['student_language'] ?? ''));
-                echo $schLang !== '' ? ' · ' . $e($schLang) : '';
+                if (trim((string) ($sch['application_level'] ?? '')) === '05') {
+                    echo ' · English medium (all applicant languages)';
+                } else {
+                    $schLang = trim((string) ($sch['student_language'] ?? ''));
+                    echo $schLang !== '' ? ' · ' . $e($schLang) : '';
+                }
             ?>. Course is optional — <a href="<?php echo APP_URL; ?>/application-admission/edit?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>">Edit schedule</a> to filter by one course.
         </div>
         <?php endif; ?>

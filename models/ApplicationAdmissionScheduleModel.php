@@ -406,6 +406,10 @@ class ApplicationAdmissionScheduleModel extends Model {
      * @param array<string, mixed> $schedule
      */
     public static function mediumLetterFromSchedule(array $schedule): string {
+        // Level 05 entrance / interview rolls use English medium for all applicants.
+        if (trim((string) ($schedule['application_level'] ?? '')) === '05') {
+            return 'E';
+        }
         require_once BASE_PATH . '/models/StudentApplicationModel.php';
         $lang = StudentApplicationModel::normalizedStaffLanguageFilter($schedule['student_language'] ?? null);
         if ($lang === null) {
@@ -416,6 +420,13 @@ class ApplicationAdmissionScheduleModel extends Model {
         }
 
         return strtoupper(substr($lang, 0, 1));
+    }
+
+    /**
+     * Level 05 schedules sit English medium and include every applicant language.
+     */
+    public static function scheduleIgnoresApplicantLanguage(array $schedule): bool {
+        return trim((string) ($schedule['application_level'] ?? '')) === '05';
     }
 
     /**
@@ -852,7 +863,10 @@ class ApplicationAdmissionScheduleModel extends Model {
                 . " AND TRIM(IFNULL(sa.`birth_certificate_path`, '')) <> '' ";
         }
         require_once BASE_PATH . '/models/StudentApplicationModel.php';
-        $lang = StudentApplicationModel::normalizedStaffLanguageFilter($studentLanguage);
+        // Level 05: all applicants sit English medium — do not filter by application language.
+        $lang = $level === '05'
+            ? null
+            : StudentApplicationModel::normalizedStaffLanguageFilter($studentLanguage);
         $provinces = self::normalizedProvinceFilters($studentProvinces);
         $types = 'si';
         $params = [$level, $scheduleId];

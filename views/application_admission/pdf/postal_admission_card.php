@@ -82,7 +82,9 @@ $instrHalf = (int) ceil(count($instructions) / 2);
 $instrLeft = array_slice($instructions, 0, $instrHalf);
 $instrRight = array_slice($instructions, $instrHalf);
 
-$medium = trim((string) ($schedule['student_language'] ?? $entry['student_language'] ?? ''));
+$medium = trim((string) ($schedule['application_level'] ?? '')) === '05'
+    ? 'English'
+    : trim((string) ($schedule['student_language'] ?? $entry['student_language'] ?? ''));
 $attendTitle = $examTitle !== '' ? $examTitle : ($courseLabel !== '' ? $courseLabel : '—');
 $centreNote = $isInterview ? 'interview' : 'examination';
 $dateLabel = $isInterview ? 'INTERVIEW DATE' : 'EXAMINATION DATE';
