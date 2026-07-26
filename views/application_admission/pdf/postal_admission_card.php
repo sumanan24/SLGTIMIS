@@ -66,6 +66,9 @@ $instrCol2 = array_slice($instructions, $instrHalf);
                         </td>
                         <td class="mail-to">
                             <div class="mail-label">Post to</div>
+                            <?php if ($roll !== ''): ?>
+                            <div class="mail-roll">Roll no.: <?php echo $e($roll); ?></div>
+                            <?php endif; ?>
                             <div class="mail-name"><?php echo $mailName !== '' ? $e($mailName) : '—'; ?></div>
                             <?php if ($mailAddress !== ''): ?>
                             <div class="mail-address"><?php echo nl2br($e($mailAddress)); ?></div>

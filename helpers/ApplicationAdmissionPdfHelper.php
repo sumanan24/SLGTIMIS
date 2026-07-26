@@ -70,6 +70,7 @@ class ApplicationAdmissionPdfHelper {
             . '.mail-from-name{font-size:11px;font-weight:700;line-height:1.3;color:#0f172a;}'
             . '.mail-from-address{font-size:11px;line-height:1.35;margin-top:4px;color:#334155;}'
             . '.mail-from-phone{font-size:11px;line-height:1.3;margin-top:4px;color:#0f172a;font-weight:600;}'
+            . '.mail-roll{font-size:11px;font-weight:700;line-height:1.3;margin:0 0 4px;color:#0f172a;font-family:DejaVu Sans Mono,Courier New,monospace;}'
             . '.mail-name{font-size:11px;font-weight:700;line-height:1.25;color:#0f172a;}'
             . '.mail-address{font-size:11px;line-height:1.35;margin-top:5px;white-space:pre-line;color:#0f172a;}'
             . '.mail-city{font-size:11px;line-height:1.3;margin-top:3px;color:#334155;}'
