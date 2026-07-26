@@ -49,85 +49,75 @@ class ApplicationAdmissionPdfHelper {
     }
 
     public static function wrapPostalAdmissionCardsDocument(string $bodyHtml): string {
-        $css = '@page{margin:10mm;size:A4 portrait;}'
-            . 'body{font-family:Helvetica,Arial,DejaVu Sans,sans-serif;font-size:11px;color:#0f172a;margin:0;padding:0;line-height:1.32;}'
-            . '.postal-card-page{page-break-after:always;}'
-            . '.postal-card-page:last-child{page-break-after:auto;}'
-            . '.admission-sheet{width:100%;border-collapse:collapse;table-layout:fixed;border:2px solid #0f172a;}'
-            . '.sheet-postal{vertical-align:top;padding:5mm 8mm 3mm;}'
-            . '.sheet-fold{vertical-align:middle;text-align:center;font-size:9px;color:#64748b;background:#f8fafc;border-top:1px dashed #94a3b8;border-bottom:1px dashed #94a3b8;padding:3px 0;letter-spacing:0.06em;}'
-            . '.sheet-body{vertical-align:top;padding:0;}'
-            . '.body-layout{width:100%;border-collapse:collapse;table-layout:fixed;}'
-            . '.body-content{vertical-align:top;padding:5mm 8mm 2mm;}'
-            . '.body-fill{height:8mm;font-size:1px;line-height:1px;}'
-            . '.body-foot{vertical-align:bottom;padding:0 8mm 5mm;}'
-            . '.postal-zone-title{font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#0f2744;margin:0 0 4px;text-align:center;}'
-            . '.mail-envelope{width:100%;border-collapse:collapse;table-layout:fixed;border:1.5px solid #0f172a;}'
-            . '.mail-envelope td{vertical-align:top;padding:8px 10px;}'
-            . '.mail-from{width:40%;border-right:1px solid #64748b;background:#f8fafc;}'
-            . '.mail-to{width:60%;}'
-            . '.mail-label{font-size:10px;text-transform:uppercase;letter-spacing:0.05em;font-weight:700;color:#334155;margin-bottom:4px;border-bottom:1px solid #cbd5e1;padding-bottom:2px;}'
-            . '.mail-from-name{font-size:11px;font-weight:700;line-height:1.3;color:#0f172a;}'
-            . '.mail-from-address{font-size:11px;line-height:1.35;margin-top:4px;color:#334155;}'
-            . '.mail-from-phone{font-size:11px;line-height:1.3;margin-top:4px;color:#0f172a;font-weight:600;}'
-            . '.mail-roll{font-size:11px;font-weight:700;line-height:1.3;margin:0 0 4px;color:#0f172a;font-family:DejaVu Sans Mono,Courier New,monospace;}'
-            . '.mail-name{font-size:11px;font-weight:700;line-height:1.25;color:#0f172a;}'
-            . '.mail-address{font-size:11px;line-height:1.35;margin-top:5px;white-space:pre-line;color:#0f172a;}'
-            . '.mail-city{font-size:11px;line-height:1.3;margin-top:3px;color:#334155;}'
-            . '.fold-hint{font-size:9px;color:#64748b;margin-top:4px;font-style:italic;text-align:center;line-height:1.3;}'
-            . '.head-row{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:0;}'
-            . '.head-row td{border:none;vertical-align:top;padding:0;}'
-            . '.head-left{width:70%;text-align:center;padding-right:8px;}'
-            . '.head-right{width:30%;text-align:right;vertical-align:top;}'
-            . '.logo-img{height:40px;width:auto;max-width:110px;display:block;margin:0 0 4px auto;}'
-            . '.inst{font-size:13px;font-weight:700;color:#0b1220;letter-spacing:0.01em;}'
-            . '.doc-title{font-size:12px;font-weight:700;margin-top:3px;color:#0b1220;text-transform:uppercase;letter-spacing:0.03em;}'
-            . '.doc-sub{font-size:11px;font-weight:600;margin-top:2px;color:#334155;line-height:1.3;}'
-            . '.ref-block{font-size:10px;color:#334155;line-height:1.35;text-align:right;}'
-            . '.ref-line{margin-top:1px;}'
-            . '.ref-label{font-weight:700;color:#0f172a;}'
-            . '.header-rule{border-top:1px solid #0f172a;margin:5px 0 6px;}'
-            . '.section-title{font-size:10px;font-weight:700;margin:0 0 3px;color:#0f2744;text-transform:uppercase;letter-spacing:0.04em;}'
-            . '.section-title-exam-attendance{margin-top:10px;margin-bottom:3px;}'
-            . 'table.info{width:100%;border-collapse:collapse;table-layout:fixed;margin:0 0 5px;}'
-            . 'table.info .col-label{width:20%;}'
-            . 'table.info .col-value{width:30%;}'
-            . 'table.info th,table.info td{border:1px solid #cbd5e1;padding:4px 6px;vertical-align:middle;text-align:left;}'
-            . 'table.info th{background:#f1f5f9;font-weight:700;text-transform:uppercase;font-size:10px;color:#0f2744;}'
-            . 'table.info td{background:#fff;color:#0f172a;font-size:11px;}'
-            . 'table.info td.mono{font-family:Courier,DejaVu Sans Mono,monospace;font-size:10px;word-break:break-all;}'
-            . '.allow-block{border:1px solid #64748b;background:#f8fafc;padding:5px 7px;margin:0 0 5px;text-align:center;font-size:11px;font-style:italic;font-weight:600;line-height:1.32;color:#0f172a;}'
-            . '.instr-cols{width:100%;border-collapse:collapse;margin:0 0 5px;table-layout:fixed;}'
-            . '.instr-col{width:50%;vertical-align:top;padding:0 6px 0 0;}'
-            . '.instr-col+.instr-col{padding:0 0 0 6px;border-left:1px solid #e2e8f0;}'
-            . '.instr-list{margin:0 0 0 14px;padding:0;font-size:11px;line-height:1.32;color:#0f172a;}'
-            . '.instr-list li{margin-bottom:1px;padding-left:2px;}'
-            . '.instr-additional{border:1px solid #cbd5e1;background:#f8fafc;padding:4px 6px;font-size:11px;line-height:1.32;margin-bottom:5px;}'
-            . 'table.grid{width:100%;border-collapse:collapse;margin:0 0 5px;table-layout:fixed;}'
-            . 'table.grid th,table.grid td{border:1px solid #64748b;padding:4px 6px;vertical-align:middle;}'
-            . 'table.grid th{background:#f1f5f9;font-weight:700;text-align:center;font-size:10px;text-transform:uppercase;color:#0f2744;}'
-            . 'table.grid td{font-size:11px;}'
-            . '.grid-attendance .col-title{width:48%;}'
-            . '.grid-attendance .col-sig{width:26%;}'
-            . '.grid-attendance .td-left{text-align:left;}'
-            . '.grid-attendance .sig-cell{height:22px;vertical-align:bottom;}'
-            . '.cert-block{border:1px solid #64748b;padding:5px 7px 5px;background:#fff;}'
-            . '.certified-by-body{font-size:10px;line-height:1.4;font-weight:400;text-align:justify;margin:0 0 6px;color:#0f172a;}'
-            . '.footer-sig-row{width:100%;border-collapse:collapse;table-layout:fixed;}'
-            . '.footer-sig-row td{border:none;vertical-align:bottom;padding:0 5px 0 0;}'
-            . '.sig-row-applicant{margin-top:25px;margin-bottom:4px;}'
-            . '.sig-row-officer{margin-top:30px;margin-bottom:0;}'
-            . '.footer-applicant{width:58%;}'
-            . '.footer-date{width:22%;}'
-            . '.footer-cert-sig{width:36%;}'
-            . '.footer-cert-name{width:40%;}'
-            . '.footer-cert-date{width:18%;}'
-            . '.footer-sig-space{height:18px;}'
-            . '.footer-sig-line{border-top:1px solid #0f172a;height:1px;font-size:1px;line-height:1px;}'
-            . '.footer-sig-caption{font-size:9px;color:#334155;margin-top:2px;text-align:center;}'
-            . '.gov-footer{font-size:11px;font-weight:700;text-align:center;border-top:1.5px solid #64748b;padding-top:5px;margin:0;line-height:1.35;color:#0f172a;}';
-
+        $css = self::postalAdmissionCardStylesheet();
         return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' . $css . '</style></head><body>' . $bodyHtml . '</body></html>';
+    }
+
+    /**
+     * CSS for A4 postal selection-exam admission cards (Dompdf-safe full-width tables).
+     */
+    private static function postalAdmissionCardStylesheet(): string {
+        return ''
+            . '@page{size:A4 portrait;margin:10px 8mm 8mm 8mm;}'
+            . 'html,body{margin:0;padding:0;}'
+            . 'body{font-family:DejaVu Sans,Helvetica,Arial,sans-serif;font-size:9pt;color:#111;line-height:1.3;}'
+            . '.adm-page{width:100%;page-break-inside:avoid;}'
+            . '.adm-page+.adm-page{page-break-before:always;}'
+            . 'table.adm-sheet{width:100%;border:1.25pt solid #111;border-collapse:collapse;}'
+            . 'td.adm-side{width:20px;padding:0;border:none;font-size:1px;line-height:1px;}'
+            . 'td.adm-main{padding:10px 0 3mm 0;border:none;vertical-align:top;}'
+            . '.adm-banner{text-align:center;font-size:9.5pt;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;margin:0 0 1.6mm 0;}'
+            . 'table{border-collapse:collapse;}'
+            . 'table.adm-postbox{width:100%;border:1pt solid #111;margin:0;}'
+            . 'table.adm-postbox td{vertical-align:top;padding:2mm 2.5mm;}'
+            . 'td.adm-from{background:#fafafa;border-right:1pt solid #111;}'
+            . 'td.adm-to{background:#fff;}'
+            . '.adm-label{font-size:7pt;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#333;border-bottom:0.6pt solid #bbb;padding-bottom:0.5mm;margin:0 0 1mm 0;}'
+            . '.adm-strong{font-size:9pt;font-weight:700;line-height:1.25;}'
+            . '.adm-roll{font-size:8.5pt;font-weight:700;font-family:DejaVu Sans Mono,Courier New,monospace;margin:0 0 0.6mm 0;}'
+            . '.adm-text{font-size:8pt;line-height:1.3;margin-top:0.4mm;color:#222;}'
+            . '.adm-foldhint{text-align:center;font-size:7pt;font-style:italic;color:#444;margin:1.4mm 0 1mm 0;}'
+            . '.adm-fold{text-align:center;font-size:7.5pt;color:#555;letter-spacing:0.08em;border-top:0.8pt dashed #777;border-bottom:0.8pt dashed #777;padding:1mm 0;margin:0 0 2mm 0;background:#f5f5f5;}'
+            . 'table.adm-header{width:100%;margin:0 0 1.2mm 0;}'
+            . 'table.adm-header td{border:none;padding:0;vertical-align:top;}'
+            . 'td.adm-hmid{text-align:center;padding-right:3mm;}'
+            . 'td.adm-hmeta{text-align:right;padding-right:2mm;}'
+            . '.adm-logo{height:11mm;width:auto;display:block;margin:0 0 1mm auto;}'
+            . '.adm-institute{font-size:11pt;font-weight:700;line-height:1.2;}'
+            . '.adm-doctitle{font-size:9pt;font-weight:700;margin-top:0.6mm;text-transform:uppercase;letter-spacing:0.03em;}'
+            . '.adm-examline{font-size:8pt;font-weight:700;margin-top:0.6mm;}'
+            . '.adm-meta-l{font-size:6.5pt;font-weight:700;color:#444;}'
+            . '.adm-meta-v{font-size:7pt;margin-top:0.2mm;font-weight:600;word-wrap:break-word;line-height:1.2;}'
+            . '.adm-meta-gap{margin-top:1.2mm;}'
+            . '.adm-sec{font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;margin:1.6mm 0 0.8mm 0;}'
+            . 'table.adm-grid{width:100%;margin:0;}'
+            . 'table.adm-grid-split{margin-top:-0.7pt;}'
+            . 'table.adm-grid th{background:#f2f2f2;font-size:6.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.02em;}'
+            . 'table.adm-grid td{font-size:8.5pt;font-weight:600;}'
+            . 'table.adm-grid th,table.adm-grid td{border:0.7pt solid #666;padding:1.3mm 2mm;vertical-align:middle;text-align:left;}'
+            . 'table.adm-grid td.adm-mono{font-family:DejaVu Sans Mono,Courier,monospace;font-size:7.5pt;}'
+            . '.adm-allow{width:100%;border:0.7pt solid #666;border-top:none;background:#f2f2f2;text-align:center;font-size:8pt;font-style:italic;font-weight:600;padding:1.5mm 2mm;margin:0 0 0.5mm 0;}'
+            . 'table.adm-instr{width:100%;margin:0 0 0.4mm 0;}'
+            . 'table.adm-instr td{vertical-align:top;padding:0 2mm 0 0;border:none;}'
+            . 'table.adm-instr td+td{padding:0 0 0 2mm;}'
+            . 'table.adm-instr ol{margin:0 0 0 3.5mm;padding:0;font-size:7.5pt;line-height:1.35;}'
+            . 'table.adm-instr li{margin:0 0 0.55mm 0;}'
+            . '.adm-extra{width:100%;border:0.6pt solid #aaa;background:#fafafa;padding:1mm 2mm;font-size:7.5pt;margin:0 0 0.8mm 0;}'
+            . '.adm-cert{width:100%;border:0.7pt solid #666;padding:2mm 2.5mm;margin:0 0 0.5mm 0;}'
+            . '.adm-cert p{margin:0 0 1.4mm 0;font-size:7.5pt;line-height:1.35;text-align:justify;}'
+            . 'table.adm-sig{width:100%;}'
+            . 'table.adm-sig td{border:none;vertical-align:bottom;padding:0 2mm 0 0;}'
+            . 'table.adm-sig td:last-child{padding-right:0;}'
+            . '.adm-sig2{margin-top:4mm;}'
+            . '.adm-sgap{height:6.5mm;font-size:1px;line-height:1px;}'
+            . '.adm-sline{border-top:0.8pt solid #111;height:1px;font-size:1px;line-height:1px;}'
+            . '.adm-scap{font-size:6.5pt;color:#444;text-align:center;margin-top:0.4mm;}'
+            . 'table.adm-att{width:100%;margin:0 0 1mm 0;}'
+            . 'table.adm-att th,table.adm-att td{border:0.7pt solid #666;padding:1.3mm 2mm;font-size:8pt;vertical-align:middle;}'
+            . 'table.adm-att th{background:#f2f2f2;font-size:6.5pt;font-weight:700;text-transform:uppercase;text-align:center;}'
+            . 'table.adm-att td{font-weight:600;}'
+            . '.adm-asig{height:9mm;}'
+            . '.adm-note{font-size:7.5pt;font-weight:700;text-align:center;border-top:1pt solid #666;padding-top:1.3mm;margin-top:0.4mm;}';
     }
 
     /**
@@ -139,20 +129,21 @@ class ApplicationAdmissionPdfHelper {
         if ($isInterview) {
             return [
                 'Report to the interview venue at least 30 minutes before the scheduled time.',
-                'Bring this admission card and the original National Identity Card (NIC) for verification.',
-                'Dress appropriately and follow the instructions of the interview panel.',
-                'Mobile phones and unauthorised materials are not permitted inside the interview room.',
-                'Candidates who commit malpractice or provide false information may be disqualified.',
+                'Bring this admission card and the original NIC for verification.',
+                'Dress appropriately and follow the interview panel instructions.',
+                'Mobile phones, smart watches, and unauthorised materials are prohibited.',
+                'Follow all instructions given by the interview panel.',
+                'Malpractice or false information may lead to disqualification.',
             ];
         }
 
         return [
-            'Report to the examination centre at least 30 minutes before the scheduled commencement time.',
-            'Bring this admission card and the original National Identity Card (NIC) for verification.',
-            'No candidate will be admitted to the examination hall after the examination has commenced.',
-            'Mobile phones, smart watches, and unauthorised materials are strictly prohibited in the examination hall.',
-            'Follow all instructions given by the supervisor, invigilator, and authorised officers.',
-            'Any form of malpractice will result in immediate disqualification from the examination.',
+            'Report to the examination centre at least 30 minutes before the scheduled time.',
+            'Bring this admission card and the original NIC for verification.',
+            'No candidate will be admitted after the examination has commenced.',
+            'Mobile phones, smart watches, and unauthorised materials are prohibited.',
+            'Follow all instructions of the supervisor and invigilator.',
+            'Malpractice will result in immediate disqualification.',
         ];
     }
 

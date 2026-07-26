@@ -1,16 +1,22 @@
 <?php
-/** @var array<string, mixed> $schedule */
-/** @var array<string, mixed> $entry */
-/** @var array{name: string, address: string, city_line: string} $mailing */
-/** @var string $cardTitle */
-/** @var string $cardSubtitle */
-/** @var bool $isInterview */
-/** @var string $logo_src */
+/**
+ * SLGTI Selection Examination / Interview — Postal Admission Card (A4, foldable).
+ *
+ * @var array<string, mixed> $schedule
+ * @var array<string, mixed> $entry
+ * @var array{name: string, address: string, city_line: string, phone?: string} $mailing
+ * @var string $cardTitle
+ * @var string $cardSubtitle
+ * @var bool $isInterview
+ * @var string $logo_src
+ */
 $e = static fn (?string $s): string => htmlspecialchars((string) ($s ?? ''), ENT_QUOTES, 'UTF-8');
+
 $fmtDate = static function (?string $d): string {
     $ts = $d ? strtotime($d) : false;
     return $ts ? date('d.m.Y', $ts) : '—';
 };
+
 $fmtTime = static function (?string $t): string {
     if (!$t || trim($t) === '') {
         return '—';
@@ -18,236 +24,253 @@ $fmtTime = static function (?string $t): string {
     $ts = strtotime($t);
     return $ts ? date('g:i A', $ts) : $t;
 };
+
 $mailName = trim((string) ($mailing['name'] ?? $entry['student_full_name'] ?? ''));
 $mailAddress = trim((string) ($mailing['address'] ?? $entry['student_address'] ?? ''));
 $mailCity = trim((string) ($mailing['city_line'] ?? ''));
 $roll = trim((string) ($entry['roll_number'] ?? ''));
+$nic = trim((string) ($entry['student_nic'] ?? ''));
+$name = trim((string) ($entry['student_full_name'] ?? ''));
+$nvq = trim((string) ($schedule['application_level'] ?? ''));
 $isInterview = !empty($isInterview);
+
 $instructions = ApplicationAdmissionPdfHelper::defaultExamInstructions($isInterview);
 $scheduleInstructions = trim((string) ($schedule['instructions'] ?? ''));
+if (mb_strlen($scheduleInstructions) > 120) {
+    $scheduleInstructions = rtrim(mb_substr($scheduleInstructions, 0, 117)) . '…';
+}
+
 $examCentre = trim((string) ($schedule['venue'] ?? ''));
 $examTitle = trim((string) ($schedule['title'] ?? $cardSubtitle ?? ''));
-$timeCell = $fmtTime($schedule['start_time'] ?? null);
-if (!empty($schedule['end_time'])) {
-    $timeCell .= ' – ' . $fmtTime($schedule['end_time']);
+$courseLabel = trim((string) ($entry['course_priority_1'] ?? ''));
+if (class_exists('ApplicationAdmissionScheduleModel')) {
+    $resolved = ApplicationAdmissionScheduleModel::courseNameFromEntry($entry);
+    if ($resolved !== '') {
+        $courseLabel = $resolved;
+    }
 }
+
+$timeStart = $fmtTime($schedule['start_time'] ?? null);
+$timeEnd = !empty($schedule['end_time']) ? $fmtTime($schedule['end_time']) : '';
+$timeCell = $timeEnd !== '' ? ($timeStart . ' – ' . $timeEnd) : $timeStart;
+
 $allowText = $isInterview
     ? 'This candidate is allowed to attend this interview.'
     : 'This candidate is allowed to sit for this selection examination.';
+
 $postFrom = ApplicationAdmissionPdfHelper::institutePostFrom();
 $examYear = (string) ($schedule['schedule_date'] ?? '');
 $examYear = preg_match('/^\d{4}/', $examYear, $ym) ? $ym[0] : date('Y');
-$cornerLabel = $isInterview
-    ? 'Interview ' . $examYear . ' — Admission Card'
-    : 'Selection Examination ' . $examYear . ' — Admission Card';
+
+$bannerTitle = $isInterview
+    ? 'INTERVIEW ' . $examYear . ' — ADMISSION CARD'
+    : 'SELECTION EXAMINATION ' . $examYear . ' — ADMISSION CARD';
+
+$docTitle = $cardTitle ?? ($isInterview
+    ? 'INTERVIEW — ADMISSION CARD'
+    : 'SELECTION EXAMINATION — ADMISSION CARD');
+
 $logoSrc = (string) ($logo_src ?? '');
-$scheduleId = (int) ($schedule['schedule_id'] ?? 0);
-$entryId = (int) ($entry['entry_id'] ?? 0);
-$refNo = ApplicationAdmissionPdfHelper::admissionCardReference($scheduleId, $roll, $entryId);
+$refNo = ApplicationAdmissionPdfHelper::admissionCardReference(
+    (int) ($schedule['schedule_id'] ?? 0),
+    $roll,
+    (int) ($entry['entry_id'] ?? 0)
+);
 $issuedDate = date('d.m.Y');
+
 $instrHalf = (int) ceil(count($instructions) / 2);
-$instrCol1 = array_slice($instructions, 0, $instrHalf);
-$instrCol2 = array_slice($instructions, $instrHalf);
+$instrLeft = array_slice($instructions, 0, $instrHalf);
+$instrRight = array_slice($instructions, $instrHalf);
+
+$medium = trim((string) ($schedule['student_language'] ?? $entry['student_language'] ?? ''));
+$attendTitle = $examTitle !== '' ? $examTitle : ($courseLabel !== '' ? $courseLabel : '—');
+$centreNote = $isInterview ? 'interview' : 'examination';
+$dateLabel = $isInterview ? 'INTERVIEW DATE' : 'EXAMINATION DATE';
+$venueLabel = $isInterview ? 'INTERVIEW VENUE' : 'EXAMINATION CENTRE';
 ?>
-<div class="postal-card-page">
-    <table class="admission-sheet">
+<div class="adm-page">
+<table class="adm-sheet" width="100%" cellspacing="0" cellpadding="0">
+<tr>
+<td class="adm-side" width="20">&nbsp;</td>
+<td class="adm-main" width="100%">
+
+    <div class="adm-banner"><?php echo $e($bannerTitle); ?></div>
+
+    <table class="adm-postbox" width="100%" cellspacing="0" cellpadding="0">
         <tr>
-            <td class="sheet-postal">
-                <div class="postal-zone-title"><?php echo $e($cornerLabel); ?></div>
-                <table class="mail-envelope">
-                    <tr>
-                        <td class="mail-from">
-                            <div class="mail-label">Post from</div>
-                            <div class="mail-from-name"><?php echo $e($postFrom['name']); ?></div>
-                            <div class="mail-from-address"><?php echo $e($postFrom['address']); ?></div>
-                            <?php if (trim((string) ($postFrom['phone'] ?? '')) !== ''): ?>
-                            <div class="mail-from-phone"><?php echo $e($postFrom['phone']); ?></div>
-                            <?php endif; ?>
-                        </td>
-                        <td class="mail-to">
-                            <div class="mail-label">Post to</div>
-                            <?php if ($roll !== ''): ?>
-                            <div class="mail-roll">Roll no.: <?php echo $e($roll); ?></div>
-                            <?php endif; ?>
-                            <div class="mail-name"><?php echo $mailName !== '' ? $e($mailName) : '—'; ?></div>
-                            <?php if ($mailAddress !== ''): ?>
-                            <div class="mail-address"><?php echo nl2br($e($mailAddress)); ?></div>
-                            <?php endif; ?>
-                            <?php if ($mailCity !== ''): ?>
-                            <div class="mail-city"><?php echo $e($mailCity); ?></div>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                </table>
-                <div class="fold-hint">Fold with <strong>Post to</strong> on the outside; <strong>Post from</strong> stays top-left when posted.</div>
+            <td class="adm-from" width="40%">
+                <div class="adm-label">POST FROM</div>
+                <div class="adm-strong"><?php echo $e($postFrom['name']); ?></div>
+                <div class="adm-text"><?php echo $e($postFrom['address']); ?></div>
+                <?php if (trim((string) ($postFrom['phone'] ?? '')) !== ''): ?>
+                <div class="adm-text"><strong>Phone:</strong> <?php echo $e($postFrom['phone']); ?></div>
+                <?php endif; ?>
             </td>
-        </tr>
-        <tr>
-            <td class="sheet-fold">— — — Fold here — — —</td>
-        </tr>
-        <tr>
-            <td class="sheet-body">
-                <table class="body-layout">
-                    <tr>
-                        <td class="body-content">
-                            <table class="head-row">
-                                <tr>
-                                    <td class="head-left">
-                                        <div class="inst">Sri Lanka German Training Institute</div>
-                                        <div class="doc-title"><?php echo $e($cardTitle ?? ($isInterview ? 'Interview — Admission Card' : 'Selection Examination — Admission Card')); ?></div>
-                                        <?php if ($examTitle !== ''): ?>
-                                        <div class="doc-sub"><?php echo $e($examTitle); ?></div>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="head-right">
-                                        <?php if ($logoSrc !== ''): ?>
-                                        <img class="logo-img" src="<?php echo $e($logoSrc); ?>" alt="SLGTI" />
-                                        <?php endif; ?>
-                                        <div class="ref-block">
-                                            <div class="ref-line"><span class="ref-label">Ref. No.</span> <?php echo $e($refNo); ?></div>
-                                            <div class="ref-line"><span class="ref-label">Issued</span> <?php echo $e($issuedDate); ?></div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </table>
-                            <div class="header-rule"></div>
-
-                            <div class="section-title">1. Candidate particulars</div>
-                            <table class="info">
-                                <colgroup>
-                                    <col class="col-label">
-                                    <col class="col-value">
-                                    <col class="col-label">
-                                    <col class="col-value">
-                                </colgroup>
-                                <tr>
-                                    <th>Index / Roll number</th>
-                                    <td class="mono"><?php echo $roll !== '' ? $e($roll) : '—'; ?></td>
-                                    <th>NIC / Passport / Driving License No.</th>
-                                    <td><?php echo $e($entry['student_nic'] ?? ''); ?></td>
-                                </tr>
-                                <tr>
-                                    <th>Name (with initials)</th>
-                                    <td colspan="3"><?php echo $e($entry['student_full_name'] ?? ''); ?></td>
-                                </tr>
-                                <tr>
-                                    <th>NVQ Level</th>
-                                    <td><?php echo $e($schedule['application_level'] ?? ''); ?></td>
-                                    <th>Course / Subject</th>
-                                    <td><?php echo $e($entry['course_priority_1'] ?? ''); ?></td>
-                                </tr>
-                                <?php if (!empty($schedule['student_language'])): ?>
-                                <tr>
-                                    <th>Medium of instruction</th>
-                                    <td colspan="3"><?php echo $e($schedule['student_language']); ?></td>
-                                </tr>
-                                <?php endif; ?>
-                                <tr>
-                                    <th><?php echo $isInterview ? 'Interview date' : 'Examination date'; ?></th>
-                                    <td><?php echo $e($fmtDate($schedule['schedule_date'] ?? null)); ?></td>
-                                    <th>Time</th>
-                                    <td><?php echo $e($timeCell); ?></td>
-                                </tr>
-                                <tr>
-                                    <th><?php echo $isInterview ? 'Interview venue' : 'Examination centre'; ?></th>
-                                    <td colspan="3"><?php echo $examCentre !== '' ? $e($examCentre) : '—'; ?></td>
-                                </tr>
-                            </table>
-
-                            <div class="allow-block"><?php echo $e($allowText); ?></div>
-
-                            <div class="section-title">2. Instructions to candidates</div>
-                            <table class="instr-cols">
-                                <tr>
-                                    <td class="instr-col">
-                                        <ol class="instr-list" start="1">
-                                            <?php foreach ($instrCol1 as $line): ?>
-                                            <li><?php echo $e($line); ?></li>
-                                            <?php endforeach; ?>
-                                        </ol>
-                                    </td>
-                                    <td class="instr-col">
-                                        <?php if ($instrCol2 !== []): ?>
-                                        <ol class="instr-list" start="<?php echo $instrHalf + 1; ?>">
-                                            <?php foreach ($instrCol2 as $line): ?>
-                                            <li><?php echo $e($line); ?></li>
-                                            <?php endforeach; ?>
-                                        </ol>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                            </table>
-                            <?php if ($scheduleInstructions !== ''): ?>
-                            <div class="instr-additional"><strong>Additional instructions:</strong> <?php echo nl2br($e($scheduleInstructions)); ?></div>
-                            <?php endif; ?>
-
-                            <div class="section-title">3. Certification</div>
-                            <div class="cert-block">
-                                <div class="certified-by-body">I hereby certify that the applicant, whose details appear below, signed this application in my presence. To the best of my knowledge, the information provided is true and correct. This certification is issued in my official capacity as a Grama Niladhari, Justice of the Peace, Gazetted Government Officer, Principal, or Head of a Government Institution.</div>
-                                <table class="footer-sig-row sig-row-applicant">
-                                    <tr>
-                                        <td class="footer-applicant">
-                                            <div class="footer-sig-space">&nbsp;</div>
-                                            <div class="footer-sig-line"></div>
-                                            <div class="footer-sig-caption">Applicant&apos;s signature</div>
-                                        </td>
-                                        <td class="footer-date">
-                                            <div class="footer-sig-space">&nbsp;</div>
-                                            <div class="footer-sig-line"></div>
-                                            <div class="footer-sig-caption">Date</div>
-                                        </td>
-                                    </tr>
-                                </table>
-                                <table class="footer-sig-row sig-row-officer">
-                                    <tr>
-                                        <td class="footer-cert-sig">
-                                            <div class="footer-sig-space">&nbsp;</div>
-                                            <div class="footer-sig-line"></div>
-                                            <div class="footer-sig-caption">Signature of certifying officer</div>
-                                        </td>
-                                        <td class="footer-cert-name">
-                                            <div class="footer-sig-space">&nbsp;</div>
-                                            <div class="footer-sig-line"></div>
-                                            <div class="footer-sig-caption">Name and designation (Official Rubber Stamp)</div>
-                                        </td>
-                                        <td class="footer-cert-date">
-                                            <div class="footer-sig-space">&nbsp;</div>
-                                            <div class="footer-sig-line"></div>
-                                            <div class="footer-sig-caption">Date</div>
-                                        </td>
-                                    </tr>
-                                </table>
-                            </div>
-
-                            <div class="section-title section-title-exam-attendance">4. Examination attendance</div>
-                            <table class="grid grid-attendance">
-                                <thead>
-                                    <tr>
-                                        <th class="col-title">Examination title</th>
-                                        <th class="col-sig">Candidate&apos;s signature</th>
-                                        <th class="col-sig">Invigilator&apos;s signature</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td class="td-left"><?php echo $examTitle !== '' ? $e($examTitle) : $e($entry['course_priority_1'] ?? '—'); ?></td>
-                                        <td class="sig-cell">&nbsp;</td>
-                                        <td class="sig-cell">&nbsp;</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="body-fill">&nbsp;</td>
-                    </tr>
-                    <tr>
-                        <td class="body-foot">
-                            <div class="gov-footer">Bring this admission card and your original NIC / Passport / Driving License to the <?php echo $isInterview ? 'interview' : 'examination'; ?> centre.</div>
-                        </td>
-                    </tr>
-                </table>
+            <td class="adm-to" width="60%">
+                <div class="adm-label">POST TO</div>
+                <?php if ($roll !== ''): ?>
+                <div class="adm-roll"><?php echo $e($roll); ?></div>
+                <?php endif; ?>
+                <div class="adm-strong"><?php echo $mailName !== '' ? $e($mailName) : '—'; ?></div>
+                <?php if ($mailAddress !== ''): ?>
+                <div class="adm-text"><?php echo nl2br($e($mailAddress)); ?></div>
+                <?php endif; ?>
+                <?php if ($mailCity !== ''): ?>
+                <div class="adm-text"><?php echo $e($mailCity); ?></div>
+                <?php endif; ?>
             </td>
         </tr>
     </table>
+    <div class="adm-foldhint">Fold with <strong>Post to</strong> on the outside; Post from stays top-left when posted.</div>
+    <div class="adm-fold">— Fold here —</div>
+
+    <table class="adm-header" width="100%" cellspacing="0" cellpadding="0">
+        <tr>
+            <td class="adm-hmid" width="68%">
+                <div class="adm-institute">Sri Lanka German Training Institute</div>
+                <div class="adm-doctitle"><?php echo $e($docTitle); ?></div>
+                <?php if ($examTitle !== ''): ?>
+                <div class="adm-examline"><?php echo $e($examTitle); ?></div>
+                <?php endif; ?>
+            </td>
+            <td class="adm-hmeta" width="32%">
+                <?php if ($logoSrc !== ''): ?>
+                <img class="adm-logo" src="<?php echo $e($logoSrc); ?>" alt="SLGTI" />
+                <?php endif; ?>
+                <div class="adm-meta-l">Ref. No.</div>
+                <div class="adm-meta-v"><?php echo $e($refNo); ?></div>
+                <div class="adm-meta-l adm-meta-gap">Issued</div>
+                <div class="adm-meta-v"><?php echo $e($issuedDate); ?></div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="adm-sec">1. CANDIDATE PARTICULARS</div>
+    <table class="adm-grid" width="100%" cellspacing="0" cellpadding="0">
+        <tr>
+            <th width="32%">INDEX / ROLL NUMBER</th>
+            <td width="68%" class="adm-mono"><?php echo $roll !== '' ? $e($roll) : '—'; ?></td>
+        </tr>
+        <tr>
+            <th>NIC / PASSPORT / DRIVING LICENSE NO.</th>
+            <td><?php echo $nic !== '' ? $e($nic) : '—'; ?></td>
+        </tr>
+        <tr>
+            <th>NAME (WITH INITIALS)</th>
+            <td><?php echo $name !== '' ? $e($name) : '—'; ?></td>
+        </tr>
+    </table>
+    <table class="adm-grid adm-grid-split" width="100%" cellspacing="0" cellpadding="0">
+        <tr>
+            <th width="18%">NVQ LEVEL</th>
+            <td width="12%"><?php echo $nvq !== '' ? $e($nvq) : '—'; ?></td>
+            <th width="22%">COURSE / SUBJECT</th>
+            <td width="48%"><?php echo $courseLabel !== '' ? $e($courseLabel) : '—'; ?></td>
+        </tr>
+    </table>
+    <table class="adm-grid" width="100%" cellspacing="0" cellpadding="0">
+        <tr>
+            <th width="32%">MEDIUM OF INSTRUCTION</th>
+            <td width="68%"><?php echo $medium !== '' ? $e($medium) : '—'; ?></td>
+        </tr>
+    </table>
+    <table class="adm-grid adm-grid-split" width="100%" cellspacing="0" cellpadding="0">
+        <tr>
+            <th width="22%"><?php echo $e($dateLabel); ?></th>
+            <td width="28%"><?php echo $e($fmtDate($schedule['schedule_date'] ?? null)); ?></td>
+            <th width="12%">TIME</th>
+            <td width="38%"><?php echo $e($timeCell); ?></td>
+        </tr>
+    </table>
+    <table class="adm-grid" width="100%" cellspacing="0" cellpadding="0">
+        <tr>
+            <th width="32%"><?php echo $e($venueLabel); ?></th>
+            <td width="68%"><?php echo $examCentre !== '' ? $e($examCentre) : '—'; ?></td>
+        </tr>
+    </table>
+    <div class="adm-allow"><?php echo $e($allowText); ?></div>
+
+    <div class="adm-sec">2. INSTRUCTIONS TO CANDIDATES</div>
+    <table class="adm-instr" width="100%" cellspacing="0" cellpadding="0">
+        <tr>
+            <td width="50%">
+                <ol start="1">
+                    <?php foreach ($instrLeft as $line): ?>
+                    <li><?php echo $e($line); ?></li>
+                    <?php endforeach; ?>
+                </ol>
+            </td>
+            <td width="50%">
+                <?php if ($instrRight !== []): ?>
+                <ol start="<?php echo $instrHalf + 1; ?>">
+                    <?php foreach ($instrRight as $line): ?>
+                    <li><?php echo $e($line); ?></li>
+                    <?php endforeach; ?>
+                </ol>
+                <?php endif; ?>
+            </td>
+        </tr>
+    </table>
+    <?php if ($scheduleInstructions !== ''): ?>
+    <div class="adm-extra"><strong>Additional:</strong> <?php echo nl2br($e($scheduleInstructions)); ?></div>
+    <?php endif; ?>
+
+    <div class="adm-sec">3. CERTIFICATION</div>
+    <div class="adm-cert">
+        <p>I hereby certify that the applicant named above signed this admission card in my presence. To the best of my knowledge the particulars given are true and correct. Issued as Grama Niladhari / Justice of the Peace / Gazetted Government Officer / Principal / Head of a Government Institution.</p>
+        <table class="adm-sig" width="100%" cellspacing="0" cellpadding="0">
+            <tr>
+                <td width="70%">
+                    <div class="adm-sgap">&nbsp;</div>
+                    <div class="adm-sline"></div>
+                    <div class="adm-scap">Applicant&apos;s signature</div>
+                </td>
+                <td width="30%">
+                    <div class="adm-sgap">&nbsp;</div>
+                    <div class="adm-sline"></div>
+                    <div class="adm-scap">Date</div>
+                </td>
+            </tr>
+        </table>
+        <table class="adm-sig adm-sig2" width="100%" cellspacing="0" cellpadding="0">
+            <tr>
+                <td width="34%">
+                    <div class="adm-sgap">&nbsp;</div>
+                    <div class="adm-sline"></div>
+                    <div class="adm-scap">Signature of certifying officer</div>
+                </td>
+                <td width="42%">
+                    <div class="adm-sgap">&nbsp;</div>
+                    <div class="adm-sline"></div>
+                    <div class="adm-scap">Name and designation (Official Rubber Stamp)</div>
+                </td>
+                <td width="24%">
+                    <div class="adm-sgap">&nbsp;</div>
+                    <div class="adm-sline"></div>
+                    <div class="adm-scap">Date</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="adm-sec">4. EXAMINATION ATTENDANCE</div>
+    <table class="adm-att" width="100%" cellspacing="0" cellpadding="0">
+        <tr>
+            <th width="50%">EXAMINATION TITLE</th>
+            <th width="25%">CANDIDATE&apos;S SIGNATURE</th>
+            <th width="25%">INVIGILATOR&apos;S SIGNATURE</th>
+        </tr>
+        <tr>
+            <td><?php echo $e($attendTitle); ?></td>
+            <td class="adm-asig">&nbsp;</td>
+            <td class="adm-asig">&nbsp;</td>
+        </tr>
+    </table>
+
+    <div class="adm-note">Bring this admission card and your original NIC / Passport / Driving License to the <?php echo $e($centreNote); ?> centre.</div>
+
+</td>
+<td class="adm-side" width="20">&nbsp;</td>
+</tr>
+</table>
 </div>

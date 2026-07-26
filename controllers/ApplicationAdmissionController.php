@@ -693,7 +693,7 @@ class ApplicationAdmissionController extends Controller {
 
         require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
         $isInterview = ($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW;
-        $cardTitle = $isInterview ? 'Interview — Admission Card' : 'Selection Examination — Admission Card';
+        $cardTitle = $isInterview ? 'INTERVIEW — ADMISSION CARD' : 'SELECTION EXAMINATION — ADMISSION CARD';
         $parts = [];
         foreach ($entries as $entry) {
             $entryIdForRoll = (int) ($entry['entry_id'] ?? 0);
@@ -724,7 +724,7 @@ class ApplicationAdmissionController extends Controller {
 
     /**
      * @param array<string, mixed> $entry
-     * @return array{name: string, address: string, city_line: string}
+     * @return array{name: string, address: string, city_line: string, phone: string}
      */
     private function formatEntryMailingBlock(array $entry): array {
         $district = trim((string) ($entry['student_district'] ?? ''));
@@ -738,6 +738,7 @@ class ApplicationAdmissionController extends Controller {
             'name' => trim((string) ($entry['student_full_name'] ?? '')),
             'address' => trim((string) ($entry['student_address'] ?? '')),
             'city_line' => implode(', ', $cityParts),
+            'phone' => trim((string) ($entry['student_phone'] ?? '')),
         ];
     }
 
