@@ -1078,43 +1078,173 @@ class StudentApplicationModel extends Model {
 
     /**
      * Resolve department + course name from stored `course_priority_N` (course name only, or legacy "id — name").
+     * Falls back to whitespace-normalized and token match so labels like
+     * "Technician in Automotive Technology" map to catalog "Automotive Technician" / AUT (not GEN).
      *
      * @return array{department_id: string, department_name: string, course_name: string}
      */
-    public function resolveCourseDepartmentForPreference(?string $stored): array {
+    public function resolveCourseDepartmentForPreference(?string $stored, ?string $applicationLevel = null): array {
         $this->ensureTable();
         $stored = trim((string) $stored);
+        $empty = ['department_id' => '', 'department_name' => '', 'course_name' => ''];
         if ($stored === '') {
-            return ['department_id' => '', 'department_name' => '', 'course_name' => ''];
+            return $empty;
         }
+        $displayName = self::displayCourseNameFromStoredPreference($stored);
         $sep = self::legacyCourseIdNameSeparator();
         $sql = 'SELECT c.`department_id`, c.`course_name`, d.`department_name` FROM `course` c '
             . 'LEFT JOIN `department` d ON d.`department_id` = c.`department_id` '
             . 'WHERE ' . self::sqlTrimUtf8mb4('c', 'course_name') . ' = ' . self::sqlTrimBoundUtf8mb4() . ' '
             . 'OR ' . self::sqlLegacyCourseRowConcatBound('c') . ' = ' . self::sqlTrimBoundUtf8mb4() . ' '
+            . 'OR ' . self::sqlTrimUtf8mb4('c', 'course_id') . ' = ' . self::sqlTrimBoundUtf8mb4() . ' '
             . 'LIMIT 1';
         $stmt = $this->db->prepare($sql);
-        if (!$stmt) {
-            return ['department_id' => '', 'department_name' => '', 'course_name' => self::displayCourseNameFromStoredPreference($stored)];
-        }
-        $stmt->bind_param('sss', $stored, $sep, $stored);
-        $stmt->execute();
-        $res = $stmt->get_result();
-        $row = $res ? $res->fetch_assoc() : null;
-        $stmt->close();
-        if ($row) {
-            $did = trim((string) ($row['department_id'] ?? ''));
-            $cn = trim((string) ($row['course_name'] ?? ''));
-            $dn = trim((string) ($row['department_name'] ?? ''));
-            if ($cn !== '' || $dn !== '' || $did !== '') {
-                return [
-                    'department_id' => $did,
-                    'department_name' => $dn,
-                    'course_name' => $cn !== '' ? $cn : self::displayCourseNameFromStoredPreference($stored),
-                ];
+        if ($stmt) {
+            $stmt->bind_param('ssss', $stored, $sep, $stored, $stored);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            $row = $res ? $res->fetch_assoc() : null;
+            $stmt->close();
+            $mapped = self::mapResolvedCourseRow($row, $displayName);
+            if ($mapped !== null) {
+                return $mapped;
             }
         }
-        return ['department_id' => '', 'department_name' => '', 'course_name' => self::displayCourseNameFromStoredPreference($stored)];
+
+        $fuzzy = $this->resolveCourseDepartmentByFuzzyName($displayName !== '' ? $displayName : $stored, $applicationLevel);
+        if ($fuzzy !== null) {
+            return $fuzzy;
+        }
+
+        return [
+            'department_id' => '',
+            'department_name' => '',
+            'course_name' => $displayName,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed>|null $row
+     * @return array{department_id: string, department_name: string, course_name: string}|null
+     */
+    private static function mapResolvedCourseRow(?array $row, string $fallbackCourseName): ?array {
+        if ($row === null) {
+            return null;
+        }
+        $did = trim((string) ($row['department_id'] ?? ''));
+        $cn = preg_replace('/\s+/u', ' ', trim((string) ($row['course_name'] ?? '')));
+        $dn = trim((string) ($row['department_name'] ?? ''));
+        if ($cn === '' && $dn === '' && $did === '') {
+            return null;
+        }
+
+        return [
+            'department_id' => $did,
+            'department_name' => $dn,
+            'course_name' => $cn !== '' ? $cn : $fallbackCourseName,
+        ];
+    }
+
+    /**
+     * Match preference text to a catalog course when labels differ slightly
+     * (extra words, double spaces, NVQ wording variants).
+     *
+     * @return array{department_id: string, department_name: string, course_name: string}|null
+     */
+    private function resolveCourseDepartmentByFuzzyName(string $preferenceName, ?string $applicationLevel = null): ?array {
+        $prefNorm = self::normalizeCourseLabel($preferenceName);
+        $prefTokens = self::significantCourseTokens($preferenceName);
+        if ($prefNorm === '' && $prefTokens === []) {
+            return null;
+        }
+
+        $sql = 'SELECT c.`course_id`, c.`department_id`, c.`course_name`, d.`department_name` FROM `course` c '
+            . 'LEFT JOIN `department` d ON d.`department_id` = c.`department_id`';
+        $res = $this->db->query($sql);
+        if (!$res) {
+            return null;
+        }
+
+        $level = trim((string) $applicationLevel);
+        $best = null;
+        $bestScore = 0.0;
+        while ($row = $res->fetch_assoc()) {
+            $courseName = trim((string) ($row['course_name'] ?? ''));
+            $courseNorm = self::normalizeCourseLabel($courseName);
+            if ($courseNorm === '') {
+                continue;
+            }
+            $score = 0.0;
+            if ($prefNorm !== '' && $courseNorm === $prefNorm) {
+                $score = 100.0;
+            } else {
+                $courseTokens = self::significantCourseTokens($courseName);
+                if ($prefTokens === [] || $courseTokens === []) {
+                    continue;
+                }
+                $overlap = count(array_intersect($prefTokens, $courseTokens));
+                if ($overlap < 1) {
+                    continue;
+                }
+                $union = count(array_unique(array_merge($prefTokens, $courseTokens)));
+                $jaccard = $union > 0 ? ($overlap / $union) : 0.0;
+                // Require a meaningful overlap (e.g. Automotive Technician ↔ Technician in Automotive Technology).
+                if ($overlap < 2 && $jaccard < 0.5) {
+                    continue;
+                }
+                $score = ($jaccard * 80.0) + ($overlap * 5.0);
+            }
+            if ($level !== '' && isset($row['course_id'])) {
+                $cid = strtoupper(trim((string) $row['course_id']));
+                if ($cid !== '' && strpos($cid, $level) === 0) {
+                    $score += 8.0;
+                } elseif ($cid !== '' && preg_match('/^[0-9]/', $cid) && strpos($cid, $level) !== 0) {
+                    $score -= 4.0;
+                }
+            }
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $best = $row;
+            }
+        }
+        $res->free();
+
+        if ($best === null || $bestScore < 40.0) {
+            return null;
+        }
+
+        return self::mapResolvedCourseRow($best, $preferenceName);
+    }
+
+    private static function normalizeCourseLabel(string $label): string {
+        $label = mb_strtolower(trim($label), 'UTF-8');
+        $label = preg_replace('/\s+/u', ' ', $label) ?? $label;
+
+        return $label;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function significantCourseTokens(string $label): array {
+        $label = self::normalizeCourseLabel($label);
+        if ($label === '') {
+            return [];
+        }
+        $parts = preg_split('/[^a-z0-9]+/u', $label, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $stop = [
+            'in' => true, 'and' => true, 'the' => true, 'of' => true, 'a' => true, 'an' => true,
+            'for' => true, 'to' => true, 'with' => true, 'nvq' => true, 'level' => true,
+        ];
+        $out = [];
+        foreach ($parts as $part) {
+            if (isset($stop[$part]) || strlen($part) < 2) {
+                continue;
+            }
+            $out[$part] = $part;
+        }
+
+        return array_values($out);
     }
 
     /**

@@ -191,16 +191,41 @@ class ApplicationAdmissionScheduleModel extends Model {
      * @param array<string, mixed> $entry
      */
     public static function departmentCodeFromEntry(array $entry): string {
-        $stored = trim((string) ($entry['course_priority_1'] ?? ''));
-        if ($stored === '') {
-            return 'GEN';
-        }
-        require_once BASE_PATH . '/models/StudentApplicationModel.php';
-        $resolved = (new StudentApplicationModel())->resolveCourseDepartmentForPreference($stored);
+        $resolved = self::resolveEntryCourseDepartment($entry);
         $dept = trim((string) ($resolved['department_id'] ?? ''));
         $dept = strtoupper(preg_replace('/[^A-Za-z0-9._-]+/', '', $dept));
 
         return $dept !== '' ? $dept : 'GEN';
+    }
+
+    /**
+     * Catalog course name for an entry's 1st preference (not the raw stored string).
+     *
+     * @param array<string, mixed> $entry
+     */
+    public static function courseNameFromEntry(array $entry): string {
+        $resolved = self::resolveEntryCourseDepartment($entry);
+        $name = trim((string) ($resolved['course_name'] ?? ''));
+        if ($name !== '') {
+            return $name;
+        }
+
+        return trim((string) ($entry['course_priority_1'] ?? ''));
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     * @return array{department_id: string, department_name: string, course_name: string}
+     */
+    public static function resolveEntryCourseDepartment(array $entry): array {
+        require_once BASE_PATH . '/models/StudentApplicationModel.php';
+        $stored = trim((string) ($entry['course_priority_1'] ?? ''));
+        $level = trim((string) ($entry['application_level'] ?? ''));
+
+        return (new StudentApplicationModel())->resolveCourseDepartmentForPreference(
+            $stored,
+            $level !== '' ? $level : null
+        );
     }
 
     /**
@@ -209,18 +234,12 @@ class ApplicationAdmissionScheduleModel extends Model {
      * @param array<string, mixed> $row
      */
     public static function courseSortKeyFromEntry(array $row): string {
-        require_once BASE_PATH . '/models/StudentApplicationModel.php';
-        $stored = trim((string) ($row['course_priority_1'] ?? ''));
-        if ($stored === '') {
-            return '';
-        }
-        $resolved = (new StudentApplicationModel())->resolveCourseDepartmentForPreference($stored);
-        $name = trim((string) ($resolved['course_name'] ?? ''));
+        $name = self::courseNameFromEntry($row);
         if ($name !== '') {
             return mb_strtolower($name, 'UTF-8');
         }
 
-        return mb_strtolower($stored, 'UTF-8');
+        return mb_strtolower(trim((string) ($row['course_priority_1'] ?? '')), 'UTF-8');
     }
 
     /**
@@ -230,18 +249,13 @@ class ApplicationAdmissionScheduleModel extends Model {
      * @return array{dept: string, course: string}
      */
     public static function departmentAndCourseSortKeysFromEntry(array $row): array {
-        require_once BASE_PATH . '/models/StudentApplicationModel.php';
-        $stored = trim((string) ($row['course_priority_1'] ?? ''));
-        if ($stored === '') {
-            return ['dept' => 'GEN', 'course' => ''];
-        }
-        $resolved = (new StudentApplicationModel())->resolveCourseDepartmentForPreference($stored);
+        $resolved = self::resolveEntryCourseDepartment($row);
         $dept = trim((string) ($resolved['department_id'] ?? ''));
         $dept = strtoupper(preg_replace('/[^A-Za-z0-9._-]+/', '', $dept));
         $name = trim((string) ($resolved['course_name'] ?? ''));
         $course = $name !== ''
             ? mb_strtolower($name, 'UTF-8')
-            : mb_strtolower($stored, 'UTF-8');
+            : mb_strtolower(trim((string) ($row['course_priority_1'] ?? '')), 'UTF-8');
 
         return [
             'dept' => $dept !== '' ? $dept : 'GEN',

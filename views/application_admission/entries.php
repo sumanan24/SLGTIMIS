@@ -151,6 +151,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 .admission-entries-table col.col-no { width: 3rem; }
 .admission-entries-table col.col-name { width: 14%; min-width: 9rem; }
 .admission-entries-table col.col-nic { width: 8.5rem; }
+.admission-entries-table col.col-dept { width: 4.5rem; }
 .admission-entries-table col.col-course { width: 12%; min-width: 8rem; }
 .admission-entries-table col.col-province { width: 7rem; }
 .admission-entries-table col.col-roll { width: 13.5rem; min-width: 13.5rem; }
@@ -165,6 +166,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 .admission-entries-table-readonly col.col-no { width: 3rem; }
 .admission-entries-table-readonly col.col-name { width: 16%; min-width: 9rem; }
 .admission-entries-table-readonly col.col-nic { width: 8.5rem; }
+.admission-entries-table-readonly col.col-dept { width: 4.5rem; }
 .admission-entries-table-readonly col.col-course { width: 14%; min-width: 8rem; }
 .admission-entries-table-readonly col.col-province { width: 7rem; }
 .admission-entries-table-readonly col.col-roll { width: 13.5rem; min-width: 13.5rem; }
@@ -176,9 +178,17 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 .admission-picker-table col.col-name { width: 26%; }
 .admission-picker-table col.col-nic { width: 14%; }
 .admission-picker-table col.col-province { width: 14%; }
+.admission-picker-table col.col-dept { width: 4.5rem; }
 .admission-picker-table col.col-status { width: 5.5rem; }
 .admission-entries-table col.col-status { width: 5.5rem; }
 .admission-entries-table-readonly col.col-status { width: 5.5rem; }
+.admission-entries-table .col-dept,
+.admission-entries-table-readonly .col-dept,
+.admission-picker-table .col-dept {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
 
 .admission-status-badge {
     display: inline-block;
@@ -539,7 +549,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
             <div class="admission-picker-scroll">
                 <table class="table admission-picker-table mb-0">
                     <colgroup>
-                        <col class="col-pick"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-course">
+                        <col class="col-pick"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-dept"><col class="col-course">
                     </colgroup>
                     <thead>
                         <tr>
@@ -549,11 +559,15 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                             <th class="col-nic">NIC</th>
                             <th class="col-province">Province</th>
                             <th class="col-status">Status</th>
+                            <th class="col-dept">Dept</th>
                             <th class="col-course">Course (1st pref.)</th>
                         </tr>
                     </thead>
                     <tbody>
-                    <?php $pickNo = 0; foreach ($picker as $p): $pickNo++; ?>
+                    <?php $pickNo = 0; foreach ($picker as $p): $pickNo++;
+                        $pDept = ApplicationAdmissionScheduleModel::departmentCodeFromEntry($p);
+                        $pCourse = ApplicationAdmissionScheduleModel::courseNameFromEntry($p);
+                    ?>
                     <tr>
                         <td class="col-pick"><input type="checkbox" class="form-check-input picker-row-cb" name="add_application_ids[]" value="<?php echo (int) $p['application_id']; ?>"></td>
                         <td class="col-no"><?php echo $pickNo; ?></td>
@@ -564,7 +578,8 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                             $pStatus = strtolower(trim((string) ($p['status'] ?? '')));
                             $pStatusClass = $pStatus === 'approved' ? 'admission-status-approved' : ($pStatus === 'rejected' ? 'admission-status-rejected' : '');
                         ?><span class="admission-status-badge <?php echo $e($pStatusClass); ?>"><?php echo $e($applicationStatusLabel($p)); ?></span></td>
-                        <td class="col-course" title="<?php echo $e($p['course_priority_1'] ?? ''); ?>"><?php echo $e($p['course_priority_1'] ?? ''); ?></td>
+                        <td class="col-dept" title="<?php echo $e($pDept); ?>"><?php echo $e($pDept !== 'GEN' ? $pDept : '—'); ?></td>
+                        <td class="col-course" title="<?php echo $e($p['course_priority_1'] ?? ''); ?>"><?php echo $e($pCourse); ?></td>
                     </tr>
                     <?php endforeach; ?>
                     </tbody>
@@ -588,7 +603,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
         <div class="admission-entries-table-wrap" id="admission-entries-table">
             <table class="table admission-entries-table mb-0">
                 <colgroup>
-                    <col class="col-remove"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-course">
+                    <col class="col-remove"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-dept"><col class="col-course">
                     <col class="col-roll"><col class="col-card"><col class="col-whatsapp"><col class="col-sent">
                 </colgroup>
                 <thead>
@@ -599,6 +614,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                         <th class="col-nic">NIC</th>
                         <th class="col-province">Province</th>
                         <th class="col-status">Status</th>
+                        <th class="col-dept">Dept</th>
                         <th class="col-course">Course</th>
                         <th class="col-roll">Roll / Index</th>
                         <th class="col-card"><span class="visually-hidden">Card</span></th>
@@ -608,7 +624,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                 </thead>
                 <tbody>
                 <?php if (empty($entries)): ?>
-                    <tr><td colspan="11" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
+                    <tr><td colspan="12" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
                 <?php else: ?>
                     <?php $i = 0; foreach ($entries as $row): $i++;
                         $entryId = (int) ($row['entry_id'] ?? 0);
@@ -616,6 +632,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                         $rollDisplay = ApplicationAdmissionScheduleModel::formatRollNumberForEntry($sch, $row, $rollSeq);
                         $rollPrefix = ApplicationAdmissionScheduleModel::rollNumberPrefixForEntry($sch, $row);
                         $deptKey = ApplicationAdmissionScheduleModel::departmentCodeFromEntry($row);
+                        $courseName = ApplicationAdmissionScheduleModel::courseNameFromEntry($row);
                         $waSent = !empty($row['whatsapp_sent']);
                         $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvinces);
                     ?>
@@ -629,7 +646,8 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                             $rowStatus = strtolower(trim((string) ($row['application_status'] ?? $row['status'] ?? '')));
                             $rowStatusClass = $rowStatus === 'approved' ? 'admission-status-approved' : ($rowStatus === 'rejected' ? 'admission-status-rejected' : '');
                         ?><span class="admission-status-badge <?php echo $e($rowStatusClass); ?>"><?php echo $e($applicationStatusLabel($row)); ?></span></td>
-                        <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($row['course_priority_1'] ?? ''); ?></td>
+                        <td class="col-dept" title="<?php echo $e($deptKey); ?>"><?php echo $e($deptKey !== 'GEN' ? $deptKey : '—'); ?></td>
+                        <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($courseName); ?></td>
                         <td class="col-roll"><input type="text" class="form-control form-control-sm roll-index-input" name="entries[<?php echo (int) $row['entry_id']; ?>][roll_number]" value="<?php echo $e($rollDisplay); ?>" data-seq="<?php echo $rollSeq; ?>" data-roll-prefix="<?php echo $e($rollPrefix); ?>" data-dept-key="<?php echo $e($deptKey); ?>"></td>
                         <td class="col-card">
                             <a href="<?php echo $e($admissionCardUrl((int) ($row['entry_id'] ?? 0))); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" title="Download postal admission card"><i class="fas fa-id-card" aria-hidden="true"></i><span class="visually-hidden"> Card</span></a>
@@ -704,7 +722,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
     <div class="admission-entries-table-wrap">
         <table class="table admission-entries-table admission-entries-table-readonly mb-0">
             <colgroup>
-                <col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-course">
+                <col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-dept"><col class="col-course">
                 <col class="col-roll"><col class="col-card"><col class="col-whatsapp"><col class="col-sent">
             </colgroup>
             <thead>
@@ -714,6 +732,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                     <th class="col-nic">NIC</th>
                     <th class="col-province">Province</th>
                     <th class="col-status">Status</th>
+                    <th class="col-dept">Dept</th>
                     <th class="col-course">Course</th>
                     <th class="col-roll">Roll / Index</th>
                     <th class="col-card"><span class="visually-hidden">Card</span></th>
@@ -723,12 +742,14 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
             </thead>
             <tbody>
             <?php if (empty($entries)): ?>
-                <tr><td colspan="10" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
+                <tr><td colspan="11" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
             <?php else: ?>
                 <?php $i = 0; foreach ($entries as $row): $i++;
                     $entryId = (int) ($row['entry_id'] ?? 0);
                     $rollSeq = (int) ($courseWiseRollSeq[$entryId] ?? 1);
                     $rollOut = ApplicationAdmissionScheduleModel::formatRollNumberForEntry($sch, $row, $rollSeq);
+                    $deptKey = ApplicationAdmissionScheduleModel::departmentCodeFromEntry($row);
+                    $courseName = ApplicationAdmissionScheduleModel::courseNameFromEntry($row);
                     $waRow = $waByEntry[(int) ($row['entry_id'] ?? 0)] ?? null;
                     $waDisplay = $waRow['display_phone'] ?? trim((string) ($row['student_whatsapp'] ?? ''));
                     if ($waDisplay === '') {
@@ -745,7 +766,8 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                         $rowStatus = strtolower(trim((string) ($row['application_status'] ?? $row['status'] ?? '')));
                         $rowStatusClass = $rowStatus === 'approved' ? 'admission-status-approved' : ($rowStatus === 'rejected' ? 'admission-status-rejected' : '');
                     ?><span class="admission-status-badge <?php echo $e($rowStatusClass); ?>"><?php echo $e($applicationStatusLabel($row)); ?></span></td>
-                    <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($row['course_priority_1'] ?? ''); ?></td>
+                    <td class="col-dept" title="<?php echo $e($deptKey); ?>"><?php echo $e($deptKey !== 'GEN' ? $deptKey : '—'); ?></td>
+                    <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($courseName); ?></td>
                     <td class="col-roll"><span class="roll-index-readout"><?php echo $e($rollOut); ?></span></td>
                     <td class="col-card">
                         <a href="<?php echo $e($admissionCardUrl((int) ($row['entry_id'] ?? 0))); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" title="Download postal admission card"><i class="fas fa-id-card" aria-hidden="true"></i></a>
