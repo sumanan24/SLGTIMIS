@@ -131,7 +131,7 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
                         </select>
                         <div class="form-text"><?php echo $isInterview
                             ? '1st course preference must match; counts reflect the language above.'
-                            : 'Optional for this venue. When set, only matching 1st preferences are listed and applicants already on another entrance exam for this course are excluded.'; ?></div>
+                            : 'Optional for this venue. When set, only matching 1st preferences are listed. Applicants already assigned to an entrance exam are excluded.'; ?></div>
                     </div>
                 </div>
                 <?php endif; ?>

@@ -340,9 +340,10 @@ class ApplicationAdmissionController extends Controller {
                 if ($entryId <= 0) {
                     continue;
                 }
-                $row = $entryRows[$entryId] ?? $entryRows[(string) $entryId] ?? [];
+                // Newly added applicants are not in the form — leave roll empty for auto-assign.
+                $row = $entryRows[$entryId] ?? $entryRows[(string) $entryId] ?? null;
                 if (!is_array($row)) {
-                    $row = [];
+                    continue;
                 }
                 $model->updateEntry($entryId, $id, [
                     'roll_number' => trim((string) ($row['roll_number'] ?? $entry['roll_number'] ?? '')),
@@ -701,7 +702,7 @@ class ApplicationAdmissionController extends Controller {
         foreach ($entries as $entry) {
             $entryIdForRoll = (int) ($entry['entry_id'] ?? 0);
             $seq = $courseWiseRollSeq[$entryIdForRoll] ?? 1;
-            $entry['roll_number'] = ApplicationAdmissionScheduleModel::formatRollNumberForEntry($schedule, $entry, $seq);
+            $entry['roll_number'] = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($schedule, $entry, $seq);
             $parts[] = ApplicationAdmissionPdfHelper::renderTemplate('postal_admission_card.php', [
                 'schedule' => $schedule,
                 'entry' => $entry,
@@ -940,12 +941,13 @@ class ApplicationAdmissionController extends Controller {
         if (($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_ENTRANCE) {
             $courseId = $this->scheduleCourseIdOrNull($schedule);
             $level = trim((string) ($schedule['application_level'] ?? ''));
+            $alreadyAssigned = 'Applicants already assigned to an entrance exam are not listed.';
             if ($level === '05') {
                 if ($courseId === null) {
-                    return 'Level 05 English medium: loading all approved and rejected applicants (every application language). Course filter is optional — set a course on Edit schedule only if you want 1st-preference filtering.';
+                    return 'Level 05 English medium: loading all approved and rejected applicants (every application language). Course filter is optional — set a course on Edit schedule only if you want 1st-preference filtering. ' . $alreadyAssigned;
                 }
 
-                return 'Level 05 English medium: all approved and rejected applicants with matching 1st preference (every application language). Applicants already on another entrance exam for this course are not listed.';
+                return 'Level 05 English medium: all approved and rejected applicants with matching 1st preference (every application language). ' . $alreadyAssigned;
             }
             if ($courseId === null) {
                 $lang = trim((string) ($schedule['student_language'] ?? ''));
@@ -954,17 +956,16 @@ class ApplicationAdmissionController extends Controller {
                 if ($lang !== '') {
                     $hint .= ' (' . $lang . ' medium)';
                 }
-                $hint .= '. Course filter is optional — set a course on Edit schedule only if you want 1st-preference filtering.';
+                $hint .= '. Course filter is optional — set a course on Edit schedule only if you want 1st-preference filtering. ' . $alreadyAssigned;
 
                 return $hint;
             }
-            $hint = 'Applicants already on another entrance exam for this course are not listed.';
             $lang = trim((string) ($schedule['student_language'] ?? ''));
             if ($lang !== '') {
-                return 'Approved and rejected ' . $lang . ' applicants (1st preference match). ' . $hint;
+                return 'Approved and rejected ' . $lang . ' applicants (1st preference match). ' . $alreadyAssigned;
             }
 
-            return 'Approved and rejected applicants with matching 1st preference. ' . $hint;
+            return 'Approved and rejected applicants with matching 1st preference. ' . $alreadyAssigned;
         }
 
         return $this->interviewPickerHint($schedule);
@@ -1031,22 +1032,45 @@ class ApplicationAdmissionController extends Controller {
     }
 
     /**
-     * Always rewrite rolls department-wise: serial continues across courses in the same
-     * department and restarts only when the department changes.
+     * Assign roll numbers only where empty: for each department prefix, read the highest
+     * existing serial and give new applicants the next numbers in sort order.
      */
     private function assignSequentialRollNumbersWhereEmpty(ApplicationAdmissionScheduleModel $model, int $scheduleId, array $schedule): void {
         $entries = ApplicationAdmissionScheduleModel::sortEntryRowsByCourseAndProvince(
             $model->getEntriesWithApplications($scheduleId)
         );
-        $seqMap = ApplicationAdmissionScheduleModel::courseWiseSequenceMap($entries);
+        $maxByPrefix = [];
+        foreach ($entries as $entry) {
+            $roll = trim((string) ($entry['roll_number'] ?? ''));
+            if ($roll === '') {
+                continue;
+            }
+            $prefix = ApplicationAdmissionScheduleModel::rollNumberPrefixForEntry($schedule, $entry);
+            $serial = ApplicationAdmissionScheduleModel::serialFromRollNumber($roll);
+            if ($serial === null) {
+                continue;
+            }
+            // Prefer serials that match this applicant's prefix; still count same trailing serial
+            // if the stored roll uses the expected prefix.
+            if (strncasecmp($roll, $prefix . '/', strlen($prefix) + 1) !== 0) {
+                continue;
+            }
+            $maxByPrefix[$prefix] = max($maxByPrefix[$prefix] ?? 0, $serial);
+        }
+
         foreach ($entries as $entry) {
             $entryId = (int) ($entry['entry_id'] ?? 0);
             if ($entryId <= 0) {
                 continue;
             }
-            $seq = $seqMap[$entryId] ?? 1;
+            if (trim((string) ($entry['roll_number'] ?? '')) !== '') {
+                continue;
+            }
+            $prefix = ApplicationAdmissionScheduleModel::rollNumberPrefixForEntry($schedule, $entry);
+            $next = ($maxByPrefix[$prefix] ?? 0) + 1;
+            $maxByPrefix[$prefix] = $next;
             $model->updateEntry($entryId, $scheduleId, [
-                'roll_number' => ApplicationAdmissionScheduleModel::formatRollNumberForEntry($schedule, $entry, $seq),
+                'roll_number' => ApplicationAdmissionScheduleModel::formatRollNumberForEntry($schedule, $entry, $next),
             ]);
         }
     }

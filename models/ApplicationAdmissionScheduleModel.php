@@ -156,6 +156,18 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
+     * Serial segment from a roll / index (trailing /001 → 1).
+     */
+    public static function serialFromRollNumber(?string $roll): ?int {
+        $roll = trim((string) $roll);
+        if ($roll === '' || !preg_match('/\/(\d+)\s*$/', $roll, $m)) {
+            return null;
+        }
+
+        return max(0, (int) $m[1]);
+    }
+
+    /**
      * Roll number for one applicant; department comes from 1st course preference when available.
      *
      * @param array<string, mixed> $schedule
@@ -460,13 +472,17 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
-     * Department-wise roll for display/PDF. Always uses the given sequence so serials
-     * continue across courses in the same department (saved per-course values are ignored).
+     * Roll for display/PDF: prefer the saved value; otherwise build from sequence.
      *
      * @param array<string, mixed> $schedule
      * @param array<string, mixed> $entry
      */
     public static function defaultRollIndexForEntry(array $schedule, array $entry, int $sequence): string {
+        $stored = trim((string) ($entry['roll_number'] ?? ''));
+        if ($stored !== '') {
+            return $stored;
+        }
+
         return self::formatRollNumberForEntry($schedule, $entry, $sequence);
     }
 
@@ -667,6 +683,39 @@ class ApplicationAdmissionScheduleModel extends Model {
         }
 
         return $byCourse;
+    }
+
+    /**
+     * Applicants already on any entrance exam for this NVQ level (any course / level-only).
+     *
+     * @return array<int, true> application_id => true
+     */
+    public function entranceScheduledApplicationIds(string $level, ?int $exceptScheduleId = null): array {
+        $this->ensureTables();
+        if (!in_array($level, ['04', '05'], true)) {
+            return [];
+        }
+        $sql = 'SELECT DISTINCT e.`application_id` '
+            . 'FROM `application_admission_schedule_entry` e '
+            . 'INNER JOIN `application_admission_schedule` s ON s.`schedule_id` = e.`schedule_id` '
+            . 'WHERE s.`schedule_type` = ? AND s.`application_level` = ?';
+        $types = 'ss';
+        $params = [self::TYPE_ENTRANCE, $level];
+        if ($exceptScheduleId !== null && $exceptScheduleId > 0) {
+            $sql .= ' AND s.`schedule_id` <> ?';
+            $types .= 'i';
+            $params[] = $exceptScheduleId;
+        }
+        $rows = $this->fetchAllPrepared($sql, $types, $params);
+        $ids = [];
+        foreach ($rows as $row) {
+            $aid = (int) ($row['application_id'] ?? 0);
+            if ($aid > 0) {
+                $ids[$aid] = true;
+            }
+        }
+
+        return $ids;
     }
 
     /**
@@ -900,12 +949,11 @@ class ApplicationAdmissionScheduleModel extends Model {
             }));
         }
 
-        if (($scheduleType ?? '') === self::TYPE_ENTRANCE && $courseIdTrim !== '') {
-            $onEntrance = $this->entranceScheduledApplicationIdsByCourse(
+        if (($scheduleType ?? '') === self::TYPE_ENTRANCE) {
+            $excludeSet = $this->entranceScheduledApplicationIds(
                 $level,
                 $scheduleId > 0 ? $scheduleId : null
             );
-            $excludeSet = $onEntrance[$courseIdTrim] ?? [];
             if ($excludeSet !== []) {
                 $rows = array_values(array_filter($rows, function (array $row) use ($excludeSet): bool {
                     $appId = (int) ($row['application_id'] ?? 0);
@@ -1046,11 +1094,9 @@ class ApplicationAdmissionScheduleModel extends Model {
         if ($schedule !== null
             && ($schedule['schedule_type'] ?? '') === self::TYPE_ENTRANCE
         ) {
-            $courseId = trim((string) ($schedule['course_id'] ?? ''));
             $level = (string) ($schedule['application_level'] ?? '');
-            if ($courseId !== '' && in_array($level, ['04', '05'], true)) {
-                $onEntrance = $this->entranceScheduledApplicationIdsByCourse($level, $scheduleId);
-                $exclude = $onEntrance[$courseId] ?? [];
+            if (in_array($level, ['04', '05'], true)) {
+                $exclude = $this->entranceScheduledApplicationIds($level, $scheduleId);
                 if ($exclude !== []) {
                     $applicationIds = array_values(array_filter($applicationIds, function ($id) use ($exclude): bool {
                         return !isset($exclude[(int) $id]);

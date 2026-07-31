@@ -100,14 +100,21 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+    gap: 0.5rem 1.25rem;
     padding: 0.625rem 1rem;
     margin-bottom: 0.75rem;
     background: #f8f9fa;
     border: 1px solid #dee2e6;
     border-radius: 0.375rem;
     font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.admission-entries-summary > span {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.35rem;
 }
 
 .admission-entries-summary strong {
@@ -122,11 +129,31 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 }
 
 .admission-picker-card .card-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
     background: #f8f9fa;
     border-bottom: 1px solid #dee2e6;
     padding: 0.625rem 1rem;
     font-size: 0.875rem;
     font-weight: 600;
+}
+
+.admission-picker-card .card-header label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.admission-picker-card .card-header .form-check-input {
+    float: none;
+    margin: 0;
+    position: static;
 }
 
 .admission-picker-scroll {
@@ -136,7 +163,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 
 .admission-entries-table,
 .admission-picker-table {
-    table-layout: auto;
+    table-layout: fixed;
     width: 100%;
     margin-bottom: 0;
     border-collapse: separate;
@@ -144,50 +171,57 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 }
 
 .admission-entries-table {
-    min-width: 72rem;
+    min-width: 74rem;
 }
 
-.admission-entries-table col.col-remove { width: 2.5rem; }
 .admission-entries-table col.col-no { width: 3rem; }
-.admission-entries-table col.col-name { width: 14%; min-width: 9rem; }
-.admission-entries-table col.col-nic { width: 8.5rem; }
+.admission-entries-table col.col-name { width: 12rem; }
+.admission-entries-table col.col-nic { width: 8rem; }
+.admission-entries-table col.col-province { width: 7.5rem; }
+.admission-entries-table col.col-status { width: 5.75rem; }
 .admission-entries-table col.col-dept { width: 4.5rem; }
-.admission-entries-table col.col-course { width: 12%; min-width: 8rem; }
-.admission-entries-table col.col-province { width: 7rem; }
-.admission-entries-table col.col-roll { width: 13.5rem; min-width: 13.5rem; }
-.admission-entries-table col.col-card { width: 4.25rem; }
-.admission-entries-table col.col-whatsapp { width: 11rem; }
-.admission-entries-table col.col-sent { width: 4.5rem; }
+.admission-entries-table col.col-course { width: 11rem; }
+.admission-entries-table col.col-roll { width: 14rem; }
+.admission-entries-table col.col-card { width: 4rem; }
+.admission-entries-table col.col-whatsapp { width: 9.5rem; }
+.admission-entries-table col.col-sent { width: 4.25rem; }
 
 .admission-entries-table-readonly {
-    min-width: 66rem;
+    min-width: 68rem;
 }
 
 .admission-entries-table-readonly col.col-no { width: 3rem; }
-.admission-entries-table-readonly col.col-name { width: 16%; min-width: 9rem; }
-.admission-entries-table-readonly col.col-nic { width: 8.5rem; }
+.admission-entries-table-readonly col.col-name { width: 13rem; }
+.admission-entries-table-readonly col.col-nic { width: 8rem; }
+.admission-entries-table-readonly col.col-province { width: 7.5rem; }
+.admission-entries-table-readonly col.col-status { width: 5.75rem; }
 .admission-entries-table-readonly col.col-dept { width: 4.5rem; }
-.admission-entries-table-readonly col.col-course { width: 14%; min-width: 8rem; }
-.admission-entries-table-readonly col.col-province { width: 7rem; }
-.admission-entries-table-readonly col.col-roll { width: 13.5rem; min-width: 13.5rem; }
-.admission-entries-table-readonly col.col-card { width: 4.25rem; }
+.admission-entries-table-readonly col.col-course { width: 12rem; }
+.admission-entries-table-readonly col.col-roll { width: 14rem; }
+.admission-entries-table-readonly col.col-card { width: 4rem; }
+.admission-entries-table-readonly col.col-whatsapp { width: 9.5rem; }
 .admission-entries-table-readonly col.col-sent { width: 4rem; }
 
-.admission-picker-table col.col-pick { width: 40px; }
-.admission-picker-table col.col-no { width: 48px; }
-.admission-picker-table col.col-name { width: 26%; }
-.admission-picker-table col.col-nic { width: 14%; }
-.admission-picker-table col.col-province { width: 14%; }
+.admission-picker-table {
+    min-width: 56rem;
+}
+
+.admission-picker-table col.col-pick { width: 2.75rem; }
+.admission-picker-table col.col-no { width: 3rem; }
+.admission-picker-table col.col-name { width: 14rem; }
+.admission-picker-table col.col-nic { width: 8rem; }
+.admission-picker-table col.col-province { width: 8rem; }
+.admission-picker-table col.col-status { width: 5.75rem; }
 .admission-picker-table col.col-dept { width: 4.5rem; }
-.admission-picker-table col.col-status { width: 5.5rem; }
-.admission-entries-table col.col-status { width: 5.5rem; }
-.admission-entries-table-readonly col.col-status { width: 5.5rem; }
+.admission-picker-table col.col-course { width: auto; }
+
 .admission-entries-table .col-dept,
 .admission-entries-table-readonly .col-dept,
 .admission-picker-table .col-dept {
     font-weight: 600;
     letter-spacing: 0.02em;
     white-space: nowrap;
+    text-align: center;
 }
 
 .admission-status-badge {
@@ -211,50 +245,118 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
     color: #842029;
 }
 
-.admission-province-filter {
+.admission-filters {
     display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
+    flex-direction: column;
     gap: 0.75rem;
     margin-bottom: 1rem;
-    padding: 0.75rem 1rem;
+    padding: 0.85rem 1rem;
     background: #f8f9fa;
     border: 1px solid #dee2e6;
     border-radius: 0.375rem;
 }
 
-.admission-province-filter label {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
+.admission-text-filter {
+    display: grid;
+    grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 14rem) auto;
+    gap: 0.75rem 1rem;
+    align-items: end;
 }
 
-.admission-province-filter .form-select {
-    min-width: 12rem;
+.admission-text-filter .filter-field {
+    min-width: 0;
+}
+
+.admission-text-filter label,
+.admission-province-filter > label,
+.admission-province-filter .filter-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+    display: block;
+    color: #343a40;
+}
+
+.admission-text-filter .form-control {
     font-size: 0.875rem;
+    height: 2rem;
+}
+
+.admission-text-filter .filter-hint {
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin: 0;
+    padding-bottom: 0.35rem;
+    align-self: end;
+    white-space: nowrap;
+}
+
+.admission-text-hidden {
+    display: none !important;
+}
+
+.admission-province-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+}
+
+.admission-province-filter .form-text {
+    margin: 0;
+    font-size: 0.75rem;
 }
 
 .admission-province-checkboxes {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.35rem 0.75rem;
-    margin-top: 0.35rem;
+    align-items: center;
+    gap: 0.4rem 0.85rem;
+    margin-top: 0.15rem;
 }
 
 .admission-province-checkboxes .form-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
     margin: 0;
-    min-height: auto;
+    min-height: 0;
+    padding-left: 0;
+}
+
+.admission-province-checkboxes .form-check-input {
+    float: none;
+    margin: 0;
+    position: static;
+    flex: 0 0 auto;
 }
 
 .admission-province-checkboxes .form-check-label {
     font-size: 0.8125rem;
     font-weight: 500;
     cursor: pointer;
+    margin: 0;
+    line-height: 1.2;
+}
+
+@media (max-width: 767.98px) {
+    .admission-text-filter {
+        grid-template-columns: 1fr;
+    }
+
+    .admission-text-filter .filter-hint {
+        white-space: normal;
+        padding-bottom: 0;
+    }
 }
 
 .admission-entries-table thead th,
 .admission-picker-table thead th {
-    padding: 0.625rem 0.75rem;
+    padding: 0.55rem 0.65rem;
     font-size: 0.6875rem;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -264,15 +366,17 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
     border-bottom: 2px solid #dee2e6;
     background-color: #f8f9fa;
     white-space: nowrap;
+    text-align: left;
 }
 
 .admission-entries-table tbody td,
 .admission-picker-table tbody td {
-    padding: 0.5rem 0.75rem;
+    padding: 0.45rem 0.65rem;
     vertical-align: middle;
     line-height: 1.35;
     border-bottom: 1px solid #eef1f4;
     font-size: 0.875rem;
+    text-align: left;
 }
 
 .admission-entries-table tbody tr:last-child td,
@@ -294,18 +398,59 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 }
 
 .admission-entries-table .col-no,
-.admission-picker-table .col-no {
+.admission-picker-table .col-no,
+.admission-entries-table thead th.col-no,
+.admission-picker-table thead th.col-no {
     text-align: center;
     color: #6c757d;
 }
 
-.admission-entries-table .col-nic {
-    font-family: ui-monospace, monospace;
-    font-size: 0.8125rem;
-    color: #495057;
+.admission-entries-table .col-pick,
+.admission-picker-table .col-pick,
+.admission-entries-table thead th.col-pick,
+.admission-picker-table thead th.col-pick {
+    text-align: center;
 }
 
-.admission-entries-table .col-course {
+.admission-picker-table .col-pick .form-check-input,
+.admission-entries-table .col-sent .form-check-input {
+    float: none;
+    margin: 0 auto;
+    display: block;
+    position: static;
+}
+
+.admission-entries-table .col-name,
+.admission-picker-table .col-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admission-entries-table .col-nic,
+.admission-picker-table .col-nic {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8125rem;
+    color: #495057;
+    white-space: nowrap;
+}
+
+.admission-entries-table .col-province,
+.admission-picker-table .col-province {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admission-entries-table .col-status,
+.admission-picker-table .col-status,
+.admission-entries-table thead th.col-status,
+.admission-picker-table thead th.col-status {
+    text-align: center;
+}
+
+.admission-entries-table .col-course,
+.admission-picker-table .col-course {
     font-size: 0.8125rem;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -337,25 +482,27 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 .admission-entries-table .col-roll input.roll-index-input {
     display: block;
     width: 100%;
-    min-width: 12.75rem;
-    max-width: none;
+    min-width: 0;
+    max-width: 100%;
     box-sizing: border-box;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 0.75rem;
     letter-spacing: 0.02em;
     line-height: 1.35;
-    padding: 0.4rem 0.5rem;
+    padding: 0.35rem 0.45rem;
     white-space: nowrap;
     overflow-x: auto;
 }
 
 .admission-entries-table-readonly .col-roll .roll-index-readout {
-    display: inline-block;
+    display: block;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 0.75rem;
     letter-spacing: 0.02em;
     line-height: 1.35;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     padding: 0.15rem 0;
     color: #212529;
 }
@@ -367,8 +514,10 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 
 .admission-entries-table .col-whatsapp,
 .admission-entries-table .col-sent,
-.admission-entries-table .col-remove,
-.admission-entries-table .col-card {
+.admission-entries-table .col-card,
+.admission-entries-table thead th.col-whatsapp,
+.admission-entries-table thead th.col-sent,
+.admission-entries-table thead th.col-card {
     text-align: center;
     vertical-align: middle;
 }
@@ -497,11 +646,26 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
         <span class="text-muted">Roll format: <code><?php echo $e($rollFormatSample); ?></code> <span class="text-muted">(serial continues within department; restarts when department changes)</span></span>
     </div>
 
-    <?php if ($provinceOptions !== []): ?>
-    <div class="admission-province-filter">
-        <div>
-            <label class="d-block">Filter by province</label>
-            <div class="form-text mb-1">Tick one or more provinces to load only those students. Applicants are sorted by department, then course, then province.</div>
+    <?php if ($pickerCount > 0 || $entryCount > 0 || $provinceOptions !== []): ?>
+    <div class="admission-filters">
+        <?php if ($pickerCount > 0 || $entryCount > 0): ?>
+        <div class="admission-text-filter" id="admission-text-filter">
+            <div class="filter-field">
+                <label for="admission_filter_name">Filter by name</label>
+                <input type="search" class="form-control form-control-sm" id="admission_filter_name" placeholder="Type student name…" autocomplete="off">
+            </div>
+            <div class="filter-field">
+                <label for="admission_filter_nic">Filter by NIC</label>
+                <input type="search" class="form-control form-control-sm" id="admission_filter_nic" placeholder="Type NIC…" autocomplete="off">
+            </div>
+            <p class="filter-hint">Filters the lists below as you type.</p>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($provinceOptions !== []): ?>
+        <div class="admission-province-filter">
+            <label class="filter-title" for="province_filter_all">Filter by province</label>
+            <div class="form-text">Tick one or more provinces to load only those students. Sorted by department, course, then province.</div>
             <div class="admission-province-checkboxes" id="admission-province-checkboxes">
                 <div class="form-check">
                     <input class="form-check-input province-filter-cb" type="checkbox" id="province_filter_all" value="" <?php echo !$provinceFilterActive ? 'checked' : ''; ?>>
@@ -515,6 +679,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                 <?php endforeach; ?>
             </div>
         </div>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 
@@ -534,7 +699,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                     $schLang = trim((string) ($sch['student_language'] ?? ''));
                     echo $schLang !== '' ? ' · ' . $e($schLang) : '';
                 }
-            ?>. Course is optional — <a href="<?php echo APP_URL; ?>/application-admission/edit?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>">Edit schedule</a> to filter by one course.
+            ?>. Course is optional — <a href="<?php echo APP_URL; ?>/application-admission/edit?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>">Edit schedule</a> to filter by one course. Applicants already assigned to an entrance exam are not listed.
         </div>
         <?php endif; ?>
 
@@ -549,9 +714,9 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 
         <?php if (!empty($picker)): ?>
         <div class="admission-picker-card">
-            <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="card-header">
                 <span>Add applicants (approved or rejected)</span>
-                <label class="small mb-0 fw-normal"><input type="checkbox" id="picker-select-all" class="form-check-input me-1"> Select all</label>
+                <label class="small"><input type="checkbox" id="picker-select-all" class="form-check-input"> Select all</label>
             </div>
             <div class="admission-picker-scroll">
                 <table class="table admission-picker-table mb-0">
@@ -575,7 +740,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                         $pDept = ApplicationAdmissionScheduleModel::departmentCodeFromEntry($p);
                         $pCourse = ApplicationAdmissionScheduleModel::courseNameFromEntry($p);
                     ?>
-                    <tr>
+                    <tr class="admission-filter-row" data-name="<?php echo $e(mb_strtolower((string) ($p['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(mb_strtolower((string) ($p['student_nic'] ?? ''), 'UTF-8')); ?>">
                         <td class="col-pick"><input type="checkbox" class="form-check-input picker-row-cb" name="add_application_ids[]" value="<?php echo (int) $p['application_id']; ?>"></td>
                         <td class="col-no"><?php echo $pickNo; ?></td>
                         <td class="col-name"><?php echo $e($p['student_full_name'] ?? ''); ?></td>
@@ -610,12 +775,11 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
         <div class="admission-entries-table-wrap" id="admission-entries-table">
             <table class="table admission-entries-table mb-0">
                 <colgroup>
-                    <col class="col-remove"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-dept"><col class="col-course">
+                    <col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-dept"><col class="col-course">
                     <col class="col-roll"><col class="col-card"><col class="col-whatsapp"><col class="col-sent">
                 </colgroup>
                 <thead>
                     <tr>
-                        <th class="col-remove" title="Remove from schedule"></th>
                         <th class="col-no">No.</th>
                         <th class="col-name">Name</th>
                         <th class="col-nic">NIC</th>
@@ -631,20 +795,19 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                 </thead>
                 <tbody>
                 <?php if (empty($entries)): ?>
-                    <tr><td colspan="12" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
+                    <tr><td colspan="11" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
                 <?php else: ?>
                     <?php $i = 0; foreach ($entries as $row): $i++;
                         $entryId = (int) ($row['entry_id'] ?? 0);
                         $rollSeq = (int) ($courseWiseRollSeq[$entryId] ?? 1);
-                        $rollDisplay = ApplicationAdmissionScheduleModel::formatRollNumberForEntry($sch, $row, $rollSeq);
+                        $rollDisplay = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $rollSeq);
                         $rollPrefix = ApplicationAdmissionScheduleModel::rollNumberPrefixForEntry($sch, $row);
                         $deptKey = ApplicationAdmissionScheduleModel::departmentCodeFromEntry($row);
                         $courseName = ApplicationAdmissionScheduleModel::courseNameFromEntry($row);
                         $waSent = !empty($row['whatsapp_sent']);
                         $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvinces);
                     ?>
-                    <tr class="<?php echo trim(($waSent ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-dept-key="<?php echo $e($deptKey); ?>">
-                        <td class="col-remove"><input type="checkbox" class="form-check-input" name="remove_entry_ids[]" value="<?php echo (int) $row['entry_id']; ?>" title="Remove"></td>
+                    <tr class="admission-filter-row <?php echo trim(($waSent ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-dept-key="<?php echo $e($deptKey); ?>" data-name="<?php echo $e(mb_strtolower((string) ($row['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(mb_strtolower((string) ($row['student_nic'] ?? ''), 'UTF-8')); ?>">
                         <td class="col-no"><?php echo $i; ?></td>
                         <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
                         <td class="col-nic"><?php echo $e($row['student_nic'] ?? ''); ?></td>
@@ -754,7 +917,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                 <?php $i = 0; foreach ($entries as $row): $i++;
                     $entryId = (int) ($row['entry_id'] ?? 0);
                     $rollSeq = (int) ($courseWiseRollSeq[$entryId] ?? 1);
-                    $rollOut = ApplicationAdmissionScheduleModel::formatRollNumberForEntry($sch, $row, $rollSeq);
+                    $rollOut = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $rollSeq);
                     $deptKey = ApplicationAdmissionScheduleModel::departmentCodeFromEntry($row);
                     $courseName = ApplicationAdmissionScheduleModel::courseNameFromEntry($row);
                     $waRow = $waByEntry[(int) ($row['entry_id'] ?? 0)] ?? null;
@@ -764,7 +927,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                     }
                     $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvinces);
                 ?>
-                <tr class="<?php echo trim((!empty($row['whatsapp_sent']) ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>">
+                <tr class="admission-filter-row <?php echo trim((!empty($row['whatsapp_sent']) ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-name="<?php echo $e(mb_strtolower((string) ($row['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(mb_strtolower((string) ($row['student_nic'] ?? ''), 'UTF-8')); ?>">
                     <td class="col-no"><?php echo $i; ?></td>
                     <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
                     <td class="col-nic"><?php echo $e($row['student_nic'] ?? ''); ?></td>
@@ -870,6 +1033,11 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
     if (selectAll) {
         selectAll.addEventListener('change', function () {
             document.querySelectorAll('.picker-row-cb').forEach(function (cb) {
+                var tr = cb.closest('tr');
+                if (tr && tr.classList.contains('admission-text-hidden')) {
+                    cb.checked = false;
+                    return;
+                }
                 cb.checked = selectAll.checked;
             });
         });
@@ -975,6 +1143,44 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                 saveWaSent(t);
             }
         });
+    }
+})();
+</script>
+<?php endif; ?>
+<?php if ($pickerCount > 0 || $entryCount > 0): ?>
+<script>
+(function () {
+    var nameInput = document.getElementById('admission_filter_name');
+    var nicInput = document.getElementById('admission_filter_nic');
+    if (!nameInput && !nicInput) {
+        return;
+    }
+
+    function normalize(value) {
+        return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    }
+
+    function applyTextFilter() {
+        var nameQ = normalize(nameInput ? nameInput.value : '');
+        var nicQ = normalize(nicInput ? nicInput.value : '');
+        document.querySelectorAll('tr.admission-filter-row').forEach(function (tr) {
+            var name = tr.getAttribute('data-name') || '';
+            var nic = tr.getAttribute('data-nic') || '';
+            var match = (!nameQ || name.indexOf(nameQ) !== -1)
+                && (!nicQ || nic.indexOf(nicQ) !== -1);
+            tr.classList.toggle('admission-text-hidden', !match);
+        });
+        var selectAll = document.getElementById('picker-select-all');
+        if (selectAll) {
+            selectAll.checked = false;
+        }
+    }
+
+    if (nameInput) {
+        nameInput.addEventListener('input', applyTextFilter);
+    }
+    if (nicInput) {
+        nicInput.addEventListener('input', applyTextFilter);
     }
 })();
 </script>
