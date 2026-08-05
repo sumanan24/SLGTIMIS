@@ -151,6 +151,7 @@ class ApplicationAdmissionPdfHelper {
         $css = '@page{margin:12mm;}body{font-family:Helvetica,Arial,DejaVu Sans,sans-serif;font-size:10pt;color:#0f172a;}'
             . 'table.grid{width:100%;border-collapse:collapse;margin:8px 0;}table.grid th,table.grid td{border:1px solid #cbd5e1;padding:5px 7px;text-align:left;}'
             . 'table.grid th{background:#f1f5f9;font-size:9px;text-transform:uppercase;}'
+            . 'table.grid td.sig{height:22px;}'
             . '.head-row{width:100%;border-collapse:collapse;margin-bottom:8px;}.head-row td{border:none;vertical-align:top;}'
             . '.inst{font-size:13px;font-weight:700;}.title{font-size:12px;font-weight:700;margin-top:4px;}.sub{font-size:10px;color:#475569;}'
             . '.logo-img{height:44px;width:auto;}.muted{color:#64748b;font-size:9px;}';

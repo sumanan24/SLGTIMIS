@@ -243,6 +243,7 @@ return [
     'application-admission/selection' => 'ApplicationAdmissionController@selection',
     'application-admission/selection-save' => 'ApplicationAdmissionController@selectionSave',
     'application-admission/pdf-schedule' => 'ApplicationAdmissionController@pdfSchedule',
+    'application-admission/pdf-attendance' => 'ApplicationAdmissionController@pdfAttendance',
     'application-admission/pdf-selection' => 'ApplicationAdmissionController@pdfSelection',
     'application-admission/admission-card' => 'ApplicationAdmissionController@admissionCard',
     'application-admission/admission-cards-bulk' => 'ApplicationAdmissionController@admissionCardsBulk',
