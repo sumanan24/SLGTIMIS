@@ -167,16 +167,29 @@
         });
     }
 
-    function resolvePrinter() {
-        return getDefaultDevice().then(function (device) {
-            if (device && device.uid) {
-                return device;
+    function resolvePrinter(preferredUid) {
+        return getLocalPrinters().then(function (list) {
+            if (!list.length) {
+                throw new Error(
+                    'No Zebra printer detected. Connect the ZD230 via USB, open Zebra Browser Print, and allow this site.'
+                );
             }
-            return getLocalPrinters().then(function (list) {
-                if (!list.length) {
-                    throw new Error(
-                        'No Zebra printer detected. Connect the ZD230 via USB, open Zebra Browser Print, and set it as the default printer.'
-                    );
+            var uid = preferredUid != null ? String(preferredUid) : '';
+            if (uid) {
+                for (var i = 0; i < list.length; i++) {
+                    if (String(list[i].uid || '') === uid) {
+                        return list[i];
+                    }
+                }
+            }
+            return getDefaultDevice().then(function (device) {
+                if (device && device.uid) {
+                    for (var j = 0; j < list.length; j++) {
+                        if (String(list[j].uid || '') === String(device.uid)) {
+                            return list[j];
+                        }
+                    }
+                    return device;
                 }
                 return list[0];
             });
@@ -187,6 +200,7 @@
         UNAVAILABLE_MSG: UNAVAILABLE_MSG,
         resolvePrinter: resolvePrinter,
         sendToDevice: sendToDevice,
-        getLocalPrinters: getLocalPrinters
+        getLocalPrinters: getLocalPrinters,
+        getDefaultDevice: getDefaultDevice
     };
 })(window);

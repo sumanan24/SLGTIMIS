@@ -19,7 +19,9 @@
 
     var COPY_OPTIONS = [1, 2, 5, 10];
     var PREVIEW_LIMIT = 60;
+    var STORAGE_KEY = 'slgti_zebra_printer_uid';
     var pendingJob = null;
+    var cachedPrinters = [];
 
     function escapeZpl(value) {
         return String(value || '')
@@ -146,6 +148,126 @@
         return COPY_OPTIONS.indexOf(n) >= 0 ? n : 1;
     }
 
+    function selectedPrinterUid(root) {
+        var modalSel = document.getElementById('roll-sticker-printer-select');
+        if (modalSel && modalSel.value) {
+            return String(modalSel.value);
+        }
+        var sel = root ? root.querySelector('#zebra-printer-select') : document.getElementById('zebra-printer-select');
+        return sel ? String(sel.value || '') : '';
+    }
+
+    function rememberPrinterUid(uid) {
+        try {
+            if (uid) {
+                global.localStorage.setItem(STORAGE_KEY, uid);
+            }
+        } catch (e) { /* ignore */ }
+    }
+
+    function rememberedPrinterUid() {
+        try {
+            return global.localStorage.getItem(STORAGE_KEY) || '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function printerOptionLabel(printer) {
+        var name = printer.name || 'Zebra Printer';
+        var conn = printer.connection ? (' · ' + printer.connection) : '';
+        return name + conn;
+    }
+
+    function fillPrinterSelect(selectEl, printers, preferredUid) {
+        if (!selectEl) {
+            return;
+        }
+        if (!printers.length) {
+            selectEl.innerHTML = '<option value="">No printer found</option>';
+            return;
+        }
+        var preferred = preferredUid || rememberedPrinterUid() || '';
+        var html = '';
+        var matched = false;
+        printers.forEach(function (p, idx) {
+            var uid = String(p.uid || ('printer-' + idx));
+            var selected = preferred && uid === preferred;
+            if (selected) {
+                matched = true;
+            }
+            html += '<option value="' + escapeHtml(uid) + '"' + (selected ? ' selected' : '') + '>'
+                + escapeHtml(printerOptionLabel(p)) + '</option>';
+        });
+        selectEl.innerHTML = html;
+        if (!matched && selectEl.options.length) {
+            selectEl.selectedIndex = 0;
+        }
+        rememberPrinterUid(selectEl.value);
+    }
+
+    function refreshPrinterList(root, statusEl) {
+        var client = global.ZebraBrowserPrintClient;
+        var selectEl = root.querySelector('#zebra-printer-select');
+        var refreshBtn = root.querySelector('#btn-refresh-zebra-printers');
+        if (!client) {
+            if (selectEl) {
+                selectEl.innerHTML = '<option value="">Print module missing</option>';
+            }
+            return Promise.resolve([]);
+        }
+        if (selectEl) {
+            selectEl.innerHTML = '<option value="">Detecting printers…</option>';
+        }
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+        }
+        if (statusEl) {
+            statusEl.textContent = 'Detecting printers…';
+        }
+        return client.getLocalPrinters()
+            .then(function (list) {
+                cachedPrinters = list || [];
+                if (!cachedPrinters.length) {
+                    return client.getDefaultDevice().then(function (device) {
+                        cachedPrinters = device ? [device] : [];
+                        return cachedPrinters;
+                    }).catch(function () {
+                        return [];
+                    });
+                }
+                return cachedPrinters;
+            })
+            .then(function (list) {
+                fillPrinterSelect(selectEl, list, rememberedPrinterUid());
+                var modalSel = document.getElementById('roll-sticker-printer-select');
+                if (modalSel) {
+                    fillPrinterSelect(modalSel, list, selectEl ? selectEl.value : rememberedPrinterUid());
+                }
+                if (statusEl) {
+                    statusEl.textContent = list.length
+                        ? (list.length + ' printer(s) found')
+                        : 'No printer found — start Zebra Browser Print';
+                }
+                return list;
+            })
+            .catch(function (err) {
+                cachedPrinters = [];
+                if (selectEl) {
+                    selectEl.innerHTML = '<option value="">Browser Print unavailable</option>';
+                }
+                if (statusEl) {
+                    statusEl.textContent = (err && err.message) ? err.message : client.UNAVAILABLE_MSG;
+                }
+                return [];
+            })
+            .finally(function () {
+                if (refreshBtn) {
+                    refreshBtn.disabled = false;
+                }
+            });
+    }
+
     function ensurePreviewStyles() {
         var style = document.getElementById('roll-sticker-preview-styles');
         if (!style) {
@@ -160,6 +282,9 @@
             + '.roll-sticker-card.is-empty{border-style:dashed;background:#f8f9fa;opacity:.55;}'
             + '.roll-sticker-card .roll{font-size:15px;font-weight:800;font-family:Consolas,Monaco,monospace;line-height:1.15;word-break:break-word;text-align:center;letter-spacing:0.01em;}'
             + '.roll-sticker-preview-meta{font-size:.875rem;color:#495057;}'
+            + '.roll-sticker-printer-row{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;margin-bottom:1rem;padding:.55rem .75rem;background:#fff;border:1px solid #dee2e6;border-radius:.375rem;}'
+            + '.roll-sticker-printer-row label{margin:0;font-size:.8125rem;font-weight:600;}'
+            + '.roll-sticker-printer-row select{min-width:14rem;max-width:100%;}'
             + '#rollStickerPreviewModal .modal-body{max-height:65vh;overflow:auto;background:#f1f3f5;}';
     }
 
@@ -180,17 +305,56 @@
             + '        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>'
             + '      </div>'
             + '      <div class="modal-body">'
+            + '        <div class="roll-sticker-printer-row">'
+            + '          <label for="roll-sticker-printer-select">Printer</label>'
+            + '          <select id="roll-sticker-printer-select" class="form-select form-select-sm"></select>'
+            + '          <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-refresh-modal-printers" title="Refresh printers"><i class="fas fa-sync-alt"></i></button>'
+            + '          <span class="text-muted small" id="roll-sticker-printer-status"></span>'
+            + '        </div>'
             + '        <p class="roll-sticker-preview-meta mb-3" id="rollStickerPreviewMeta"></p>'
             + '        <div class="roll-sticker-preview-grid" id="rollStickerPreviewGrid"></div>'
             + '      </div>'
             + '      <div class="modal-footer py-2">'
             + '        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>'
-            + '        <button type="button" class="btn btn-dark btn-sm" id="btn-confirm-print-roll-stickers"><i class="fas fa-print me-1"></i> Print to Zebra</button>'
+            + '        <button type="button" class="btn btn-outline-dark btn-sm" id="btn-download-stickers-pdf-modal"><i class="fas fa-file-pdf me-1"></i> Download PDF</button>'
+            + '        <button type="button" class="btn btn-dark btn-sm" id="btn-confirm-print-roll-stickers"><i class="fas fa-print me-1"></i> Print to selected printer</button>'
             + '      </div>'
             + '    </div>'
             + '  </div>'
             + '</div>';
         document.body.appendChild(wrap.firstElementChild);
+
+        var modalSel = document.getElementById('roll-sticker-printer-select');
+        var modalRefresh = document.getElementById('btn-refresh-modal-printers');
+        if (modalSel) {
+            modalSel.addEventListener('change', function () {
+                rememberPrinterUid(modalSel.value);
+                var pageSel = document.getElementById('zebra-printer-select');
+                if (pageSel) {
+                    pageSel.value = modalSel.value;
+                }
+            });
+        }
+        if (modalRefresh) {
+            modalRefresh.addEventListener('click', function () {
+                var root = document.querySelector('.admission-entries-page-wrap');
+                if (root) {
+                    refreshPrinterList(root, document.getElementById('roll-sticker-printer-status'));
+                }
+            });
+        }
+
+        var modalPdfBtn = document.getElementById('btn-download-stickers-pdf-modal');
+        if (modalPdfBtn) {
+            modalPdfBtn.addEventListener('click', function () {
+                if (!pendingJob || !pendingJob.rolls.length) {
+                    showError('No roll numbers to download.');
+                    return;
+                }
+                downloadStickersPdf(pendingJob.rolls, pendingJob.copies, [modalPdfBtn]);
+            });
+        }
+
         return document.getElementById('rollStickerPreviewModal');
     }
 
@@ -225,6 +389,13 @@
             copies: copies
         };
 
+        fillPrinterSelect(
+            document.getElementById('roll-sticker-printer-select'),
+            cachedPrinters,
+            selectedPrinterUid(root)
+        );
+        refreshPrinterList(root, document.getElementById('roll-sticker-printer-status'));
+
         if (meta) {
             meta.innerHTML = '<strong>' + rollNumbers.length + '</strong> sticker(s)'
                 + ' · <strong>' + rows + '</strong> print row(s) (2 parallel)'
@@ -252,9 +423,15 @@
                     return;
                 }
                 var job = pendingJob;
+                var printerUid = selectedPrinterUid(job.root);
+                if (!printerUid) {
+                    showError('Select a Zebra printer before printing.');
+                    return;
+                }
+                rememberPrinterUid(printerUid);
                 var printAllBtn = job.root.querySelector('#btn-print-all-roll-numbers');
                 hidePreviewModal();
-                printRollNumbers(job.rolls, job.copies, [printAllBtn, confirmBtn]);
+                printRollNumbers(job.rolls, job.copies, printerUid, [printAllBtn, confirmBtn]);
             });
         }
 
@@ -282,7 +459,131 @@
         }
     }
 
-    function printRollNumbers(rollNumbers, copies, buttons) {
+    var jsPdfLoading = null;
+
+    function loadJsPdf() {
+        if (typeof global.jspdf !== 'undefined' && global.jspdf.jsPDF) {
+            return Promise.resolve(global.jspdf.jsPDF);
+        }
+        if (typeof global.jsPDF === 'function') {
+            return Promise.resolve(global.jsPDF);
+        }
+        if (jsPdfLoading) {
+            return jsPdfLoading;
+        }
+        jsPdfLoading = new Promise(function (resolve, reject) {
+            var script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js';
+            script.async = true;
+            script.onload = function () {
+                if (global.jspdf && global.jspdf.jsPDF) {
+                    resolve(global.jspdf.jsPDF);
+                } else if (typeof global.jsPDF === 'function') {
+                    resolve(global.jsPDF);
+                } else {
+                    jsPdfLoading = null;
+                    reject(new Error('jsPDF loaded but API was not found.'));
+                }
+            };
+            script.onerror = function () {
+                jsPdfLoading = null;
+                reject(new Error('Could not load PDF library. Check your internet connection.'));
+            };
+            document.head.appendChild(script);
+        });
+        return jsPdfLoading;
+    }
+
+    function drawCenteredRoll(doc, text, boxX, boxY, boxW, boxH) {
+        var value = String(text || '').trim();
+        if (!value) {
+            return;
+        }
+        var fontSize = value.length > 24 ? 11 : (value.length > 20 ? 12 : 13);
+        doc.setFont('courier', 'bold');
+        doc.setFontSize(fontSize);
+        var textWidth = doc.getTextWidth(value);
+        while (textWidth > boxW - 4 && fontSize > 7) {
+            fontSize -= 0.5;
+            doc.setFontSize(fontSize);
+            textWidth = doc.getTextWidth(value);
+        }
+        var x = boxX + (boxW / 2);
+        var y = boxY + (boxH / 2) + (fontSize * 0.35);
+        doc.text(value, x, y, { align: 'center' });
+    }
+
+    function buildStickersPdf(JsPDF, rollNumbers, copies) {
+        var count = COPY_OPTIONS.indexOf(copies) >= 0 ? copies : 1;
+        var labelW = 50;
+        var labelH = 25;
+        var gap = 3;
+        var pageW = labelW + gap + labelW;
+        var pageH = labelH;
+        var doc = new JsPDF({
+            orientation: 'landscape',
+            unit: 'mm',
+            format: [pageW, pageH],
+            compress: true
+        });
+        var firstPage = true;
+
+        for (var i = 0; i < rollNumbers.length; i += 2) {
+            var left = rollNumbers[i];
+            var right = rollNumbers[i + 1] || '';
+            for (var c = 0; c < count; c++) {
+                if (!firstPage) {
+                    doc.addPage([pageW, pageH], 'landscape');
+                }
+                firstPage = false;
+
+                doc.setDrawColor(180);
+                doc.setLineWidth(0.2);
+                doc.roundedRect(0.4, 0.4, labelW - 0.8, labelH - 0.8, 1.5, 1.5, 'S');
+                drawCenteredRoll(doc, left, 0, 0, labelW, labelH);
+
+                if (right) {
+                    var rx = labelW + gap;
+                    doc.roundedRect(rx + 0.4, 0.4, labelW - 0.8, labelH - 0.8, 1.5, 1.5, 'S');
+                    drawCenteredRoll(doc, right, rx, 0, labelW, labelH);
+                }
+            }
+        }
+
+        return doc;
+    }
+
+    function downloadStickersPdf(rollNumbers, copies, buttons) {
+        var codes = (rollNumbers || []).map(function (v) {
+            return String(v || '').trim();
+        }).filter(Boolean);
+
+        if (!codes.length) {
+            showError('No student roll numbers found to download.');
+            return;
+        }
+
+        setBusy(buttons, true);
+        loadJsPdf()
+            .then(function (JsPDF) {
+                var doc = buildStickersPdf(JsPDF, codes, copies);
+                var stamp = new Date();
+                var name = 'roll-stickers-'
+                    + stamp.getFullYear()
+                    + String(stamp.getMonth() + 1).padStart(2, '0')
+                    + String(stamp.getDate()).padStart(2, '0')
+                    + '-' + codes.length + '.pdf';
+                doc.save(name);
+            })
+            .catch(function (err) {
+                showError((err && err.message) ? err.message : 'Could not create stickers PDF.');
+            })
+            .finally(function () {
+                setBusy(buttons, false);
+            });
+    }
+
+    function printRollNumbers(rollNumbers, copies, printerUid, buttons) {
         var client = global.ZebraBrowserPrintClient;
         if (!client) {
             showError('Roll-number print module failed to load.');
@@ -299,7 +600,7 @@
         }
 
         setBusy(buttons, true);
-        client.resolvePrinter()
+        client.resolvePrinter(printerUid)
             .then(function (printer) {
                 var zpl = buildPrintJobZpl(codes, copies);
                 return client.sendToDevice(printer, zpl).then(function () {
@@ -329,6 +630,35 @@
         root.setAttribute('data-barcode-bound', '1');
 
         var printAllBtn = root.querySelector('#btn-print-all-roll-numbers');
+        var downloadPdfBtn = root.querySelector('#btn-download-stickers-pdf');
+        var printerSelect = root.querySelector('#zebra-printer-select');
+        var refreshBtn = root.querySelector('#btn-refresh-zebra-printers');
+
+        if (printerSelect) {
+            printerSelect.addEventListener('change', function () {
+                rememberPrinterUid(printerSelect.value);
+            });
+        }
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', function () {
+                refreshPrinterList(root, null);
+            });
+        }
+
+        refreshPrinterList(root, null);
+
+        if (downloadPdfBtn) {
+            downloadPdfBtn.addEventListener('click', function (ev) {
+                ev.preventDefault();
+                var rolls = visibleRows(root).map(readRollFromRow).filter(Boolean);
+                if (!rolls.length) {
+                    showError('No visible student roll numbers to download.');
+                    return;
+                }
+                downloadStickersPdf(rolls, copiesFromUi(root), [downloadPdfBtn]);
+            });
+        }
+
         if (!printAllBtn) {
             return;
         }
@@ -354,6 +684,7 @@
     global.StudentBarcodeSticker = {
         buildPairLabelZpl: buildPairLabelZpl,
         buildPrintJobZpl: buildPrintJobZpl,
+        downloadStickersPdf: downloadStickersPdf,
         openPreview: openPreview,
         init: init
     };

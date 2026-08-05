@@ -228,6 +228,12 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
     min-width: 4.5rem;
 }
 
+.admission-barcode-toolbar #zebra-printer-select {
+    width: auto;
+    min-width: 12rem;
+    max-width: 18rem;
+}
+
 .admission-picker-table {
     min-width: 56rem;
 }
@@ -801,6 +807,11 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 
         <?php if ($entryCount > 0): ?>
         <div class="admission-barcode-toolbar" id="admission-barcode-toolbar">
+            <label for="zebra-printer-select">Printer</label>
+            <select id="zebra-printer-select" class="form-select form-select-sm" title="Select Zebra printer">
+                <option value="">Detecting printers…</option>
+            </select>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-refresh-zebra-printers" title="Refresh printer list"><i class="fas fa-sync-alt"></i></button>
             <label for="barcode-copies">Copies</label>
             <select id="barcode-copies" class="form-select form-select-sm" title="Number of stickers per roll number">
                 <option value="1" selected>1</option>
@@ -808,8 +819,9 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                 <option value="5">5</option>
                 <option value="10">10</option>
             </select>
-            <button type="button" class="btn btn-dark btn-sm" id="btn-print-all-roll-numbers" title="Preview then print all student roll-number stickers to Zebra ZD230"><i class="fas fa-eye me-1"></i> Preview &amp; Print Roll Numbers</button>
-            <span class="text-muted small">Preview first · 2 stickers parallel · landscape 50×25 mm · Zebra ZD230</span>
+            <button type="button" class="btn btn-dark btn-sm" id="btn-print-all-roll-numbers" title="Preview then print all student roll-number stickers to selected Zebra printer"><i class="fas fa-eye me-1"></i> Preview &amp; Print Roll Numbers</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="btn-download-stickers-pdf" title="Download roll-number stickers as PDF (2-up landscape)"><i class="fas fa-file-pdf me-1"></i> Stickers PDF</button>
+            <span class="text-muted small">Select printer · preview · PDF download · 2 stickers parallel · landscape 50×25 mm</span>
         </div>
         <?php endif; ?>
 
@@ -933,6 +945,11 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 
     <?php if ($entryCount > 0): ?>
     <div class="admission-barcode-toolbar" id="admission-barcode-toolbar">
+        <label for="zebra-printer-select">Printer</label>
+        <select id="zebra-printer-select" class="form-select form-select-sm" title="Select Zebra printer">
+            <option value="">Detecting printers…</option>
+        </select>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-refresh-zebra-printers" title="Refresh printer list"><i class="fas fa-sync-alt"></i></button>
         <label for="barcode-copies">Copies</label>
         <select id="barcode-copies" class="form-select form-select-sm" title="Number of stickers per roll number">
             <option value="1" selected>1</option>
@@ -940,8 +957,9 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
             <option value="5">5</option>
             <option value="10">10</option>
         </select>
-        <button type="button" class="btn btn-dark btn-sm" id="btn-print-all-roll-numbers" title="Preview then print all student roll-number stickers to Zebra ZD230"><i class="fas fa-eye me-1"></i> Preview &amp; Print Roll Numbers</button>
-        <span class="text-muted small">Preview first · 2 stickers parallel · landscape 50×25 mm · Zebra ZD230</span>
+        <button type="button" class="btn btn-dark btn-sm" id="btn-print-all-roll-numbers" title="Preview then print all student roll-number stickers to selected Zebra printer"><i class="fas fa-eye me-1"></i> Preview &amp; Print Roll Numbers</button>
+        <button type="button" class="btn btn-outline-dark btn-sm" id="btn-download-stickers-pdf" title="Download roll-number stickers as PDF (2-up landscape)"><i class="fas fa-file-pdf me-1"></i> Stickers PDF</button>
+        <span class="text-muted small">Select printer · preview · PDF download · 2 stickers parallel · landscape 50×25 mm</span>
     </div>
     <?php endif; ?>
 
