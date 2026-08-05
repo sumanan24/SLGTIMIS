@@ -204,6 +204,30 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 .admission-entries-table-readonly col.col-whatsapp { width: 9.5rem; }
 .admission-entries-table-readonly col.col-sent { width: 4rem; }
 
+.admission-barcode-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
+    padding: 0.55rem 0.85rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+}
+
+.admission-barcode-toolbar label {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #495057;
+}
+
+.admission-barcode-toolbar #barcode-copies {
+    width: auto;
+    min-width: 4.5rem;
+}
+
 .admission-picker-table {
     min-width: 56rem;
 }
@@ -775,6 +799,20 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
         ?></p>
         <?php endif; ?>
 
+        <?php if ($entryCount > 0): ?>
+        <div class="admission-barcode-toolbar" id="admission-barcode-toolbar">
+            <label for="barcode-copies">Copies</label>
+            <select id="barcode-copies" class="form-select form-select-sm" title="Number of stickers per roll number">
+                <option value="1" selected>1</option>
+                <option value="2">2</option>
+                <option value="5">5</option>
+                <option value="10">10</option>
+            </select>
+            <button type="button" class="btn btn-dark btn-sm" id="btn-print-all-roll-numbers" title="Preview then print all student roll-number stickers to Zebra ZD230"><i class="fas fa-eye me-1"></i> Preview &amp; Print Roll Numbers</button>
+            <span class="text-muted small">Preview first · 2 stickers parallel · landscape 50×25 mm · Zebra ZD230</span>
+        </div>
+        <?php endif; ?>
+
         <div class="admission-entries-table-wrap" id="admission-entries-table">
             <table class="table admission-entries-table mb-0">
                 <colgroup>
@@ -810,7 +848,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                         $waSent = !empty($row['whatsapp_sent']);
                         $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvinces);
                     ?>
-                    <tr class="admission-filter-row <?php echo trim(($waSent ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-dept-key="<?php echo $e($deptKey); ?>" data-name="<?php echo $e(mb_strtolower((string) ($row['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(mb_strtolower((string) ($row['student_nic'] ?? ''), 'UTF-8')); ?>">
+                    <tr class="admission-filter-row <?php echo trim(($waSent ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-dept-key="<?php echo $e($deptKey); ?>" data-enrollment="<?php echo $e($rollDisplay); ?>" data-name="<?php echo $e(mb_strtolower((string) ($row['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(mb_strtolower((string) ($row['student_nic'] ?? ''), 'UTF-8')); ?>">
                         <td class="col-no"><?php echo $i; ?></td>
                         <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
                         <td class="col-nic"><?php echo $e($row['student_nic'] ?? ''); ?></td>
@@ -869,7 +907,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
             <a href="<?php echo $e($attendanceSheetUrl); ?>" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener"><i class="fas fa-clipboard-list me-1"></i> Download attendance sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener"><i class="fas fa-id-card me-1"></i> Download admission cards<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <?php endif; ?>
-            <p class="toolbar-hint mb-0"><i class="fab fa-whatsapp text-success"></i> Use <strong>WhatsApp</strong> for links, <strong>Attendance sheet</strong> for hall signing, or <strong>Admission cards</strong> for postal mail.</p>
+            <p class="toolbar-hint mb-0"><i class="fab fa-whatsapp text-success"></i> Use <strong>WhatsApp</strong> for links, <strong>Attendance sheet</strong> for hall signing, <strong>Admission cards</strong> for postal mail, or <strong>Preview &amp; Print Roll Numbers</strong> for Zebra stickers.</p>
         </div>
     </form>
 
@@ -892,6 +930,20 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
     </div>
 
     <?php else: ?>
+
+    <?php if ($entryCount > 0): ?>
+    <div class="admission-barcode-toolbar" id="admission-barcode-toolbar">
+        <label for="barcode-copies">Copies</label>
+        <select id="barcode-copies" class="form-select form-select-sm" title="Number of stickers per roll number">
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="5">5</option>
+            <option value="10">10</option>
+        </select>
+        <button type="button" class="btn btn-dark btn-sm" id="btn-print-all-roll-numbers" title="Preview then print all student roll-number stickers to Zebra ZD230"><i class="fas fa-eye me-1"></i> Preview &amp; Print Roll Numbers</button>
+        <span class="text-muted small">Preview first · 2 stickers parallel · landscape 50×25 mm · Zebra ZD230</span>
+    </div>
+    <?php endif; ?>
 
     <div class="admission-entries-table-wrap">
         <table class="table admission-entries-table admission-entries-table-readonly mb-0">
@@ -931,7 +983,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                     }
                     $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvinces);
                 ?>
-                <tr class="admission-filter-row <?php echo trim((!empty($row['whatsapp_sent']) ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-name="<?php echo $e(mb_strtolower((string) ($row['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(mb_strtolower((string) ($row['student_nic'] ?? ''), 'UTF-8')); ?>">
+                <tr class="admission-filter-row <?php echo trim((!empty($row['whatsapp_sent']) ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-enrollment="<?php echo $e($rollOut); ?>" data-name="<?php echo $e(mb_strtolower((string) ($row['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(mb_strtolower((string) ($row['student_nic'] ?? ''), 'UTF-8')); ?>">
                     <td class="col-no"><?php echo $i; ?></td>
                     <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
                     <td class="col-nic"><?php echo $e($row['student_nic'] ?? ''); ?></td>
@@ -1188,4 +1240,8 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
     }
 })();
 </script>
+<?php endif; ?>
+<?php if ($entryCount > 0): ?>
+<script src="<?php echo htmlspecialchars(rtrim(APP_URL, '/') . '/assets/js/zebra-browser-print-client.js', ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(rtrim(APP_URL, '/') . '/assets/js/student-barcode-sticker.js', ENT_QUOTES, 'UTF-8'); ?>"></script>
 <?php endif; ?>

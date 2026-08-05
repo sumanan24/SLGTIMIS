@@ -11,27 +11,51 @@ $fmtTime = static function (?string $t): string {
     return $ts ? date('g:i A', $ts) : $t;
 };
 $isInterview = ($schedule['schedule_type'] ?? '') === 'interview';
-$docTitle = $isInterview ? 'Interview Attendance Sheet' : 'Entrance Examination Attendance Sheet';
+$docTitle = $isInterview ? 'INTERVIEW ATTENDANCE SHEET' : 'ENTRANCE EXAMINATION ATTENDANCE SHEET';
 $filterNote = trim((string) ($province_filter_label ?? ''));
-?>
-<table class="head-row">
-<tr>
-<td class="head-left" style="text-align:left;">
-<div class="inst">Sri Lanka German Training Institute</div>
-<div class="title"><?php echo $e($docTitle); ?></div>
-<div class="sub"><?php echo $e($schedule['title'] ?? ''); ?> — NVQ Level <?php echo $e($schedule['application_level'] ?? ''); ?><?php if (!empty($schedule['course_name'])): ?> — <?php echo $e($schedule['course_name']); ?><?php endif; ?></div>
-<div class="sub"><?php echo $e($fmtDate($schedule['schedule_date'] ?? null)); ?>
-<?php
+
+$title = trim((string) ($schedule['title'] ?? ''));
+$level = trim((string) ($schedule['application_level'] ?? ''));
+$course = trim((string) ($schedule['course_name'] ?? ''));
+$examLine = $title;
+if ($level !== '' && stripos($title, 'NVQ') === false && stripos($title, 'Level ' . $level) === false) {
+    $examLine .= ($examLine !== '' ? ' — ' : '') . 'NVQ Level ' . $level;
+}
+if ($course !== '' && ($title === '' || stripos($title, $course) === false)) {
+    $examLine .= ($examLine !== '' ? ' — ' : '') . $course;
+}
+
+$dateLine = $fmtDate($schedule['schedule_date'] ?? null);
 $st = $fmtTime($schedule['start_time'] ?? null);
 $et = $fmtTime($schedule['end_time'] ?? null);
-if ($st !== '') echo ' · ' . $e($st) . ($et !== '' ? ' – ' . $e($et) : '');
-?> · <?php echo $e($schedule['venue'] ?? ''); ?></div>
-<?php if ($filterNote !== ''): ?>
-<div class="sub">Province filter: <?php echo $e($filterNote); ?></div>
+$timeLine = $st !== '' ? ($st . ($et !== '' ? ' – ' . $et : '')) : '—';
+$venueLine = trim((string) ($schedule['venue'] ?? ''));
+if ($venueLine === '') {
+    $venueLine = '—';
+}
+$total = (int) count($entries ?? []);
+?>
+<table class="head-row" style="margin-bottom:10px;">
+<tr>
+<td style="border:none;text-align:center;vertical-align:top;">
+<?php if (!empty($logo_src)): ?>
+<img class="logo-img" src="<?php echo $e($logo_src); ?>" alt="SLGTI" style="display:block;margin:0 auto 6px auto;">
 <?php endif; ?>
-</td>
-<td class="head-right" style="text-align:right;">
-<?php if (!empty($logo_src)): ?><img class="logo-img" src="<?php echo $e($logo_src); ?>" alt="SLGTI"><?php endif; ?>
+<div class="inst" style="text-align:center;text-transform:uppercase;letter-spacing:0.04em;">Sri Lanka German Training Institute</div>
+<div class="title" style="text-align:center;margin-top:6px;text-transform:uppercase;letter-spacing:0.03em;"><?php echo $e($docTitle); ?></div>
+<?php if ($examLine !== ''): ?>
+<div class="sub" style="text-align:center;margin-top:8px;color:#0f172a;font-size:10.5px;font-weight:700;"><?php echo $e($examLine); ?></div>
+<?php endif; ?>
+<div class="sub" style="text-align:center;margin-top:6px;line-height:1.55;">
+<strong>Date:</strong> <?php echo $e($dateLine); ?>
+&nbsp;&nbsp;|&nbsp;&nbsp;
+<strong>Time:</strong> <?php echo $e($timeLine); ?>
+<br>
+<strong>Venue:</strong> <?php echo $e($venueLine); ?>
+<?php if ($filterNote !== ''): ?>
+<br><strong>Province:</strong> <?php echo $e($filterNote); ?>
+<?php endif; ?>
+</div>
 </td>
 </tr>
 </table>
@@ -52,10 +76,10 @@ if ($st !== '') echo ' · ' . $e($st) . ($et !== '' ? ' – ' . $e($et) : '');
 <?php else: ?>
 <?php $n = 0; foreach ($entries as $row): $n++; ?>
 <tr>
-<td><?php echo $n; ?></td>
-<td><?php echo $e($row['roll_number'] ?? '—'); ?></td>
-<td><?php echo $e($row['student_full_name'] ?? ''); ?></td>
-<td><?php echo $e($row['student_nic'] ?? ''); ?></td>
+<td style="text-align:center;"><?php echo $n; ?></td>
+<td style="text-align:center;"><?php echo $e($row['roll_number'] ?? '—'); ?></td>
+<td><?php echo $e(mb_strtoupper(trim((string) ($row['student_full_name'] ?? '')), 'UTF-8')); ?></td>
+<td style="text-align:center;"><?php echo $e($row['student_nic'] ?? ''); ?></td>
 <td class="sig">&nbsp;</td>
 <td class="sig">&nbsp;</td>
 </tr>
@@ -63,4 +87,20 @@ if ($st !== '') echo ' · ' . $e($st) . ($et !== '' ? ' – ' . $e($et) : '');
 <?php endif; ?>
 </tbody>
 </table>
-<p class="muted">Attendance is not stored in the system. This sheet is for manual use only. Total candidates: <?php echo (int) count($entries ?? []); ?>.</p>
+<p class="muted" style="margin:10px 0 0 0;">Total candidates: <?php echo $total; ?>. This sheet is for manual attendance use only.</p>
+<table style="width:100%;border-collapse:collapse;margin-top:28px;">
+<tr>
+<td style="width:34%;border:none;vertical-align:bottom;padding:0 12px 0 0;">
+<div style="height:36px;">&nbsp;</div>
+<div style="border-top:1px solid #111;padding-top:6px;font-size:9px;text-align:center;">Supervisor&apos;s name</div>
+</td>
+<td style="width:33%;border:none;vertical-align:bottom;padding:0 12px;">
+<div style="height:36px;">&nbsp;</div>
+<div style="border-top:1px solid #111;padding-top:6px;font-size:9px;text-align:center;">Supervisor&apos;s signature</div>
+</td>
+<td style="width:33%;border:none;vertical-align:bottom;padding:0 0 0 12px;">
+<div style="height:36px;">&nbsp;</div>
+<div style="border-top:1px solid #111;padding-top:6px;font-size:9px;text-align:center;">Date</div>
+</td>
+</tr>
+</table>
