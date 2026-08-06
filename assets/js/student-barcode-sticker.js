@@ -82,8 +82,8 @@
     }
 
     function fontForRollLines(lines) {
-        // Bold ~20px on 203 DPI sticker (~40 dots high).
-        return { h: 40, w: 28 };
+        // Bold ~18px on 203 DPI sticker (~36 dots high).
+        return { h: 36, w: 26 };
     }
 
     function cellTextZpl(x, rollNumber) {
@@ -323,10 +323,10 @@
             + '.roll-sticker-pair{display:flex;gap:10px;padding:8px;background:#e9ecef;border:1px dashed #adb5bd;border-radius:4px;}'
             + '.roll-sticker-card{width:200px;height:100px;border:1px solid #212529;border-radius:6px;background:#fff;padding:8px 10px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(0,0,0,.08);}'
             + '.roll-sticker-card.is-empty{border-style:dashed;background:#f8f9fa;opacity:.55;}'
-            + '.roll-sticker-card .roll{width:100%;font-size:20px;font-weight:900;font-family:Consolas,Monaco,monospace;line-height:1.2;text-align:center;letter-spacing:0.02em;}'
+            + '.roll-sticker-card .roll{width:100%;font-size:18px;font-weight:900;font-family:Consolas,Monaco,monospace;line-height:1.2;text-align:center;letter-spacing:0.02em;}'
             + '.roll-sticker-card .roll span{display:block;width:100%;}'
-            + '.roll-sticker-card .roll span.roll-line1{font-size:20px;font-weight:900;}'
-            + '.roll-sticker-card .roll span.roll-line2{font-size:20px;font-weight:900;margin-top:2px;}'
+            + '.roll-sticker-card .roll span.roll-line1{font-size:18px;font-weight:900;}'
+            + '.roll-sticker-card .roll span.roll-line2{font-size:18px;font-weight:900;margin-top:2px;}'
             + '.roll-sticker-preview-meta{font-size:.875rem;color:#495057;}'
             + '.roll-sticker-printer-row{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;margin-bottom:1rem;padding:.55rem .75rem;background:#fff;border:1px solid #dee2e6;border-radius:.375rem;}'
             + '.roll-sticker-printer-row label{margin:0;font-size:.8125rem;font-weight:600;}'
@@ -553,14 +553,14 @@
         if (!lines.length) {
             return;
         }
-        // Fixed bold font size 20px for both lines.
-        var fontSize = 20;
+        // Fixed bold font size 18px for both lines.
+        var fontSize = 18;
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(fontSize);
-        var lineH = 7.5;
+        var lineH = 6.8;
         var gap = 1.8;
         var blockH = (lineH * lines.length) + (gap * Math.max(0, lines.length - 1));
-        var startY = boxY + ((boxH - blockH) / 2) + 5.2;
+        var startY = boxY + ((boxH - blockH) / 2) + 4.8;
         var x = boxX + (boxW / 2);
         lines.forEach(function (line, idx) {
             doc.setFont('helvetica', 'bold');
