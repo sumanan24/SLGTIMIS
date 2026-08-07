@@ -680,6 +680,31 @@ class ApplicationAdmissionController extends Controller {
         if ($entries === []) {
             throw new RuntimeException('No applicants to include on the attendance sheet.');
         }
+        // Hall sheet must follow roll / index order (not course/province/name list order).
+        usort($entries, static function (array $a, array $b): int {
+            $rollA = trim((string) ($a['roll_number'] ?? ''));
+            $rollB = trim((string) ($b['roll_number'] ?? ''));
+            if ($rollA === '' && $rollB === '') {
+                return strcasecmp(
+                    (string) ($a['student_full_name'] ?? ''),
+                    (string) ($b['student_full_name'] ?? '')
+                );
+            }
+            if ($rollA === '') {
+                return 1;
+            }
+            if ($rollB === '') {
+                return -1;
+            }
+            $cmp = strnatcasecmp($rollA, $rollB);
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return strcasecmp(
+                (string) ($a['student_full_name'] ?? ''),
+                (string) ($b['student_full_name'] ?? '')
+            );
+        });
         require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
         $inner = ApplicationAdmissionPdfHelper::renderTemplate('attendance_sheet.php', [
             'schedule' => $schedule,

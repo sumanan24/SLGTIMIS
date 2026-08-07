@@ -641,7 +641,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
             <?php endif; ?>
             <a href="<?php echo APP_URL; ?>/application-admission/pdf-schedule?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>" class="btn btn-sm btn-outline-dark"><i class="fas fa-file-pdf me-1"></i> Schedule PDF</a>
             <?php if ($entryCount > 0): ?>
-            <a href="<?php echo $e($attendanceSheetUrl); ?>" class="btn btn-sm btn-outline-dark" target="_blank" rel="noopener" title="Download printable attendance sheet with signature columns"><i class="fas fa-clipboard-list me-1"></i> Attendance sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
+            <a href="<?php echo $e($attendanceSheetUrl); ?>" class="btn btn-sm btn-outline-dark" target="_blank" rel="noopener" title="Download printable attendance sheet in roll number order"><i class="fas fa-clipboard-list me-1"></i> Attendance sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" title="Download postal admission cards (name &amp; address on top)"><i class="fas fa-id-card me-1"></i> Admission cards<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <?php endif; ?>
             <?php if ($isInterview): ?>
@@ -916,7 +916,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
             <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i> Save applicants</button>
             <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-renumber-rolls"><i class="fas fa-sort-numeric-down me-1"></i> Renumber</button>
             <?php if ($entryCount > 0): ?>
-            <a href="<?php echo $e($attendanceSheetUrl); ?>" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener"><i class="fas fa-clipboard-list me-1"></i> Download attendance sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
+            <a href="<?php echo $e($attendanceSheetUrl); ?>" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener" title="Download printable attendance sheet in roll number order"><i class="fas fa-clipboard-list me-1"></i> Download attendance sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener"><i class="fas fa-id-card me-1"></i> Download admission cards<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <?php endif; ?>
             <p class="toolbar-hint mb-0"><i class="fab fa-whatsapp text-success"></i> Use <strong>WhatsApp</strong> for links, <strong>Attendance sheet</strong> for hall signing, <strong>Admission cards</strong> for postal mail, or <strong>Preview &amp; Print Roll Numbers</strong> for Zebra stickers.</p>
