@@ -98,8 +98,13 @@ class ApplicationAdmissionController extends Controller {
         if ($level !== '' && !in_array($level, ['04', '05'], true)) {
             $level = '';
         }
+        $venue = trim((string) $this->get('venue', ''));
 
-        $schedules = $model->listSchedules($tab, $level !== '' ? $level : null);
+        $schedules = $model->listSchedules(
+            $tab,
+            $level !== '' ? $level : null,
+            $venue !== '' ? $venue : null
+        );
         foreach ($schedules as &$s) {
             $s['entry_count'] = $model->countEntries((int) $s['schedule_id']);
             $s['public_url'] = APP_URL . '/application-admission/public/' . rawurlencode((string) $s['public_token']);
@@ -111,8 +116,175 @@ class ApplicationAdmissionController extends Controller {
             'schedules' => $schedules,
             'tab' => $tab,
             'levelFilter' => $level,
+            'venueFilter' => $venue,
+            'venueOptions' => $model->listDistinctVenues($tab),
             'canManage' => $userModel->canManageApplicationAdmissionSchedules($uid),
         ]);
+    }
+
+    /**
+     * Excel of participants for one schedule (?id=).
+     */
+    public function exportParticipants() {
+        $uid = $this->requireLogin();
+        $this->requireView($uid);
+        $model = $this->scheduleModel();
+
+        $scheduleId = (int) $this->get('id', 0);
+        if ($scheduleId < 1) {
+            $_SESSION['error'] = 'Invalid schedule.';
+            $this->redirect('application-admission');
+        }
+        $schedule = $model->findSchedule($scheduleId);
+        if (!$schedule) {
+            $_SESSION['error'] = 'Schedule not found.';
+            $this->redirect('application-admission');
+        }
+
+        $tab = (string) ($schedule['schedule_type'] ?? ApplicationAdmissionScheduleModel::TYPE_ENTRANCE);
+        $entries = $model->getParticipantsAcrossSchedules(null, null, null, $scheduleId);
+        if ($entries === []) {
+            $_SESSION['error'] = 'No participants found on this schedule.';
+            $this->redirect('application-admission?tab=' . rawurlencode($tab));
+        }
+
+        usort($entries, static function (array $a, array $b): int {
+            $rollA = trim((string) ($a['roll_number'] ?? ''));
+            $rollB = trim((string) ($b['roll_number'] ?? ''));
+            if ($rollA === '' && $rollB === '') {
+                return strcasecmp((string) ($a['student_full_name'] ?? ''), (string) ($b['student_full_name'] ?? ''));
+            }
+            if ($rollA === '') {
+                return 1;
+            }
+            if ($rollB === '') {
+                return -1;
+            }
+            $cmp = strnatcasecmp($rollA, $rollB);
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return strcasecmp((string) ($a['student_full_name'] ?? ''), (string) ($b['student_full_name'] ?? ''));
+        });
+
+        $typeLabel = $tab === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW ? 'Interview' : 'Entrance exam';
+        $rows = [];
+        $n = 0;
+        foreach ($entries as $row) {
+            $n++;
+            $rows[] = [
+                'no' => (string) $n,
+                'schedule_title' => (string) ($row['schedule_title'] ?? ''),
+                'schedule_type' => $typeLabel,
+                'schedule_date' => (string) ($row['schedule_date'] ?? ''),
+                'venue' => (string) ($row['venue'] ?? ''),
+                'roll_number' => (string) ($row['roll_number'] ?? ''),
+                'student_full_name' => (string) ($row['student_full_name'] ?? ''),
+                'student_nic' => (string) ($row['student_nic'] ?? ''),
+                'student_phone' => (string) ($row['student_phone'] ?? ''),
+                'student_whatsapp' => (string) ($row['student_whatsapp'] ?? ''),
+                'student_email' => (string) ($row['student_email'] ?? ''),
+                'student_province' => (string) ($row['student_province'] ?? ''),
+                'student_district' => (string) ($row['student_district'] ?? ''),
+                'department' => ApplicationAdmissionScheduleModel::departmentCodeFromEntry($row),
+                'course_name' => ApplicationAdmissionScheduleModel::courseNameFromEntry($row),
+                'application_level' => (string) ($row['application_level'] ?? $row['schedule_level'] ?? ''),
+                'application_status' => (string) ($row['application_status'] ?? ''),
+                'selection_status' => (string) ($row['selection_status'] ?? ''),
+                'room_or_panel' => (string) ($row['room_or_panel'] ?? ''),
+                'notes' => (string) ($row['notes'] ?? ''),
+            ];
+        }
+
+        $cols = [
+            'no', 'schedule_title', 'schedule_type', 'schedule_date', 'venue', 'roll_number',
+            'student_full_name', 'student_nic', 'student_phone', 'student_whatsapp', 'student_email',
+            'student_province', 'student_district', 'department', 'course_name', 'application_level',
+            'application_status', 'selection_status', 'room_or_panel', 'notes',
+        ];
+        $colLabels = [
+            'no' => 'No',
+            'schedule_title' => 'Schedule',
+            'schedule_type' => 'Type',
+            'schedule_date' => 'Date',
+            'venue' => 'Centre / Venue',
+            'roll_number' => 'Roll / Index',
+            'student_full_name' => 'Name',
+            'student_nic' => 'NIC',
+            'student_phone' => 'Phone',
+            'student_whatsapp' => 'WhatsApp',
+            'student_email' => 'Email',
+            'student_province' => 'Province',
+            'student_district' => 'District',
+            'department' => 'Dept',
+            'course_name' => 'Course (1st preference)',
+            'application_level' => 'NVQ Level',
+            'application_status' => 'Application status',
+            'selection_status' => 'Selection status',
+            'room_or_panel' => 'Room / Panel',
+            'notes' => 'Notes',
+        ];
+
+        $venue = trim((string) ($schedule['venue'] ?? ''));
+        $filterSummary = implode(' · ', array_filter([
+            $typeLabel . ' participants',
+            trim((string) ($schedule['title'] ?? '')),
+            $venue !== '' ? ('Centre: ' . $venue) : '',
+            count($rows) . ' participant(s)',
+        ]));
+
+        $autoload = BASE_PATH . '/vendor/autoload.php';
+        if (!is_readable($autoload) || !extension_loaded('zip') || !class_exists('ZipArchive', false)) {
+            $_SESSION['error'] = 'Excel export requires PhpSpreadsheet and the PHP zip extension.';
+            $this->redirect('application-admission?tab=' . rawurlencode($tab));
+        }
+        require_once $autoload;
+        require_once BASE_PATH . '/helpers/StudentApplicationExportXlsx.php';
+
+        try {
+            $spreadsheet = StudentApplicationExportXlsx::buildSpreadsheet(
+                $rows,
+                $cols,
+                $colLabels,
+                'Participants',
+                $filterSummary
+            );
+            $spreadsheet->getActiveSheet()->setCellValue('A1', 'SLGTI — Admission schedule participants');
+
+            $parts = ['admission_participants', 'schedule' . $scheduleId, date('Y-m-d_H-i')];
+            $filename = implode('_', $parts) . '.xlsx';
+
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $tmpPath = tempnam(sys_get_temp_dir(), 'slgti_adm_xlsx_');
+            if ($tmpPath === false) {
+                throw new RuntimeException('Could not create temp file for XLSX export.');
+            }
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save($tmpPath);
+            $size = filesize($tmpPath);
+            if ($size === false) {
+                @unlink($tmpPath);
+                throw new RuntimeException('XLSX temp file not readable after write.');
+            }
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
+            header('Cache-Control: private, max-age=0');
+            header('Content-Length: ' . (string) $size);
+            readfile($tmpPath);
+            @unlink($tmpPath);
+            $spreadsheet->disconnectWorksheets();
+            exit;
+        } catch (Throwable $e) {
+            if (isset($tmpPath) && is_string($tmpPath) && $tmpPath !== '') {
+                @unlink($tmpPath);
+            }
+            error_log('ApplicationAdmission exportParticipants: ' . $e->getMessage());
+            $_SESSION['error'] = 'Could not generate Excel file. Please try again.';
+            $this->redirect('application-admission?tab=' . rawurlencode($tab));
+        }
     }
 
     public function create() {

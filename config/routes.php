@@ -247,6 +247,7 @@ return [
     'application-admission/pdf-selection' => 'ApplicationAdmissionController@pdfSelection',
     'application-admission/admission-card' => 'ApplicationAdmissionController@admissionCard',
     'application-admission/admission-cards-bulk' => 'ApplicationAdmissionController@admissionCardsBulk',
+    'application-admission/export-participants' => 'ApplicationAdmissionController@exportParticipants',
     'application-admission/public/{token}' => 'ApplicationAdmissionController@publicLanding',
     'application-admission/public/{token}/schedule-pdf' => 'ApplicationAdmissionController@publicPdfSchedule',
     'application-admission/public/{token}/selection-pdf' => 'ApplicationAdmissionController@publicPdfSelection',

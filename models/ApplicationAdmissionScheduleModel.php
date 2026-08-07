@@ -719,9 +719,37 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
+     * Distinct exam / interview centres (venue) for filter dropdowns.
+     *
+     * @return list<string>
+     */
+    public function listDistinctVenues(?string $scheduleType = null): array {
+        $this->ensureTables();
+        $sql = "SELECT DISTINCT TRIM(`venue`) AS venue FROM `{$this->table}` WHERE TRIM(`venue`) <> ''";
+        $types = '';
+        $params = [];
+        if ($scheduleType !== null && in_array($scheduleType, [self::TYPE_ENTRANCE, self::TYPE_INTERVIEW], true)) {
+            $sql .= ' AND `schedule_type` = ?';
+            $types .= 's';
+            $params[] = $scheduleType;
+        }
+        $sql .= ' ORDER BY venue ASC';
+        $rows = $this->fetchAllPrepared($sql, $types, $params);
+        $out = [];
+        foreach ($rows as $row) {
+            $v = trim((string) ($row['venue'] ?? ''));
+            if ($v !== '') {
+                $out[] = $v;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
-    public function listSchedules(?string $scheduleType = null, ?string $level = null): array {
+    public function listSchedules(?string $scheduleType = null, ?string $level = null, ?string $venue = null): array {
         $this->ensureTables();
         $sql = "SELECT * FROM `{$this->table}` WHERE 1=1";
         $types = '';
@@ -736,9 +764,71 @@ class ApplicationAdmissionScheduleModel extends Model {
             $types .= 's';
             $params[] = $level;
         }
+        $venue = trim((string) ($venue ?? ''));
+        if ($venue !== '') {
+            $sql .= ' AND TRIM(`venue`) = ?';
+            $types .= 's';
+            $params[] = $venue;
+        }
         $sql .= ' ORDER BY `schedule_date` DESC, `schedule_id` DESC';
         $rows = $this->fetchAllPrepared($sql, $types, $params);
         return $this->attachCourseNames($rows);
+    }
+
+    /**
+     * Schedule participants (one row per entry) for Excel export.
+     * Pass $scheduleId to export one schedule; otherwise filter by type / level / venue.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getParticipantsAcrossSchedules(
+        ?string $scheduleType = null,
+        ?string $level = null,
+        ?string $venue = null,
+        ?int $scheduleId = null
+    ): array {
+        $this->ensureTables();
+        $this->migrateSchema();
+        $sql = 'SELECT e.`entry_id`, e.`schedule_id`, e.`application_id`, e.`roll_number`, e.`room_or_panel`,'
+            . ' e.`selection_status`, e.`notes`, e.`whatsapp_sent`,'
+            . ' s.`title` AS schedule_title, s.`schedule_type`, s.`schedule_date`, s.`start_time`, s.`end_time`,'
+            . ' s.`venue`, s.`application_level` AS schedule_level, s.`course_id` AS schedule_course_id,'
+            . ' sa.`student_full_name`, sa.`student_nic`, sa.`student_phone`, sa.`student_whatsapp`, sa.`student_email`,'
+            . ' sa.`student_address`, sa.`student_district`, sa.`student_province`, sa.`student_zip_code`,'
+            . ' sa.`course_priority_1`, sa.`course_priority_2`, sa.`course_priority_3`,'
+            . ' sa.`application_level`, sa.`status` AS application_status'
+            . ' FROM `application_admission_schedule_entry` e'
+            . ' INNER JOIN `application_admission_schedule` s ON s.`schedule_id` = e.`schedule_id`'
+            . ' INNER JOIN `student_applications` sa ON sa.`application_id` = e.`application_id`'
+            . ' WHERE 1=1';
+        $types = '';
+        $params = [];
+        if ($scheduleId !== null && $scheduleId > 0) {
+            $sql .= ' AND e.`schedule_id` = ?';
+            $types .= 'i';
+            $params[] = $scheduleId;
+        } else {
+            if ($scheduleType !== null && in_array($scheduleType, [self::TYPE_ENTRANCE, self::TYPE_INTERVIEW], true)) {
+                $sql .= ' AND s.`schedule_type` = ?';
+                $types .= 's';
+                $params[] = $scheduleType;
+            }
+            if ($level !== null && in_array($level, ['04', '05'], true)) {
+                $sql .= ' AND s.`application_level` = ?';
+                $types .= 's';
+                $params[] = $level;
+            }
+            $venue = trim((string) ($venue ?? ''));
+            if ($venue !== '') {
+                $sql .= ' AND TRIM(s.`venue`) = ?';
+                $types .= 's';
+                $params[] = $venue;
+            }
+        }
+        $sql .= ' ORDER BY s.`venue` ASC, s.`schedule_date` ASC, s.`schedule_id` ASC,'
+            . ' e.`roll_number` ASC, sa.`student_full_name` ASC';
+
+        return $this->fetchAllPrepared($sql, $types, $params);
     }
 
     /**

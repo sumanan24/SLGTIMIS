@@ -38,15 +38,31 @@ $typeLabel = $tab === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW ? 'Inter
         </li>
     </ul>
 
-    <form method="get" class="row g-2 align-items-end mb-3">
+    <?php
+    $venueFilter = (string) ($venueFilter ?? '');
+    $venueOptions = $venueOptions ?? [];
+    ?>
+    <form method="get" action="<?php echo APP_URL; ?>/application-admission" class="row g-2 align-items-end mb-3">
         <input type="hidden" name="tab" value="<?php echo $e($tab); ?>">
         <div class="col-auto">
             <label class="form-label small mb-0">NVQ level</label>
-            <select name="level" class="form-select form-select-sm" onchange="this.form.submit()">
+            <select name="level" class="form-select form-select-sm">
                 <option value="">All</option>
                 <option value="04" <?php echo ($levelFilter ?? '') === '04' ? 'selected' : ''; ?>>Level 04</option>
                 <option value="05" <?php echo ($levelFilter ?? '') === '05' ? 'selected' : ''; ?>>Level 05</option>
             </select>
+        </div>
+        <div class="col-auto" style="min-width:14rem;">
+            <label class="form-label small mb-0">Centre / Venue</label>
+            <select name="venue" class="form-select form-select-sm">
+                <option value="">All centres</option>
+                <?php foreach ($venueOptions as $venueOpt): ?>
+                <option value="<?php echo $e($venueOpt); ?>" <?php echo $venueFilter === $venueOpt ? 'selected' : ''; ?>><?php echo $e($venueOpt); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-filter me-1"></i> Apply</button>
         </div>
     </form>
 
@@ -101,6 +117,7 @@ $typeLabel = $tab === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW ? 'Inter
                         <a href="<?php echo APP_URL; ?>/application-admission/selection?id=<?php echo (int) $s['schedule_id']; ?>" class="btn btn-sm btn-outline-info" title="Exam results"><i class="fas fa-clipboard-check"></i></a>
                         <?php endif; ?>
                         <a href="<?php echo APP_URL; ?>/application-admission/pdf-schedule?id=<?php echo (int) $s['schedule_id']; ?>" class="btn btn-sm btn-outline-dark" title="PDF"><i class="fas fa-file-pdf"></i></a>
+                        <a href="<?php echo APP_URL; ?>/application-admission/export-participants?id=<?php echo (int) $s['schedule_id']; ?>" class="btn btn-sm btn-outline-success" title="Download participants Excel"><i class="fas fa-file-excel"></i></a>
                         <?php if (!empty($s['is_published'])): ?>
                         <a href="<?php echo $e($s['public_url'] ?? '#'); ?>" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" title="Public link"><i class="fas fa-link"></i></a>
                         <?php endif; ?>
