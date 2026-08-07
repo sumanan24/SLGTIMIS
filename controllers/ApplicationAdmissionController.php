@@ -233,16 +233,64 @@ class ApplicationAdmissionController extends Controller {
             $venue !== '' ? ('Centre: ' . $venue) : '',
             count($rows) . ' participant(s)',
         ]));
+        $baseName = 'admission_participants_schedule' . $scheduleId . '_' . date('Y-m-d_H-i');
 
+        // Excel-readable HTML table (.xls) — always works without Zip/PhpSpreadsheet.
+        $xlsFallback = static function () use ($rows, $cols, $colLabels, $baseName, $filterSummary): void {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $baseName) . '.xls"');
+            header('Cache-Control: private, max-age=0');
+            echo "\xEF\xBB\xBF";
+            $esc = static function (string $s): string {
+                return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+            };
+            echo '<table border="1">' . "\n";
+            echo '<tr><td colspan="' . count($cols) . '"><b>SLGTI — Admission schedule participants</b></td></tr>' . "\n";
+            echo '<tr><td colspan="' . count($cols) . '">' . $esc($filterSummary) . '</td></tr>' . "\n";
+            echo '<tr><td colspan="' . count($cols) . '">Exported: ' . $esc(date('Y-m-d H:i')) . '</td></tr>' . "\n";
+            echo '<thead><tr>';
+            foreach ($cols as $h) {
+                $label = $colLabels[$h] ?? $h;
+                echo '<th style="background:#1F4E79;color:#fff;font-weight:bold;padding:6px;">' . $esc((string) $label) . '</th>';
+            }
+            echo "</tr></thead>\n<tbody>\n";
+            foreach ($rows as $row) {
+                echo '<tr>';
+                foreach ($cols as $colName) {
+                    $v = isset($row[$colName]) ? (string) $row[$colName] : '';
+                    $v = str_replace(["\r\n", "\r", "\n"], ' | ', $v);
+                    echo '<td style="mso-number-format:\'\@\';">' . $esc($v) . '</td>';
+                }
+                echo "</tr>\n";
+            }
+            echo "</tbody></table>";
+            exit;
+        };
+
+        $needs = [
+            extension_loaded('zip') && class_exists('ZipArchive', false),
+            extension_loaded('xmlwriter'),
+            extension_loaded('dom'),
+            extension_loaded('simplexml'),
+            extension_loaded('xml'),
+            extension_loaded('mbstring') && function_exists('mb_strlen'),
+            extension_loaded('iconv') && function_exists('iconv'),
+        ];
         $autoload = BASE_PATH . '/vendor/autoload.php';
-        if (!is_readable($autoload) || !extension_loaded('zip') || !class_exists('ZipArchive', false)) {
-            $_SESSION['error'] = 'Excel export requires PhpSpreadsheet and the PHP zip extension.';
-            $this->redirect('application-admission?tab=' . rawurlencode($tab));
+        if (!is_readable($autoload) || in_array(false, $needs, true)) {
+            $xlsFallback();
         }
-        require_once $autoload;
-        require_once BASE_PATH . '/helpers/StudentApplicationExportXlsx.php';
 
         try {
+            require_once $autoload;
+            require_once BASE_PATH . '/helpers/StudentApplicationExportXlsx.php';
+            if (!class_exists(\PhpOffice\PhpSpreadsheet\Spreadsheet::class)) {
+                $xlsFallback();
+            }
+
             $spreadsheet = StudentApplicationExportXlsx::buildSpreadsheet(
                 $rows,
                 $cols,
@@ -251,9 +299,6 @@ class ApplicationAdmissionController extends Controller {
                 $filterSummary
             );
             $spreadsheet->getActiveSheet()->setCellValue('A1', 'SLGTI — Admission schedule participants');
-
-            $parts = ['admission_participants', 'schedule' . $scheduleId, date('Y-m-d_H-i')];
-            $filename = implode('_', $parts) . '.xlsx';
 
             while (ob_get_level() > 0) {
                 ob_end_clean();
@@ -265,12 +310,12 @@ class ApplicationAdmissionController extends Controller {
             $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
             $writer->save($tmpPath);
             $size = filesize($tmpPath);
-            if ($size === false) {
+            if ($size === false || $size < 1) {
                 @unlink($tmpPath);
                 throw new RuntimeException('XLSX temp file not readable after write.');
             }
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $baseName) . '.xlsx"');
             header('Cache-Control: private, max-age=0');
             header('Content-Length: ' . (string) $size);
             readfile($tmpPath);
@@ -282,8 +327,7 @@ class ApplicationAdmissionController extends Controller {
                 @unlink($tmpPath);
             }
             error_log('ApplicationAdmission exportParticipants: ' . $e->getMessage());
-            $_SESSION['error'] = 'Could not generate Excel file. Please try again.';
-            $this->redirect('application-admission?tab=' . rawurlencode($tab));
+            $xlsFallback();
         }
     }
 
