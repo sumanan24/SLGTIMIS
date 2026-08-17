@@ -15,6 +15,19 @@ final class StudentIdCardHelper
     {
         self::ensureComposerAutoload();
 
+        if (PHP_VERSION_ID >= 80000) {
+            try {
+                return self::qrPngDataUriEndroid($text, $size, $margin);
+            } catch (\Throwable $e) {
+                // Fall back to Bacon/GD.
+            }
+        }
+
+        return self::qrPngDataUriBaconGd($text, $size, $margin);
+    }
+
+    private static function qrPngDataUriEndroid(string $text, int $size, int $margin): string
+    {
         $qr = \Endroid\QrCode\QrCode::create($text)
             ->setSize($size)
             ->setMargin($margin);
@@ -22,6 +35,71 @@ final class StudentIdCardHelper
         $writer = new \Endroid\QrCode\Writer\PngWriter();
         $result = $writer->write($qr);
         $png = $result->getString();
+
+        return 'data:image/png;base64,' . base64_encode($png);
+    }
+
+    private static function qrPngDataUriBaconGd(string $text, int $size, int $margin): string
+    {
+        if (!extension_loaded('gd')) {
+            throw new \RuntimeException('GD extension is required to generate QR code images.');
+        }
+
+        $encoded = \BaconQrCode\Encoder\Encoder::encode(
+            $text,
+            \BaconQrCode\Common\ErrorCorrectionLevel::L(),
+            'UTF-8'
+        );
+        $matrix = $encoded->getMatrix();
+        $blockCount = $matrix->getWidth();
+
+        $size = max(40, $size);
+        $margin = max(0, $margin);
+        $inner = max($blockCount, $size - ($margin * 2));
+        $blockSize = max(1, (int) floor($inner / $blockCount));
+        $qrPixels = $blockCount * $blockSize;
+        $total = $qrPixels + ($margin * 2);
+
+        $img = imagecreatetruecolor($total, $total);
+        if ($img === false) {
+            throw new \RuntimeException('Could not create QR image.');
+        }
+
+        $white = imagecolorallocate($img, 255, 255, 255);
+        $black = imagecolorallocate($img, 0, 0, 0);
+        imagefill($img, 0, 0, $white);
+
+        for ($y = 0; $y < $blockCount; $y++) {
+            for ($x = 0; $x < $blockCount; $x++) {
+                if ($matrix->get($x, $y) !== 1) {
+                    continue;
+                }
+                imagefilledrectangle(
+                    $img,
+                    $margin + ($x * $blockSize),
+                    $margin + ($y * $blockSize),
+                    $margin + (($x + 1) * $blockSize) - 1,
+                    $margin + (($y + 1) * $blockSize) - 1,
+                    $black
+                );
+            }
+        }
+
+        if ($total !== $size) {
+            $scaled = imagecreatetruecolor($size, $size);
+            if ($scaled === false) {
+                imagedestroy($img);
+                throw new \RuntimeException('Could not scale QR image.');
+            }
+            imagecopyresampled($scaled, $img, 0, 0, 0, 0, $size, $size, $total, $total);
+            imagedestroy($img);
+            $img = $scaled;
+        }
+
+        ob_start();
+        imagepng($img);
+        $png = (string) ob_get_clean();
+        imagedestroy($img);
 
         return 'data:image/png;base64,' . base64_encode($png);
     }
