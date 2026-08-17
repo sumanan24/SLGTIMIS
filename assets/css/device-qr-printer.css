@@ -109,7 +109,21 @@
     font-size: 0.7rem;
 }
 
-.zebra-bp-spinner {
+.zebra-bp-ready-details {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.15rem 0.75rem;
+}
+.zebra-bp-ready-details dt {
+    color: #6c757d;
+    font-weight: 600;
+    margin: 0;
+}
+.zebra-bp-ready-details dd {
+    margin: 0;
+    color: #212529;
+}
+
     display: inline-block;
     width: 0.85rem;
     height: 0.85rem;

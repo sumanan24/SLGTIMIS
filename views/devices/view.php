@@ -27,6 +27,13 @@ $aa = $activeAssignment ?? null;
         </div>
     </div>
     <?php require BASE_PATH . '/views/devices/_nav.php'; ?>
+    <?php if (!empty($canPrintQr)): ?>
+    <div id="device-page-zebra-status" class="zebra-bp-status-card mb-3" aria-live="polite">
+        <div class="status-head"><span class="zebra-bp-spinner"></span><span class="status-dot checking"></span><span>Connecting to Zebra Browser Print…</span></div>
+        <p class="status-meta mb-2">Checking your existing Windows ZD230 printer…</p>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="device-page-zebra-retry"><i class="fas fa-sync-alt me-1"></i> Refresh</button>
+    </div>
+    <?php endif; ?>
     <?php if (!empty($_SESSION['success'])): ?><div class="alert alert-success"><?php echo $e($_SESSION['success']); unset($_SESSION['success']); ?></div><?php endif; ?>
 
     <div class="row g-3">
@@ -136,6 +143,7 @@ $aa = $activeAssignment ?? null;
     </div>
 </div>
 <?php if (!empty($canPrintQr)): ?>
+<link rel="stylesheet" href="<?php echo htmlspecialchars(rtrim(APP_URL, '/') . '/assets/css/device-qr-printer.css', ENT_QUOTES, 'UTF-8'); ?>">
 <?php require BASE_PATH . '/views/devices/partials/qr_print_modal.php'; ?>
 <script src="<?php echo htmlspecialchars(rtrim(APP_URL, '/') . '/assets/js/BrowserPrint-3.0.216.min.js', ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(rtrim(APP_URL, '/') . '/assets/js/zebra-browser-print-client.js', ENT_QUOTES, 'UTF-8'); ?>"></script>

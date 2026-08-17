@@ -110,40 +110,37 @@
         }
     }
 
-    function renderStatusCard(conn, selectedPrinter) {
-        var card = document.getElementById('zebra-bp-status-card');
+    function renderStatusCard(conn, selectedPrinter, cardId) {
+        var card = document.getElementById(cardId || 'zebra-bp-status-card');
         if (!card) {
             return;
         }
         var st = conn ? conn.state : STATE().CHECKING;
-        var title = 'Connecting to Zebra Browser Print…';
-        var meta = 'Please wait while we connect to the printer on this computer.';
-
-        if (st === STATE().READY && selectedPrinter) {
-            title = selectedPrinter.name + ' Connected';
-            meta = 'Connection: ' + escapeHtml(selectedPrinter.connection || 'USB') + ' · Status: Ready';
-        } else if (st === STATE().SSL_SETUP_REQUIRED) {
-            title = 'Secure Printer Connection Required';
-            meta = 'Chrome must trust the local Browser Print certificate before printing.';
-        } else if (st === STATE().HOST_AUTHORIZATION_REQUIRED) {
-            title = 'Website Authorization Required';
-            meta = 'Allow ' + escapeHtml(siteHost()) + ' in Zebra Browser Print Accepted Hosts.';
-        } else if (st === STATE().SERVICE_UNAVAILABLE) {
-            title = 'Zebra Browser Print is not running';
-            meta = 'Install and start Browser Print on this Windows computer.';
-        } else if (st === STATE().NO_PRINTERS) {
-            title = 'Zebra Printer Not Detected';
-            meta = 'Check USB cable, power, and Browser Print printer selection.';
-        } else if (conn && conn.message) {
-            title = conn.message;
-        }
+        var title = (conn && conn.title) ? conn.title : 'Connecting to Zebra Browser Print…';
+        var meta = (conn && conn.message) ? conn.message : 'Checking connection to your local Zebra printer…';
 
         var spinner = st === STATE().CHECKING ? '<span class="zebra-bp-spinner"></span>' : '';
-        card.innerHTML = ''
+        var html = ''
             + '<div class="status-head">' + spinner
             + '<span class="status-dot ' + statusDotClass(st) + '"></span>'
             + '<span>' + escapeHtml(title) + '</span></div>'
-            + '<p class="status-meta">' + meta + '</p>';
+            + '<p class="status-meta">' + escapeHtml(meta) + '</p>';
+
+        if (st === STATE().READY && selectedPrinter) {
+            html += ''
+                + '<dl class="zebra-bp-ready-details small mb-0 mt-2">'
+                + '<dt>Printer</dt><dd>' + escapeHtml(selectedPrinter.name) + '</dd>'
+                + '<dt>Connection</dt><dd>' + escapeHtml(selectedPrinter.connection || 'USB') + '</dd>'
+                + '<dt>Status</dt><dd>Ready</dd>'
+                + '<dt>Browser Print</dt><dd>Connected</dd>'
+                + '</dl>';
+        }
+
+        card.innerHTML = html;
+    }
+
+    function renderPageStatus(conn, selectedPrinter) {
+        renderStatusCard(conn, selectedPrinter, 'device-page-zebra-status');
     }
 
     function renderWizard(conn) {
@@ -164,49 +161,48 @@
 
         if (conn.state === STATE().SSL_SETUP_REQUIRED) {
             html = ''
-                + '<h6>Secure Printer Connection Required</h6>'
-                + '<div class="wizard-step"><span class="wizard-step-num">1</span><span>Open Browser Print SSL setup and accept the certificate.</span></div>'
-                + '<div class="wizard-step"><span class="wizard-step-num">2</span><span>When prompted, allow <strong>' + escapeHtml(host) + '</strong> as an Accepted Host.</span></div>'
-                + '<div class="wizard-step"><span class="wizard-step-num">3</span><span>Return here and click <strong>Refresh Printers</strong>.</span></div>'
+                + '<h6>Zebra Printer Connection Requires Setup</h6>'
+                + '<p class="small mb-2">Your Zebra ZD230 is already installed in Windows. Chrome needs a one-time permission to connect this website to Zebra Browser Print.</p>'
+                + '<div class="wizard-step"><span class="wizard-step-num">1</span><span>Click <strong>Open SSL Setup</strong> below.</span></div>'
+                + '<div class="wizard-step"><span class="wizard-step-num">2</span><span>Accept the Browser Print certificate.</span></div>'
+                + '<div class="wizard-step"><span class="wizard-step-num">3</span><span>Allow <strong>' + escapeHtml(host) + '</strong> as an Accepted Host when prompted.</span></div>'
+                + '<div class="wizard-step"><span class="wizard-step-num">4</span><span>Return here and click <strong>Refresh Printers</strong>.</span></div>'
                 + '<div class="wizard-actions">'
                 + '<button type="button" class="btn btn-primary btn-sm" id="zebra-bp-open-ssl"><i class="fas fa-shield-alt me-1"></i> Open SSL Setup</button>'
-                + '<button type="button" class="btn btn-outline-secondary btn-sm" id="zebra-bp-retry"><i class="fas fa-sync-alt me-1"></i> Retry Connection</button>'
+                + '<button type="button" class="btn btn-outline-secondary btn-sm" id="zebra-bp-retry"><i class="fas fa-sync-alt me-1"></i> Refresh Printers</button>'
                 + '</div>';
         } else if (conn.state === STATE().HOST_AUTHORIZATION_REQUIRED) {
             html = ''
-                + '<h6>Zebra Printer Setup Required</h6>'
-                + '<p class="small mb-2">Your computer has Zebra Browser Print, but this website has not yet been authorized.</p>'
+                + '<h6>Website Authorization Required</h6>'
+                + '<p class="small mb-2">Browser Print is running on this laptop, but <strong>' + escapeHtml(host) + '</strong> has not been authorized yet.</p>'
                 + '<div class="wizard-step"><span class="wizard-step-num">1</span><span>Open Browser Print SSL setup.</span></div>'
-                + '<div class="wizard-step"><span class="wizard-step-num">2</span><span>Accept the Browser Print certificate.</span></div>'
-                + '<div class="wizard-step"><span class="wizard-step-num">3</span><span>When Browser Print asks for an accepted host, allow <strong>' + escapeHtml(host) + '</strong>.</span></div>'
-                + '<div class="wizard-step"><span class="wizard-step-num">4</span><span>Click <strong>Refresh Printers</strong>.</span></div>'
+                + '<div class="wizard-step"><span class="wizard-step-num">2</span><span>When asked, allow <strong>' + escapeHtml(host) + '</strong> as an Accepted Host.</span></div>'
+                + '<div class="wizard-step"><span class="wizard-step-num">3</span><span>Click <strong>Refresh Printers</strong>.</span></div>'
                 + '<div class="wizard-actions">'
-                + '<button type="button" class="btn btn-primary btn-sm" id="zebra-bp-open-ssl"><i class="fas fa-external-link-alt me-1"></i> Open Browser Print SSL Setup</button>'
+                + '<button type="button" class="btn btn-primary btn-sm" id="zebra-bp-open-ssl"><i class="fas fa-external-link-alt me-1"></i> Open Browser Print Setup</button>'
                 + '<button type="button" class="btn btn-outline-secondary btn-sm" id="zebra-bp-retry"><i class="fas fa-sync-alt me-1"></i> Refresh Printers</button>'
                 + '</div>';
         } else if (conn.state === STATE().SERVICE_UNAVAILABLE) {
             html = ''
-                + '<h6>Zebra Browser Print is not running</h6>'
-                + '<p class="small mb-2">Please install and start Zebra Browser Print on this Windows computer.</p>'
-                + '<ol class="small ps-3 mb-2">'
-                + '<li>Download and install Zebra Browser Print.</li>'
-                + '<li>Connect the ZD230 via USB.</li>'
-                + '<li>Start Browser Print from the system tray.</li>'
-                + '<li>Click Retry Connection below.</li>'
-                + '</ol>'
+                + '<h6>Browser Print Not Running</h6>'
+                + '<p class="small mb-2">Start Zebra Browser Print on this laptop. Your Zebra ZD230 is already installed in Windows — no new printer setup is needed.</p>'
+                + '<ul class="small ps-3 mb-2">'
+                + '<li>Look for the Zebra icon in the system tray (bottom-right).</li>'
+                + '<li>If not running, start <strong>Zebra Browser Print</strong> from the Start menu.</li>'
+                + '<li>Click <strong>Retry Connection</strong> below.</li>'
+                + '</ul>'
                 + '<div class="wizard-actions">'
                 + '<button type="button" class="btn btn-primary btn-sm" id="zebra-bp-retry"><i class="fas fa-sync-alt me-1"></i> Retry Connection</button>'
-                + '<a class="btn btn-outline-info btn-sm" href="https://www.zebra.com/us/en/support-downloads/software/printer-software/browser-print.html" target="_blank" rel="noopener"><i class="fas fa-book me-1"></i> Printer Setup Guide</a>'
                 + '</div>';
         } else if (conn.state === STATE().NO_PRINTERS) {
             html = ''
-                + '<h6>Zebra Printer Not Detected</h6>'
+                + '<h6>Zebra ZD230 Not Found</h6>'
+                + '<p class="small mb-2">Browser Print is connected, but your existing ZD230 was not detected. Please verify:</p>'
                 + '<ul class="small ps-3 mb-2">'
-                + '<li>ZD230 powered ON</li>'
-                + '<li>USB cable connected</li>'
-                + '<li>Zebra Browser Print running</li>'
-                + '<li>Printer selected in Browser Print Settings</li>'
-                + '<li>Windows driver installed</li>'
+                + '<li>ZD230 is powered ON</li>'
+                + '<li>USB cable is connected</li>'
+                + '<li>Printer appears in <strong>Windows Settings → Printers &amp; scanners</strong></li>'
+                + '<li>Printer is selected in Browser Print → Settings (Broadcast + Driver search)</li>'
                 + '</ul>'
                 + '<div class="wizard-actions">'
                 + '<button type="button" class="btn btn-primary btn-sm" id="zebra-bp-retry"><i class="fas fa-sync-alt me-1"></i> Refresh Printers</button>'
@@ -345,8 +341,9 @@
         if (refreshBtn) {
             refreshBtn.disabled = true;
         }
-        connection = { state: STATE().CHECKING, message: 'Connecting…' };
+        connection = { state: STATE().CHECKING, message: 'Checking connection…' };
         renderStatusCard(connection, null);
+        renderPageStatus(connection, null);
         renderWizard(null);
         updatePrintButton(null, selectEl);
 
@@ -360,6 +357,7 @@
                 cachedPrinters = conn.printers || [];
                 var selected = fillPrinterSelect(selectEl, cachedPrinters, rememberedPrinterUid());
                 renderStatusCard(conn, selected);
+                renderPageStatus(conn, selected);
                 renderWizard(conn);
                 renderPrinterList(cachedPrinters, selectEl ? selectEl.value : '');
                 renderDiagnostics();
@@ -367,12 +365,17 @@
                 return cachedPrinters;
             })
             .catch(function () {
-                connection = { state: STATE().SERVICE_UNAVAILABLE, message: client.userMessage(STATE().SERVICE_UNAVAILABLE) };
+                connection = {
+                    state: STATE().SERVICE_UNAVAILABLE,
+                    title: client.userTitle(STATE().SERVICE_UNAVAILABLE),
+                    message: client.userMessage(STATE().SERVICE_UNAVAILABLE)
+                };
                 cachedPrinters = [];
                 if (selectEl) {
                     selectEl.innerHTML = '<option value="">Browser Print unavailable</option>';
                 }
                 renderStatusCard(connection, null);
+                renderPageStatus(connection, null);
                 renderWizard(connection);
                 updatePrintButton(connection, selectEl);
                 return [];
@@ -632,16 +635,29 @@
         });
 
         global.addEventListener('focus', function () {
-            if (modalEl.classList.contains('show') && connection
+            var needsRecheck = connection
                 && (connection.state === STATE().SSL_SETUP_REQUIRED
-                    || connection.state === STATE().HOST_AUTHORIZATION_REQUIRED)) {
+                    || connection.state === STATE().HOST_AUTHORIZATION_REQUIRED);
+            if (needsRecheck) {
                 refreshConnection(false);
             }
         });
+
+        var pageRetry = document.getElementById('device-page-zebra-retry');
+        if (pageRetry) {
+            pageRetry.addEventListener('click', function () {
+                refreshConnection(true);
+            });
+        }
     }
 
     function init() {
+        printData = readPrintData();
+        ensurePreviewStyles();
         bindModal();
+        if (document.getElementById('device-page-zebra-status')) {
+            refreshConnection(true);
+        }
     }
 
     global.DeviceQrSticker = { init: init, refreshConnection: refreshConnection };

@@ -69,7 +69,7 @@ $printPayload = [
                         <i class="fas fa-sync-alt me-1"></i> Refresh Printers
                     </button>
                     <button type="button" class="btn btn-outline-info btn-sm" id="device-qr-chrome-setup">
-                        <i class="fas fa-shield-alt me-1"></i> Set up Chrome
+                        <i class="fas fa-shield-alt me-1"></i> Open SSL Setup
                     </button>
                     <button type="button" class="btn btn-outline-primary btn-sm" id="device-qr-test-print" disabled>
                         <i class="fas fa-vial me-1"></i> Test Print

@@ -420,6 +420,7 @@
                 defaultPrinter: null,
                 preferredModel: preferredModel,
                 message: userMessage(state),
+                title: userTitle(state),
                 serviceReachable: false,
                 sslBlocked: httpsBlocked,
                 acceptedHost: false,
@@ -442,6 +443,7 @@
                 defaultPrinter: null,
                 preferredModel: preferredModel,
                 message: userMessage(STATE.HOST_AUTHORIZATION_REQUIRED),
+                title: userTitle(STATE.HOST_AUTHORIZATION_REQUIRED),
                 serviceReachable: true,
                 sslBlocked: false,
                 acceptedHost: false,
@@ -461,6 +463,7 @@
                 defaultPrinter: best.defaultPrinter,
                 preferredModel: preferredModel,
                 message: userMessage(STATE.NO_PRINTERS),
+                title: userTitle(STATE.NO_PRINTERS),
                 serviceReachable: true,
                 sslBlocked: false,
                 acceptedHost: accepted !== false,
@@ -477,6 +480,7 @@
             defaultPrinter: best.defaultPrinter || selected,
             preferredModel: preferredModel,
             message: userMessage(STATE.READY),
+            title: userTitle(STATE.READY),
             serviceReachable: true,
             sslBlocked: false,
             acceptedHost: accepted !== false,
@@ -484,26 +488,49 @@
         };
     }
 
+    function userTitle(state) {
+        switch (state) {
+            case STATE.READY:
+                return 'Zebra Printer Connected';
+            case STATE.SERVICE_UNAVAILABLE:
+                return 'Browser Print Not Running';
+            case STATE.SSL_SETUP_REQUIRED:
+                return 'Zebra Printer Connection Requires Setup';
+            case STATE.HOST_AUTHORIZATION_REQUIRED:
+                return 'Website Authorization Required';
+            case STATE.NO_PRINTERS:
+                return 'Zebra ZD230 Not Found';
+            case STATE.PRINTING:
+                return 'Printing…';
+            case STATE.PRINT_SUCCESS:
+                return 'Print Successful';
+            case STATE.PRINT_FAILED:
+                return 'Print Failed';
+            default:
+                return 'Connecting to Zebra Browser Print…';
+        }
+    }
+
     function userMessage(state) {
         switch (state) {
             case STATE.READY:
-                return 'Printer ready';
+                return 'Your existing Windows ZD230 is ready to print.';
             case STATE.SERVICE_UNAVAILABLE:
-                return 'Zebra Browser Print is not running on this computer.';
+                return 'Start Zebra Browser Print on this laptop (system tray icon), then click Retry.';
             case STATE.SSL_SETUP_REQUIRED:
-                return 'Secure printer connection required — trust the Browser Print certificate.';
+                return 'Chrome needs permission to communicate with Zebra Browser Print on this computer. This is a one-time setup — your printer is already installed in Windows.';
             case STATE.HOST_AUTHORIZATION_REQUIRED:
-                return 'This website must be authorized in Zebra Browser Print.';
+                return 'Allow ' + siteHostname() + ' in Zebra Browser Print when prompted, then click Refresh Printers.';
             case STATE.NO_PRINTERS:
-                return 'No Zebra printer detected on this computer.';
+                return 'Browser Print is connected, but your ZD230 was not found. Check that it appears in Windows Settings → Printers & scanners and is selected in Browser Print Settings.';
             case STATE.PRINTING:
-                return 'Printing label…';
+                return 'Sending label to printer…';
             case STATE.PRINT_SUCCESS:
                 return 'Label sent successfully.';
             case STATE.PRINT_FAILED:
                 return 'Print failed.';
             default:
-                return 'Connecting to Zebra Browser Print…';
+                return 'Checking connection to your local Zebra printer…';
         }
     }
 
@@ -648,9 +675,9 @@
         return '^XA'
             + '^PW406^LL203^LH0,0^CI28'
             + '^FO20,20^A0N,28,24^FDSLGTI SIS^FS'
-            + '^FO20,55^A0N,22,18^FDZEBRA PRINTER TEST^FS'
-            + '^FO20,85^A0N,20,16^FDDevice ID: ' + deviceId + '^FS'
-            + '^FO20,110^A0N,20,16^FDPrinter: ' + printerName + '^FS'
+            + '^FO20,55^A0N,22,18^FDZEBRA ZD230^FS'
+            + '^FO20,80^A0N,20,16^FDPRINTER TEST^FS'
+            + '^FO20,105^A0N,20,16^FDDevice ID: ' + deviceId + '^FS'
             + '^FO20,135^A0N,20,16^FDConnection: ' + connection + '^FS'
             + '^FO20,160^A0N,18,14^FD' + stamp + '^FS'
             + '^FO20,185^A0N,18,14^FDStatus: TEST PRINT^FS'
@@ -666,15 +693,17 @@
         return printZpl(device, zpl);
     }
 
+    function findZD230(printers, preferredModel) {
+        return pickBestPrinter(printers || cachedRawDevices, preferredModel || 'Zebra ZD230', null);
+    }
+
     function getChromeSetupSteps() {
-        var host = siteHostname() || 'this site';
+        var host = siteHostname() || 'sis.slgti.ac.lk';
         return [
-            'Install Zebra Browser Print on this Windows PC.',
-            'Connect the ZD230 via USB and turn it on.',
-            'In Browser Print → Settings, enable Broadcast search and Driver search, then select your printer.',
-            'Open ' + sslSupportUrl() + ' and accept the Browser Print certificate.',
-            'When prompted, allow ' + host + ' as an Accepted Host.',
-            'Return here and click Refresh Printers.'
+            'Your Zebra ZD230 is already installed in Windows — no new printer setup is needed.',
+            'Open the SSL setup page and accept the Browser Print certificate.',
+            'When Browser Print asks, allow ' + host + ' as an Accepted Host.',
+            'Return to this page and click Refresh Printers.'
         ];
     }
 
@@ -697,15 +726,22 @@
     var service = {
         STATE: STATE,
         userMessage: userMessage,
+        userTitle: userTitle,
         sslSupportUrl: sslSupportUrl,
         getChromeSetupSteps: getChromeSetupSteps,
+        connect: connectBrowserPrint,
+        checkConnection: connectBrowserPrint,
         connectBrowserPrint: connectBrowserPrint,
         connectWithRetry: connectWithRetry,
         discoverPrinters: discoverPrinters,
+        findZD230: findZD230,
         selectConfiguredPrinter: selectConfiguredPrinter,
+        selectPrinter: selectConfiguredPrinter,
+        getPrinterStatus: getLastConnection,
         resolvePrinter: resolvePrinter,
         sendToDevice: sendToDevice,
         printZpl: printZpl,
+        printZPL: printZpl,
         testPrint: testPrint,
         buildTestPrintZpl: buildTestPrintZpl,
         printerMatchScore: printerMatchScore,
@@ -718,7 +754,7 @@
         getLocalPrinters: discoverPrinters,
         getDefaultDevice: function (options) {
             return connectBrowserPrint(options).then(function (c) {
-                return c.selectedPrinter || c.defaultPrinter || (c.printers[0] || null);
+                return c.selectedPrinter || c.defaultPrinter || findZD230(c.printers, options && options.preferredModel) || (c.printers[0] || null);
             });
         },
         getLastProbe: getLastConnection,
