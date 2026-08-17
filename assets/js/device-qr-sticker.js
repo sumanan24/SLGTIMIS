@@ -1,12 +1,21 @@
 /**
- * Device QR sticker printing for Zebra ZD230 — 2-up identical labels (same pattern as admission roll stickers).
+ * Device QR sticker printing — Zebra ZD230 via Browser Print (client-side only).
  */
 (function (global, document) {
     'use strict';
 
     var STORAGE_KEY = 'slgti_zebra_printer_uid';
     var cachedPrinters = [];
+    var printerProbe = null;
     var printData = null;
+
+    var STATUS = {
+        LOADING: 'loading',
+        READY: 'ready',
+        SERVICE_UNAVAILABLE: 'service_unavailable',
+        SSL_SETUP_REQUIRED: 'ssl_setup_required',
+        NO_PRINTERS: 'no_printers'
+    };
 
     function escapeHtml(value) {
         return String(value == null ? '' : value)
@@ -55,86 +64,142 @@
         }
     }
 
-    function printerOptionLabel(printer) {
-        var name = printer.name || 'Printer';
-        var conn = printer.connection ? (' · ' + printer.connection) : '';
-        var tag = '';
-        if (printer.source === 'pc') {
-            tag = ' [PC]';
-        } else if (printer.source === 'zebra') {
-            tag = ' [Zebra]';
+    function configuredModel() {
+        return (printData && printData.printerModel) ? printData.printerModel : 'Zebra ZD230';
+    }
+
+    function printerOptionLabel(printer, isSelected) {
+        var name = printer.name || 'Zebra Printer';
+        if (isSelected) {
+            return name + ' — Connected';
         }
-        return name + conn + tag;
+        return name;
     }
 
-    function isPcPrinterUid(uid) {
-        return String(uid || '').indexOf('pc:') === 0;
+    function statusIcon(status) {
+        switch (status) {
+            case STATUS.READY:
+                return '🟢';
+            case STATUS.SSL_SETUP_REQUIRED:
+                return '🟠';
+            case STATUS.NO_PRINTERS:
+                return '🔴';
+            case STATUS.SERVICE_UNAVAILABLE:
+                return '🟡';
+            default:
+                return '⚪';
+        }
     }
 
-    function pcPrinterNameFromUid(uid) {
-        return decodeURIComponent(String(uid || '').slice(3));
+    function statusLine(probe, selectedPrinter) {
+        if (!probe) {
+            return statusIcon(STATUS.LOADING) + ' Detecting printers…';
+        }
+        var icon = statusIcon(probe.status);
+        if (probe.status === STATUS.READY && selectedPrinter) {
+            return icon + ' ' + escapeHtml(selectedPrinter.name) + ' connected and ready';
+        }
+        return icon + ' ' + escapeHtml(probe.message || 'Detecting printers…');
     }
 
-    function renderSetupHelp(show) {
+    function updatePrintButton(probe, selectEl) {
+        var printBtn = document.getElementById('device-qr-confirm-print');
+        if (!printBtn) {
+            return;
+        }
+        var ready = probe
+            && probe.status === STATUS.READY
+            && selectEl
+            && String(selectEl.value || '') !== '';
+        printBtn.disabled = !ready;
+        printBtn.title = ready
+            ? 'Send ZPL to the selected Zebra printer'
+            : 'Select a detected Zebra printer first';
+    }
+
+    function renderSetupHelp(probe) {
         var box = document.getElementById('device-qr-printer-setup');
         var client = global.ZebraBrowserPrintClient;
         if (!box) {
             return;
         }
-        if (!show) {
+        if (!probe || probe.status === STATUS.READY) {
             box.classList.add('d-none');
             box.innerHTML = '';
             return;
         }
+
+        var sslUrl = client && client.sslSupportUrl
+            ? client.sslSupportUrl()
+            : 'https://localhost:9101/ssl_support';
         var steps = client && client.getChromeSetupSteps
             ? client.getChromeSetupSteps()
-            : ['Install Zebra Browser Print on this PC and click Load printers.'];
-        var sslUrl = client && client.sslSupportUrl ? client.sslSupportUrl() : 'https://localhost:9101/ssl_support';
-        var html = '<strong>No printer detected on this computer.</strong> Chrome on '
-            + (global.location && global.location.protocol === 'https:' ? 'HTTPS' : 'HTTP')
-            + ' needs Zebra Browser Print running locally:<ol class="mb-2 ps-3">';
-        steps.forEach(function (step) {
-            html += '<li>' + escapeHtml(step) + '</li>';
-        });
-        html += '</ol><a class="alert-link" href="' + escapeHtml(sslUrl) + '" target="_blank" rel="noopener">Open certificate setup (' + escapeHtml(sslUrl) + ')</a>'
-            + ' · Or use <strong>PDF</strong> / <strong>ZPL file</strong> below.';
+            : ['Install Zebra Browser Print on this PC and click Refresh Printers.'];
+
+        var title = 'Zebra Browser Print is not running on this computer.';
+        if (probe.status === STATUS.SSL_SETUP_REQUIRED) {
+            title = 'SSL certificate requires setup before Chrome can reach Browser Print.';
+        } else if (probe.status === STATUS.NO_PRINTERS) {
+            title = 'Browser Print is running, but no Zebra printer was detected.';
+        }
+
+        var html = '<strong>' + escapeHtml(title) + '</strong>';
+        if (probe.status !== STATUS.NO_PRINTERS) {
+            html += '<ol class="mb-2 ps-3 mt-2">';
+            steps.forEach(function (step) {
+                html += '<li>' + escapeHtml(step) + '</li>';
+            });
+            html += '</ol>';
+        } else {
+            html += '<ul class="mb-2 ps-3 mt-2">';
+            html += '<li>Check the ZD230 USB cable and power.</li>';
+            html += '<li>In Browser Print → Settings, enable Broadcast search and Driver search.</li>';
+            html += '<li>Select your ZDesigner ZD230 printer, then click Refresh Printers.</li>';
+            html += '</ul>';
+        }
+        html += '<a class="alert-link" href="' + escapeHtml(sslUrl) + '" target="_blank" rel="noopener">Open certificate setup</a>'
+            + ' · You can still use <strong>PDF</strong>, <strong>ZPL file</strong>, or <strong>Full preview</strong>.';
         box.innerHTML = html;
         box.classList.remove('d-none');
     }
 
     function fillPrinterSelect(selectEl, printers, preferredUid) {
         if (!selectEl) {
-            return;
+            return null;
         }
         if (!printers.length) {
-            selectEl.innerHTML = '<option value="">No printer found</option>';
-            return;
+            selectEl.innerHTML = '<option value="">— No Zebra printer detected —</option>';
+            return null;
         }
+
+        var client = global.ZebraBrowserPrintClient;
         var preferred = preferredUid || rememberedPrinterUid() || '';
+        var best = client && client.pickBestPrinter
+            ? client.pickBestPrinter(printers, configuredModel(), preferred)
+            : printers[0];
+        var bestUid = best ? String(best.uid || '') : '';
+
         var html = '';
-        var matched = false;
         printers.forEach(function (p, idx) {
             var uid = String(p.uid || ('printer-' + idx));
             var selected = preferred && uid === preferred;
-            if (selected) {
-                matched = true;
+            if (!preferred && uid === bestUid) {
+                selected = true;
             }
             html += '<option value="' + escapeHtml(uid) + '"' + (selected ? ' selected' : '') + '>'
-                + escapeHtml(printerOptionLabel(p)) + '</option>';
+                + escapeHtml(printerOptionLabel(p, selected)) + '</option>';
         });
         selectEl.innerHTML = html;
-        if (!matched && selectEl.options.length) {
-            var preferIdx = -1;
-            for (var j = 0; j < selectEl.options.length; j++) {
-                var label = (selectEl.options[j].text || '').toLowerCase();
-                if (label.indexOf('zdesigner') !== -1 || label.indexOf('zd230') !== -1 || label.indexOf('zebra') !== -1) {
-                    preferIdx = j;
-                    break;
-                }
+
+        var selectedPrinter = null;
+        for (var i = 0; i < printers.length; i++) {
+            if (String(printers[i].uid || '') === String(selectEl.value || '')) {
+                selectedPrinter = printers[i];
+                break;
             }
-            selectEl.selectedIndex = preferIdx >= 0 ? preferIdx : 0;
         }
         rememberPrinterUid(selectEl.value);
+        return selectedPrinter;
     }
 
     function refreshPrinterList(statusEl) {
@@ -145,60 +210,52 @@
             if (selectEl) {
                 selectEl.innerHTML = '<option value="">Print module missing</option>';
             }
+            if (statusEl) {
+                statusEl.textContent = 'Print module failed to load.';
+            }
+            updatePrintButton(null, selectEl);
             return Promise.resolve([]);
         }
+
         if (selectEl) {
-            selectEl.innerHTML = '<option value="">Loading printers…</option>';
+            selectEl.innerHTML = '<option value="">Detecting printers…</option>';
         }
         if (refreshBtn) {
             refreshBtn.disabled = true;
         }
         if (statusEl) {
-            statusEl.textContent = 'Loading printers from this PC…';
+            statusEl.innerHTML = statusIcon(STATUS.LOADING) + ' Detecting printers on this computer…';
         }
+        updatePrintButton(null, selectEl);
 
-        var discover = client.discoverAllPrinters
-            ? client.discoverAllPrinters({ pcPrintersUrl: printData && printData.printersUrl })
-            : client.getLocalPrinters();
-
-        return discover
-            .then(function (list) {
-                cachedPrinters = list || [];
-                var ctx = cachedPrinters._context || {};
-                fillPrinterSelect(selectEl, cachedPrinters, rememberedPrinterUid());
-                if (!cachedPrinters.length) {
-                    renderSetupHelp(true);
-                    if (statusEl) {
-                        statusEl.textContent = ctx.serverPrintAvailable
-                            ? 'No local printers found. Use Zebra Browser Print on this PC (see steps below).'
-                            : 'No printers found on this PC. Install Zebra Browser Print and click Set up Chrome.';
-                    }
-                } else {
-                    renderSetupHelp(false);
-                    if (statusEl) {
-                        var pcCount = cachedPrinters.filter(function (p) {
-                            return p.source === 'pc' || p.source === 'zebra+pc';
-                        }).length;
-                        var zebraCount = cachedPrinters.filter(function (p) {
-                            return p.source === 'zebra' || p.source === 'zebra+pc';
-                        }).length;
-                        statusEl.textContent = cachedPrinters.length + ' printer(s) on this PC'
-                            + (zebraCount ? (' · ' + zebraCount + ' via Browser Print') : '')
-                            + (pcCount ? (' · ' + pcCount + ' from server Windows') : '')
-                            + '. Select ZDesigner ZD230 if listed.';
-                    }
+        return client.probeBrowserPrint({ preferredModel: configuredModel() })
+            .then(function (probe) {
+                printerProbe = probe;
+                cachedPrinters = probe.printers || [];
+                var selected = fillPrinterSelect(selectEl, cachedPrinters, rememberedPrinterUid());
+                renderSetupHelp(probe);
+                if (statusEl) {
+                    statusEl.innerHTML = statusLine(probe, selected);
                 }
+                updatePrintButton(probe, selectEl);
                 return cachedPrinters;
             })
             .catch(function (err) {
+                printerProbe = {
+                    status: STATUS.SERVICE_UNAVAILABLE,
+                    printers: [],
+                    message: (err && err.message) ? err.message : 'Could not reach Zebra Browser Print.'
+                };
                 cachedPrinters = [];
-                renderSetupHelp(true);
                 if (selectEl) {
-                    selectEl.innerHTML = '<option value="">Could not load printers</option>';
+                    selectEl.innerHTML = '<option value="">Browser Print unavailable</option>';
                 }
+                renderSetupHelp(printerProbe);
                 if (statusEl) {
-                    statusEl.textContent = (err && err.message) ? err.message : 'Could not load printer list.';
+                    statusEl.innerHTML = statusIcon(STATUS.SERVICE_UNAVAILABLE) + ' '
+                        + escapeHtml(printerProbe.message);
                 }
+                updatePrintButton(printerProbe, selectEl);
                 return [];
             })
             .finally(function () {
@@ -224,9 +281,10 @@
             + '.device-qr-sticker-card .qr-text .asset-no{font-size:15px;font-weight:600;color:#666;line-height:1.15;}'
             + '.device-qr-sticker-card .qr-text .serial-no{font-size:15px;font-weight:800;line-height:1.15;word-break:break-all;color:#111;}'
             + '.device-qr-preview-meta{font-size:.875rem;color:#495057;}'
-            + '.device-qr-printer-row{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;margin-bottom:1rem;padding:.55rem .75rem;background:#fff;border:1px solid #dee2e6;border-radius:.375rem;}'
+            + '.device-qr-printer-row{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;margin-bottom:.5rem;padding:.55rem .75rem;background:#fff;border:1px solid #dee2e6;border-radius:.375rem;}'
             + '.device-qr-printer-row label{margin:0;font-size:.8125rem;font-weight:600;}'
-            + '.device-qr-printer-row select{min-width:14rem;max-width:100%;}'
+            + '.device-qr-printer-row select{min-width:16rem;max-width:100%;}'
+            + '.device-qr-printer-status{display:block;width:100%;font-size:.8125rem;margin-top:.25rem;}'
             + '#deviceQrPrintModal .modal-body{max-height:70vh;overflow:auto;background:#f1f3f5;}';
     }
 
@@ -264,7 +322,7 @@
                 + ' · <strong>' + totalStickers + '</strong> sticker(s) total'
                 + ' · <strong>' + perSet + '</strong> identical QR labels side-by-side per set'
                 + ' · Asset No. + Serial Number beside QR'
-                + '<br><span class="text-muted">Left and right stickers use the same device QR.</span>';
+                + '<br><span class="text-muted">Both stickers use the same QR linking to this device page.</span>';
         }
     }
 
@@ -272,7 +330,7 @@
         var url = (printData.zplUrl || '') + '?id=' + encodeURIComponent(printData.deviceId) + '&sets=' + encodeURIComponent(sets);
         return fetch(url, { credentials: 'same-origin' }).then(function (res) {
             if (!res.ok) {
-                throw new Error('Could not load ZPL (HTTP ' + res.status + ').');
+                throw new Error('Could not generate label data (HTTP ' + res.status + ').');
             }
             return res.text();
         });
@@ -286,83 +344,58 @@
         });
     }
 
+    function showUserMessage(message) {
+        window.alert(message);
+    }
+
     function printToZebra(buttons) {
         var client = global.ZebraBrowserPrintClient;
         if (!client) {
-            window.alert('Zebra print module failed to load.');
+            showUserMessage('Zebra print module failed to load. Refresh the page and try again.');
             return;
         }
+
         var selectEl = document.getElementById('device-qr-printer-select');
         var printerUid = selectEl ? String(selectEl.value || '') : '';
         if (!printerUid) {
-            window.alert('Select a printer before printing.');
+            if (printerProbe && printerProbe.status === STATUS.SSL_SETUP_REQUIRED) {
+                showUserMessage('SSL certificate requires setup. Click Set up Chrome, then Refresh Printers.');
+            } else if (printerProbe && printerProbe.status === STATUS.SERVICE_UNAVAILABLE) {
+                showUserMessage('Zebra Browser Print is not running on this computer. Install and start Browser Print, then click Refresh Printers.');
+            } else if (printerProbe && printerProbe.status === STATUS.NO_PRINTERS) {
+                showUserMessage('No Zebra printer detected. Check the USB connection and Browser Print settings.');
+            } else {
+                showUserMessage('Select a Zebra printer before printing.');
+            }
             return;
         }
+
         var sets = setsFromUi();
+        var perSet = printData.labelsPerSet || 2;
         rememberPrinterUid(printerUid);
         setBusy(buttons, true);
 
-        if (isPcPrinterUid(printerUid)) {
-            var printerName = pcPrinterNameFromUid(printerUid);
-            var serverUrl = printData && printData.serverPrintUrl;
-            if (!serverUrl) {
-                window.alert('Server print URL is not configured.');
-                setBusy(buttons, false);
-                return;
-            }
-            var body = new URLSearchParams();
-            body.set('printer', printerName);
-            body.set('device_id', String(printData.deviceId || ''));
-            body.set('sets', String(sets));
-            fetch(serverUrl, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-                body: body.toString()
-            })
-                .then(function (res) { return res.json(); })
-                .then(function (data) {
-                    if (!data || !data.ok) {
-                        throw new Error((data && data.error) ? data.error : 'Print failed.');
-                    }
-                    var perSet = printData.labelsPerSet || 2;
-                    window.alert(
-                        'Sent ' + sets + ' set(s) (' + (sets * perSet) + ' stickers) to ' + printerName + '.'
-                    );
-                    var modalEl = document.getElementById('deviceQrPrintModal');
-                    if (modalEl && global.bootstrap && global.bootstrap.Modal) {
-                        var inst = global.bootstrap.Modal.getInstance(modalEl);
-                        if (inst) {
-                            inst.hide();
-                        }
-                    }
-                })
-                .catch(function (err) {
-                    window.alert((err && err.message) ? err.message : 'Print failed.');
-                })
-                .finally(function () {
-                    setBusy(buttons, false);
-                });
-            return;
+        var statusEl = document.getElementById('device-qr-printer-status');
+        if (statusEl) {
+            statusEl.innerHTML = statusIcon(STATUS.LOADING) + ' Sending labels to printer…';
         }
 
         fetchZpl(sets)
             .then(function (zpl) {
-                var zebraOnly = (cachedPrinters || []).filter(function (p) {
-                    return p.source !== 'pc' && String(p.uid || '').indexOf('pc:') !== 0;
-                });
-                return client.resolvePrinter(printerUid, zebraOnly).then(function (printer) {
-                    return client.sendToDevice(printer, zpl).then(function () {
-                        return printer;
+                return client.resolvePrinter(printerUid, cachedPrinters, configuredModel())
+                    .then(function (printer) {
+                        return client.sendToDevice(printer, zpl).then(function () {
+                            return printer;
+                        });
                     });
-                });
             })
             .then(function (printer) {
-                var perSet = printData.labelsPerSet || 2;
-                var label = (printer && printer.name) ? printer.name : 'Zebra printer';
-                window.alert(
-                    'Sent ' + sets + ' set(s) (' + (sets * perSet) + ' identical stickers) to ' + label + '.'
-                );
+                var label = (printer && printer.name) ? printer.name : configuredModel();
+                var totalLabels = sets * perSet;
+                if (statusEl) {
+                    statusEl.innerHTML = statusIcon(STATUS.READY) + ' ' + escapeHtml(label) + ' connected and ready';
+                }
+                showUserMessage(totalLabels + ' QR label(s) sent successfully to ' + label + '.');
                 var modalEl = document.getElementById('deviceQrPrintModal');
                 if (modalEl && global.bootstrap && global.bootstrap.Modal) {
                     var inst = global.bootstrap.Modal.getInstance(modalEl);
@@ -372,10 +405,15 @@
                 }
             })
             .catch(function (err) {
-                window.alert((err && err.message) ? err.message : 'Print failed.');
+                var msg = (err && err.message) ? err.message : 'Print failed.';
+                if (statusEl && printerProbe) {
+                    statusEl.innerHTML = statusLine(printerProbe, null);
+                }
+                showUserMessage(msg);
             })
             .finally(function () {
                 setBusy(buttons, false);
+                updatePrintButton(printerProbe, selectEl);
             });
     }
 
@@ -394,7 +432,7 @@
                 setTimeout(function () { URL.revokeObjectURL(a.href); }, 500);
             })
             .catch(function (err) {
-                window.alert((err && err.message) ? err.message : 'Could not download ZPL.');
+                showUserMessage((err && err.message) ? err.message : 'Could not download ZPL file.');
             })
             .finally(function () {
                 setBusy(buttons, false);
@@ -431,7 +469,6 @@
                     ? client.sslSupportUrl()
                     : 'https://localhost:9101/ssl_support';
                 global.open(url, '_blank', 'noopener');
-                renderSetupHelp(true);
             });
         }
 
@@ -439,20 +476,32 @@
         if (printerSelect) {
             printerSelect.addEventListener('change', function () {
                 rememberPrinterUid(printerSelect.value);
+                var selected = null;
+                for (var i = 0; i < cachedPrinters.length; i++) {
+                    if (String(cachedPrinters[i].uid || '') === String(printerSelect.value || '')) {
+                        selected = cachedPrinters[i];
+                        break;
+                    }
+                }
+                var statusEl = document.getElementById('device-qr-printer-status');
+                if (statusEl && printerProbe) {
+                    statusEl.innerHTML = statusLine(printerProbe, selected);
+                }
+                updatePrintButton(printerProbe, printerSelect);
             });
         }
 
         var printBtn = document.getElementById('device-qr-confirm-print');
         if (printBtn) {
             printBtn.addEventListener('click', function () {
-                printToZebra([printBtn, document.getElementById('device-qr-download-zpl')]);
+                printToZebra([printBtn]);
             });
         }
 
         var zplBtn = document.getElementById('device-qr-download-zpl');
         if (zplBtn) {
             zplBtn.addEventListener('click', function () {
-                downloadZpl([zplBtn, printBtn]);
+                downloadZpl([zplBtn]);
             });
         }
 

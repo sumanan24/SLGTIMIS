@@ -225,7 +225,7 @@ class DeviceController extends Controller {
             $_SESSION['error'] = 'Device not found.';
             $this->redirect('devices');
         }
-        $qrUri = DeviceAssetHelper::qrPngDataUri((string) $device['qr_token'], 260);
+        $qrUri = DeviceAssetHelper::qrPngDataUriForDevice($device, 260);
 
         return $this->view('devices/view', array_merge($this->baseViewData($uid, $um), [
             'page' => 'devices',
@@ -236,7 +236,7 @@ class DeviceController extends Controller {
             'activeAssignment' => $model->getActiveAssignment($id),
             'conditionHistory' => $model->getConditionHistory($id),
             'qrDataUri' => $qrUri,
-            'qrUrl' => DeviceAssetHelper::qrScanUrl((string) $device['qr_token']),
+            'qrUrl' => DeviceAssetHelper::qrContentUrl($device),
             'fullDetail' => $um->canManageDevices($uid),
             'labelPrinterConfig' => DeviceAssetHelper::labelConfig(),
             'defaultLabelSets' => DeviceAssetHelper::defaultLabelSets(),
@@ -339,8 +339,8 @@ class DeviceController extends Controller {
             'use_label_print_layout' => true,
             'title' => 'Device QR — ' . ($device['asset_id'] ?? ''),
             'device' => $device,
-            'qrDataUri' => DeviceAssetHelper::qrPngDataUri($token),
-            'qrUrl' => DeviceAssetHelper::qrScanUrl($token),
+            'qrDataUri' => DeviceAssetHelper::qrPngDataUriForDevice($device),
+            'qrUrl' => DeviceAssetHelper::qrContentUrl($device),
             'labelCopies' => DeviceAssetHelper::labelsPerSet(),
             'labelSets' => $sets,
             'labelConfig' => DeviceAssetHelper::labelConfig(),
@@ -368,7 +368,7 @@ class DeviceController extends Controller {
         }
         $token = (string) $device['qr_token'];
         $sets = $this->parseLabelSets();
-        $qrDataUri = DeviceAssetHelper::qrPngDataUri($token, 220);
+        $qrDataUri = DeviceAssetHelper::qrPngDataUriForDevice($device, 220);
         $html = DeviceAssetHelper::renderQrLabelPdfHtml($device, $qrDataUri, $sets);
         $model->logAudit($id, $uid, 'qr_pdf_download', null, [
             'asset_id' => $device['asset_id'] ?? '',

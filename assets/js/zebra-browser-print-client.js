@@ -1,43 +1,45 @@
 /**
- * Client for Zebra Browser Print (localhost ports 9100 / 9101).
- * Tries multiple localhost URLs for Chrome on HTTPS production sites.
+ * Zebra Browser Print client — local service only (ports 9100 / 9101).
+ * Browser → Browser Print → USB/network Zebra printer. No server-side USB access.
  */
 (function (global) {
     'use strict';
 
     var DEFAULT_TIMEOUT_MS = 10000;
     var cachedBaseUrl = null;
-    var sdkLoadPromise = null;
+    var cachedRawDevices = [];
+    var lastProbe = null;
 
-    var UNAVAILABLE_MSG =
-        'Zebra Browser Print is not running on this computer. Install it, connect the ZD230 via USB, then click "Set up Chrome" below.';
+    /** @typedef {'ready'|'service_unavailable'|'ssl_setup_required'|'no_printers'|'loading'} ProbeStatus */
 
-    var SDK_SCRIPT_PATHS = [
-        '/browserprint/BrowserPrint-3.1.250.min.js',
-        '/browserprint/BrowserPrint-3.0.216.min.js',
-        '/browserprint/BrowserPrint.min.js',
-        '/BrowserPrint.js'
-    ];
+    var STATUS = {
+        LOADING: 'loading',
+        READY: 'ready',
+        SERVICE_UNAVAILABLE: 'service_unavailable',
+        SSL_SETUP_REQUIRED: 'ssl_setup_required',
+        NO_PRINTERS: 'no_printers'
+    };
+
+    var ZEBRA_NAME_RE = /zd230|zdesigner|zebra/i;
 
     function isHttpsPage() {
         return !!(global.location && global.location.protocol === 'https:');
     }
 
     function serviceBaseCandidates() {
-        var bases = [
-            'https://127.0.0.1:9101',
-            'https://localhost:9101',
-            'http://127.0.0.1:9100',
-            'http://localhost:9100'
-        ];
-        if (!isHttpsPage()) {
-            bases = [
+        var bases = isHttpsPage()
+            ? [
+                'https://127.0.0.1:9101',
+                'https://localhost:9101',
+                'http://127.0.0.1:9100',
+                'http://localhost:9100'
+            ]
+            : [
                 'http://127.0.0.1:9100',
                 'http://localhost:9100',
                 'https://127.0.0.1:9101',
                 'https://localhost:9101'
             ];
-        }
         if (cachedBaseUrl) {
             bases = [cachedBaseUrl].concat(bases.filter(function (b) { return b !== cachedBaseUrl; }));
         }
@@ -45,17 +47,35 @@
     }
 
     function sslSupportUrl() {
-        return isHttpsPage() ? 'https://localhost:9101/ssl_support' : 'http://localhost:9100/ssl_support';
+        return isHttpsPage()
+            ? 'https://localhost:9101/ssl_support'
+            : 'http://localhost:9100/ssl_support';
+    }
+
+    function statusMessage(status) {
+        switch (status) {
+            case STATUS.READY:
+                return 'Printer ready';
+            case STATUS.SERVICE_UNAVAILABLE:
+                return 'Zebra Browser Print is not running on this computer.';
+            case STATUS.SSL_SETUP_REQUIRED:
+                return 'SSL certificate requires setup before Chrome can reach Browser Print.';
+            case STATUS.NO_PRINTERS:
+                return 'Browser Print is running, but no Zebra printer was detected. Check the USB cable and power.';
+            default:
+                return 'Detecting printers…';
+        }
     }
 
     function getChromeSetupSteps() {
+        var host = global.location ? global.location.hostname : 'this site';
         return [
-            'Install Zebra Browser Print on this Windows PC (not on the web server).',
-            'Connect the ZD230 label printer via USB and turn it on.',
+            'Install Zebra Browser Print on this Windows PC (the computer connected to the ZD230).',
+            'Connect the ZD230 via USB and turn it on.',
             'Open Browser Print → Settings → enable Broadcast search and Driver search → select your printer.',
-            'Open ' + sslSupportUrl() + ' in a new tab, accept the certificate, and click Yes to add localhost.',
-            'When prompted, allow ' + (global.location ? global.location.hostname : 'this site') + ' as an Accepted Host in Browser Print.',
-            'Return here and click Load printers.'
+            'Open ' + sslSupportUrl() + ', accept the certificate, and click Yes for localhost.',
+            'Allow ' + host + ' as an Accepted Host when Browser Print prompts you.',
+            'Click Refresh Printers in this modal.'
         ];
     }
 
@@ -98,10 +118,18 @@
     }
 
     function request(method, path, body, timeoutMs) {
+        if (cachedBaseUrl) {
+            return requestOnBase(cachedBaseUrl, method, path, body, timeoutMs)
+                .then(function (result) { return result.text; })
+                .catch(function () {
+                    cachedBaseUrl = null;
+                    return request(method, path, body, timeoutMs);
+                });
+        }
         var bases = serviceBaseCandidates();
         var attempt = function (index) {
             if (index >= bases.length) {
-                return Promise.reject(new Error(UNAVAILABLE_MSG));
+                return Promise.reject(new Error('unreachable'));
             }
             return requestOnBase(bases[index], method, path, body, timeoutMs)
                 .then(function (result) {
@@ -113,58 +141,6 @@
                 });
         };
         return attempt(0);
-    }
-
-    function loadScriptFromBase(base, scriptPath) {
-        return new Promise(function (resolve, reject) {
-            var script = document.createElement('script');
-            script.src = base + scriptPath;
-            script.async = true;
-            script.onload = function () {
-                if (typeof global.BrowserPrint === 'object') {
-                    cachedBaseUrl = base;
-                    resolve(global.BrowserPrint);
-                } else {
-                    reject(new Error('SDK missing'));
-                }
-            };
-            script.onerror = function () {
-                reject(new Error('SDK load failed'));
-            };
-            document.head.appendChild(script);
-        });
-    }
-
-    function ensureBrowserPrintSdk() {
-        if (typeof global.BrowserPrint === 'object'
-            && typeof global.BrowserPrint.getLocalDevices === 'function') {
-            return Promise.resolve(global.BrowserPrint);
-        }
-        if (sdkLoadPromise) {
-            return sdkLoadPromise;
-        }
-
-        var bases = serviceBaseCandidates();
-        var tryBase = function (baseIndex) {
-            if (baseIndex >= bases.length) {
-                return Promise.resolve(null);
-            }
-            var base = bases[baseIndex];
-            var tryPath = function (pathIndex) {
-                if (pathIndex >= SDK_SCRIPT_PATHS.length) {
-                    return tryBase(baseIndex + 1);
-                }
-                return loadScriptFromBase(base, SDK_SCRIPT_PATHS[pathIndex]).catch(function () {
-                    return tryPath(pathIndex + 1);
-                });
-            };
-            return tryPath(0);
-        };
-
-        sdkLoadPromise = tryBase(0).catch(function () {
-            return null;
-        });
-        return sdkLoadPromise;
     }
 
     function parseJson(text, fallback) {
@@ -182,15 +158,19 @@
         if (!raw || typeof raw !== 'object') {
             return null;
         }
-        return {
+        var device = {
             name: raw.name || raw.deviceName || 'Zebra Printer',
             deviceType: raw.deviceType || 'printer',
             connection: raw.connection || raw.connectionType || '',
             uid: raw.uid || raw.uniqueId || raw.id || '',
             provider: raw.provider || 'com.zebra.ds.webdriver.desktop.provider.DefaultDeviceProvider',
             manufacturer: raw.manufacturer || 'Zebra Technologies',
-            version: raw.version != null ? raw.version : 3
+            version: raw.version != null ? raw.version : 3,
+            source: 'zebra',
+            send: typeof raw.send === 'function' ? raw.send.bind(raw) : null,
+            _raw: raw
         };
+        return device;
     }
 
     function normalizeDeviceList(raw) {
@@ -231,195 +211,242 @@
         return [];
     }
 
-    function normalizePcPrinter(raw) {
-        if (!raw || typeof raw !== 'object') {
-            return null;
+    function wrapSdkDevices(devices) {
+        if (!devices) {
+            return [];
         }
-        var name = raw.name || raw.Name || 'Printer';
-        return {
-            name: name,
-            deviceType: 'printer',
-            connection: raw.port || raw.PortName || 'Windows',
-            uid: 'pc:' + encodeURIComponent(name),
-            source: 'pc',
-            provider: 'windows-spooler',
-            manufacturer: raw.driver || raw.DriverName || 'Windows',
-            version: 1
-        };
-    }
-
-    function mergePrinterLists(zebraList, pcList) {
-        var merged = [];
-        var seen = Object.create(null);
-
-        (zebraList || []).forEach(function (p) {
-            var copy = Object.assign({}, p, { source: p.source || 'zebra' });
-            var key = String(copy.name || copy.uid || '').toLowerCase();
-            if (key && !seen[key]) {
-                seen[key] = true;
-                merged.push(copy);
-            }
-        });
-
-        (pcList || []).forEach(function (p) {
-            var copy = Object.assign({}, p, { source: p.source || 'pc' });
-            var key = String(copy.name || copy.uid || '').toLowerCase();
-            if (key && !seen[key]) {
-                seen[key] = true;
-                merged.push(copy);
-            } else if (key && seen[key]) {
-                for (var i = 0; i < merged.length; i++) {
-                    if (String(merged[i].name || '').toLowerCase() === key && merged[i].source === 'pc') {
-                        merged[i] = Object.assign({}, merged[i], copy, { source: 'zebra+pc' });
-                        break;
-                    }
+        if (typeof global.BrowserPrint === 'object' && global.BrowserPrint.Device) {
+            var list = Array.isArray(devices) ? devices : normalizeDeviceList(devices);
+            return list.map(function (d) {
+                if (d instanceof global.BrowserPrint.Device) {
+                    return normalizeDevice(d);
                 }
-            }
-        });
-
-        return merged;
-    }
-
-    function fetchPrinterContext(apiUrl) {
-        if (!apiUrl) {
-            return Promise.resolve({ platform: '', printers: [], serverPrintAvailable: false });
+                return normalizeDevice(d);
+            }).filter(Boolean);
         }
-        return fetch(apiUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-            .then(function (res) {
-                if (!res.ok) {
-                    throw new Error('HTTP ' + res.status);
-                }
-                return res.json();
-            })
-            .then(function (data) {
-                var platform = String((data && data.platform) || '');
-                var rows = (data && data.printers) ? data.printers : [];
-                var serverPrintAvailable = platform === 'Windows' && rows.length > 0;
-                return {
-                    platform: platform,
-                    printers: rows.map(normalizePcPrinter).filter(Boolean),
-                    serverPrintAvailable: serverPrintAvailable
-                };
-            })
-            .catch(function () {
-                return { platform: '', printers: [], serverPrintAvailable: false };
-            });
+        return normalizeDeviceList(devices);
     }
 
     function getLocalPrintersViaSdk() {
-        return ensureBrowserPrintSdk().then(function (sdk) {
-            if (!sdk || typeof sdk.getLocalDevices !== 'function') {
-                return null;
+        if (typeof global.BrowserPrint !== 'object' || typeof global.BrowserPrint.getLocalDevices !== 'function') {
+            return Promise.resolve(null);
+        }
+        return new Promise(function (resolve) {
+            try {
+                global.BrowserPrint.getLocalDevices(
+                    function (devices) {
+                        resolve(wrapSdkDevices(devices));
+                    },
+                    function () {
+                        resolve(null);
+                    },
+                    'printer'
+                );
+            } catch (e) {
+                resolve(null);
             }
-            return new Promise(function (resolve, reject) {
-                try {
-                    sdk.getLocalDevices(
-                        function (devices) {
-                            resolve(normalizeDeviceList(devices));
-                        },
-                        function () {
-                            reject(new Error(UNAVAILABLE_MSG));
-                        },
-                        'printer'
-                    );
-                } catch (err) {
-                    reject(new Error(UNAVAILABLE_MSG));
-                }
-            });
         });
     }
 
-    function getDefaultDevice() {
-        return ensureBrowserPrintSdk().then(function (sdk) {
-            if (sdk && typeof sdk.getDefaultDevice === 'function') {
-                return new Promise(function (resolve, reject) {
-                    try {
-                        sdk.getDefaultDevice(
-                            'printer',
-                            function (device) { resolve(normalizeDevice(device)); },
-                            function () {
-                                getLocalPrinters().then(function (list) {
-                                    resolve(list.length ? list[0] : null);
-                                }).catch(reject);
-                            }
-                        );
-                    } catch (err) {
-                        reject(new Error(UNAVAILABLE_MSG));
+    function getDefaultDeviceViaSdk() {
+        if (typeof global.BrowserPrint !== 'object' || typeof global.BrowserPrint.getDefaultDevice !== 'function') {
+            return Promise.resolve(null);
+        }
+        return new Promise(function (resolve) {
+            try {
+                global.BrowserPrint.getDefaultDevice(
+                    'printer',
+                    function (device) {
+                        resolve(device ? normalizeDevice(device) : null);
+                    },
+                    function () {
+                        resolve(null);
                     }
-                });
+                );
+            } catch (e) {
+                resolve(null);
             }
-            return request('GET', '/default?type=printer').then(function (text) {
-                if (!text || !String(text).trim()) {
+        });
+    }
+
+    function fetchAvailableAtBase(base) {
+        return requestOnBase(base, 'GET', '/available', null, DEFAULT_TIMEOUT_MS)
+            .then(function (result) {
+                return {
+                    base: result.base,
+                    reachable: true,
+                    sslBlocked: false,
+                    printers: normalizeDeviceList(parseJson(result.text, {}))
+                };
+            })
+            .catch(function (err) {
+                return {
+                    base: base,
+                    reachable: false,
+                    sslBlocked: String(err && err.message) === 'blocked',
+                    printers: []
+                };
+            });
+    }
+
+    function fetchDefaultAtBase(base) {
+        return requestOnBase(base, 'GET', '/default?type=printer', null, DEFAULT_TIMEOUT_MS)
+            .then(function (result) {
+                if (!result.text || !String(result.text).trim()) {
                     return null;
                 }
-                return normalizeDevice(parseJson(text, null));
-            }).catch(function () {
-                return getLocalPrinters().then(function (list) {
-                    return list.length ? list[0] : null;
+                return normalizeDevice(parseJson(result.text, null));
+            })
+            .catch(function () {
+                return null;
+            });
+    }
+
+    /**
+     * Score printer names for auto-selecting ZD230 / ZDesigner variants.
+     */
+    function printerMatchScore(name, preferredModel) {
+        var n = String(name || '').toLowerCase();
+        var model = String(preferredModel || 'zd230').toLowerCase();
+        if (n.indexOf('zd230') !== -1) {
+            return 100;
+        }
+        if (n.indexOf('zdesigner') !== -1 && n.indexOf('zpl') !== -1) {
+            return 90;
+        }
+        if (n.indexOf('zdesigner') !== -1) {
+            return 80;
+        }
+        if (n.indexOf('zebra') !== -1) {
+            return 70;
+        }
+        if (model && n.indexOf(model) !== -1) {
+            return 60;
+        }
+        return ZEBRA_NAME_RE.test(n) ? 50 : 0;
+    }
+
+    function pickBestPrinter(printers, preferredModel, preferredUid) {
+        if (!printers || !printers.length) {
+            return null;
+        }
+        if (preferredUid) {
+            for (var i = 0; i < printers.length; i++) {
+                if (String(printers[i].uid || '') === String(preferredUid)) {
+                    return printers[i];
+                }
+            }
+        }
+        var best = printers[0];
+        var bestScore = printerMatchScore(best.name, preferredModel);
+        for (var j = 1; j < printers.length; j++) {
+            var score = printerMatchScore(printers[j].name, preferredModel);
+            if (score > bestScore) {
+                best = printers[j];
+                bestScore = score;
+            }
+        }
+        return best;
+    }
+
+    function filterZebraPrinters(printers) {
+        return (printers || []).filter(function (p) {
+            return printerMatchScore(p.name, 'zd230') > 0
+                || ZEBRA_NAME_RE.test(String(p.name || ''));
+        });
+    }
+
+    /**
+     * Probe Browser Print and classify the situation for UI messaging.
+     */
+    function probeBrowserPrint(options) {
+        options = options || {};
+        var preferredModel = options.preferredModel || 'Zebra ZD230';
+
+        return Promise.all(serviceBaseCandidates().map(fetchAvailableAtBase))
+            .then(function (attempts) {
+                var reachable = attempts.filter(function (a) { return a.reachable; });
+                var anySslBlocked = isHttpsPage() && attempts.some(function (a) {
+                    return a.sslBlocked;
+                });
+
+                if (!reachable.length) {
+                    var status = anySslBlocked ? STATUS.SSL_SETUP_REQUIRED : STATUS.SERVICE_UNAVAILABLE;
+                    lastProbe = {
+                        status: status,
+                        printers: [],
+                        defaultPrinter: null,
+                        preferredModel: preferredModel,
+                        message: statusMessage(status),
+                        serviceReachable: false,
+                        sslBlocked: anySslBlocked
+                    };
+                    return lastProbe;
+                }
+
+                var best = reachable.slice().sort(function (a, b) {
+                    return b.printers.length - a.printers.length;
+                })[0];
+                cachedBaseUrl = best.base;
+
+                var finish = function (printers, defaultPrinter) {
+                    var zebraOnly = filterZebraPrinters(printers);
+                    var list = zebraOnly.length ? zebraOnly : printers;
+                    cachedRawDevices = list.slice();
+
+                    var status = list.length ? STATUS.READY : STATUS.NO_PRINTERS;
+                    lastProbe = {
+                        status: status,
+                        printers: list,
+                        defaultPrinter: defaultPrinter || pickBestPrinter(list, preferredModel, null),
+                        preferredModel: preferredModel,
+                        message: list.length
+                            ? statusMessage(STATUS.READY)
+                            : statusMessage(STATUS.NO_PRINTERS),
+                        serviceReachable: true,
+                        sslBlocked: false,
+                        activeBaseUrl: cachedBaseUrl
+                    };
+                    return lastProbe;
+                };
+
+                if (best.printers.length) {
+                    return getDefaultDeviceViaSdk().then(function (def) {
+                        return finish(best.printers, def || pickBestPrinter(best.printers, preferredModel, null));
+                    });
+                }
+
+                return fetchDefaultAtBase(best.base).then(function (def) {
+                    var list = def ? [def] : [];
+                    return getDefaultDeviceViaSdk().then(function (sdkDef) {
+                        if (sdkDef) {
+                            list = [sdkDef];
+                        }
+                        return finish(list, sdkDef || def);
+                    });
                 });
             });
+    }
+
+    function discoverPrinters(options) {
+        return probeBrowserPrint(options).then(function (probe) {
+            return probe.printers || [];
         });
     }
 
     function getLocalPrinters() {
-        return getLocalPrintersViaSdk().then(function (sdkList) {
-            if (sdkList && sdkList.length) {
-                return sdkList;
-            }
-            return request('GET', '/available').then(function (text) {
-                return normalizeDeviceList(parseJson(text, {}));
-            });
-        }).catch(function () {
-            return request('GET', '/available').then(function (text) {
-                return normalizeDeviceList(parseJson(text, {}));
-            });
-        });
+        return discoverPrinters();
     }
 
-    function fetchPcPrinters(apiUrl) {
-        return fetchPrinterContext(apiUrl).then(function (ctx) {
-            return ctx.serverPrintAvailable ? ctx.printers : [];
-        });
-    }
-
-    function discoverAllPrinters(options) {
-        options = options || {};
-
-        var zebraPromise = ensureBrowserPrintSdk()
-            .then(function () {
-                return getLocalPrinters();
-            })
-            .catch(function () {
-                return getLocalPrinters().catch(function () {
-                    return getDefaultDevice().then(function (device) {
-                        return device ? [device] : [];
-                    }).catch(function () {
-                        return [];
-                    });
-                });
-            });
-
-        var contextPromise = fetchPrinterContext(options.pcPrintersUrl);
-
-        return Promise.all([zebraPromise, contextPromise]).then(function (results) {
-            var merged = mergePrinterLists(results[0], results[1].printers);
-            merged._context = results[1];
-            return merged;
+    function getDefaultDevice() {
+        return probeBrowserPrint().then(function (probe) {
+            return probe.defaultPrinter || (probe.printers.length ? probe.printers[0] : null);
         });
     }
 
     function sendToDevice(device, data) {
         if (!device) {
             return Promise.reject(new Error('No Zebra printer selected.'));
-        }
-        if (device.send && typeof device.send === 'function') {
-            return new Promise(function (resolve, reject) {
-                device.send(
-                    data,
-                    function () { resolve(true); },
-                    function (err) { reject(new Error(err || 'Failed to send label to printer.')); }
-                );
-            });
         }
 
         var payload = JSON.stringify({
@@ -428,7 +455,7 @@
                 deviceType: device.deviceType || 'printer',
                 connection: device.connection || '',
                 uid: device.uid || '',
-                provider: device.provider,
+                provider: device.provider || 'com.zebra.ds.webdriver.desktop.provider.DefaultDeviceProvider',
                 manufacturer: device.manufacturer || 'Zebra Technologies',
                 version: device.version != null ? device.version : 3
             },
@@ -437,56 +464,53 @@
 
         return request('POST', '/write', payload).then(function () {
             return true;
+        }).catch(function () {
+            return Promise.reject(new Error(
+                'Unable to print. Zebra Browser Print is running, but the selected printer is unavailable.'
+            ));
         });
     }
 
-    function resolvePrinter(preferredUid, cachedList) {
-        var listPromise = (cachedList && cachedList.length)
-            ? Promise.resolve(cachedList.filter(function (p) {
-                return p.source !== 'pc' && String(p.uid || '').indexOf('pc:') !== 0;
-            }))
-            : getLocalPrinters();
-
-        return listPromise.then(function (list) {
-            if (!list.length) {
-                throw new Error(
-                    'No Zebra printer detected on this PC. Install Zebra Browser Print, accept the certificate, and click Load printers.'
-                );
+    function resolvePrinter(preferredUid, cachedList, preferredModel) {
+        var list = (cachedList && cachedList.length) ? cachedList : cachedRawDevices;
+        if (list && list.length) {
+            var picked = pickBestPrinter(list, preferredModel, preferredUid);
+            if (picked) {
+                return Promise.resolve(picked);
             }
-            var uid = preferredUid != null ? String(preferredUid) : '';
-            if (uid) {
-                for (var i = 0; i < list.length; i++) {
-                    if (String(list[i].uid || '') === uid) {
-                        return list[i];
-                    }
+        }
+        return probeBrowserPrint({ preferredModel: preferredModel }).then(function (probe) {
+            if (!probe.printers.length) {
+                if (probe.status === STATUS.SERVICE_UNAVAILABLE) {
+                    throw new Error(statusMessage(STATUS.SERVICE_UNAVAILABLE));
                 }
+                if (probe.status === STATUS.SSL_SETUP_REQUIRED) {
+                    throw new Error(statusMessage(STATUS.SSL_SETUP_REQUIRED));
+                }
+                throw new Error(statusMessage(STATUS.NO_PRINTERS));
             }
-            return getDefaultDevice().then(function (device) {
-                if (device && device.uid) {
-                    for (var j = 0; j < list.length; j++) {
-                        if (String(list[j].uid || '') === String(device.uid)) {
-                            return list[j];
-                        }
-                    }
-                    return device;
-                }
-                return list[0];
-            });
+            var match = pickBestPrinter(probe.printers, preferredModel, preferredUid);
+            if (!match) {
+                throw new Error('Select a Zebra printer before printing.');
+            }
+            return match;
         });
     }
 
     global.ZebraBrowserPrintClient = {
-        UNAVAILABLE_MSG: UNAVAILABLE_MSG,
+        STATUS: STATUS,
+        statusMessage: statusMessage,
         sslSupportUrl: sslSupportUrl,
         getChromeSetupSteps: getChromeSetupSteps,
-        ensureBrowserPrintSdk: ensureBrowserPrintSdk,
-        resolvePrinter: resolvePrinter,
-        sendToDevice: sendToDevice,
+        probeBrowserPrint: probeBrowserPrint,
+        discoverPrinters: discoverPrinters,
+        discoverAllPrinters: discoverPrinters,
         getLocalPrinters: getLocalPrinters,
         getDefaultDevice: getDefaultDevice,
-        discoverAllPrinters: discoverAllPrinters,
-        fetchPcPrinters: fetchPcPrinters,
-        fetchPrinterContext: fetchPrinterContext,
-        mergePrinterLists: mergePrinterLists
+        resolvePrinter: resolvePrinter,
+        sendToDevice: sendToDevice,
+        printerMatchScore: printerMatchScore,
+        pickBestPrinter: pickBestPrinter,
+        getLastProbe: function () { return lastProbe; }
     };
 })(window);

@@ -137,6 +137,7 @@ $aa = $activeAssignment ?? null;
 </div>
 <?php if (!empty($canPrintQr)): ?>
 <?php require BASE_PATH . '/views/devices/partials/qr_print_modal.php'; ?>
+<script src="<?php echo htmlspecialchars(rtrim(APP_URL, '/') . '/assets/js/BrowserPrint-3.0.216.min.js', ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(rtrim(APP_URL, '/') . '/assets/js/zebra-browser-print-client.js', ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(rtrim(APP_URL, '/') . '/assets/js/device-qr-sticker.js', ENT_QUOTES, 'UTF-8'); ?>"></script>
 <?php endif; ?>

@@ -141,7 +141,7 @@ final class DeviceAssetHelper
         $cfg = self::labelConfig();
         $token = (string) ($device['qr_token'] ?? '');
         if ($qrDataUri === null && $token !== '') {
-            $qrDataUri = self::qrPngDataUri($token);
+            $qrDataUri = self::qrPngDataUriForDevice($device);
         }
 
         return [
@@ -331,6 +331,41 @@ final class DeviceAssetHelper
         return rtrim(APP_URL, '/') . '/devices/qr/' . rawurlencode($token);
     }
 
+    /** Public device record page — QR label destination. */
+    public static function deviceViewUrl(int $deviceId): string
+    {
+        return rtrim(APP_URL, '/') . '/devices/view?id=' . max(0, $deviceId);
+    }
+
+    /**
+     * URL encoded in QR labels (view page when device id is known).
+     *
+     * @param array<string, mixed> $device
+     */
+    public static function qrContentUrl(array $device): string
+    {
+        $id = (int) ($device['id'] ?? 0);
+        if ($id > 0) {
+            return self::deviceViewUrl($id);
+        }
+        $token = trim((string) ($device['qr_token'] ?? ''));
+
+        return $token !== '' ? self::qrScanUrl($token) : '';
+    }
+
+    public static function qrPngDataUriForDevice(array $device, ?int $size = null): string
+    {
+        $url = self::qrContentUrl($device);
+        if ($url === '') {
+            return '';
+        }
+        $cfg = self::labelConfig();
+        $size = $size ?? (int) ($cfg['qr_png_px'] ?? 320);
+        $margin = (int) ($cfg['qr_margin_px'] ?? 4);
+
+        return StudentIdCardHelper::qrPngDataUri($url, $size, $margin);
+    }
+
     /**
      * ZPL for Zebra ZD230 — one row with two identical labels; ^PQ repeats the set.
      *
@@ -343,7 +378,7 @@ final class DeviceAssetHelper
         $labelWDots = self::labelWidthDots();
         $stripHDots = self::labelHeightDots();
         $stripWDots = self::stripWidthDots();
-        $url = self::zplFieldData(self::qrScanUrl($token));
+        $url = self::zplFieldData(self::qrContentUrl($device));
         $assetId = self::zplFieldData(trim((string) ($device['asset_id'] ?? '')) ?: '—');
         $serial = self::zplFieldData(trim((string) ($device['serial_number'] ?? '')) ?: '—');
 
