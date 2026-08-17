@@ -653,5 +653,56 @@ class UserModel extends Model {
         
         return $users;
     }
+
+    /**
+     * HOD of ICT department — full device asset management (same as ADM for this module).
+     */
+    public function isHodIct($userId): bool {
+        if (!$this->isHOD($userId)) {
+            return false;
+        }
+        $dept = strtoupper(trim((string) $this->getHODDepartment($userId)));
+
+        return $dept === 'ICT';
+    }
+
+    /**
+     * Full CRUD on device assets: system admin, ADM, HOD ICT.
+     */
+    public function canManageDevices($userId): bool {
+        if ($this->isAdminOrADM($userId)) {
+            return true;
+        }
+
+        return $this->isHodIct($userId);
+    }
+
+    /**
+     * View/search/scan/export device assets: ADM, HOD ICT, ACC, DIR (+ system admin).
+     */
+    public function canViewDevices($userId): bool {
+        if ($this->canManageDevices($userId)) {
+            return true;
+        }
+        $role = $this->getUserRole($userId);
+
+        return in_array($role, ['ACC', 'DIR'], true);
+    }
+
+    public function canScanDeviceQr($userId): bool {
+        return $this->canViewDevices($userId);
+    }
+
+    public function canExportDevices($userId): bool {
+        return $this->canViewDevices($userId);
+    }
+
+    public function canPrintDeviceQr($userId): bool {
+        return $this->canViewDevices($userId);
+    }
+
+    public function canViewDeviceHistory($userId): bool {
+        return $this->canViewDevices($userId);
+    }
 }
 

@@ -97,6 +97,8 @@
                                 $canViewStudentApplications = $userModel->canViewOnlineStudentApplications($_SESSION['user_id']);
                                 $canViewApplicationAdmissionSchedules = $userModel->canViewApplicationAdmissionSchedules($_SESSION['user_id']);
                                 $canAccessExamsModule = $userModel->canAccessExamsModule($_SESSION['user_id']);
+                                $canViewDevices = $userModel->canViewDevices($_SESSION['user_id']);
+                                $canManageDevices = $userModel->canManageDevices($_SESSION['user_id']);
                                 // Bus Season processing & payments: SAO, DIR (view), ADM, Admin
                                 $canProcessBusSeasonMenu = $userModel->canViewBusSeasonOperations($_SESSION['user_id']);
                                 $canViewPaymentsMenu = $userModel->canViewPaymentsList($_SESSION['user_id']);
@@ -108,6 +110,13 @@
                             if (!isset($canViewPaymentsMenu)) {
                                 $canViewPaymentsMenu = false;
                             }
+                            if (!isset($canViewDevices)) {
+                                $canViewDevices = false;
+                            }
+                            if (!isset($canManageDevices)) {
+                                $canManageDevices = false;
+                            }
+                            $devicePages = ['devices'];
                             $busSeasonPages = ['bus-season-requests-sao', 'bus-season-payments'];
                             $paymentsPages = ['payments', 'payments-create', 'payments-edit', 'payments-delete'];
                             $hasStaffApprovalAccess = $isADMRole;
@@ -127,6 +136,31 @@
                                     <i class="fas fa-file-signature"></i>
                                     <span>Exams</span>
                                 </a>
+                            </li>
+                            <?php endif; ?>
+
+                            <?php if (!empty($canViewDevices)): ?>
+                            <li data-nav="devices" class="menu-item-has-children <?php echo (isset($page) && $page === 'devices') ? 'active' : ''; ?>">
+                                <a href="#" class="menu-toggle">
+                                    <i class="fas fa-laptop"></i>
+                                    <span>Asset Management</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="<?php echo (isset($page) && $page === 'devices') ? 'display: block;' : ''; ?>">
+                                    <li><a href="<?php echo APP_URL; ?>/devices" class="<?php echo (isset($deviceSection) && $deviceSection === 'dashboard') ? 'active' : ''; ?>"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/list"><i class="fas fa-list"></i><span>All Devices</span></a></li>
+                                    <?php if (!empty($canManageDevices)): ?>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/create"><i class="fas fa-plus"></i><span>Add Device</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/assignments"><i class="fas fa-user-check"></i><span>Assignments</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/maintenance"><i class="fas fa-tools"></i><span>Maintenance</span></a></li>
+                                    <?php endif; ?>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/warranty"><i class="fas fa-shield-alt"></i><span>Warranty</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/scan"><i class="fas fa-qrcode"></i><span>QR Scanner</span></a></li>
+                                    <?php if (!empty($canViewDevices)): ?>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/export"><i class="fas fa-file-export"></i><span>Reports / Export</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/audit"><i class="fas fa-history"></i><span>Audit History</span></a></li>
+                                    <?php endif; ?>
+                                </ul>
                             </li>
                             <?php endif; ?>
                             
