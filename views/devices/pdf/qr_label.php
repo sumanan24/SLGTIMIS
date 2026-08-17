@@ -1,58 +1,88 @@
 <?php
 /**
- * 2" × 1" device QR label (Dompdf).
- * @var array<string, mixed> $device
+ * Device QR PDF — full 4" × 1" page · two 2" × 1" identical stickers side-by-side.
  */
+require_once BASE_PATH . '/helpers/DeviceAssetHelper.php';
 $e = static fn (?string $s): string => htmlspecialchars((string) ($s ?? ''), ENT_QUOTES, 'UTF-8');
 $d = $device ?? [];
+$cfg = $labelConfig ?? DeviceAssetHelper::labelConfig();
 $assetId = trim((string) ($d['asset_id'] ?? ''));
 $assetTag = trim((string) ($d['asset_tag_no'] ?? ''));
 $serial = trim((string) ($d['serial_number'] ?? ''));
 $line2 = trim((string) ($d['brand'] ?? '') . ' ' . (string) ($d['model'] ?? ''));
+$labelsPerSet = DeviceAssetHelper::labelsPerSet();
+$sets = DeviceAssetHelper::clampLabelSets((int) ($labelSets ?? DeviceAssetHelper::defaultLabelSets()));
+
+$pageW = DeviceAssetHelper::stripWidthIn();
+$pageH = DeviceAssetHelper::labelHeightIn();
+$pageWmm = DeviceAssetHelper::inchesToMm($pageW);
+$pageHmm = DeviceAssetHelper::inchesToMm($pageH);
+$labelW = DeviceAssetHelper::labelWidthIn();
+$labelH = DeviceAssetHelper::labelHeightIn();
+$labelWmm = DeviceAssetHelper::labelWidthMm();
+$labelHmm = DeviceAssetHelper::labelHeightMm();
+$qrMm = min(18.0, round($labelWmm * 0.34, 1));
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <style>
-        @page { size: 2in 1in; margin: 0; }
+        @page {
+            size: <?php echo round($pageWmm, 2); ?>mm <?php echo round($pageHmm, 2); ?>mm;
+            margin: 0;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: DejaVu Sans, sans-serif; font-size: 6pt; color: #111; }
-        .label {
-            width: 2in;
-            height: 1in;
-            padding: 0.04in 0.05in;
+        html, body { font-family: DejaVu Sans, sans-serif; color: #111; }
+        .pdf-label-set {
+            width: <?php echo $pageW; ?>in;
+            height: <?php echo $pageH; ?>in;
+            page-break-after: always;
             overflow: hidden;
         }
-        table.layout { width: 100%; height: 0.92in; border-collapse: collapse; }
-        table.layout td { vertical-align: middle; }
-        td.qr { width: 0.78in; text-align: center; }
-        td.qr img { width: 0.72in; height: 0.72in; }
-        td.text { padding-left: 0.04in; }
-        .asset-id { font-size: 8pt; font-weight: bold; line-height: 1.1; }
-        .meta { font-size: 5.5pt; line-height: 1.15; margin-top: 1pt; color: #333; }
-        .brand { font-size: 5pt; color: #555; margin-top: 1pt; }
-        .slgti { font-size: 4.5pt; font-weight: bold; letter-spacing: 0.3pt; color: #444; margin-bottom: 1pt; }
+        .pdf-label-set:last-child { page-break-after: auto; }
+        table.pair-row {
+            width: <?php echo $pageW; ?>in;
+            height: <?php echo $pageH; ?>in;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        table.pair-row td {
+            vertical-align: middle;
+            padding: 0;
+            width: <?php echo $labelW; ?>in;
+            height: <?php echo $labelH; ?>in;
+        }
+        .sticker-card {
+            width: <?php echo $labelW; ?>in;
+            height: <?php echo $labelH; ?>in;
+            background: #fff;
+            border-right: 0.2mm solid #ccc;
+            padding: 0;
+            overflow: hidden;
+        }
+        table.pair-row td:last-child .sticker-card { border-right: none; }
+        table.sticker-inner { width: 100%; height: 100%; border-collapse: collapse; }
+        table.sticker-inner td { vertical-align: middle; }
+        td.sticker-qr { text-align: left; }
+        td.sticker-text { text-align: left; }
+        .asset-no { font-size: 15px; font-weight: 600; color: #666; line-height: 1.15; margin-bottom: 0.5mm; word-break: break-all; }
+        .serial-no { font-size: 15px; font-weight: bold; line-height: 1.15; word-break: break-all; color: #111; }
     </style>
 </head>
 <body>
-    <div class="label">
-        <table class="layout">
+<?php for ($s = 0; $s < $sets; $s++): ?>
+    <div class="pdf-label-set">
+        <table class="pair-row" cellpadding="0" cellspacing="0">
             <tr>
-                <td class="qr">
-                    <?php if (!empty($qrDataUri)): ?>
-                    <img src="<?php echo $qrDataUri; ?>" alt="QR">
-                    <?php endif; ?>
+                <?php for ($i = 0; $i < $labelsPerSet; $i++): ?>
+                <td>
+                    <?php require BASE_PATH . '/views/devices/partials/qr_label_pdf_cell.php'; ?>
                 </td>
-                <td class="text">
-                    <div class="slgti">SLGTI</div>
-                    <div class="asset-id"><?php echo $e($assetId !== '' ? $assetId : '—'); ?></div>
-                    <?php if ($assetTag !== ''): ?><div class="meta">Tag: <?php echo $e($assetTag); ?></div><?php endif; ?>
-                    <?php if ($serial !== ''): ?><div class="meta">S/N: <?php echo $e($serial); ?></div><?php endif; ?>
-                    <?php if ($line2 !== ''): ?><div class="brand"><?php echo $e($line2); ?></div><?php endif; ?>
-                </td>
+                <?php endfor; ?>
             </tr>
         </table>
     </div>
+<?php endfor; ?>
 </body>
 </html>

@@ -33,7 +33,9 @@ class View {
         // Determine which layout to use based on user type
         $layoutFile = null;
         
-        if (!empty($this->data['use_print_layout'])) {
+        if (!empty($this->data['use_label_print_layout'])) {
+            $layoutFile = BASE_PATH . '/views/layouts/print_label.php';
+        } elseif (!empty($this->data['use_print_layout'])) {
             $layoutFile = BASE_PATH . '/views/layouts/print.php';
         } elseif (!empty($this->data['use_public_layout'])) {
             $layoutFile = BASE_PATH . '/views/layouts/public.php';

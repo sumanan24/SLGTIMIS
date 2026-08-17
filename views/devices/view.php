@@ -14,8 +14,9 @@ $aa = $activeAssignment ?? null;
         </div>
         <div class="d-flex flex-wrap gap-1">
             <?php if (!empty($canPrintQr)): ?>
-            <a href="<?php echo APP_URL; ?>/devices/qr-print?id=<?php echo $id; ?>" class="btn btn-sm btn-outline-dark" target="_blank" title="Print 2×1 label"><i class="fas fa-print me-1"></i> Print QR</a>
-            <a href="<?php echo APP_URL; ?>/devices/qr-pdf?id=<?php echo $id; ?>" class="btn btn-sm btn-outline-danger" title="Download 2×1 PDF"><i class="fas fa-file-pdf me-1"></i> QR PDF</a>
+            <button type="button" class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#deviceQrPrintModal">
+                <i class="fas fa-print me-1"></i> Print QR Labels
+            </button>
             <?php endif; ?>
             <a href="<?php echo APP_URL; ?>/devices/print?id=<?php echo $id; ?>" class="btn btn-sm btn-outline-secondary" target="_blank"><i class="fas fa-print me-1"></i> Asset Record</a>
             <?php if (!empty($canManage)): ?>
@@ -134,3 +135,8 @@ $aa = $activeAssignment ?? null;
         </div>
     </div>
 </div>
+<?php if (!empty($canPrintQr)): ?>
+<?php require BASE_PATH . '/views/devices/partials/qr_print_modal.php'; ?>
+<script src="<?php echo htmlspecialchars(rtrim(APP_URL, '/') . '/assets/js/zebra-browser-print-client.js', ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(rtrim(APP_URL, '/') . '/assets/js/device-qr-sticker.js', ENT_QUOTES, 'UTF-8'); ?>"></script>
+<?php endif; ?>

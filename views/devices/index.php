@@ -183,7 +183,7 @@ $canAssignDevice = static function (array $row) use ($canManage): bool {
                             <a href="<?php echo APP_URL; ?>/devices/edit?id=<?php echo $id; ?>" class="btn btn-outline-secondary btn-icon" title="Edit"><i class="fas fa-edit"></i></a>
                             <?php endif; ?>
                             <?php if (!empty($canPrintQr)): ?>
-                            <a href="<?php echo APP_URL; ?>/devices/qr-print?id=<?php echo $id; ?>" class="btn btn-outline-dark btn-icon" title="Print QR 2×1" target="_blank"><i class="fas fa-print"></i></a>
+                            <a href="<?php echo APP_URL; ?>/devices/view?id=<?php echo $id; ?>" class="btn btn-outline-dark btn-icon" title="Print QR labels"><i class="fas fa-print"></i></a>
                             <a href="<?php echo APP_URL; ?>/devices/qr-pdf?id=<?php echo $id; ?>" class="btn btn-outline-danger btn-icon" title="QR PDF"><i class="fas fa-file-pdf"></i></a>
                             <?php endif; ?>
                         </div>

@@ -1,0 +1,236 @@
+/**
+ * SLGTI Device QR sticker — print layout (mm-based, 2-up side-by-side).
+ */
+:root {
+    --sticker-w: 50.8mm;
+    --sticker-h: 25.4mm;
+    --sticker-gap: 3mm;
+    --strip-w: calc(var(--sticker-w) * 2 + var(--sticker-gap));
+    --strip-h: var(--sticker-h);
+    --sticker-pad: 1.5mm;
+    --qr-size: 17mm;
+    --text-gap: 3.5mm;
+}
+
+/* ── Screen toolbar (hidden when printing) ── */
+.device-qr-print-toolbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 10px 16px;
+    font: 14px/1.4 Arial, sans-serif;
+}
+.device-qr-print-toolbar .toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px 12px;
+}
+.device-qr-print-toolbar label { margin: 0; font-weight: 600; font-size: 13px; }
+.device-qr-print-toolbar select,
+.device-qr-print-toolbar .btn {
+    font-size: 13px;
+    padding: 5px 12px;
+    border-radius: 4px;
+}
+.device-qr-print-toolbar .btn-primary { background: #0d6efd; color: #fff; border: 1px solid #0d6efd; cursor: pointer; }
+.device-qr-print-toolbar .btn-outline { background: #fff; color: #212529; border: 1px solid #adb5bd; text-decoration: none; cursor: pointer; }
+.device-qr-print-toolbar .size-badge {
+    background: #e7f1ff;
+    color: #084298;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* ── Preview canvas (screen only — scaled visually) ── */
+.device-qr-print-canvas {
+    margin-top: 88px;
+    padding: 24px 16px 48px;
+    min-height: 100vh;
+    background: #e9ecef;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+.device-qr-preview-scale-wrap {
+    transform-origin: top center;
+}
+.device-qr-preview-scale-wrap[data-screen-scale="125"] { transform: scale(1.25); }
+.device-qr-preview-scale-wrap[data-screen-scale="150"] { transform: scale(1.5); }
+
+/* ── One printable strip (two stickers) ── */
+.device-qr-strip {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: var(--sticker-gap);
+    width: var(--strip-w);
+    height: var(--strip-h);
+    box-sizing: border-box;
+}
+.device-qr-strip-preview {
+    padding: 8px;
+    background: #dee2e6;
+    border: 1px dashed #adb5bd;
+    border-radius: 6px;
+    width: fit-content;
+}
+
+/* ── Single sticker card ── */
+.device-qr-sticker {
+    width: var(--sticker-w);
+    height: var(--sticker-h);
+    min-width: var(--sticker-w);
+    max-width: var(--sticker-w);
+    min-height: var(--sticker-h);
+    max-height: var(--sticker-h);
+    flex: 0 0 var(--sticker-w);
+    box-sizing: border-box;
+    background: #fff;
+    border: 0.35mm solid #212529;
+    border-radius: 1.5mm;
+    padding: var(--sticker-pad);
+    overflow: hidden;
+    font-family: "DejaVu Sans", Arial, sans-serif;
+    color: #111;
+}
+
+/* Horizontal: QR left · text right (matches printed sticker) */
+.device-qr-sticker-horizontal {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--text-gap);
+    text-align: left;
+}
+.device-qr-sticker-horizontal .sticker-qr-wrap {
+    flex: 0 0 var(--qr-size);
+    width: var(--qr-size);
+    height: var(--qr-size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5mm;
+    box-sizing: border-box;
+}
+.device-qr-sticker-horizontal .sticker-qr {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+.device-qr-sticker-horizontal .sticker-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.4mm;
+}
+.device-qr-sticker .sticker-asset-no {
+    font-size: 15px;
+    font-weight: 600;
+    color: #666;
+    line-height: 1.15;
+    margin: 0;
+    word-break: break-all;
+}
+.device-qr-sticker .sticker-serial {
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.15;
+    margin: 0;
+    color: #111;
+    word-break: break-all;
+}
+
+/* Legacy centered layout (unused when layout=horizontal) */
+.device-qr-sticker:not(.device-qr-sticker-horizontal) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+.device-qr-sticker:not(.device-qr-sticker-horizontal) .sticker-qr {
+    width: var(--qr-size);
+    height: var(--qr-size);
+    flex: 0 0 var(--qr-size);
+    object-fit: contain;
+    display: block;
+    margin: 0 auto 0.5mm;
+}
+.device-qr-sticker:not(.device-qr-sticker-horizontal) .sticker-asset-id {
+    max-width: 100%;
+    margin: 0.3mm 0 0;
+}
+
+/* ── Modal preview (uses same sticker classes, px approximation on screen) ── */
+#deviceQrPrintModal .device-qr-sticker {
+    --sticker-w: 200px;
+    --sticker-h: 100px;
+    --sticker-gap: 8px;
+    --qr-size: 58px;
+    --sticker-pad: 5px;
+    --text-gap: 10px;
+}
+#deviceQrPrintModal .device-qr-sticker .sticker-asset-no,
+#deviceQrPrintModal .device-qr-sticker .sticker-serial { font-size: 15px; }
+#deviceQrPrintModal .device-qr-strip-preview { background: #e9ecef; }
+
+/* ── Print: exact physical mm, no UI, no scaling ── */
+@media print {
+    .no-print,
+    .device-qr-print-toolbar { display: none !important; }
+    .device-qr-print-canvas {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        min-height: 0 !important;
+        gap: 0 !important;
+    }
+    .device-qr-preview-scale-wrap {
+        transform: none !important;
+    }
+    .device-qr-strip-preview {
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        border-radius: 0 !important;
+    }
+    .device-qr-strip {
+        page-break-after: always;
+        break-after: page;
+    }
+    .device-qr-strip:last-child {
+        page-break-after: auto;
+        break-after: auto;
+    }
+    .device-qr-sticker {
+        border-radius: 0;
+        box-shadow: none;
+    }
+    .print-root[data-print-scale="fit"] .device-qr-strip {
+        margin: 10mm auto;
+    }
+}
+
+@page {
+    size: var(--strip-w) var(--strip-h);
+    margin: 0;
+}
+
+.print-root[data-print-scale="fit"] @page {
+    size: A4 landscape;
+    margin: 10mm;
+}

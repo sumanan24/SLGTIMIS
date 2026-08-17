@@ -58,6 +58,13 @@ class DeviceController extends Controller {
         ];
     }
 
+    private function parseLabelSets(?int $raw = null): int
+    {
+        $sets = $raw ?? (int) $this->get('sets', DeviceAssetHelper::defaultLabelSets());
+
+        return DeviceAssetHelper::clampLabelSets($sets);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -231,6 +238,10 @@ class DeviceController extends Controller {
             'qrDataUri' => $qrUri,
             'qrUrl' => DeviceAssetHelper::qrScanUrl((string) $device['qr_token']),
             'fullDetail' => $um->canManageDevices($uid),
+            'labelPrinterConfig' => DeviceAssetHelper::labelConfig(),
+            'defaultLabelSets' => DeviceAssetHelper::defaultLabelSets(),
+            'maxLabelSets' => DeviceAssetHelper::maxLabelSets(),
+            'labelsPerSet' => DeviceAssetHelper::labelsPerSet(),
         ]));
     }
 
@@ -323,12 +334,16 @@ class DeviceController extends Controller {
             $this->redirect('devices');
         }
         $token = (string) $device['qr_token'];
+        $sets = $this->parseLabelSets();
         return $this->view('devices/qr_print', [
-            'use_print_layout' => true,
+            'use_label_print_layout' => true,
             'title' => 'Device QR — ' . ($device['asset_id'] ?? ''),
             'device' => $device,
             'qrDataUri' => DeviceAssetHelper::qrPngDataUri($token),
             'qrUrl' => DeviceAssetHelper::qrScanUrl($token),
+            'labelCopies' => DeviceAssetHelper::labelsPerSet(),
+            'labelSets' => $sets,
+            'labelConfig' => DeviceAssetHelper::labelConfig(),
         ]);
     }
 
@@ -352,11 +367,103 @@ class DeviceController extends Controller {
             $this->redirect('devices/view?id=' . $id);
         }
         $token = (string) $device['qr_token'];
-        $qrDataUri = DeviceAssetHelper::qrPngDataUri($token);
-        $html = DeviceAssetHelper::renderQrLabelPdfHtml($device, $qrDataUri);
-        $model->logAudit($id, $uid, 'qr_pdf_download', null, ['asset_id' => $device['asset_id'] ?? '']);
-        $filename = 'device-qr-' . preg_replace('/[^a-zA-Z0-9._-]+/', '_', (string) ($device['asset_id'] ?? $id)) . '-2x1.pdf';
-        ExamPdfHelper::streamHtml($html, $filename, DeviceAssetHelper::LABEL_PAPER_2X1, 'portrait');
+        $sets = $this->parseLabelSets();
+        $qrDataUri = DeviceAssetHelper::qrPngDataUri($token, 220);
+        $html = DeviceAssetHelper::renderQrLabelPdfHtml($device, $qrDataUri, $sets);
+        $model->logAudit($id, $uid, 'qr_pdf_download', null, [
+            'asset_id' => $device['asset_id'] ?? '',
+            'sets' => $sets,
+            'labels_per_set' => DeviceAssetHelper::labelsPerSet(),
+        ]);
+        $filename = 'device-qr-' . preg_replace('/[^a-zA-Z0-9._-]+/', '_', (string) ($device['asset_id'] ?? $id)) . '-2up-x' . $sets . '.pdf';
+        ExamPdfHelper::streamHtml($html, $filename, DeviceAssetHelper::labelPaper4x1Pdf(), 'landscape');
+    }
+
+    public function qrZpl() {
+        $uid = $this->requireLogin();
+        $um = $this->requireView($uid);
+        if (!$um->canPrintDeviceQr($uid)) {
+            $_SESSION['error'] = 'Not authorized.';
+            $this->redirect('devices');
+        }
+        $id = (int) $this->get('id', 0);
+        $model = $this->deviceModel();
+        $device = $model->findDevice($id);
+        if (!$device) {
+            $_SESSION['error'] = 'Device not found.';
+            $this->redirect('devices');
+        }
+        $token = (string) $device['qr_token'];
+        $sets = $this->parseLabelSets((int) $this->get('sets', (int) $this->post('sets', DeviceAssetHelper::defaultLabelSets())));
+        $zpl = DeviceAssetHelper::renderQrLabelZpl($device, $token, $sets);
+        $model->logAudit($id, $uid, 'qr_zpl_download', null, [
+            'asset_id' => $device['asset_id'] ?? '',
+            'sets' => $sets,
+            'labels_per_set' => DeviceAssetHelper::labelsPerSet(),
+        ]);
+        $filename = 'device-qr-' . preg_replace('/[^a-zA-Z0-9._-]+/', '_', (string) ($device['asset_id'] ?? $id)) . '-2up-x' . $sets . '.zpl';
+        header('Content-Type: text/plain; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . strlen($zpl));
+        echo $zpl;
+        exit;
+    }
+
+    /** JSON — printers installed on the PC running WAMP. */
+    public function listPrinters() {
+        $uid = $this->requireLogin();
+        $um = $this->requireView($uid);
+        if (!$um->canPrintDeviceQr($uid)) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['ok' => false, 'error' => 'Not authorized.', 'printers' => []]);
+            exit;
+        }
+
+        $printers = DeviceAssetHelper::listSystemPrinters();
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode([
+            'ok' => true,
+            'printers' => $printers,
+            'platform' => PHP_OS_FAMILY,
+        ]);
+        exit;
+    }
+
+    /** POST — send ZPL to a Windows printer on the server PC. */
+    public function qrPrintServer() {
+        $uid = $this->requireLogin();
+        $um = $this->requireView($uid);
+        if (!$um->canPrintDeviceQr($uid)) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['ok' => false, 'error' => 'Not authorized.']);
+            exit;
+        }
+
+        $printer = trim((string) $this->post('printer', ''));
+        $zpl = (string) $this->post('zpl', '');
+        $id = (int) $this->post('device_id', 0);
+        $sets = $this->parseLabelSets((int) $this->post('sets', DeviceAssetHelper::defaultLabelSets()));
+
+        if ($zpl === '' && $id > 0) {
+            $device = $this->deviceModel()->findDevice($id);
+            if ($device) {
+                $zpl = DeviceAssetHelper::renderQrLabelZpl($device, (string) $device['qr_token'], $sets);
+            }
+        }
+
+        $result = DeviceAssetHelper::sendZplToWindowsPrinter($printer, $zpl);
+        if (!empty($result['ok']) && $id > 0) {
+            $this->deviceModel()->logAudit($id, $uid, 'qr_server_print', null, [
+                'printer' => $printer,
+                'sets' => $sets,
+            ]);
+        }
+
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode($result);
+        exit;
     }
 
     public function regenerateQr() {

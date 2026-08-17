@@ -1,61 +1,108 @@
 <?php
+require_once BASE_PATH . '/helpers/DeviceAssetHelper.php';
 $e = static fn (?string $s): string => htmlspecialchars((string) ($s ?? ''), ENT_QUOTES, 'UTF-8');
 $d = $device ?? [];
+$cfg = $labelConfig ?? DeviceAssetHelper::labelConfig();
 $assetId = trim((string) ($d['asset_id'] ?? ''));
 $assetTag = trim((string) ($d['asset_tag_no'] ?? ''));
 $serial = trim((string) ($d['serial_number'] ?? ''));
 $line2 = trim((string) ($d['brand'] ?? '') . ' ' . (string) ($d['model'] ?? ''));
+$copies = max(2, (int) ($labelCopies ?? DeviceAssetHelper::labelsPerSet()));
+$sets = DeviceAssetHelper::clampLabelSets((int) ($labelSets ?? DeviceAssetHelper::defaultLabelSets()));
+$pageW = DeviceAssetHelper::stripWidthIn();
+$pageH = DeviceAssetHelper::labelHeightIn();
+$labelW = DeviceAssetHelper::labelWidthIn();
+$labelH = DeviceAssetHelper::labelHeightIn();
+$printerModel = (string) ($cfg['printer_model'] ?? 'Zebra ZD230');
 ?>
 <style>
-@page { size: 2in 1in; margin: 0; }
+@media screen {
+    .no-print.toolbar {
+        position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+        background: #f8f9fa; border-bottom: 1px solid #dee2e6;
+        padding: 10px; text-align: center; font: 14px/1.4 Arial, sans-serif;
+    }
+    .no-print.toolbar p { margin: 0 0 8px; color: #666; font-size: 13px; }
+    .no-print.toolbar .btn {
+        display: inline-block; margin: 0 4px; padding: 6px 14px; font-size: 13px;
+        text-decoration: none; border-radius: 4px; border: 1px solid transparent; cursor: pointer;
+    }
+    .no-print.toolbar .btn-primary { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+    .no-print.toolbar .btn-outline { background: #fff; color: #212529; border-color: #212529; }
+    .no-print.toolbar .btn-zebra { background: #111; color: #fff; border-color: #111; }
+    .screen-preview { margin-top: 96px; padding: 16px; text-align: center; background: #eee; min-height: 100vh; }
+}
 @media print {
-    html, body { width: 2in; height: 1in; margin: 0; padding: 0; }
     .no-print { display: none !important; }
+    .screen-preview { margin: 0 !important; padding: 0 !important; background: #fff !important; min-height: 0 !important; }
+    .label-set { page-break-after: always; width: <?php echo $pageW; ?>in !important; height: <?php echo $pageH; ?>in !important; }
+    .label-set:last-child { page-break-after: auto; }
+    .device-qr-sticker-pair { border: none !important; background: #fff !important; padding: 0 !important; width: <?php echo $pageW; ?>in !important; height: <?php echo $pageH; ?>in !important; }
+    .device-qr-sticker-card { border-radius: 0 !important; box-shadow: none !important; outline: none !important; }
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: Arial, Helvetica, sans-serif; font-size: 8px; color: #111; background: #f5f5f5; }
-.label-2x1 {
-    width: 2in;
-    height: 1in;
-    padding: 0.04in 0.05in;
+.device-qr-preview-grid { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.device-qr-sticker-pair {
+    display: inline-flex;
+    gap: 0;
+    padding: 8px;
+    background: #e9ecef;
+    border: 1px dashed #adb5bd;
+    border-radius: 4px;
+    width: <?php echo round($pageW * 100); ?>px;
+}
+.device-qr-sticker-card {
+    width: <?php echo round($labelW * 100); ?>px;
+    height: <?php echo round($labelH * 100); ?>px;
+    border: 1px solid #212529;
+    border-radius: 6px;
     background: #fff;
-    border: 1px dashed #ccc;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.08);
     overflow: hidden;
-    margin: 0 auto;
+    box-sizing: border-box;
 }
+.device-qr-sticker-card .qr-img { width: 64px; height: 64px; flex: 0 0 64px; object-fit: contain; }
+.device-qr-sticker-card .qr-text { flex: 1; min-width: 0; text-align: left; }
+.label-2x1 .slgti { font: 700 10px/1.05 Arial, sans-serif; color: #444; margin: 0; }
+.label-2x1 .asset-id { font: 800 13px/1.1 Arial, sans-serif; margin: 0; word-break: break-all; }
 @media print {
-    .label-2x1 { border: none; margin: 0; }
-    body { background: #fff; }
+    .device-qr-sticker-card {
+        width: <?php echo $labelW; ?>in;
+        height: <?php echo $labelH; ?>in;
+        border: none;
+        border-right: 1px solid #ccc;
+        border-radius: 0;
+        padding: 0.06in 0.08in;
+    }
+    .device-qr-sticker-card:last-child { border-right: none; }
+    .device-qr-sticker-card .qr-img { width: 0.68in; height: 0.68in; flex: 0 0 0.68in; }
 }
-.label-2x1 table { width: 100%; height: 0.92in; border-collapse: collapse; }
-.label-2x1 td { vertical-align: middle; }
-.label-2x1 td.qr { width: 0.78in; text-align: center; }
-.label-2x1 td.qr img { width: 0.72in; height: 0.72in; }
-.label-2x1 td.text { padding-left: 0.04in; }
-.label-2x1 .asset-id { font-size: 11px; font-weight: 700; line-height: 1.1; }
-.label-2x1 .meta { font-size: 8px; line-height: 1.15; margin-top: 1px; color: #333; }
-.label-2x1 .brand { font-size: 7px; color: #555; margin-top: 1px; }
-.label-2x1 .slgti { font-size: 7px; font-weight: 700; color: #444; margin-bottom: 1px; }
-.toolbar { text-align: center; padding: 12px; }
 </style>
 <div class="no-print toolbar">
-    <p class="small text-muted mb-2">Label size: <strong>2″ × 1″</strong> — set paper to 2×1 in your printer dialog if needed.</p>
-    <button type="button" class="btn btn-primary btn-sm" onclick="window.print()"><i class="fas fa-print me-1"></i> Print</button>
-    <a href="<?php echo APP_URL; ?>/devices/qr-pdf?id=<?php echo (int)($d['id'] ?? 0); ?>" class="btn btn-outline-dark btn-sm"><i class="fas fa-file-pdf me-1"></i> Download PDF</a>
+    <p><strong><?php echo $e($printerModel); ?></strong> — Full page <strong>4″ × 1″</strong> (two 2″ × 1″ labels) · <?php echo $sets; ?> set(s)</p>
+    <button type="button" class="btn btn-primary" onclick="window.print()">Print</button>
+    <a href="<?php echo APP_URL; ?>/devices/qr-pdf?id=<?php echo (int)($d['id'] ?? 0); ?>&amp;sets=<?php echo $sets; ?>" class="btn btn-outline">Download PDF</a>
+    <a href="<?php echo APP_URL; ?>/devices/qr-zpl?id=<?php echo (int)($d['id'] ?? 0); ?>&amp;sets=<?php echo $sets; ?>" class="btn btn-zebra">Download ZPL</a>
 </div>
-<div class="label-2x1">
-    <table>
-        <tr>
-            <td class="qr">
-                <?php if (!empty($qrDataUri)): ?><img src="<?php echo $qrDataUri; ?>" alt="QR"><?php endif; ?>
-            </td>
-            <td class="text">
-                <div class="slgti">SLGTI</div>
-                <div class="asset-id"><?php echo $e($assetId !== '' ? $assetId : '—'); ?></div>
-                <?php if ($assetTag !== ''): ?><div class="meta">Tag: <?php echo $e($assetTag); ?></div><?php endif; ?>
-                <?php if ($serial !== ''): ?><div class="meta">S/N: <?php echo $e($serial); ?></div><?php endif; ?>
-                <?php if ($line2 !== ''): ?><div class="brand"><?php echo $e($line2); ?></div><?php endif; ?>
-            </td>
-        </tr>
-    </table>
+<div class="screen-preview">
+    <div class="device-qr-preview-grid">
+        <?php for ($s = 0; $s < $sets; $s++): ?>
+        <div class="label-set">
+            <div class="device-qr-sticker-pair">
+                <?php for ($i = 0; $i < $copies; $i++): ?>
+                <div class="device-qr-sticker-card label-2x1">
+                    <?php if (!empty($qrDataUri)): ?><img class="qr-img" src="<?php echo $qrDataUri; ?>" alt="QR"><?php endif; ?>
+                    <div class="qr-text">
+                        <?php require BASE_PATH . '/views/devices/partials/qr_label_text_only.php'; ?>
+                    </div>
+                </div>
+                <?php endfor; ?>
+            </div>
+        </div>
+        <?php endfor; ?>
+    </div>
 </div>

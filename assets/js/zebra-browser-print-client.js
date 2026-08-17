@@ -110,14 +110,136 @@
         });
     }
 
+    function normalizeDeviceList(raw) {
+        if (raw == null) {
+            return [];
+        }
+        if (Array.isArray(raw)) {
+            return raw.map(normalizeDevice).filter(Boolean);
+        }
+        if (typeof raw === 'object') {
+            if (Array.isArray(raw.printer)) {
+                return raw.printer.map(normalizeDevice).filter(Boolean);
+            }
+            if (Array.isArray(raw.printers)) {
+                return raw.printers.map(normalizeDevice).filter(Boolean);
+            }
+            try {
+                var asList = Array.from(raw);
+                if (asList.length) {
+                    return asList.map(normalizeDevice).filter(Boolean);
+                }
+            } catch (e) { /* ignore */ }
+            if (raw[0]) {
+                var indexed = [];
+                for (var k = 0; raw[k] != null; k++) {
+                    var item = normalizeDevice(raw[k]);
+                    if (item) {
+                        indexed.push(item);
+                    }
+                }
+                if (indexed.length) {
+                    return indexed;
+                }
+            }
+            var single = normalizeDevice(raw);
+            return single ? [single] : [];
+        }
+        return [];
+    }
+
+    function normalizePcPrinter(raw) {
+        if (!raw || typeof raw !== 'object') {
+            return null;
+        }
+        var name = raw.name || raw.Name || 'Printer';
+        return {
+            name: name,
+            deviceType: 'printer',
+            connection: raw.port || raw.PortName || 'Windows',
+            uid: 'pc:' + encodeURIComponent(name),
+            source: 'pc',
+            provider: 'windows-spooler',
+            manufacturer: raw.driver || raw.DriverName || 'Windows',
+            version: 1
+        };
+    }
+
+    function mergePrinterLists(zebraList, pcList) {
+        var merged = [];
+        var seen = Object.create(null);
+
+        (zebraList || []).forEach(function (p) {
+            var copy = Object.assign({}, p, { source: p.source || 'zebra' });
+            var key = String(copy.name || copy.uid || '').toLowerCase();
+            if (key && !seen[key]) {
+                seen[key] = true;
+                merged.push(copy);
+            }
+        });
+
+        (pcList || []).forEach(function (p) {
+            var copy = Object.assign({}, p, { source: p.source || 'pc' });
+            var key = String(copy.name || copy.uid || '').toLowerCase();
+            if (key && !seen[key]) {
+                seen[key] = true;
+                merged.push(copy);
+            } else if (key && seen[key]) {
+                for (var i = 0; i < merged.length; i++) {
+                    if (String(merged[i].name || '').toLowerCase() === key && merged[i].source === 'pc') {
+                        merged[i] = Object.assign({}, merged[i], copy, { source: 'zebra+pc' });
+                        break;
+                    }
+                }
+            }
+        });
+
+        return merged;
+    }
+
+    function fetchPcPrinters(apiUrl) {
+        if (!apiUrl) {
+            return Promise.resolve([]);
+        }
+        return fetch(apiUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+            .then(function (res) {
+                if (!res.ok) {
+                    throw new Error('Could not load PC printers (HTTP ' + res.status + ').');
+                }
+                return res.json();
+            })
+            .then(function (data) {
+                var rows = (data && data.printers) ? data.printers : [];
+                return rows.map(normalizePcPrinter).filter(Boolean);
+            });
+    }
+
+    function discoverAllPrinters(options) {
+        options = options || {};
+        var zebraPromise = getLocalPrinters().catch(function () {
+            return getDefaultDevice().then(function (device) {
+                return device ? [device] : [];
+            }).catch(function () {
+                return [];
+            });
+        });
+
+        var pcPromise = fetchPcPrinters(options.pcPrintersUrl).catch(function () {
+            return [];
+        });
+
+        return Promise.all([zebraPromise, pcPromise]).then(function (results) {
+            return mergePrinterLists(results[0], results[1]);
+        });
+    }
+
     function getLocalPrinters() {
         if (typeof global.BrowserPrint === 'object' && typeof global.BrowserPrint.getLocalDevices === 'function') {
             return new Promise(function (resolve, reject) {
                 try {
                     global.BrowserPrint.getLocalDevices(
                         function (devices) {
-                            var list = Array.isArray(devices) ? devices : (devices && devices.printer) || [];
-                            resolve(list.map(normalizeDevice).filter(Boolean));
+                            resolve(normalizeDeviceList(devices));
                         },
                         function () { reject(new Error(UNAVAILABLE_MSG)); },
                         'printer'
@@ -129,9 +251,7 @@
         }
 
         return request('GET', '/available').then(function (text) {
-            var data = parseJson(text, {});
-            var list = Array.isArray(data) ? data : (data.printer || data.printers || []);
-            return list.map(normalizeDevice).filter(Boolean);
+            return normalizeDeviceList(parseJson(text, {}));
         });
     }
 
@@ -201,6 +321,9 @@
         resolvePrinter: resolvePrinter,
         sendToDevice: sendToDevice,
         getLocalPrinters: getLocalPrinters,
-        getDefaultDevice: getDefaultDevice
+        getDefaultDevice: getDefaultDevice,
+        discoverAllPrinters: discoverAllPrinters,
+        fetchPcPrinters: fetchPcPrinters,
+        mergePrinterLists: mergePrinterLists
     };
 })(window);
