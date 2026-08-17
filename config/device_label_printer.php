@@ -51,4 +51,7 @@ return [
      * Labels scanned on phones must open the live site, not localhost/WAMP.
      */
     'qr_public_base_url' => 'https://sis.slgti.ac.lk',
+
+    /** false = load Windows printers from this PC (WAMP); true = Zebra Browser Print in browser. */
+    'use_browser_print' => false,
 ];

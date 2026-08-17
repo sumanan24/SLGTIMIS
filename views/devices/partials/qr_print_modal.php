@@ -15,6 +15,7 @@ $baseUrl = rtrim(APP_URL, '/');
 $siteHost = parse_url($baseUrl, PHP_URL_HOST) ?: 'sis.slgti.ac.lk';
 $sslSupportUrl = DeviceAssetHelper::browserPrintSslSupportUrl();
 $deviceViewUrl = DeviceAssetHelper::deviceViewUrl((int) $id);
+$useBrowserPrint = !empty($labelPrinterConfig['use_browser_print']);
 $printPayload = [
     'deviceId' => (int) $id,
     'assetId' => (string) ($d['asset_id'] ?? ''),
@@ -34,6 +35,9 @@ $printPayload = [
     'siteHost' => $siteHost,
     'sslSupportUrl' => $sslSupportUrl,
     'assetsBase' => $baseUrl,
+    'printersUrl' => $baseUrl . '/devices/printers',
+    'serverPrintUrl' => $baseUrl . '/devices/qr-print-server',
+    'useBrowserPrint' => $useBrowserPrint,
 ];
 ?>
 <link rel="stylesheet" href="<?php echo htmlspecialchars($baseUrl . '/assets/css/device-qr-printer.css', ENT_QUOTES, 'UTF-8'); ?>">
@@ -59,23 +63,25 @@ $printPayload = [
                 </dl>
 
                 <div id="zebra-bp-status-card" class="zebra-bp-status-card">
-                    <div class="status-head"><span class="zebra-bp-spinner"></span><span class="status-dot checking"></span><span>Connecting to Zebra Browser Print…</span></div>
-                    <p class="status-meta">Please wait while we connect to the printer on this computer.</p>
+                    <div class="status-head"><span class="zebra-bp-spinner"></span><span class="status-dot checking"></span><span>Loading printers from this PC…</span></div>
+                    <p class="status-meta">Reading Windows installed printers (Settings → Printers &amp; scanners).</p>
                 </div>
 
                 <div id="zebra-bp-setup-wizard" class="zebra-bp-wizard d-none" aria-live="polite"></div>
 
                 <div class="device-qr-printer-row mb-2">
                     <label for="device-qr-printer-select">Printer</label>
-                    <select id="device-qr-printer-select" class="form-select form-select-sm" title="Zebra printer on this computer">
-                        <option value="">Connecting…</option>
+                    <select id="device-qr-printer-select" class="form-select form-select-sm" title="Windows printer on this PC">
+                        <option value="">Loading printers…</option>
                     </select>
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="device-qr-refresh-printers">
                         <i class="fas fa-sync-alt me-1"></i> Refresh Printers
                     </button>
-                    <a href="<?php echo $e($sslSupportUrl); ?>" target="_blank" rel="noopener" class="btn btn-outline-info btn-sm" id="device-qr-chrome-setup">
+                    <?php if ($useBrowserPrint): ?>
+                    <a href="<?php echo $e($sslSupportUrl); ?>" target="_blank" rel="noopener" class="btn btn-outline-info btn-sm d-none" id="device-qr-chrome-setup">
                         <i class="fas fa-shield-alt me-1"></i> Open SSL Setup
                     </a>
+                    <?php endif; ?>
                     <button type="button" class="btn btn-outline-primary btn-sm" id="device-qr-test-print" disabled>
                         <i class="fas fa-vial me-1"></i> Test Print
                     </button>
