@@ -9,6 +9,7 @@ $canManage = !empty($canManage);
 $listQuery = static function (array $extra = []) use ($f): string {
     $params = [
         'q' => $f['search'] ?? '',
+        'serial' => $f['serial'] ?? '',
         'type' => $f['device_type'] ?? '',
         'status' => $f['status'] ?? '',
         'dept' => $f['department_id'] ?? '',
@@ -111,7 +112,6 @@ $canAssignDevice = static function (array $row) use ($canManage): bool {
         <table class="table table-hover align-middle mb-0">
             <colgroup>
                 <col class="dev-col-asset">
-                <col class="dev-col-tag">
                 <col class="dev-col-type">
                 <col class="dev-col-brand">
                 <col class="dev-col-model">
@@ -119,13 +119,11 @@ $canAssignDevice = static function (array $row) use ($canManage): bool {
                 <col class="dev-col-user">
                 <col class="dev-col-dept">
                 <col class="dev-col-status">
-                <col class="dev-col-warranty">
                 <col class="dev-col-actions">
             </colgroup>
             <thead>
                 <tr>
                     <th scope="col">Asset ID</th>
-                    <th scope="col">Tag</th>
                     <th scope="col">Type</th>
                     <th scope="col">Brand</th>
                     <th scope="col">Model</th>
@@ -133,16 +131,14 @@ $canAssignDevice = static function (array $row) use ($canManage): bool {
                     <th scope="col">Assigned User</th>
                     <th scope="col">Department</th>
                     <th scope="col">Status</th>
-                    <th scope="col">Warranty</th>
                     <th scope="col" class="text-end">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($devices)): ?>
-                <tr><td colspan="11" class="text-center text-muted py-4">No devices found.</td></tr>
+                <tr><td colspan="9" class="text-center text-muted py-4">No devices found.</td></tr>
                 <?php else: foreach ($devices as $d):
                     $id = (int) ($d['id'] ?? 0);
-                    $wc = DeviceModel::warrantyCategory($d['warranty_expiry'] ?? null);
                     $status = (string) ($d['status'] ?? '');
                     $showAssign = $canAssignDevice($d);
                 ?>
@@ -152,7 +148,6 @@ $canAssignDevice = static function (array $row) use ($canManage): bool {
                             <span class="dev-cell-ellipsis" title="<?php echo $e($d['asset_id'] ?? ''); ?>"><?php echo $e($d['asset_id'] ?? ''); ?></span>
                         </a>
                     </td>
-                    <td><span class="dev-cell-ellipsis" title="<?php echo $e($d['asset_tag_no'] ?? ''); ?>"><?php echo $e($d['asset_tag_no'] ?? '—'); ?></span></td>
                     <td><?php echo $e($d['device_type'] ?? ''); ?></td>
                     <td><span class="dev-cell-ellipsis" title="<?php echo $e($d['brand'] ?? ''); ?>"><?php echo $e($d['brand'] ?? '—'); ?></span></td>
                     <td><span class="dev-cell-ellipsis" title="<?php echo $e($d['model'] ?? ''); ?>"><?php echo $e($d['model'] ?? '—'); ?></span></td>
@@ -167,17 +162,10 @@ $canAssignDevice = static function (array $row) use ($canManage): bool {
                         <span class="badge bg-<?php echo DeviceAssetHelper::statusBadgeClass($status); ?>"><?php echo $e(DeviceModel::statusLabel($status)); ?></span>
                     </td>
                     <td>
-                        <span class="badge bg-<?php echo DeviceAssetHelper::warrantyBadgeClass($wc); ?>" title="<?php echo $e(DeviceModel::warrantyCategory($d['warranty_expiry'] ?? null)); ?>">
-                            <?php echo $e($d['warranty_expiry'] ?? '—'); ?>
-                        </span>
-                    </td>
-                    <td>
                         <div class="dev-actions">
                             <a href="<?php echo APP_URL; ?>/devices/view?id=<?php echo $id; ?>" class="btn btn-outline-primary btn-icon" title="View"><i class="fas fa-eye"></i></a>
                             <?php if ($showAssign): ?>
-                            <a href="<?php echo APP_URL; ?>/devices/assign?id=<?php echo $id; ?>" class="btn btn-outline-success btn-assign" title="<?php echo $status === DeviceModel::STATUS_ASSIGNED ? 'Reassign' : 'Assign'; ?>">
-                                <i class="fas fa-user-plus me-1"></i><?php echo $status === DeviceModel::STATUS_ASSIGNED ? 'Reassign' : 'Assign'; ?>
-                            </a>
+                            <a href="<?php echo APP_URL; ?>/devices/assign?id=<?php echo $id; ?>" class="btn btn-outline-success btn-icon" title="<?php echo $status === DeviceModel::STATUS_ASSIGNED ? 'Reassign' : 'Assign'; ?>"><i class="fas fa-user-plus"></i></a>
                             <?php endif; ?>
                             <?php if ($canManage): ?>
                             <a href="<?php echo APP_URL; ?>/devices/edit?id=<?php echo $id; ?>" class="btn btn-outline-secondary btn-icon" title="Edit"><i class="fas fa-edit"></i></a>

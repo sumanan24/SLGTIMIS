@@ -56,7 +56,7 @@ $aa = $activeAssignment ?? null;
                 <?php if (!empty($qrDataUri)): ?><img src="<?php echo $qrDataUri; ?>" alt="QR"><?php endif; ?>
             </div>
             <div class="mt-3 text-center">
-                <a href="<?php echo APP_URL; ?>/devices/view?id=<?php echo (int)($d['id'] ?? 0); ?>" class="btn btn-sm btn-outline-primary">Full record</a>
+                <a href="<?php echo $e(DeviceAssetHelper::qrContentUrl($d)); ?>" class="btn btn-sm btn-outline-primary">Full record</a>
                 <a href="<?php echo APP_URL; ?>/devices/list" class="btn btn-sm btn-outline-secondary">All devices</a>
             </div>
         </div>

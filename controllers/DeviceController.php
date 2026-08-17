@@ -24,6 +24,23 @@ class DeviceController extends Controller {
         return $this->model('DeviceModel');
     }
 
+    private function resolveDeviceFromRequest(DeviceModel $model): ?array {
+        $serialNumber = trim((string) $this->get('serial', ''));
+        if ($serialNumber !== '') {
+            return $model->findDeviceBySerialNumber($serialNumber);
+        }
+        $assetId = trim((string) $this->get('asset_id', ''));
+        if ($assetId !== '') {
+            return $model->findDeviceByAssetId($assetId);
+        }
+        $id = (int) $this->get('id', 0);
+        if ($id > 0) {
+            return $model->findDevice($id);
+        }
+
+        return null;
+    }
+
     private function requireView(int $uid): UserModel {
         $um = $this->userModel();
         if (!$um->canViewDevices($uid)) {
@@ -48,6 +65,7 @@ class DeviceController extends Controller {
     private function listFilters(): array {
         return [
             'search' => trim((string) $this->get('q', '')),
+            'serial' => trim((string) $this->get('serial', '')),
             'device_type' => trim((string) $this->get('type', '')),
             'status' => trim((string) $this->get('status', '')),
             'department_id' => trim((string) $this->get('dept', '')),
@@ -98,6 +116,13 @@ class DeviceController extends Controller {
         $uid = $this->requireLogin();
         $um = $this->requireView($uid);
         $model = $this->deviceModel();
+        $serialFilter = trim((string) $this->get('serial', ''));
+        if ($serialFilter !== '') {
+            $device = $model->findDeviceBySerialNumber($serialFilter);
+            if ($device) {
+                $this->redirect('devices/view?id=' . (int) ($device['id'] ?? 0));
+            }
+        }
         $filters = $this->listFilters();
         $page = max(1, (int) $this->get('page', 1));
         $result = $model->listDevices($filters, $page, 25);
@@ -208,29 +233,38 @@ class DeviceController extends Controller {
             $_SESSION['error'] = 'Device not found.';
             $this->redirect('devices');
         }
-        $model->softDeleteDevice($id, $uid);
-        $model->logAudit($id, $uid, 'device_deleted', $old, null);
-        $this->logActivity('DELETE', 'devices', (string) $id, 'Device deleted: ' . ($old['asset_id'] ?? ''));
-        $_SESSION['success'] = 'Device removed.';
-        $this->redirect('devices');
+        if ($model->isDeviceAssigned($old)) {
+            $_SESSION['error'] = 'Cannot delete an assigned device. Return the device first.';
+            $this->redirect('devices/view?id=' . $id);
+        }
+        $assetLabel = (string) ($old['asset_id'] ?? $id);
+        if (!$model->hardDeleteDevice($id)) {
+            $_SESSION['error'] = 'Could not delete device. Please try again.';
+            $this->redirect('devices/view?id=' . $id);
+        }
+        $this->logActivity('DELETE', 'devices', (string) $id, 'Device permanently deleted: ' . $assetLabel);
+        $_SESSION['success'] = 'Device "' . $assetLabel . '" and all related records were permanently deleted from the database.';
+        $this->redirect('devices/list');
     }
 
     public function show() {
         $uid = $this->requireLogin();
         $um = $this->requireView($uid);
-        $id = (int) $this->get('id', 0);
         $model = $this->deviceModel();
-        $device = $model->findDevice($id);
+        $device = $this->resolveDeviceFromRequest($model);
         if (!$device) {
             $_SESSION['error'] = 'Device not found.';
             $this->redirect('devices');
         }
+        $id = (int) ($device['id'] ?? 0);
         $qrUri = DeviceAssetHelper::qrPngDataUriForDevice($device, 260);
+        $canDeleteDevice = $um->canManageDevices($uid) && !$model->isDeviceAssigned($device);
 
         return $this->view('devices/view', array_merge($this->baseViewData($uid, $um), [
             'page' => 'devices',
             'deviceSection' => 'devices',
             'device' => $device,
+            'canDeleteDevice' => $canDeleteDevice,
             'accessories' => $model->getAccessories($id),
             'assignments' => $model->getAssignmentHistory($id),
             'activeAssignment' => $model->getActiveAssignment($id),

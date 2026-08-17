@@ -171,6 +171,12 @@ class DeviceModel extends Model {
                 $params[] = $q;
             }
         }
+        $serial = trim((string) ($filters['serial'] ?? ''));
+        if ($serial !== '') {
+            $where[] = 'd.`serial_number` = ?';
+            $types .= 's';
+            $params[] = $serial;
+        }
         if (!empty($filters['device_type']) && in_array($filters['device_type'], self::DEVICE_TYPES, true)) {
             $where[] = 'd.`device_type` = ?';
             $types .= 's';
@@ -231,6 +237,50 @@ class DeviceModel extends Model {
         }
         $sql .= ' LIMIT 1';
         $rows = $this->fetchAllPrepared($sql, 'i', [$id]);
+
+        return $rows[0] ?? null;
+    }
+
+    public function findDeviceByAssetId(string $assetId, bool $includeDeleted = false): ?array {
+        $assetId = trim($assetId);
+        if ($assetId === '') {
+            return null;
+        }
+        $this->ensureTables();
+        $sql = 'SELECT d.*, s.`staff_name` AS assigned_staff_name, s.`staff_pno` AS assigned_staff_phone, '
+            . 's.`staff_email` AS assigned_staff_email, s.`staff_position` AS assigned_staff_position, '
+            . 'dep.`department_name` AS assigned_department_name '
+            . 'FROM `devices` d '
+            . 'LEFT JOIN `staff` s ON s.`staff_id` = d.`assigned_employee_id` '
+            . 'LEFT JOIN `department` dep ON dep.`department_id` = s.`department_id` '
+            . 'WHERE d.`asset_id` = ?';
+        if (!$includeDeleted) {
+            $sql .= ' AND d.`deleted_at` IS NULL';
+        }
+        $sql .= ' LIMIT 1';
+        $rows = $this->fetchAllPrepared($sql, 's', [$assetId]);
+
+        return $rows[0] ?? null;
+    }
+
+    public function findDeviceBySerialNumber(string $serialNumber, bool $includeDeleted = false): ?array {
+        $serialNumber = trim($serialNumber);
+        if ($serialNumber === '') {
+            return null;
+        }
+        $this->ensureTables();
+        $sql = 'SELECT d.*, s.`staff_name` AS assigned_staff_name, s.`staff_pno` AS assigned_staff_phone, '
+            . 's.`staff_email` AS assigned_staff_email, s.`staff_position` AS assigned_staff_position, '
+            . 'dep.`department_name` AS assigned_department_name '
+            . 'FROM `devices` d '
+            . 'LEFT JOIN `staff` s ON s.`staff_id` = d.`assigned_employee_id` '
+            . 'LEFT JOIN `department` dep ON dep.`department_id` = s.`department_id` '
+            . 'WHERE d.`serial_number` = ?';
+        if (!$includeDeleted) {
+            $sql .= ' AND d.`deleted_at` IS NULL';
+        }
+        $sql .= ' LIMIT 1';
+        $rows = $this->fetchAllPrepared($sql, 's', [$serialNumber]);
 
         return $rows[0] ?? null;
     }
@@ -307,6 +357,60 @@ class DeviceModel extends Model {
             'deleted_at' => date('Y-m-d H:i:s'),
             'updated_by' => $userId,
         ]);
+    }
+
+    /**
+     * @param array<string, mixed> $device
+     */
+    public function isDeviceAssigned(array $device): bool {
+        if (($device['status'] ?? '') === self::STATUS_ASSIGNED) {
+            return true;
+        }
+        if (trim((string) ($device['assigned_employee_id'] ?? '')) !== '') {
+            return true;
+        }
+        $id = (int) ($device['id'] ?? 0);
+        if ($id > 0 && $this->getActiveAssignment($id) !== null) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function hardDeleteDevice(int $id): bool {
+        $conn = $this->db->getConnection();
+        $conn->begin_transaction();
+        try {
+            $childTables = [
+                'device_accessories',
+                'device_assignments',
+                'device_condition_history',
+                'device_audit_logs',
+            ];
+            foreach ($childTables as $table) {
+                $stmt = $this->db->prepare("DELETE FROM `{$table}` WHERE `device_id` = ?");
+                if (!$stmt) {
+                    throw new RuntimeException('Prepare failed for ' . $table);
+                }
+                $stmt->bind_param('i', $id);
+                if (!$stmt->execute()) {
+                    $stmt->close();
+                    throw new RuntimeException('Delete failed for ' . $table);
+                }
+                $stmt->close();
+            }
+            if (!$this->delete($id)) {
+                throw new RuntimeException('Delete failed for devices');
+            }
+            $conn->commit();
+
+            return true;
+        } catch (Throwable $e) {
+            $conn->rollback();
+            error_log('DeviceModel::hardDeleteDevice: ' . $e->getMessage());
+
+            return false;
+        }
     }
 
     public function regenerateQrToken(int $id, int $userId): ?string {

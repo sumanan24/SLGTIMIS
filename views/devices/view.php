@@ -126,18 +126,14 @@ $aa = $activeAssignment ?? null;
                 <h3>QR Code</h3>
                 <?php if (!empty($qrDataUri)): ?><img src="<?php echo $qrDataUri; ?>" alt="QR Code"><?php endif; ?>
                 <p class="small text-muted mt-2 mb-0">Scan opens authorized device page (login required).</p>
-                <?php if (!empty($canManage)): ?>
-                <form method="post" action="<?php echo APP_URL; ?>/devices/regenerate-qr" class="mt-2" onsubmit="return confirm('Regenerate QR? Old labels will stop working.');">
-                    <input type="hidden" name="id" value="<?php echo $id; ?>">
-                    <button class="btn btn-sm btn-outline-danger">Regenerate QR</button>
-                </form>
-                <?php endif; ?>
             </div>
-            <?php if (!empty($canManage)): ?>
-            <form method="post" action="<?php echo APP_URL; ?>/devices/delete" onsubmit="return confirm('Delete this device?');">
+            <?php if (!empty($canDeleteDevice)): ?>
+            <form method="post" action="<?php echo APP_URL; ?>/devices/delete" onsubmit="return confirm('WARNING: This will permanently delete this device and all related data (assignments, accessories, condition history, audit logs) from the database.\n\nThis action cannot be undone.\n\nAre you sure you want to delete <?php echo $e($d['asset_id'] ?? 'this device'); ?>?');">
                 <input type="hidden" name="id" value="<?php echo $id; ?>">
-                <button class="btn btn-sm btn-outline-danger w-100">Delete Device</button>
+                <button type="submit" class="btn btn-sm btn-outline-danger w-100">Delete Device</button>
             </form>
+            <?php elseif (!empty($canManage)): ?>
+            <p class="small text-muted mb-0">Assigned devices cannot be deleted. Return the device first.</p>
             <?php endif; ?>
         </div>
     </div>

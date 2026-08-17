@@ -48,7 +48,6 @@
     background-color: #f8f9fa;
 }
 .dev-col-asset { width: 7.5rem; }
-.dev-col-tag { width: 5.5rem; }
 .dev-col-type { width: 4.5rem; }
 .dev-col-brand { width: 6.5rem; }
 .dev-col-model { width: 7.5rem; }
@@ -56,7 +55,6 @@
 .dev-col-user { width: 9rem; }
 .dev-col-dept { width: 8rem; }
 .dev-col-status { width: 7.5rem; }
-.dev-col-warranty { width: 6.5rem; }
 .dev-col-actions { width: 11rem; }
 .dev-cell-ellipsis {
     display: block;
@@ -83,9 +81,6 @@
     padding-left: 0;
     padding-right: 0;
     text-align: center;
-}
-.dev-actions .btn-assign {
-    font-weight: 600;
 }
 .dev-list-summary {
     display: flex;

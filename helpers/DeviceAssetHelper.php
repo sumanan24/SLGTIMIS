@@ -331,18 +331,40 @@ final class DeviceAssetHelper
         return rtrim(APP_URL, '/') . '/devices/qr/' . rawurlencode($token);
     }
 
-    /** Public device record page — QR label destination (uses production base URL when configured). */
-    public static function deviceViewUrl(int $deviceId): string
+    /** Base URL for QR label links (production override when configured). */
+    private static function qrPublicBaseUrl(): string
     {
         $cfg = self::labelConfig();
         $base = trim((string) ($cfg['qr_public_base_url'] ?? ''));
         if ($base === '') {
-            $base = rtrim(APP_URL, '/');
-        } else {
-            $base = rtrim($base, '/');
+            return rtrim(APP_URL, '/');
         }
 
-        return $base . '/devices/view?id=' . max(0, $deviceId);
+        return rtrim($base, '/');
+    }
+
+    /** Public device list filter — QR scan opens device by serial number. */
+    public static function deviceFilterUrl(string $serialNumber): string
+    {
+        $serialNumber = trim($serialNumber);
+        $base = self::qrPublicBaseUrl();
+        if ($serialNumber === '') {
+            return $base . '/devices';
+        }
+
+        return $base . '/devices?serial=' . rawurlencode($serialNumber);
+    }
+
+    /** Public device record page — fallback when serial is not set. */
+    public static function deviceViewUrl(string $assetId): string
+    {
+        $assetId = trim($assetId);
+        $base = self::qrPublicBaseUrl();
+        if ($assetId === '') {
+            return $base . '/devices/view';
+        }
+
+        return $base . '/devices/view?asset_id=' . rawurlencode($assetId);
     }
 
     /** Browser Print SSL setup — always localhost on the user's PC. */
@@ -358,9 +380,17 @@ final class DeviceAssetHelper
      */
     public static function qrContentUrl(array $device): string
     {
+        $serial = trim((string) ($device['serial_number'] ?? ''));
+        if ($serial !== '') {
+            return self::deviceFilterUrl($serial);
+        }
+        $assetId = trim((string) ($device['asset_id'] ?? ''));
+        if ($assetId !== '') {
+            return self::deviceViewUrl($assetId);
+        }
         $id = (int) ($device['id'] ?? 0);
         if ($id > 0) {
-            return self::deviceViewUrl($id);
+            return self::qrPublicBaseUrl() . '/devices/view?id=' . $id;
         }
         $token = trim((string) ($device['qr_token'] ?? ''));
 
