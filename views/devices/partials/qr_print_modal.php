@@ -1,7 +1,6 @@
 <?php
 /**
- * Device QR label print modal — 2-up preview, Zebra Browser Print (client-side).
- * Vars: $id, $d, $e, $qrDataUri, $labelPrinterConfig, $defaultLabelSets, $maxLabelSets, $labelsPerSet
+ * Device QR label print modal — production Browser Print integration.
  */
 if (!class_exists('DeviceAssetHelper', false)) {
     require_once BASE_PATH . '/helpers/DeviceAssetHelper.php';
@@ -13,6 +12,7 @@ $labelsPerSet = (int) ($labelsPerSet ?? DeviceAssetHelper::labelsPerSet());
 $labelWmm = round(DeviceAssetHelper::labelWidthIn() * 25.4, 1);
 $labelHmm = round(DeviceAssetHelper::labelHeightIn() * 25.4, 1);
 $baseUrl = rtrim(APP_URL, '/');
+$siteHost = parse_url($baseUrl, PHP_URL_HOST) ?: 'sis.slgti.ac.lk';
 $printPayload = [
     'deviceId' => (int) $id,
     'assetId' => (string) ($d['asset_id'] ?? ''),
@@ -29,8 +29,11 @@ $printPayload = [
     'pdfUrl' => $baseUrl . '/devices/qr-pdf',
     'previewUrl' => $baseUrl . '/devices/qr-print',
     'deviceViewUrl' => DeviceAssetHelper::deviceViewUrl((int) $id),
+    'siteHost' => $siteHost,
+    'assetsBase' => $baseUrl,
 ];
 ?>
+<link rel="stylesheet" href="<?php echo htmlspecialchars($baseUrl . '/assets/css/device-qr-printer.css', ENT_QUOTES, 'UTF-8'); ?>">
 <script type="application/json" id="device-qr-print-data"><?php echo json_encode($printPayload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?></script>
 
 <div class="modal fade" id="deviceQrPrintModal" tabindex="-1" aria-labelledby="deviceQrPrintModalLabel" aria-hidden="true">
@@ -45,31 +48,42 @@ $printPayload = [
                     <dt class="col-sm-3">Device</dt>
                     <dd class="col-sm-9 mb-1"><strong><?php echo $e($d['asset_id'] ?? '—'); ?></strong></dd>
                     <dt class="col-sm-3">Configured printer</dt>
-                    <dd class="col-sm-9 mb-1"><?php echo $e($printerModel); ?></dd>
+                    <dd class="col-sm-9 mb-1"><?php echo $e($printerModel); ?> <span class="text-muted">· USB · Zebra</span></dd>
                     <dt class="col-sm-3">Labels per set</dt>
                     <dd class="col-sm-9 mb-0"><?php echo $labelsPerSet; ?> <span class="text-muted">(same QR side-by-side)</span></dd>
                 </dl>
 
-                <div class="device-qr-printer-row">
+                <div id="zebra-bp-status-card" class="zebra-bp-status-card">
+                    <div class="status-head"><span class="zebra-bp-spinner"></span><span class="status-dot checking"></span><span>Connecting to Zebra Browser Print…</span></div>
+                    <p class="status-meta">Please wait while we connect to the printer on this computer.</p>
+                </div>
+
+                <div id="zebra-bp-setup-wizard" class="zebra-bp-wizard d-none" aria-live="polite"></div>
+
+                <div class="device-qr-printer-row mb-2">
                     <label for="device-qr-printer-select">Printer</label>
                     <select id="device-qr-printer-select" class="form-select form-select-sm" title="Zebra printer on this computer">
-                        <option value="">Detecting printers…</option>
+                        <option value="">Connecting…</option>
                     </select>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="device-qr-refresh-printers" title="Re-detect Zebra printers via Browser Print">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="device-qr-refresh-printers">
                         <i class="fas fa-sync-alt me-1"></i> Refresh Printers
                     </button>
-                    <button type="button" class="btn btn-outline-info btn-sm" id="device-qr-chrome-setup" title="Accept Browser Print SSL certificate for Chrome">
+                    <button type="button" class="btn btn-outline-info btn-sm" id="device-qr-chrome-setup">
                         <i class="fas fa-shield-alt me-1"></i> Set up Chrome
                     </button>
-                    <span class="device-qr-printer-status text-muted small" id="device-qr-printer-status">Detecting printers…</span>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="device-qr-test-print" disabled>
+                        <i class="fas fa-vial me-1"></i> Test Print
+                    </button>
                 </div>
-                <div class="alert alert-warning py-2 px-3 small mb-3 d-none" id="device-qr-printer-setup" role="alert"></div>
-                <p class="small text-muted mb-3">Printing uses <strong>Zebra Browser Print</strong> on <strong>this computer</strong> (Chrome → Browser Print → USB ZD230). The web server does not access your USB printer.</p>
+
+                <div id="zebra-bp-printer-list" class="d-none mb-2"></div>
+                <div id="zebra-bp-diagnostics"></div>
+                <div id="device-qr-print-result" class="device-qr-print-result" role="status" aria-live="polite"></div>
 
                 <div class="mb-3">
                     <label for="deviceQrLabelSets" class="form-label">Number of sets</label>
                     <input type="number" class="form-control form-control-sm" id="deviceQrLabelSets" min="1" max="<?php echo $maxSets; ?>" value="<?php echo $defaultSets; ?>" required style="max-width:8rem;">
-                    <div class="form-text">Each set fills one <strong>4″ × 1″</strong> strip (two <?php echo $labelWmm; ?> mm × <?php echo $labelHmm; ?> mm identical labels side-by-side).</div>
+                    <div class="form-text">Each set = one <?php echo $labelWmm; ?> mm × 2 strip with <?php echo $labelsPerSet; ?> identical QR labels.</div>
                 </div>
 
                 <p class="device-qr-preview-meta mb-2" id="deviceQrPreviewMeta"></p>
@@ -80,8 +94,22 @@ $printPayload = [
                 <button type="button" class="btn btn-outline-primary btn-sm" id="device-qr-full-preview"><i class="fas fa-external-link-alt me-1"></i> Full Preview</button>
                 <button type="button" class="btn btn-outline-danger btn-sm" id="device-qr-download-pdf"><i class="fas fa-file-pdf me-1"></i> PDF</button>
                 <button type="button" class="btn btn-outline-dark btn-sm" id="device-qr-download-zpl"><i class="fas fa-download me-1"></i> ZPL File</button>
-                <button type="button" class="btn btn-dark btn-sm" id="device-qr-confirm-print" disabled title="Select a detected Zebra printer first"><i class="fas fa-print me-1"></i> Print Labels</button>
+                <button type="button" class="btn btn-dark btn-sm" id="device-qr-confirm-print" disabled><i class="fas fa-print me-1"></i> Print Labels</button>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+.device-qr-preview-grid{display:flex;flex-direction:column;gap:10px;align-items:center;}
+.device-qr-sticker-pair{display:flex;gap:0;padding:8px;background:#e9ecef;border:1px dashed #adb5bd;border-radius:4px;width:408px;}
+.device-qr-sticker-card{width:200px;height:100px;border:1px solid #212529;border-radius:6px;background:#fff;padding:5px 6px;display:flex;flex-direction:row;align-items:center;gap:10px;overflow:hidden;box-sizing:border-box;}
+.device-qr-sticker-card .qr-img{width:58px;height:58px;flex:0 0 58px;object-fit:contain;}
+.device-qr-sticker-card .qr-text{flex:1;font-family:Arial,sans-serif;}
+.device-qr-sticker-card .asset-no{font-size:15px;font-weight:600;color:#666;}
+.device-qr-sticker-card .serial-no{font-size:15px;font-weight:800;color:#111;word-break:break-all;}
+.device-qr-printer-row{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;padding:.55rem .75rem;background:#fff;border:1px solid #dee2e6;border-radius:.375rem;}
+.device-qr-printer-row label{margin:0;font-size:.8125rem;font-weight:600;}
+.device-qr-printer-row select{min-width:16rem;max-width:100%;}
+#deviceQrPrintModal .modal-body{max-height:70vh;overflow:auto;background:#f1f3f5;}
+</style>
