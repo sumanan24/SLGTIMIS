@@ -75,6 +75,33 @@
         return decodeURIComponent(String(uid || '').slice(3));
     }
 
+    function renderSetupHelp(show) {
+        var box = document.getElementById('device-qr-printer-setup');
+        var client = global.ZebraBrowserPrintClient;
+        if (!box) {
+            return;
+        }
+        if (!show) {
+            box.classList.add('d-none');
+            box.innerHTML = '';
+            return;
+        }
+        var steps = client && client.getChromeSetupSteps
+            ? client.getChromeSetupSteps()
+            : ['Install Zebra Browser Print on this PC and click Load printers.'];
+        var sslUrl = client && client.sslSupportUrl ? client.sslSupportUrl() : 'https://localhost:9101/ssl_support';
+        var html = '<strong>No printer detected on this computer.</strong> Chrome on '
+            + (global.location && global.location.protocol === 'https:' ? 'HTTPS' : 'HTTP')
+            + ' needs Zebra Browser Print running locally:<ol class="mb-2 ps-3">';
+        steps.forEach(function (step) {
+            html += '<li>' + escapeHtml(step) + '</li>';
+        });
+        html += '</ol><a class="alert-link" href="' + escapeHtml(sslUrl) + '" target="_blank" rel="noopener">Open certificate setup (' + escapeHtml(sslUrl) + ')</a>'
+            + ' · Or use <strong>PDF</strong> / <strong>ZPL file</strong> below.';
+        box.innerHTML = html;
+        box.classList.remove('d-none');
+    }
+
     function fillPrinterSelect(selectEl, printers, preferredUid) {
         if (!selectEl) {
             return;
@@ -137,27 +164,35 @@
         return discover
             .then(function (list) {
                 cachedPrinters = list || [];
+                var ctx = cachedPrinters._context || {};
                 fillPrinterSelect(selectEl, cachedPrinters, rememberedPrinterUid());
-                if (statusEl) {
-                    if (!cachedPrinters.length) {
-                        statusEl.textContent = 'No printers found on this PC. Connect the ZD230 and click refresh.';
-                    } else {
+                if (!cachedPrinters.length) {
+                    renderSetupHelp(true);
+                    if (statusEl) {
+                        statusEl.textContent = ctx.serverPrintAvailable
+                            ? 'No local printers found. Use Zebra Browser Print on this PC (see steps below).'
+                            : 'No printers found on this PC. Install Zebra Browser Print and click Set up Chrome.';
+                    }
+                } else {
+                    renderSetupHelp(false);
+                    if (statusEl) {
                         var pcCount = cachedPrinters.filter(function (p) {
                             return p.source === 'pc' || p.source === 'zebra+pc';
                         }).length;
                         var zebraCount = cachedPrinters.filter(function (p) {
                             return p.source === 'zebra' || p.source === 'zebra+pc';
                         }).length;
-                        statusEl.textContent = cachedPrinters.length + ' printer(s) found'
-                            + (pcCount ? (' · ' + pcCount + ' from Windows') : '')
-                            + (zebraCount ? (' · ' + zebraCount + ' via Zebra Browser Print') : '')
-                            + '. Select your label printer (e.g. ZDesigner ZD230).';
+                        statusEl.textContent = cachedPrinters.length + ' printer(s) on this PC'
+                            + (zebraCount ? (' · ' + zebraCount + ' via Browser Print') : '')
+                            + (pcCount ? (' · ' + pcCount + ' from server Windows') : '')
+                            + '. Select ZDesigner ZD230 if listed.';
                     }
                 }
                 return cachedPrinters;
             })
             .catch(function (err) {
                 cachedPrinters = [];
+                renderSetupHelp(true);
                 if (selectEl) {
                     selectEl.innerHTML = '<option value="">Could not load printers</option>';
                 }
@@ -313,7 +348,10 @@
 
         fetchZpl(sets)
             .then(function (zpl) {
-                return client.resolvePrinter(printerUid).then(function (printer) {
+                var zebraOnly = (cachedPrinters || []).filter(function (p) {
+                    return p.source !== 'pc' && String(p.uid || '').indexOf('pc:') !== 0;
+                });
+                return client.resolvePrinter(printerUid, zebraOnly).then(function (printer) {
                     return client.sendToDevice(printer, zpl).then(function () {
                         return printer;
                     });
@@ -382,6 +420,18 @@
         if (refreshBtn) {
             refreshBtn.addEventListener('click', function () {
                 refreshPrinterList(document.getElementById('device-qr-printer-status'));
+            });
+        }
+
+        var setupBtn = document.getElementById('device-qr-chrome-setup');
+        if (setupBtn) {
+            setupBtn.addEventListener('click', function () {
+                var client = global.ZebraBrowserPrintClient;
+                var url = client && client.sslSupportUrl
+                    ? client.sslSupportUrl()
+                    : 'https://localhost:9101/ssl_support';
+                global.open(url, '_blank', 'noopener');
+                renderSetupHelp(true);
             });
         }
 

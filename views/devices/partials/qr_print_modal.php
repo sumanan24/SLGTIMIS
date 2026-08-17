@@ -56,10 +56,12 @@ $printPayload = [
                     <select id="device-qr-printer-select" class="form-select form-select-sm" title="Select label printer">
                         <option value="">Loading printers…</option>
                     </select>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="device-qr-refresh-printers" title="Load printers from this PC"><i class="fas fa-sync-alt me-1"></i> Load printers</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="device-qr-refresh-printers" title="Detect printers on this computer"><i class="fas fa-sync-alt me-1"></i> Load printers</button>
+                    <button type="button" class="btn btn-outline-info btn-sm" id="device-qr-chrome-setup" title="Open Zebra Browser Print certificate setup"><i class="fas fa-shield-alt me-1"></i> Set up Chrome</button>
                     <span class="text-muted small" id="device-qr-printer-status"></span>
                 </div>
-                <p class="small text-muted mb-3">Printers are loaded from <strong>Windows on this server PC</strong>. Choose <strong>ZDesigner ZD230</strong> for label printing. Zebra Browser Print is optional if installed.</p>
+                <div class="alert alert-warning py-2 px-3 small mb-3 d-none" id="device-qr-printer-setup" role="alert"></div>
+                <p class="small text-muted mb-3">Printers are detected on <strong>this computer</strong> (your Chrome PC) via <strong>Zebra Browser Print</strong>. Install Browser Print, connect the ZD230 via USB, click <strong>Set up Chrome</strong>, then <strong>Load printers</strong>. Server-side printing only works when WAMP runs on the same Windows PC as the printer.</p>
 
                 <div class="mb-3">
                     <label for="deviceQrLabelSets" class="form-label">Number of sets</label>
