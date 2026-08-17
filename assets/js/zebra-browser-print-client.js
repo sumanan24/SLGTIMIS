@@ -701,9 +701,9 @@
         var host = siteHostname() || 'sis.slgti.ac.lk';
         return [
             'Your Zebra ZD230 is already installed in Windows — no new printer setup is needed.',
-            'Open the SSL setup page and accept the Browser Print certificate.',
+            'Open ' + sslSupportUrl() + ' in a new tab and accept the Browser Print certificate.',
             'When Browser Print asks, allow ' + host + ' as an Accepted Host.',
-            'Return to this page and click Refresh Printers.'
+            'Return to https://' + host + '/devices/view and click Refresh Printers.'
         ];
     }
 

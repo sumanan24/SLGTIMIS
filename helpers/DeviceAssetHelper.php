@@ -331,10 +331,24 @@ final class DeviceAssetHelper
         return rtrim(APP_URL, '/') . '/devices/qr/' . rawurlencode($token);
     }
 
-    /** Public device record page — QR label destination. */
+    /** Public device record page — QR label destination (uses production base URL when configured). */
     public static function deviceViewUrl(int $deviceId): string
     {
-        return rtrim(APP_URL, '/') . '/devices/view?id=' . max(0, $deviceId);
+        $cfg = self::labelConfig();
+        $base = trim((string) ($cfg['qr_public_base_url'] ?? ''));
+        if ($base === '') {
+            $base = rtrim(APP_URL, '/');
+        } else {
+            $base = rtrim($base, '/');
+        }
+
+        return $base . '/devices/view?id=' . max(0, $deviceId);
+    }
+
+    /** Browser Print SSL setup — always localhost on the user's PC. */
+    public static function browserPrintSslSupportUrl(): string
+    {
+        return 'https://localhost:9101/ssl_support';
     }
 
     /**

@@ -45,4 +45,10 @@ return [
     'print_speed' => 4,
     'horizontal_offset_dots' => 0,
     'vertical_offset_dots' => 0,
+
+    /**
+     * Public URL embedded in printed QR codes (always production SIS).
+     * Labels scanned on phones must open the live site, not localhost/WAMP.
+     */
+    'qr_public_base_url' => 'https://sis.slgti.ac.lk',
 ];

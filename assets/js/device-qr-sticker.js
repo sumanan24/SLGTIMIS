@@ -70,7 +70,18 @@
         return (printData && printData.printerModel) ? printData.printerModel : 'Zebra ZD230';
     }
 
+    function sslSetupUrl() {
+        if (printData && printData.sslSupportUrl) {
+            return printData.sslSupportUrl;
+        }
+        var client = svc();
+        return (client && client.sslSupportUrl) ? client.sslSupportUrl() : 'https://localhost:9101/ssl_support';
+    }
+
     function siteHost() {
+        if (printData && printData.siteHost) {
+            return printData.siteHost;
+        }
         return global.location ? global.location.hostname : 'sis.slgti.ac.lk';
     }
 
@@ -155,7 +166,7 @@
             return;
         }
 
-        var sslUrl = client && client.sslSupportUrl ? client.sslSupportUrl() : 'https://localhost:9101/ssl_support';
+        var sslUrl = sslSetupUrl();
         var host = siteHost();
         var html = '';
 
@@ -163,23 +174,27 @@
             html = ''
                 + '<h6>Zebra Printer Connection Requires Setup</h6>'
                 + '<p class="small mb-2">Your Zebra ZD230 is already installed in Windows. Chrome needs a one-time permission to connect this website to Zebra Browser Print.</p>'
-                + '<div class="wizard-step"><span class="wizard-step-num">1</span><span>Click <strong>Open SSL Setup</strong> below.</span></div>'
-                + '<div class="wizard-step"><span class="wizard-step-num">2</span><span>Accept the Browser Print certificate.</span></div>'
-                + '<div class="wizard-step"><span class="wizard-step-num">3</span><span>Allow <strong>' + escapeHtml(host) + '</strong> as an Accepted Host when prompted.</span></div>'
-                + '<div class="wizard-step"><span class="wizard-step-num">4</span><span>Return here and click <strong>Refresh Printers</strong>.</span></div>'
+                + '<div class="wizard-step"><span class="wizard-step-num">1</span><span>Open '
+                + '<a href="' + escapeHtml(sslUrl) + '" target="_blank" rel="noopener"><strong>' + escapeHtml(sslUrl) + '</strong></a>'
+                + ' and accept the certificate.</span></div>'
+                + '<div class="wizard-step"><span class="wizard-step-num">2</span><span>Allow <strong>' + escapeHtml(host) + '</strong> as an Accepted Host when prompted.</span></div>'
+                + '<div class="wizard-step"><span class="wizard-step-num">3</span><span>Return to '
+                + '<a href="' + escapeHtml((printData && printData.deviceViewUrl) || global.location.href) + '"><strong>this page</strong></a>'
+                + ' and click <strong>Refresh Printers</strong>.</span></div>'
                 + '<div class="wizard-actions">'
-                + '<button type="button" class="btn btn-primary btn-sm" id="zebra-bp-open-ssl"><i class="fas fa-shield-alt me-1"></i> Open SSL Setup</button>'
+                + '<a href="' + escapeHtml(sslUrl) + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm" id="zebra-bp-open-ssl"><i class="fas fa-shield-alt me-1"></i> Open SSL Setup</a>'
                 + '<button type="button" class="btn btn-outline-secondary btn-sm" id="zebra-bp-retry"><i class="fas fa-sync-alt me-1"></i> Refresh Printers</button>'
                 + '</div>';
         } else if (conn.state === STATE().HOST_AUTHORIZATION_REQUIRED) {
             html = ''
                 + '<h6>Website Authorization Required</h6>'
                 + '<p class="small mb-2">Browser Print is running on this laptop, but <strong>' + escapeHtml(host) + '</strong> has not been authorized yet.</p>'
-                + '<div class="wizard-step"><span class="wizard-step-num">1</span><span>Open Browser Print SSL setup.</span></div>'
+                + '<div class="wizard-step"><span class="wizard-step-num">1</span><span>Open '
+                + '<a href="' + escapeHtml(sslUrl) + '" target="_blank" rel="noopener">' + escapeHtml(sslUrl) + '</a>.</span></div>'
                 + '<div class="wizard-step"><span class="wizard-step-num">2</span><span>When asked, allow <strong>' + escapeHtml(host) + '</strong> as an Accepted Host.</span></div>'
                 + '<div class="wizard-step"><span class="wizard-step-num">3</span><span>Click <strong>Refresh Printers</strong>.</span></div>'
                 + '<div class="wizard-actions">'
-                + '<button type="button" class="btn btn-primary btn-sm" id="zebra-bp-open-ssl"><i class="fas fa-external-link-alt me-1"></i> Open Browser Print Setup</button>'
+                + '<a href="' + escapeHtml(sslUrl) + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm" id="zebra-bp-open-ssl"><i class="fas fa-external-link-alt me-1"></i> Open Browser Print SSL Setup</a>'
                 + '<button type="button" class="btn btn-outline-secondary btn-sm" id="zebra-bp-retry"><i class="fas fa-sync-alt me-1"></i> Refresh Printers</button>'
                 + '</div>';
         } else if (conn.state === STATE().SERVICE_UNAVAILABLE) {
@@ -212,12 +227,6 @@
         wizard.innerHTML = html;
         wizard.classList.toggle('d-none', !html);
 
-        var sslBtn = document.getElementById('zebra-bp-open-ssl');
-        if (sslBtn) {
-            sslBtn.addEventListener('click', function () {
-                global.open(sslUrl, '_blank', 'noopener');
-            });
-        }
         var retryBtn = document.getElementById('zebra-bp-retry');
         if (retryBtn) {
             retryBtn.addEventListener('click', function () {
@@ -583,11 +592,8 @@
         }
 
         var setupBtn = document.getElementById('device-qr-chrome-setup');
-        if (setupBtn) {
-            setupBtn.addEventListener('click', function () {
-                var client = svc();
-                global.open(client && client.sslSupportUrl ? client.sslSupportUrl() : 'https://localhost:9101/ssl_support', '_blank', 'noopener');
-            });
+        if (setupBtn && setupBtn.tagName === 'A') {
+            setupBtn.setAttribute('href', sslSetupUrl());
         }
 
         var printerSelect = document.getElementById('device-qr-printer-select');

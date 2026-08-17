@@ -13,6 +13,8 @@ $labelWmm = round(DeviceAssetHelper::labelWidthIn() * 25.4, 1);
 $labelHmm = round(DeviceAssetHelper::labelHeightIn() * 25.4, 1);
 $baseUrl = rtrim(APP_URL, '/');
 $siteHost = parse_url($baseUrl, PHP_URL_HOST) ?: 'sis.slgti.ac.lk';
+$sslSupportUrl = DeviceAssetHelper::browserPrintSslSupportUrl();
+$deviceViewUrl = DeviceAssetHelper::deviceViewUrl((int) $id);
 $printPayload = [
     'deviceId' => (int) $id,
     'assetId' => (string) ($d['asset_id'] ?? ''),
@@ -28,8 +30,9 @@ $printPayload = [
     'zplUrl' => $baseUrl . '/devices/qr-zpl',
     'pdfUrl' => $baseUrl . '/devices/qr-pdf',
     'previewUrl' => $baseUrl . '/devices/qr-print',
-    'deviceViewUrl' => DeviceAssetHelper::deviceViewUrl((int) $id),
+    'deviceViewUrl' => $deviceViewUrl,
     'siteHost' => $siteHost,
+    'sslSupportUrl' => $sslSupportUrl,
     'assetsBase' => $baseUrl,
 ];
 ?>
@@ -49,6 +52,8 @@ $printPayload = [
                     <dd class="col-sm-9 mb-1"><strong><?php echo $e($d['asset_id'] ?? '—'); ?></strong></dd>
                     <dt class="col-sm-3">Configured printer</dt>
                     <dd class="col-sm-9 mb-1"><?php echo $e($printerModel); ?> <span class="text-muted">· USB · Zebra</span></dd>
+                    <dt class="col-sm-3">QR links to</dt>
+                    <dd class="col-sm-9 mb-1"><a href="<?php echo $e($deviceViewUrl); ?>" target="_blank" rel="noopener" class="small"><?php echo $e($deviceViewUrl); ?></a></dd>
                     <dt class="col-sm-3">Labels per set</dt>
                     <dd class="col-sm-9 mb-0"><?php echo $labelsPerSet; ?> <span class="text-muted">(same QR side-by-side)</span></dd>
                 </dl>
@@ -68,9 +73,9 @@ $printPayload = [
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="device-qr-refresh-printers">
                         <i class="fas fa-sync-alt me-1"></i> Refresh Printers
                     </button>
-                    <button type="button" class="btn btn-outline-info btn-sm" id="device-qr-chrome-setup">
+                    <a href="<?php echo $e($sslSupportUrl); ?>" target="_blank" rel="noopener" class="btn btn-outline-info btn-sm" id="device-qr-chrome-setup">
                         <i class="fas fa-shield-alt me-1"></i> Open SSL Setup
-                    </button>
+                    </a>
                     <button type="button" class="btn btn-outline-primary btn-sm" id="device-qr-test-print" disabled>
                         <i class="fas fa-vial me-1"></i> Test Print
                     </button>
