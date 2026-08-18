@@ -18,10 +18,17 @@ $aa = $activeAssignment ?? null;
                 <i class="fas fa-print me-1"></i> Print QR Labels
             </button>
             <?php endif; ?>
-            <a href="<?php echo APP_URL; ?>/devices/print?id=<?php echo $id; ?>" class="btn btn-sm btn-outline-secondary" target="_blank"><i class="fas fa-print me-1"></i> Asset Record</a>
+            <a href="<?php echo APP_URL; ?>/devices/print?id=<?php echo $id; ?>" class="btn btn-sm btn-outline-secondary" target="_blank"><i class="fas fa-print me-1"></i> Property Receipt</a>
             <?php if (!empty($canManage)): ?>
             <a href="<?php echo APP_URL; ?>/devices/edit?id=<?php echo $id; ?>" class="btn btn-sm btn-primary">Edit</a>
+            <?php
+            $isAssigned = DeviceModel::STATUS_ASSIGNED === ($d['status'] ?? '')
+                || !empty($aa)
+                || trim((string) ($d['assigned_employee_id'] ?? '')) !== '';
+            if (!$isAssigned):
+            ?>
             <a href="<?php echo APP_URL; ?>/devices/assign?id=<?php echo $id; ?>" class="btn btn-sm btn-outline-primary">Assign</a>
+            <?php endif; ?>
             <?php endif; ?>
             <a href="<?php echo APP_URL; ?>/devices/history?id=<?php echo $id; ?>" class="btn btn-sm btn-outline-info">History</a>
         </div>
@@ -35,6 +42,7 @@ $aa = $activeAssignment ?? null;
     </div>
     <?php endif; ?>
     <?php if (!empty($_SESSION['success'])): ?><div class="alert alert-success"><?php echo $e($_SESSION['success']); unset($_SESSION['success']); ?></div><?php endif; ?>
+    <?php if (!empty($_SESSION['error'])): ?><div class="alert alert-danger"><?php echo $e($_SESSION['error']); unset($_SESSION['error']); ?></div><?php endif; ?>
 
     <div class="row g-3">
         <div class="col-lg-8">
@@ -74,7 +82,8 @@ $aa = $activeAssignment ?? null;
                 <p class="mb-0"><?php echo $e($d['assigned_staff_name']); ?> · <?php echo $e($d['assigned_department_name'] ?? ''); ?></p>
                 <?php else: ?><p class="text-muted mb-0">Not assigned</p><?php endif; ?>
 
-                <?php if (!empty($canManage) && ($d['status'] ?? '') === DeviceModel::STATUS_ASSIGNED): ?>
+                <?php if (!empty($canManage) && !empty($isAssigned)): ?>
+                <div class="alert alert-warning small mt-3 mb-0 py-2">This device is assigned. Return it before assigning to another person.</div>
                 <form method="post" action="<?php echo APP_URL; ?>/devices/return" class="mt-3 border-top pt-3" onsubmit="return confirm('Return this device?');">
                     <input type="hidden" name="device_id" value="<?php echo $id; ?>">
                     <div class="row g-2 align-items-end">

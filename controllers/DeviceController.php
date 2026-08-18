@@ -289,6 +289,10 @@ class DeviceController extends Controller {
             $_SESSION['error'] = 'Device not found.';
             $this->redirect('devices');
         }
+        if ($model->isDeviceAssigned($device)) {
+            $_SESSION['error'] = 'This device is already assigned. Return it first, then assign it to another person.';
+            $this->redirect('devices/view?id=' . $id);
+        }
         require_once BASE_PATH . '/models/StaffModel.php';
         $staff = (new StaffModel())->getStaffWithDepartment(1, 500, '', null);
 
@@ -297,7 +301,7 @@ class DeviceController extends Controller {
             'deviceSection' => 'assignments',
             'device' => $device,
             'staffList' => $staff,
-            'activeAssignment' => $model->getActiveAssignment($id),
+            'activeAssignment' => null,
         ]));
     }
 
@@ -314,6 +318,10 @@ class DeviceController extends Controller {
             $_SESSION['error'] = 'Device not found.';
             $this->redirect('devices');
         }
+        if ($model->isDeviceAssigned($device)) {
+            $_SESSION['error'] = 'This device is already assigned. Return it first, then assign it to another person.';
+            $this->redirect('devices/view?id=' . $id);
+        }
         if ($employeeId === '' || $issueDate === '') {
             $_SESSION['error'] = 'Employee and issue date are required.';
             $this->redirect('devices/assign?id=' . $id);
@@ -324,9 +332,9 @@ class DeviceController extends Controller {
             $this->redirect('devices/assign?id=' . $id);
         }
         $old = $device;
-        if (!$model->assignDevice($id, $employeeId, $issueDate, $uid, $remarks)) {
-            $_SESSION['error'] = 'Assignment failed.';
-            $this->redirect('devices/assign?id=' . $id);
+        if (!$model->assignDevice($id, $employeeId, $issueDate, $uid, $remarks !== '' ? $remarks : null)) {
+            $_SESSION['error'] = 'Assignment failed. Return the device first if it is already assigned.';
+            $this->redirect('devices/view?id=' . $id);
         }
         $model->logAudit($id, $uid, 'device_assigned', $old, ['employee_id' => $employeeId, 'issue_date' => $issueDate]);
         $this->logActivity('UPDATE', 'devices', (string) $id, 'Device assigned to ' . $employeeId);
@@ -673,7 +681,7 @@ class DeviceController extends Controller {
 
         return $this->view('devices/print_record', [
             'use_print_layout' => true,
-            'title' => 'Asset Record — ' . ($device['asset_id'] ?? ''),
+            'title' => 'Property Receipt — ' . ($device['asset_id'] ?? ''),
             'device' => $device,
             'accessories' => $model->getAccessories($id),
             'activeAssignment' => $model->getActiveAssignment($id),

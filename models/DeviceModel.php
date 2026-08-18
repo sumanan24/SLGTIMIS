@@ -483,16 +483,16 @@ class DeviceModel extends Model {
     }
 
     public function assignDevice(int $deviceId, string $employeeId, string $issueDate, int $userId, ?string $remarks = null): bool {
+        $device = $this->findDevice($deviceId);
+        if (!$device) {
+            return false;
+        }
+        if ($this->isDeviceAssigned($device)) {
+            return false;
+        }
+
         $this->db->getConnection()->begin_transaction();
         try {
-            $stmt = $this->db->prepare(
-                'UPDATE `device_assignments` SET `is_active` = 0, `return_date` = COALESCE(`return_date`, CURDATE()), `returned_by` = ? WHERE `device_id` = ? AND `is_active` = 1'
-            );
-            if ($stmt) {
-                $stmt->bind_param('ii', $userId, $deviceId);
-                $stmt->execute();
-                $stmt->close();
-            }
             $stmt2 = $this->db->prepare(
                 'INSERT INTO `device_assignments` (`device_id`, `employee_id`, `issue_date`, `issued_by`, `remarks`, `is_active`) VALUES (?, ?, ?, ?, ?, 1)'
             );

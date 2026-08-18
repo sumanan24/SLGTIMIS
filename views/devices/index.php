@@ -24,7 +24,18 @@ $canAssignDevice = static function (array $row) use ($canManage): bool {
         return false;
     }
     $status = (string) ($row['status'] ?? '');
-    return !in_array($status, [DeviceModel::STATUS_DISPOSED, DeviceModel::STATUS_RETIRED], true);
+    if (in_array($status, [DeviceModel::STATUS_DISPOSED, DeviceModel::STATUS_RETIRED], true)) {
+        return false;
+    }
+    // Already assigned: must return before assigning another person.
+    if ($status === DeviceModel::STATUS_ASSIGNED) {
+        return false;
+    }
+    if (trim((string) ($row['assigned_employee_id'] ?? '')) !== '') {
+        return false;
+    }
+
+    return true;
 };
 ?>
 <div class="container-fluid px-3 px-md-4 devices-page-wrap devices-list-page">
@@ -165,7 +176,7 @@ $canAssignDevice = static function (array $row) use ($canManage): bool {
                         <div class="dev-actions">
                             <a href="<?php echo APP_URL; ?>/devices/view?id=<?php echo $id; ?>" class="btn btn-outline-primary btn-icon" title="View"><i class="fas fa-eye"></i></a>
                             <?php if ($showAssign): ?>
-                            <a href="<?php echo APP_URL; ?>/devices/assign?id=<?php echo $id; ?>" class="btn btn-outline-success btn-icon" title="<?php echo $status === DeviceModel::STATUS_ASSIGNED ? 'Reassign' : 'Assign'; ?>"><i class="fas fa-user-plus"></i></a>
+                            <a href="<?php echo APP_URL; ?>/devices/assign?id=<?php echo $id; ?>" class="btn btn-outline-success btn-icon" title="Assign"><i class="fas fa-user-plus"></i></a>
                             <?php endif; ?>
                             <?php if ($canManage): ?>
                             <a href="<?php echo APP_URL; ?>/devices/edit?id=<?php echo $id; ?>" class="btn btn-outline-secondary btn-icon" title="Edit"><i class="fas fa-edit"></i></a>
