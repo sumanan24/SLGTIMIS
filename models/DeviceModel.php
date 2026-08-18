@@ -144,7 +144,8 @@ class DeviceModel extends Model {
         $orderDir = (!empty($filters['dir']) && strtoupper((string) $filters['dir']) === 'DESC') ? 'DESC' : 'ASC';
 
         $sql = 'SELECT d.*, s.`staff_name` AS assigned_staff_name, s.`staff_pno` AS assigned_staff_phone, '
-            . 's.`staff_email` AS assigned_staff_email, dep.`department_name` AS assigned_department_name '
+            . 's.`staff_email` AS assigned_staff_email, dep.`department_name` AS assigned_department_name, '
+            . '(EXISTS (SELECT 1 FROM `device_assignments` da WHERE da.`device_id` = d.`id` AND da.`is_active` = 1)) AS has_active_assignment '
             . 'FROM `devices` d '
             . 'LEFT JOIN `staff` s ON s.`staff_id` = d.`assigned_employee_id` '
             . 'LEFT JOIN `department` dep ON dep.`department_id` = s.`department_id` '
@@ -488,6 +489,10 @@ class DeviceModel extends Model {
             return false;
         }
         if ($this->isDeviceAssigned($device)) {
+            return false;
+        }
+        $status = strtolower(trim((string) ($device['status'] ?? '')));
+        if ($status !== self::STATUS_AVAILABLE) {
             return false;
         }
 

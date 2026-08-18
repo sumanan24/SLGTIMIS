@@ -22,10 +22,11 @@ $aa = $activeAssignment ?? null;
             <?php if (!empty($canManage)): ?>
             <a href="<?php echo APP_URL; ?>/devices/edit?id=<?php echo $id; ?>" class="btn btn-sm btn-primary">Edit</a>
             <?php
-            $isAssigned = DeviceModel::STATUS_ASSIGNED === ($d['status'] ?? '')
-                || !empty($aa)
-                || trim((string) ($d['assigned_employee_id'] ?? '')) !== '';
-            if (!$isAssigned):
+            $statusNow = strtolower(trim((string) ($d['status'] ?? '')));
+            $canShowAssign = $statusNow === DeviceModel::STATUS_AVAILABLE
+                && empty($aa)
+                && trim((string) ($d['assigned_employee_id'] ?? '')) === '';
+            if ($canShowAssign):
             ?>
             <a href="<?php echo APP_URL; ?>/devices/assign?id=<?php echo $id; ?>" class="btn btn-sm btn-outline-primary">Assign</a>
             <?php endif; ?>

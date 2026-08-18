@@ -23,15 +23,20 @@ $canAssignDevice = static function (array $row) use ($canManage): bool {
     if (!$canManage) {
         return false;
     }
-    $status = (string) ($row['status'] ?? '');
-    if (in_array($status, [DeviceModel::STATUS_DISPOSED, DeviceModel::STATUS_RETIRED], true)) {
+
+    // Only Available laptops/devices can be assigned.
+    $status = strtolower(trim((string) ($row['status'] ?? '')));
+    if ($status !== DeviceModel::STATUS_AVAILABLE) {
         return false;
     }
-    // Already assigned: must return before assigning another person.
-    if ($status === DeviceModel::STATUS_ASSIGNED) {
-        return false;
-    }
-    if (trim((string) ($row['assigned_employee_id'] ?? '')) !== '') {
+
+    $employeeId = trim((string) ($row['assigned_employee_id'] ?? ''));
+    $staffName = trim((string) ($row['assigned_staff_name'] ?? ''));
+    $hasActive = (int) ($row['has_active_assignment'] ?? 0) === 1
+        || $row['has_active_assignment'] === true
+        || $row['has_active_assignment'] === '1';
+
+    if ($hasActive || $employeeId !== '' || $staffName !== '') {
         return false;
     }
 
@@ -151,7 +156,12 @@ $canAssignDevice = static function (array $row) use ($canManage): bool {
                 <?php else: foreach ($devices as $d):
                     $id = (int) ($d['id'] ?? 0);
                     $status = (string) ($d['status'] ?? '');
+                    $assignedName = trim((string) ($d['assigned_staff_name'] ?? ''));
                     $showAssign = $canAssignDevice($d);
+                    // Hard stop: Assign only for Available status with no assignee.
+                    if (strtolower(trim($status)) !== 'available' || $assignedName !== '') {
+                        $showAssign = false;
+                    }
                 ?>
                 <tr>
                     <td>
@@ -164,8 +174,8 @@ $canAssignDevice = static function (array $row) use ($canManage): bool {
                     <td><span class="dev-cell-ellipsis" title="<?php echo $e($d['model'] ?? ''); ?>"><?php echo $e($d['model'] ?? '—'); ?></span></td>
                     <td><code class="small dev-cell-ellipsis d-block" title="<?php echo $e($d['serial_number'] ?? ''); ?>"><?php echo $e($d['serial_number'] ?? '—'); ?></code></td>
                     <td>
-                        <span class="dev-cell-ellipsis" title="<?php echo $e($d['assigned_staff_name'] ?? ''); ?>">
-                            <?php echo $e($d['assigned_staff_name'] ?? '—'); ?>
+                        <span class="dev-cell-ellipsis" title="<?php echo $e($assignedName); ?>">
+                            <?php echo $e($assignedName !== '' ? $assignedName : '—'); ?>
                         </span>
                     </td>
                     <td><span class="dev-cell-ellipsis" title="<?php echo $e($d['assigned_department_name'] ?? ''); ?>"><?php echo $e($d['assigned_department_name'] ?? '—'); ?></span></td>

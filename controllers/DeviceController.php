@@ -293,6 +293,11 @@ class DeviceController extends Controller {
             $_SESSION['error'] = 'This device is already assigned. Return it first, then assign it to another person.';
             $this->redirect('devices/view?id=' . $id);
         }
+        $status = strtolower(trim((string) ($device['status'] ?? '')));
+        if ($status !== DeviceModel::STATUS_AVAILABLE) {
+            $_SESSION['error'] = 'Only devices with Available status can be assigned.';
+            $this->redirect('devices/view?id=' . $id);
+        }
         require_once BASE_PATH . '/models/StaffModel.php';
         $staff = (new StaffModel())->getStaffWithDepartment(1, 500, '', null);
 
@@ -322,6 +327,11 @@ class DeviceController extends Controller {
             $_SESSION['error'] = 'This device is already assigned. Return it first, then assign it to another person.';
             $this->redirect('devices/view?id=' . $id);
         }
+        $status = strtolower(trim((string) ($device['status'] ?? '')));
+        if ($status !== DeviceModel::STATUS_AVAILABLE) {
+            $_SESSION['error'] = 'Only devices with Available status can be assigned.';
+            $this->redirect('devices/view?id=' . $id);
+        }
         if ($employeeId === '' || $issueDate === '') {
             $_SESSION['error'] = 'Employee and issue date are required.';
             $this->redirect('devices/assign?id=' . $id);
@@ -333,7 +343,7 @@ class DeviceController extends Controller {
         }
         $old = $device;
         if (!$model->assignDevice($id, $employeeId, $issueDate, $uid, $remarks !== '' ? $remarks : null)) {
-            $_SESSION['error'] = 'Assignment failed. Return the device first if it is already assigned.';
+            $_SESSION['error'] = 'Assignment failed. Only Available devices can be assigned.';
             $this->redirect('devices/view?id=' . $id);
         }
         $model->logAudit($id, $uid, 'device_assigned', $old, ['employee_id' => $employeeId, 'issue_date' => $issueDate]);
