@@ -374,6 +374,17 @@ $signRows = [
     padding: 1.5mm 1.8mm;
     vertical-align: middle;
 }
+
+.property-receipt .doc-footer {
+    flex: 0 0 auto;
+    margin-top: 1.5mm;
+    padding-top: 1.2mm;
+    border-top: 0.55px solid #666;
+    font-size: 7.5pt;
+    letter-spacing: .04em;
+    color: #333;
+    text-align: center;
+}
 </style>
 
 <div class="print-toolbar no-print">
@@ -549,5 +560,7 @@ $signRows = [
             </table>
         </section>
     </div>
+
+    <footer class="doc-footer">SLGTI-MAN-FOR-005-v1.1</footer>
 </div>
 </div>
