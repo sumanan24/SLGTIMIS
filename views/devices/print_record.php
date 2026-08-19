@@ -31,14 +31,38 @@ $accessoryRows = [
 
 $aa = is_array($activeAssignment ?? null) ? $activeAssignment : [];
 $empName = $val($aa['staff_name'] ?? $d['assigned_staff_name'] ?? null);
-$empId = $val($aa['employee_id'] ?? $d['assigned_employee_id'] ?? null);
+$empId = $val($aa['staff_epf'] ?? $d['assigned_staff_epf'] ?? $aa['employee_id'] ?? $d['assigned_employee_id'] ?? null);
 $empDept = $val($aa['department_name'] ?? $d['assigned_department_name'] ?? null);
 $empIssue = $val($aa['issue_date'] ?? null);
+
+$logoSrc = '';
+foreach ([
+    BASE_PATH . '/assets/img/logo.png',
+    BASE_PATH . '/assets/img/SLGTILogo.png',
+    BASE_PATH . '/assets/img/slgtilogo.png',
+] as $logoPath) {
+    if (!is_file($logoPath)) {
+        continue;
+    }
+    $ext = strtolower(pathinfo($logoPath, PATHINFO_EXTENSION));
+    $mime = $ext === 'jpg' || $ext === 'jpeg' ? 'jpeg' : ($ext === 'svg' ? 'svg+xml' : $ext);
+    $logoSrc = 'data:image/' . $mime . ';base64,' . base64_encode((string) file_get_contents($logoPath));
+    break;
+}
+
+$signRows = [
+    'Employee Signature',
+    'Recommended by HOD',
+    'Taken Over',
+    'Approved by Branch Principal / Deputy Branch Principal',
+    'Released by Store MA',
+    'Return by Signature',
+];
 ?>
 <style>
 @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 0;
 }
 
 @media print {
@@ -49,257 +73,330 @@ $empIssue = $val($aa['issue_date'] ?? null);
         margin: 0 !important;
         padding: 0 !important;
         background: #fff !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
+        overflow: hidden !important;
     }
-    .receipt {
-        width: 190mm !important;
-        height: 277mm !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        border: none !important;
+    .print-toolbar { display: none !important; }
+    .page {
         box-shadow: none !important;
+        border: none !important;
+        margin: 0 !important;
+        width: 210mm !important;
+        height: 297mm !important;
+        overflow: hidden !important;
+    }
+    .property-receipt {
+        width: 186mm !important;
+        height: 277mm !important;
+        margin: 10mm auto !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
         page-break-inside: avoid;
         page-break-after: avoid;
+        overflow: hidden !important;
+    }
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
 }
 
-.receipt {
+.print-toolbar {
+    width: 210mm;
+    margin: 12px auto 8px;
+    text-align: right;
+}
+
+/* Exact A4 — full content, no page scroll */
+.page {
     box-sizing: border-box;
     width: 210mm;
     height: 297mm;
-    max-width: 100%;
-    margin: 10px auto;
-    padding: 10mm;
+    margin: 0 auto 24px;
     background: #fff;
-    color: #000;
-    font-family: "Times New Roman", Times, "Liberation Serif", serif;
-    font-size: 9pt;
-    line-height: 1.28;
-    border: 1px solid #ccc;
-    box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    overflow: hidden;
+}
+@media screen {
+    .page {
+        box-shadow: 0 0 8px rgba(0, 0, 0, 0.25);
+    }
+}
+
+.property-receipt {
+    box-sizing: border-box;
+    width: 186mm;
+    height: 277mm;
+    margin: 10mm auto;
+    padding: 0;
+    color: #111;
+    background: #fff;
+    font-family: Arial, Calibri, "Helvetica Neue", Helvetica, sans-serif;
+    font-size: 8.5pt;
+    line-height: 1.3;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
-.receipt *,
-.receipt *::before,
-.receipt *::after { box-sizing: border-box; }
+.property-receipt *,
+.property-receipt *::before,
+.property-receipt *::after { box-sizing: border-box; }
 
-.receipt .toolbar {
-    flex: 0 0 auto;
-    text-align: right;
-    margin: 0 0 4px;
-}
-
-/* Header — optically centred title with equal side gutters */
-.receipt .head {
+/* Header */
+.property-receipt .head {
     flex: 0 0 auto;
     display: grid;
-    grid-template-columns: 52px 1fr 52px;
+    grid-template-columns: 22mm 1fr 32mm;
     align-items: center;
-    column-gap: 8px;
-    padding-bottom: 5px;
-    border-bottom: 2px solid #000;
+    column-gap: 4mm;
+    padding-bottom: 2.5mm;
+    border-bottom: 1.4px solid #111;
+    margin-bottom: 2mm;
 }
-.receipt .head .gutter {
-    width: 52px;
-    height: 52px;
+.property-receipt .head .side {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
-.receipt .head .titles {
+.property-receipt .head .side.logo {
+    justify-content: flex-end;
+}
+.property-receipt .head .titles {
     text-align: center;
 }
-.receipt .head .org {
+.property-receipt .head .org {
     margin: 0;
-    font-size: 12.5pt;
+    font-size: 13pt;
     font-weight: 700;
-    letter-spacing: .08em;
+    letter-spacing: .035em;
     text-transform: uppercase;
-    line-height: 1.15;
+    line-height: 1.12;
+    color: #000;
 }
-.receipt .head .doc-title {
-    margin: 3px 0 0;
-    font-size: 14pt;
-    font-weight: 700;
-    letter-spacing: .14em;
-    text-transform: uppercase;
-    line-height: 1.1;
-}
-.receipt .head .qr img {
-    width: 52px;
-    height: 52px;
-    display: block;
-    margin: 0 auto;
-}
-
-.receipt .body {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.receipt .sec { flex: 0 0 auto; }
-.receipt .sec-terms {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.receipt .sec-h {
-    margin: 6px 0 2px;
-    padding: 0 0 1px;
-    font-size: 8.5pt;
+.property-receipt .head .doc-title {
+    margin: 1.6mm 0 0;
+    font-size: 14.5pt;
     font-weight: 700;
     letter-spacing: .1em;
     text-transform: uppercase;
-    border-bottom: 1px solid #000;
+    line-height: 1.05;
+    color: #000;
+}
+.property-receipt .head .qr img {
+    width: 18mm;
+    height: 18mm;
+    display: block;
+}
+.property-receipt .head .logo img {
+    width: 30mm;
+    height: 26mm;
+    object-fit: contain;
+    display: block;
 }
 
-/* Uniform data grid */
-.receipt table.grid {
+.property-receipt .body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.property-receipt .sec { flex: 0 0 auto; }
+
+.property-receipt .sec-h {
+    margin: 2.4mm 0 1.2mm;
+    padding: 0 0 0.7mm;
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: #000;
+    border-bottom: 0.65px solid #333;
+}
+
+/* Shared tables */
+.property-receipt table.data,
+.property-receipt table.check,
+.property-receipt table.signs {
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
 }
-.receipt table.grid th,
-.receipt table.grid td {
-    border: 1px solid #000;
-    padding: 2.5px 5px;
+.property-receipt table.data th,
+.property-receipt table.data td,
+.property-receipt table.check th,
+.property-receipt table.check td,
+.property-receipt table.signs th,
+.property-receipt table.signs td {
+    border: 0.55px solid #222;
+    padding: 1.2mm 1.8mm;
     vertical-align: middle;
     word-wrap: break-word;
-    overflow-wrap: anywhere;
 }
-.receipt table.grid th {
-    width: 22%;
-    background: #f0f0f0;
+.property-receipt table.data th {
+    width: 20%;
+    background: #f2f2f2;
     font-weight: 700;
+    font-size: 8pt;
     text-align: left;
 }
-.receipt table.grid td {
-    width: 28%;
+.property-receipt table.data td {
+    width: 30%;
+    font-size: 8.25pt;
     text-align: left;
+}
+.property-receipt table.data.emp td {
+    height: 6.5mm;
 }
 
-/* Accessories checklist */
-.receipt table.check {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-    font-size: 8pt;
+/* Accessories */
+.property-receipt table.check {
+    font-size: 7.75pt;
 }
-.receipt table.check col.c-no { width: 5%; }
-.receipt table.check col.c-item { width: 23%; }
-.receipt table.check col.c-st { width: 29%; }
-.receipt table.check col.c-rm { width: 14%; }
-.receipt table.check th,
-.receipt table.check td {
-    border: 1px solid #000;
-    padding: 2.5px 4px;
-    vertical-align: middle;
-}
-.receipt table.check thead th {
-    background: #f0f0f0;
+.property-receipt table.check col.c-no { width: 6%; }
+.property-receipt table.check col.c-item { width: 24%; }
+.property-receipt table.check col.c-st { width: 28%; }
+.property-receipt table.check col.c-rm { width: 14%; }
+.property-receipt table.check thead th {
+    background: #f2f2f2;
     font-weight: 700;
+    font-size: 7.75pt;
     text-align: center;
     line-height: 1.15;
+    padding: 1mm 1.2mm;
 }
-.receipt table.check td.num {
+.property-receipt table.check td.num {
     text-align: center;
     font-weight: 700;
 }
-.receipt table.check td.rmk {
-    height: 18px;
+.property-receipt table.check td {
+    padding: 1mm 1.4mm;
 }
-
-.receipt .status-opts {
+.property-receipt table.check td.rmk {
+    height: 6mm;
+}
+.property-receipt .status-opts {
     display: flex;
-    flex-wrap: wrap;
-    gap: 2px 6px;
+    flex-wrap: nowrap;
+    gap: 0 3mm;
     align-items: center;
+    justify-content: flex-start;
 }
-.receipt .chk {
+.property-receipt .chk {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: 1.1mm;
     white-space: nowrap;
+    font-size: 7.25pt;
 }
-.receipt .chk .box {
+.property-receipt .chk .box {
     display: inline-block;
-    width: 8px;
-    height: 8px;
-    border: 1px solid #000;
+    width: 2.4mm;
+    height: 2.4mm;
+    border: 0.55px solid #111;
     background: #fff;
     flex: 0 0 auto;
 }
 
 /* Terms */
-.receipt .terms {
-    margin: 0;
-    padding-left: 1.1rem;
+.property-receipt .terms {
+    margin: 1mm 0 0;
+    padding-left: 5mm;
+    flex: 0 0 auto;
+}
+.property-receipt .terms li {
+    margin: 0 0 1.3mm;
+    text-align: justify;
+    text-justify: inter-word;
+    line-height: 1.3;
+    font-size: 8pt;
+}
+.property-receipt .terms li:last-child {
+    margin-bottom: 0;
+}
+.property-receipt .terms .term-label {
+    font-weight: 700;
+}
+.property-receipt .terms .term-emph {
+    font-weight: 700;
+}
+
+/* Signatures — fill remaining page height evenly */
+.property-receipt .sec-signs {
     flex: 1 1 auto;
     display: flex;
     flex-direction: column;
-    justify-content: space-evenly;
+    min-height: 0;
+    margin-top: 2mm;
 }
-.receipt .terms li {
-    margin: 0;
-    text-align: justify;
-    text-justify: inter-word;
-    hyphens: auto;
-    line-height: 1.22;
-    font-size: 7.75pt;
+.property-receipt .sec-signs .sec-h {
+    flex: 0 0 auto;
 }
-
-/* Signatures */
-.receipt table.signs {
+.property-receipt table.signs {
+    flex: 1 1 auto;
     width: 100%;
-    border-collapse: collapse;
+    height: 100%;
+    font-size: 8pt;
     table-layout: fixed;
-    font-size: 7.5pt;
+    border-collapse: collapse;
 }
-.receipt table.signs th,
-.receipt table.signs td {
-    border: 1px solid #000;
-    padding: 3px 4px;
-    vertical-align: top;
+.property-receipt table.signs col.c-role { width: 36%; }
+.property-receipt table.signs col.c-name { width: 22%; }
+.property-receipt table.signs col.c-sig { width: 26%; }
+.property-receipt table.signs col.c-date { width: 16%; }
+.property-receipt table.signs thead {
+    height: 7mm;
 }
-.receipt table.signs th {
-    width: 33.333%;
-    background: #f0f0f0;
+.property-receipt table.signs thead th {
+    background: #f2f2f2;
     font-weight: 700;
+    font-size: 8.25pt;
     text-align: center;
-    line-height: 1.15;
+    padding: 1.2mm 1.6mm;
+    height: 7mm;
 }
-.receipt table.signs .pad {
-    height: 28px;
+.property-receipt table.signs tbody {
+    height: calc(100% - 7mm);
 }
-.receipt table.signs .meta {
-    margin-top: 1px;
+.property-receipt table.signs td.role {
+    text-align: left;
+    font-weight: 600;
+    font-size: 8pt;
     line-height: 1.2;
+    vertical-align: middle;
 }
-.receipt table.signs .meta span {
-    display: inline-block;
-    min-width: 48%;
+.property-receipt table.signs tbody tr {
+    height: 16.66%;
+}
+.property-receipt table.signs tbody td {
+    height: 16.66%;
+    min-height: 9mm;
+    padding: 1.5mm 1.8mm;
+    vertical-align: middle;
 }
 </style>
 
-<div class="receipt">
-    <div class="toolbar no-print">
-        <button type="button" onclick="window.print()" class="btn btn-sm btn-dark">
-            <i class="fas fa-print me-1"></i> Print A4
-        </button>
-    </div>
+<div class="print-toolbar no-print">
+    <button type="button" onclick="window.print()" class="btn btn-sm btn-dark">
+        <i class="fas fa-print me-1"></i> Print A4
+    </button>
+</div>
 
+<div class="page">
+<div class="property-receipt">
     <header class="head">
-        <div class="gutter" aria-hidden="true"></div>
+        <div class="side qr">
+            <?php if (!empty($qrDataUri)): ?>
+                <img src="<?php echo $qrDataUri; ?>" alt="QR">
+            <?php endif; ?>
+        </div>
         <div class="titles">
             <p class="org">Sri Lanka German Training Institute</p>
             <p class="doc-title">Property Receipt</p>
         </div>
-        <div class="gutter qr">
-            <?php if (!empty($qrDataUri)): ?>
-                <img src="<?php echo $qrDataUri; ?>" alt="QR">
+        <div class="side logo">
+            <?php if ($logoSrc !== ''): ?>
+                <img src="<?php echo $logoSrc; ?>" alt="SLGTI">
             <?php endif; ?>
         </div>
     </header>
@@ -307,7 +404,7 @@ $empIssue = $val($aa['issue_date'] ?? null);
     <div class="body">
         <section class="sec">
             <h2 class="sec-h">Property / Device Information</h2>
-            <table class="grid">
+            <table class="data">
                 <tr>
                     <th>Asset ID</th>
                     <td><?php echo $e($val($d['asset_id'] ?? null)); ?></td>
@@ -341,11 +438,11 @@ $empIssue = $val($aa['issue_date'] ?? null);
 
         <section class="sec">
             <h2 class="sec-h">Employee Information</h2>
-            <table class="grid">
+            <table class="data emp">
                 <tr>
                     <th>Name</th>
                     <td><?php echo $e($empName); ?></td>
-                    <th>Employee ID</th>
+                    <th>EPF No.</th>
                     <td><?php echo $e($empId); ?></td>
                 </tr>
                 <tr>
@@ -393,7 +490,7 @@ $empIssue = $val($aa['issue_date'] ?? null);
         <?php if (!empty($fullDetail)): ?>
         <section class="sec">
             <h2 class="sec-h">Configuration</h2>
-            <table class="grid">
+            <table class="data">
                 <tr>
                     <th>Windows Activated</th>
                     <td><?php echo !empty($d['windows_activated']) ? 'Yes' : 'No'; ?></td>
@@ -410,62 +507,47 @@ $empIssue = $val($aa['issue_date'] ?? null);
         </section>
         <?php endif; ?>
 
-        <section class="sec-terms">
+        <section class="sec">
             <h2 class="sec-h">Laptop Issue – Terms and Conditions</h2>
             <ol class="terms">
-                <li>The laptop is issued in good working condition. The recipient is responsible for the safe custody and proper use of the laptop.</li>
-                <li>Any damage caused due to negligence, misuse, mishandling, physical impact, liquid damage, or unauthorized modification shall be the responsibility of the recipient. The applicable repair or replacement cost must be paid by the recipient.</li>
-                <li>If the laptop develops any technical issue or malfunction, the recipient must immediately inform the ICT Officer / ICT Department.</li>
-                <li>The laptop must not be opened, dismantled, repaired, upgraded, or modified by the recipient or by any unauthorized person / service centre outside the institution.</li>
-                <li>All repairs, hardware replacements, software-related issues, and technical maintenance must be handled or authorized by the ICT Department.</li>
-                <li>The recipient must not remove, replace, or modify any internal components such as RAM, SSD/HDD, battery, motherboard, display, keyboard, or other hardware without prior approval from the ICT Department.</li>
-                <li>Any loss of the laptop or issued accessories must be reported immediately and may result in recovery of the applicable cost according to institutional regulations.</li>
-                <li>The recipient acknowledges and agrees to comply with the above conditions when accepting the laptop.</li>
+                <li><span class="term-label">Care &amp; Responsibility:</span> The recipient is responsible for the safe custody and proper use of the laptop.</li>
+                <li><span class="term-label">Damage &amp; Loss:</span> Any damage, loss, or missing item caused by negligence, misuse, or mishandling shall be the recipient&apos;s responsibility. <span class="term-emph">The applicable repair or replacement cost must be paid by the recipient.</span></li>
+                <li><span class="term-label">Technical Issues:</span> All technical issues must be reported immediately to the ICT Department. Repairs must be handled only by authorized ICT Department personnel.</li>
+                <li><span class="term-label">No Unauthorized Modification:</span> The laptop must not be opened, repaired, upgraded, or modified without prior approval from the ICT Department.</li>
             </ol>
         </section>
 
-        <section class="sec">
+        <section class="sec-signs">
             <h2 class="sec-h">Authorization &amp; Signatures</h2>
             <table class="signs">
-                <tr>
-                    <th>Employee Signature</th>
-                    <th>Recommended by HOD</th>
-                    <th>Taken Over</th>
-                </tr>
-                <tr>
-                    <td>
-                        <div class="pad"></div>
-                        <div class="meta"><span>Name: ........................</span><span>Date: ............</span></div>
-                    </td>
-                    <td>
-                        <div class="pad"></div>
-                        <div class="meta"><span>Name: ........................</span><span>Date: ............</span></div>
-                    </td>
-                    <td>
-                        <div class="pad"></div>
-                        <div class="meta"><span>Name: ........................</span><span>Date: ............</span></div>
-                    </td>
-                </tr>
-                <tr>
-                    <th>Approved by Branch Principal / Deputy Branch Principal</th>
-                    <th>Released by Store MA</th>
-                    <th>Return by Signature</th>
-                </tr>
-                <tr>
-                    <td>
-                        <div class="pad"></div>
-                        <div class="meta"><span>Name: ........................</span><span>Date: ............</span></div>
-                    </td>
-                    <td>
-                        <div class="pad"></div>
-                        <div class="meta"><span>Name: ........................</span><span>Date: ............</span></div>
-                    </td>
-                    <td>
-                        <div class="pad"></div>
-                        <div class="meta"><span>Name: ........................</span><span>Date: ............</span></div>
-                    </td>
-                </tr>
+                <colgroup>
+                    <col class="c-role">
+                    <col class="c-name">
+                    <col class="c-sig">
+                    <col class="c-date">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Authorization</th>
+                        <th>Name</th>
+                        <th>Signature</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($signRows as $role):
+                    $tall = (stripos($role, 'Branch Principal') !== false);
+                ?>
+                    <tr<?php echo $tall ? ' class="tall"' : ''; ?>>
+                        <td class="role"><?php echo $e($role); ?></td>
+                        <td class="name-cell">&nbsp;</td>
+                        <td class="sig-cell">&nbsp;</td>
+                        <td class="date-cell">&nbsp;</td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
             </table>
         </section>
     </div>
+</div>
 </div>

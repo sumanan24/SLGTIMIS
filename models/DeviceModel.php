@@ -228,6 +228,7 @@ class DeviceModel extends Model {
         $this->ensureTables();
         $sql = 'SELECT d.*, s.`staff_name` AS assigned_staff_name, s.`staff_pno` AS assigned_staff_phone, '
             . 's.`staff_email` AS assigned_staff_email, s.`staff_position` AS assigned_staff_position, '
+            . 's.`staff_epf` AS assigned_staff_epf, '
             . 'dep.`department_name` AS assigned_department_name '
             . 'FROM `devices` d '
             . 'LEFT JOIN `staff` s ON s.`staff_id` = d.`assigned_employee_id` '
@@ -473,7 +474,7 @@ class DeviceModel extends Model {
     }
 
     public function getActiveAssignment(int $deviceId): ?array {
-        $sql = 'SELECT a.*, s.`staff_name`, dep.`department_name` '
+        $sql = 'SELECT a.*, s.`staff_name`, s.`staff_epf`, dep.`department_name` '
             . 'FROM `device_assignments` a '
             . 'INNER JOIN `staff` s ON s.`staff_id` = a.`employee_id` '
             . 'LEFT JOIN `department` dep ON dep.`department_id` = s.`department_id` '
