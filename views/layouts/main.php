@@ -69,6 +69,7 @@
                             $canStaffDeviceAttendanceMenu = false;
                             $canViewStudentApplications = false;
                             $canViewApplicationAdmissionSchedules = false;
+                            $canViewComplaintLetters = false;
                             $canAccessExamsModule = false;
                             if (isset($_SESSION['user_id'])) {
                                 require_once BASE_PATH . '/models/UserModel.php';
@@ -96,6 +97,7 @@
                                 $canStaffDeviceAttendanceMenu = !$isSAO && $userModel->canViewStaffDeviceDashboardMonth($_SESSION['user_id']);
                                 $canViewStudentApplications = $userModel->canViewOnlineStudentApplications($_SESSION['user_id']);
                                 $canViewApplicationAdmissionSchedules = $userModel->canViewApplicationAdmissionSchedules($_SESSION['user_id']);
+                                $canViewComplaintLetters = $userModel->canViewComplaintLetters($_SESSION['user_id']);
                                 $canAccessExamsModule = $userModel->canAccessExamsModule($_SESSION['user_id']);
                                 $canViewDevices = $userModel->canViewDevices($_SESSION['user_id']);
                                 $canManageDevices = $userModel->canManageDevices($_SESSION['user_id']);
@@ -115,6 +117,9 @@
                             }
                             if (!isset($canManageDevices)) {
                                 $canManageDevices = false;
+                            }
+                            if (!isset($canViewComplaintLetters)) {
+                                $canViewComplaintLetters = false;
                             }
                             $devicePages = ['devices'];
                             $busSeasonPages = ['bus-season-requests-sao', 'bus-season-payments'];
@@ -273,6 +278,9 @@ $educationPages = ['departments', 'courses', 'modules', 'staff'];
                             if (!empty($canViewApplicationAdmissionSchedules)) {
                                 $studentAffairsPages[] = 'application-admission';
                             }
+                            if (!empty($canViewComplaintLetters)) {
+                                $studentAffairsPages[] = 'complaint-letters';
+                            }
                             if ($hasGroupAccess) {
                                 $studentAffairsPages[] = 'groups';
                             }
@@ -322,6 +330,14 @@ $educationPages = ['departments', 'courses', 'modules', 'staff'];
                                         <a href="<?php echo APP_URL; ?>/application-admission" class="<?php echo (isset($page) && $page === 'application-admission') ? 'active' : ''; ?>">
                                             <i class="fas fa-calendar-check"></i>
                                             <span>Exam &amp; interview schedules</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
+                                    <?php if (!empty($canViewComplaintLetters)): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/complaint-letters" class="<?php echo (isset($page) && $page === 'complaint-letters') ? 'active' : ''; ?>">
+                                            <i class="fas fa-envelope-open-text"></i>
+                                            <span>Complaint Letters</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>

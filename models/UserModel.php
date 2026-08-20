@@ -704,5 +704,43 @@ class UserModel extends Model {
     public function canViewDeviceHistory($userId): bool {
         return $this->canViewDevices($userId);
     }
+
+    /**
+     * Student complaint letters: SAO, ADM, HOD, REG, DIR (+ system admin).
+     */
+    public function canViewComplaintLetters($userId): bool {
+        if ($this->isAdminOrADM($userId) || $this->isSAO($userId)) {
+            return true;
+        }
+        $role = $this->getUserRole($userId);
+
+        return in_array($role, ['HOD', 'REG', 'DIR'], true);
+    }
+
+    /**
+     * Create/edit/delete/generate complaint letters: SAO, ADM, HOD (dept-scoped in controller).
+     */
+    public function canManageComplaintLetters($userId): bool {
+        if ($this->isAdminOrADM($userId) || $this->isSAO($userId)) {
+            return true;
+        }
+
+        return $this->isHOD($userId);
+    }
+
+    /**
+     * REG and DIR — read-only complaint letter access.
+     */
+    public function isComplaintLetterReadOnly($userId): bool {
+        if ($this->canManageComplaintLetters($userId)) {
+            return false;
+        }
+        if (!$this->canViewComplaintLetters($userId)) {
+            return false;
+        }
+        $role = $this->getUserRole($userId);
+
+        return in_array($role, ['REG', 'DIR'], true);
+    }
 }
 

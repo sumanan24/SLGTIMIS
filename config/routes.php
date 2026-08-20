@@ -281,5 +281,20 @@ return [
     'devices/assignments' => 'DeviceController@assignments',
     'devices/export' => 'DeviceController@export',
     'devices/print' => 'DeviceController@printRecord',
+
+    // Student complaint letters (SAO/ADM CRUD all depts; HOD CRUD own dept; REG/DIR view)
+    'complaint-letters' => 'ComplaintLetterController@index',
+    'complaint-letters/create' => 'ComplaintLetterController@create',
+    'complaint-letters/store' => 'ComplaintLetterController@store',
+    'complaint-letters/view' => 'ComplaintLetterController@show',
+    'complaint-letters/edit' => 'ComplaintLetterController@edit',
+    'complaint-letters/update' => 'ComplaintLetterController@update',
+    'complaint-letters/delete' => 'ComplaintLetterController@delete',
+    'complaint-letters/preview' => 'ComplaintLetterController@preview',
+    'complaint-letters/print' => 'ComplaintLetterController@printLetter',
+    'complaint-letters/pdf' => 'ComplaintLetterController@pdf',
+    'complaint-letters/history' => 'ComplaintLetterController@history',
+    'complaint-letters/courses' => 'ComplaintLetterController@coursesJson',
+    'complaint-letters/students' => 'ComplaintLetterController@studentsJson',
 ];
 
