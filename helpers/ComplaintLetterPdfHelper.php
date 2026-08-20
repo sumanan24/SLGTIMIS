@@ -31,6 +31,11 @@ class ComplaintLetterPdfHelper {
         ];
     }
 
+    /** Printable area margins (top/bottom, left/right). */
+    public static function pageMarginCss(): string {
+        return '15mm 25mm';
+    }
+
     public static function postalHeaderStylesheet(): string {
         return self::complaintLetterStylesheet();
     }
@@ -64,7 +69,7 @@ class ComplaintLetterPdfHelper {
             . 'table.cl-particulars th{width:18%;background:#f2f2f2;font-size:7pt;font-weight:700;text-align:left;padding:1.2mm 2mm;border:0.6pt solid #666;text-transform:uppercase;letter-spacing:0.03em;color:#222;vertical-align:middle;}'
             . 'table.cl-particulars td{width:32%;font-size:8.5pt;padding:1.2mm 2mm;border:0.6pt solid #666;font-weight:600;vertical-align:middle;color:#111;text-align:left;}'
             . 'table.cl-particulars td.cl-mono{font-family:DejaVu Sans Mono,Courier New,monospace;font-size:8pt;}'
-            . '.cl-body{text-align:justify;text-justify:inter-word;white-space:pre-wrap;font-size:9.5pt;line-height:1.5;margin:0 0 2.5mm 0;word-wrap:break-word;}'
+            . '.cl-body{text-align:left;white-space:pre-wrap;font-size:9.5pt;line-height:1.5;margin:0 0 2.5mm 0;word-wrap:break-word;}'
             . '.cl-body-action{margin-bottom:0;}'
             . '.cl-action-title{font-size:8.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;margin:3mm 0 1.5mm 0;color:#222;text-align:left;}'
             . '.cl-closing{margin-top:7mm;text-align:left;}'
@@ -75,7 +80,7 @@ class ComplaintLetterPdfHelper {
     /** @page + root rules for PDF output (one A4 sheet per letter). */
     public static function pdfPageStylesheet(): string {
         return ''
-            . '@page{size:A4 portrait;margin:10mm 12mm;}'
+            . '@page{size:A4 portrait;margin:' . self::pageMarginCss() . ';}'
             . 'html,body{margin:0;padding:0;}'
             . 'body{font-family:DejaVu Serif,Times New Roman,serif;font-size:10pt;color:#111;line-height:1.45;}'
             . '.letter-page{width:100%;page-break-after:always;page-break-inside:avoid;}'

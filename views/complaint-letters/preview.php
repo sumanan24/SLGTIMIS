@@ -14,6 +14,7 @@ if ($studentRows === []) {
     $studentRows = [['student_id' => '', 'student_name' => '', 'course_name' => '']];
 }
 $singlePartial = BASE_PATH . '/views/complaint-letters/partials/letter_body.php';
+$clPageMargin = ComplaintLetterPdfHelper::pageMarginCss();
 ?>
 <style>
     <?php echo ComplaintLetterPdfHelper::complaintLetterStylesheet(); ?>
@@ -22,7 +23,7 @@ $singlePartial = BASE_PATH . '/views/complaint-letters/partials/letter_body.php'
         width: 210mm;
         min-height: 297mm;
         margin: 0 auto 1.5rem;
-        padding: 10mm 12mm;
+        padding: <?php echo $clPageMargin; ?>;
         font-family: "Times New Roman", Times, serif;
         color: #111;
         background: #fff;
@@ -34,7 +35,7 @@ $singlePartial = BASE_PATH . '/views/complaint-letters/partials/letter_body.php'
     .cl-post-strong { text-transform: uppercase; }
     @media print {
         .no-print { display: none !important; }
-        @page { size: A4 portrait; margin: 10mm 12mm; }
+        @page { size: A4 portrait; margin: <?php echo $clPageMargin; ?>; }
         html, body { margin: 0; padding: 0; background: #fff; }
         .cl-preview-wrap { padding: 0; background: #fff; }
         .cl-letter {
