@@ -47,6 +47,37 @@ class ModuleModel extends Model {
             return;
         }
         $conn->query("ALTER TABLE `{$this->table}` ADD COLUMN `semester` TINYINT UNSIGNED NULL DEFAULT NULL COMMENT 'Academic semester (e.g. 1, 2)' AFTER `credit`");
+        $this->ensureModuleAimOptional();
+    }
+
+    /**
+     * module_aim is not used by SLGTI SIS imports/forms — allow NULL so inserts succeed.
+     */
+    public function ensureModuleAimOptional() {
+        $conn = $this->db->getConnection();
+        $res = $conn->query("SHOW COLUMNS FROM `{$this->table}` LIKE 'module_aim'");
+        if (!$res || $res->num_rows === 0) {
+            return;
+        }
+        $row = $res->fetch_assoc();
+        $allowsNull = strtoupper((string) ($row['Null'] ?? '')) === 'YES';
+        $hasDefault = array_key_exists('Default', $row) && $row['Default'] !== null;
+        if ($allowsNull || $hasDefault) {
+            return;
+        }
+        $type = preg_replace('/\s+(unsigned|zerofill)/i', '', (string) ($row['Type'] ?? 'TEXT'));
+        if ($type === '') {
+            $type = 'TEXT';
+        }
+        $conn->query("ALTER TABLE `{$this->table}` MODIFY COLUMN `module_aim` {$type} NULL DEFAULT NULL");
+    }
+
+    private function moduleColumnExists(string $column): bool {
+        $conn = $this->db->getConnection();
+        $safe = $conn->real_escape_string($column);
+        $res = $conn->query("SHOW COLUMNS FROM `{$this->table}` LIKE '{$safe}'");
+
+        return $res && $res->num_rows > 0;
     }
 
     /**
@@ -210,6 +241,7 @@ class ModuleModel extends Model {
         $this->ensureModuleVersionColumn();
         $this->ensureModuleCreditColumn();
         $this->ensureModuleSemesterColumn();
+        $this->ensureModuleAimOptional();
         $columns = ['course_id', 'course_version', 'module_id', 'module_name', 'credit', 'semester'];
         $filtered = [];
         foreach ($columns as $col) {
@@ -235,6 +267,9 @@ class ModuleModel extends Model {
         if (empty($filtered['course_id']) || $filtered['module_id'] === '' || $filtered['module_name'] === '') {
             $sqlError = 'Missing course_id, course_version, module_id or module_name';
             return false;
+        }
+        if ($this->moduleColumnExists('module_aim') && !array_key_exists('module_aim', $filtered)) {
+            $filtered['module_aim'] = '';
         }
         return $this->create($filtered, $sqlError);
     }
