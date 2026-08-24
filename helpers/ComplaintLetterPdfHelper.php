@@ -36,6 +36,114 @@ class ComplaintLetterPdfHelper {
         return '15mm 25mm';
     }
 
+    /** Allowed HTML tags for complaint letter rich text. */
+    public static function sanitizeLetterHtml(string $html): string {
+        $html = trim($html);
+        if ($html === '') {
+            return '';
+        }
+
+        $html = preg_replace('#<(script|style)\b[^>]*>.*?</\1>#is', '', $html) ?? $html;
+
+        $html = preg_replace_callback('/\sstyle=(["\'])(.*?)\1/i', static function (array $m): string {
+            $clean = self::sanitizeInlineStyle($m[2]);
+            if ($clean === '') {
+                return '';
+            }
+
+            return ' style="' . htmlspecialchars($clean, ENT_QUOTES, 'UTF-8') . '"';
+        }, $html) ?? $html;
+
+        $allowed = '<p><br><strong><b><em><i><u><s><sub><sup><ul><ol><li><blockquote>'
+            . '<h1><h2><h3><h4><span><div><table><thead><tbody><tr><th><td><hr><a><img>';
+        $html = strip_tags($html, $allowed);
+
+        $html = preg_replace_callback('/<a\b[^>]*>/i', static function (array $m): string {
+            if (preg_match('/\shref=(["\'])(.*?)\1/i', $m[0], $href)) {
+                $url = trim($href[2]);
+                if ($url !== '' && !preg_match('/^\s*javascript:/i', $url)) {
+                    return '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">';
+                }
+            }
+
+            return '<a>';
+        }, $html) ?? $html;
+
+        $html = preg_replace_callback('/<img\b[^>]*>/i', static function (array $m): string {
+            if (preg_match('/\ssrc=(["\'])(.*?)\1/i', $m[0], $src)) {
+                $url = trim($src[2]);
+                if (preg_match('/^(https?:|data:image\/)/i', $url)) {
+                    return '<img src="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" alt="">';
+                }
+            }
+
+            return '';
+        }, $html) ?? $html;
+
+        return $html;
+    }
+
+    private static function sanitizeInlineStyle(string $style): string {
+        $safe = [];
+        foreach (explode(';', $style) as $rule) {
+            $rule = trim($rule);
+            if ($rule === '' || !str_contains($rule, ':')) {
+                continue;
+            }
+            [$prop, $val] = array_map('trim', explode(':', $rule, 2));
+            $prop = strtolower($prop);
+            $allowed = ['font-size', 'font-family', 'color', 'background-color', 'text-align', 'font-weight', 'font-style', 'text-decoration', 'line-height'];
+            if (!in_array($prop, $allowed, true)) {
+                continue;
+            }
+            if (preg_match('/expression|javascript|url\s*\(/i', $val)) {
+                continue;
+            }
+            $safe[] = $prop . ': ' . $val;
+        }
+
+        return implode('; ', $safe);
+    }
+
+    /** Render stored complaint content (plain text or rich HTML). */
+    public static function formatLetterContent(?string $content): string {
+        $content = trim((string) $content);
+        if ($content === '') {
+            return '';
+        }
+        if ($content === strip_tags($content)) {
+            return nl2br(htmlspecialchars($content, ENT_QUOTES, 'UTF-8'));
+        }
+
+        return self::sanitizeLetterHtml($content);
+    }
+
+    /** Prepare complaint body for the rich-text editor (plain text → paragraphs). */
+    public static function prepareEditorContent(?string $content, ?string $defaultHtml = null): string {
+        $defaultHtml ??= '<p>We wish to bring to your attention a matter concerning your ward\'s conduct at the institute.</p>'
+            . '<p>[Describe the incident, dates, and impact.]</p>'
+            . '<p>We request your cooperation in addressing this matter.</p>';
+
+        $content = trim((string) $content);
+        if ($content === '') {
+            return $defaultHtml;
+        }
+        if ($content === strip_tags($content)) {
+            $parts = preg_split('/\R\s*\R/', $content) ?: [];
+            $parts = array_values(array_filter(array_map('trim', $parts), static fn (string $p): bool => $p !== ''));
+            if ($parts === []) {
+                $parts = [$content];
+            }
+
+            return implode('', array_map(
+                static fn (string $p): string => '<p>' . htmlspecialchars($p, ENT_QUOTES, 'UTF-8') . '</p>',
+                $parts
+            ));
+        }
+
+        return $content;
+    }
+
     public static function postalHeaderStylesheet(): string {
         return self::complaintLetterStylesheet();
     }
@@ -69,12 +177,19 @@ class ComplaintLetterPdfHelper {
             . 'table.cl-particulars th{width:18%;background:#f2f2f2;font-size:7pt;font-weight:700;text-align:left;padding:1.2mm 2mm;border:0.6pt solid #666;text-transform:uppercase;letter-spacing:0.03em;color:#222;vertical-align:middle;}'
             . 'table.cl-particulars td{width:32%;font-size:8.5pt;padding:1.2mm 2mm;border:0.6pt solid #666;font-weight:600;vertical-align:middle;color:#111;text-align:left;}'
             . 'table.cl-particulars td.cl-mono{font-family:DejaVu Sans Mono,Courier New,monospace;font-size:8pt;}'
-            . '.cl-body{text-align:left;white-space:pre-wrap;font-size:9.5pt;line-height:1.5;margin:0 0 2.5mm 0;word-wrap:break-word;}'
+            . '.cl-body{text-align:left;font-size:9.5pt;line-height:1.5;margin:0 0 2.5mm 0;word-wrap:break-word;overflow-wrap:break-word;}'
+            . '.cl-body p{margin:0 0 2.5mm 0;text-align:inherit;}'
+            . '.cl-body div{margin:0 0 2.5mm 0;text-align:inherit;}'
+            . '.cl-body span{text-align:inherit;}'
+            . '.cl-body ul,.cl-body ol{margin:0 0 2.5mm 0;padding-left:6mm;}'
+            . '.cl-body li{margin:0 0 1mm 0;}'
+            . '.cl-body blockquote{margin:0 0 2.5mm 0;padding-left:4mm;border-left:1pt solid #ccc;}'
+            . '.cl-body table{width:100%;border-collapse:collapse;margin:0 0 2.5mm 0;}'
+            . '.cl-body th,.cl-body td{border:0.6pt solid #666;padding:1.2mm 2mm;font-size:8.5pt;}'
+            . '.cl-body a{color:#111;text-decoration:underline;}'
+            . '.cl-body img{max-width:100%;height:auto;}'
             . '.cl-body-action{margin-bottom:0;}'
-            . '.cl-action-title{font-size:8.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;margin:3mm 0 1.5mm 0;color:#222;text-align:left;}'
-            . '.cl-closing{margin-top:7mm;text-align:left;}'
-            . '.cl-closing-text{margin:0 0 8mm 0;font-size:9.5pt;}'
-            . '.cl-sig-line{margin:0;width:52mm;font-size:9.5pt;letter-spacing:0.06em;color:#111;}';
+            . '.cl-action-title{font-size:8.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;margin:3mm 0 1.5mm 0;color:#222;text-align:left;}';
     }
 
     /** @page + root rules for PDF output (one A4 sheet per letter). */

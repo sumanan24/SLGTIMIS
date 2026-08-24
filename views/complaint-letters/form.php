@@ -1,4 +1,5 @@
 <?php
+require_once BASE_PATH . '/helpers/ComplaintLetterPdfHelper.php';
 $e = static fn (?string $s): string => htmlspecialchars((string) ($s ?? ''), ENT_QUOTES, 'UTF-8');
 $c = $complaint ?? [];
 $id = (int) ($c['id'] ?? 0);
@@ -110,12 +111,13 @@ $selectedStudentsJson = array_values(array_map(static function ($s) {
                                 </select>
                             </div>
                             <div class="col-12">
-                                <label class="form-label small">Complaint Details</label>
-                                <textarea name="complaint_body" class="form-control" rows="8" required><?php echo $e($c['complaint_body'] ?? "We wish to bring to your attention a matter concerning your ward's conduct at the institute.\n\n[Describe the incident, dates, and impact.]\n\nWe request your cooperation in addressing this matter."); ?></textarea>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label small">Action Required</label>
-                                <textarea name="action_required" class="form-control form-control-sm" rows="3"><?php echo $e($c['action_required'] ?? 'Kindly discuss this matter with your ward and ensure improved conduct at the institute.'); ?></textarea>
+                                <label class="form-label small" for="complaint_body">Complaint Details</label>
+                                <div class="cl-complaint-editor-wrap">
+                                    <textarea id="complaint_body" name="complaint_body" class="form-control cl-rich-editor" rows="10"><?php
+                                        echo $e(ComplaintLetterPdfHelper::prepareEditorContent($c['complaint_body'] ?? null));
+                                    ?></textarea>
+                                </div>
+                                <div class="invalid-feedback d-block" id="complaint-body-error" style="display:none;">Complaint details are required.</div>
                             </div>
                         </div>
                         <div class="d-flex gap-2 mt-3">
@@ -128,6 +130,63 @@ $selectedStudentsJson = array_values(array_map(static function ($s) {
         </div>
     </form>
 </div>
+<style>
+    .cl-complaint-editor-wrap {
+        width: 100%;
+    }
+    .cl-complaint-editor-wrap .tox-tinymce {
+        border: 1px solid #dee2e6 !important;
+        border-radius: 0.375rem !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        overflow: visible !important;
+    }
+    .cl-complaint-editor-wrap .tox-editor-container {
+        width: 100% !important;
+    }
+    .cl-complaint-editor-wrap .tox-editor-header {
+        background: #f8f9fa !important;
+        border-bottom: 1px solid #dee2e6 !important;
+        flex: 0 0 auto;
+    }
+    .cl-complaint-editor-wrap .tox-sidebar-wrap {
+        flex: 1 1 auto;
+        min-height: 380px;
+    }
+    .cl-complaint-editor-wrap .tox-edit-area {
+        min-height: 380px !important;
+        max-height: 560px !important;
+        overflow: hidden !important;
+    }
+    .cl-complaint-editor-wrap .tox-edit-area iframe {
+        min-height: 380px !important;
+        height: 100% !important;
+    }
+    .cl-complaint-editor-wrap .tox-statusbar {
+        border-top: 1px solid #dee2e6 !important;
+        flex: 0 0 auto;
+    }
+    .cl-complaint-editor-wrap.is-invalid .tox-tinymce {
+        border-color: #dc3545 !important;
+    }
+    .cl-complaint-editor-wrap textarea.cl-rich-editor {
+        min-height: 380px;
+        resize: vertical;
+        line-height: 1.6;
+        font-family: "Times New Roman", Times, serif;
+        font-size: 14px;
+    }
+    @media (max-width: 767.98px) {
+        .cl-complaint-editor-wrap .tox-toolbar-overlord {
+            overflow-x: auto;
+        }
+        .cl-complaint-editor-wrap .tox-edit-area {
+            min-height: 300px !important;
+            max-height: 480px !important;
+        }
+    }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/tinymce@7.6.0/tinymce.min.js"></script>
 <script type="application/json" id="cl-form-config"><?php echo json_encode([
     'baseUrl' => rtrim(APP_URL, '/'),
     'selectedStudentIds' => array_keys($selected),
@@ -138,3 +197,4 @@ $selectedStudentsJson = array_values(array_map(static function ($s) {
     'hodScoped' => !empty($isHodScoped),
 ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?></script>
 <script src="<?php echo htmlspecialchars(rtrim(APP_URL, '/') . '/assets/js/complaint-letters.js', ENT_QUOTES, 'UTF-8'); ?>"></script>
+<script src="<?php echo htmlspecialchars(rtrim(APP_URL, '/') . '/assets/js/complaint-letter-editor.js', ENT_QUOTES, 'UTF-8'); ?>"></script>

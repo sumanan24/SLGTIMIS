@@ -192,20 +192,26 @@
         if (!deptEl || !deptEl.value || !yearEl) {
             return;
         }
-        var runLoad = function () {
-            loadStudents();
+
+        var afterCourses = function () {
+            if (courseEl && preservedCourseId && !courseEl.value) {
+                courseEl.value = preservedCourseId;
+            }
+            if (courseEl && courseEl.value && yearEl.value) {
+                loadStudents();
+                return;
+            }
+            if (isEdit && Object.keys(selected).length) {
+                renderStudents([]);
+            }
         };
-        if (courseEl && courseEl.value) {
-            runLoad();
+
+        if (courseEl && courseEl.options.length > 1 && courseEl.value) {
+            afterCourses();
             return;
         }
-        if (preservedCourseId) {
-            loadCourses().then(runLoad);
-            return;
-        }
-        if (isEdit && Object.keys(selected).length) {
-            renderStudents([]);
-        }
+
+        loadCourses().then(afterCourses);
     }
 
     if (deptEl) {

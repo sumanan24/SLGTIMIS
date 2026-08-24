@@ -165,6 +165,50 @@ class ComplaintLetterController extends Controller {
     }
 
     /**
+     * Filter options for create/edit forms (uses complaint or request prefill, not list GET filters).
+     *
+     * @param array<string, mixed> $prefill
+     * @return array<string, mixed>
+     */
+    private function formFilterOptions(UserModel $um, int $uid, array $prefill = []): array {
+        require_once BASE_PATH . '/models/DepartmentModel.php';
+        require_once BASE_PATH . '/models/StudentModel.php';
+        require_once BASE_PATH . '/models/CourseModel.php';
+
+        $scope = $this->departmentScope($um, $uid);
+        $deptModel = new DepartmentModel();
+        $studentModel = new StudentModel();
+        $courseModel = new CourseModel();
+
+        $departments = $deptModel->getAll();
+        if ($scope !== null) {
+            $departments = array_values(array_filter($departments, static function ($d) use ($scope) {
+                return ($d['department_id'] ?? '') === $scope;
+            }));
+        }
+
+        $departmentId = trim((string) ($prefill['department_id'] ?? $this->get('department_id', '')));
+        if ($departmentId === '' && $scope !== null) {
+            $departmentId = $scope;
+        }
+
+        $courses = $departmentId !== ''
+            ? $courseModel->getCoursesWithDepartment(['department_id' => $departmentId])
+            : [];
+
+        return [
+            'departments' => $departments,
+            'courses' => $courses,
+            'academicYears' => $studentModel->getAcademicYears(),
+            'filters' => [
+                'department_id' => $departmentId,
+                'course_id' => trim((string) ($prefill['course_id'] ?? $this->get('course_id', ''))),
+                'academic_year' => trim((string) ($prefill['academic_year'] ?? $this->get('academic_year', ''))),
+            ],
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function validatedPost(UserModel $um, int $uid, ?int $exceptId = null): ?array {
@@ -176,7 +220,7 @@ class ComplaintLetterController extends Controller {
         $courseId = trim((string) $this->post('course_id', ''));
         $academicYear = trim((string) $this->post('academic_year', ''));
         $subject = trim((string) $this->post('subject', ''));
-        $complaintBody = trim((string) $this->post('complaint_body', ''));
+        $complaintBody = ComplaintLetterPdfHelper::sanitizeLetterHtml((string) $this->post('complaint_body', ''));
         $studentIds = $this->post('student_ids', []);
         if (!is_array($studentIds)) {
             $studentIds = [];
@@ -187,7 +231,7 @@ class ComplaintLetterController extends Controller {
             $_SESSION['error'] = 'Department, course, and academic year are required.';
             return null;
         }
-        if ($subject === '' || $complaintBody === '') {
+        if ($subject === '' || trim(strip_tags($complaintBody)) === '') {
             $_SESSION['error'] = 'Subject and complaint details are required.';
             return null;
         }
@@ -215,7 +259,7 @@ class ComplaintLetterController extends Controller {
                 'recipient_name' => '',
                 'recipient_address' => '',
                 'complaint_body' => $complaintBody,
-                'action_required' => trim((string) $this->post('action_required', '')),
+                'action_required' => '',
                 'department_id' => $departmentId,
                 'course_id' => $courseId,
                 'academic_year' => $academicYear,
@@ -264,7 +308,7 @@ class ComplaintLetterController extends Controller {
     public function create() {
         $uid = $this->requireLogin();
         $um = $this->requireManage($uid);
-        $opts = $this->filterOptions($um, $uid);
+        $opts = $this->formFilterOptions($um, $uid);
 
         return $this->view('complaint-letters/form', array_merge($this->baseViewData($uid, $um), $opts, [
             'page' => 'complaint-letters',
@@ -324,10 +368,7 @@ class ComplaintLetterController extends Controller {
         $this->assertComplaintInScope($um, $uid, $complaint);
         $students = $model->getComplaintStudents($id);
         $selectedStudentIds = array_map(static fn ($s) => (string) ($s['student_id'] ?? ''), $students);
-        $opts = $this->filterOptions($um, $uid);
-        $opts['filters']['department_id'] = (string) ($complaint['department_id'] ?? '');
-        $opts['filters']['course_id'] = (string) ($complaint['course_id'] ?? '');
-        $opts['filters']['academic_year'] = (string) ($complaint['academic_year'] ?? '');
+        $opts = $this->formFilterOptions($um, $uid, $complaint);
 
         return $this->view('complaint-letters/form', array_merge($this->baseViewData($uid, $um), $opts, [
             'page' => 'complaint-letters',

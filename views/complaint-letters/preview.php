@@ -30,6 +30,11 @@ $clPageMargin = ComplaintLetterPdfHelper::pageMarginCss();
         box-sizing: border-box;
         page-break-after: always;
         page-break-inside: avoid;
+        overflow-x: hidden;
+    }
+    .cl-letter .cl-a4-inner {
+        width: 100%;
+        max-width: 100%;
     }
     table.cl-postbox { width: 100%; }
     .cl-post-strong { text-transform: uppercase; }

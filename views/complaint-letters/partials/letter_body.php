@@ -59,15 +59,5 @@ $postalHeaderPath = BASE_PATH . '/views/complaint-letters/partials/postal_header
         </tr>
     </table>
 
-    <div class="cl-body"><?php echo $e($complaint['complaint_body'] ?? ''); ?></div>
-
-    <?php if (!empty($complaint['action_required'])): ?>
-    <div class="cl-action-title">Action Required</div>
-    <div class="cl-body cl-body-action"><?php echo $e($complaint['action_required']); ?></div>
-    <?php endif; ?>
-
-    <div class="cl-closing">
-        <p class="cl-closing-text">Yours faithfully,</p>
-        <p class="cl-sig-line">.........................................................</p>
-    </div>
+    <div class="cl-body"><?php echo ComplaintLetterPdfHelper::formatLetterContent($complaint['complaint_body'] ?? ''); ?></div>
 </div>

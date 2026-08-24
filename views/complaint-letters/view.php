@@ -1,5 +1,6 @@
 <?php
 $e = static fn (?string $s): string => htmlspecialchars((string) ($s ?? ''), ENT_QUOTES, 'UTF-8');
+require_once BASE_PATH . '/helpers/ComplaintLetterPdfHelper.php';
 $c = $complaint ?? [];
 $id = (int) ($c['id'] ?? 0);
 $canManage = !empty($canManage);
@@ -27,6 +28,8 @@ $readOnly = !empty($readOnly);
     <?php if (!empty($_SESSION['success'])): ?><div class="alert alert-success"><?php echo $e($_SESSION['success']); unset($_SESSION['success']); ?></div><?php endif; ?>
     <?php if (!empty($_SESSION['error'])): ?><div class="alert alert-danger"><?php echo $e($_SESSION['error']); unset($_SESSION['error']); ?></div><?php endif; ?>
 
+    <style><?php echo ComplaintLetterPdfHelper::complaintLetterStylesheet(); ?> .cl-letter-rich{font-size:14px;}</style>
+
     <div class="row g-3">
         <div class="col-lg-8">
             <div class="card mb-3">
@@ -43,14 +46,8 @@ $readOnly = !empty($readOnly);
             </div>
             <div class="card mb-3">
                 <div class="card-header py-2"><strong>Complaint Details</strong></div>
-                <div class="card-body"><div class="small" style="white-space:pre-wrap;"><?php echo $e($c['complaint_body'] ?? ''); ?></div></div>
+                <div class="card-body"><div class="small cl-letter-rich cl-body"><?php echo ComplaintLetterPdfHelper::formatLetterContent($c['complaint_body'] ?? ''); ?></div></div>
             </div>
-            <?php if (!empty($c['action_required'])): ?>
-            <div class="card mb-3">
-                <div class="card-header py-2"><strong>Action Required</strong></div>
-                <div class="card-body"><div class="small" style="white-space:pre-wrap;"><?php echo $e($c['action_required']); ?></div></div>
-            </div>
-            <?php endif; ?>
             <div class="card">
                 <div class="card-header py-2"><strong>Students</strong></div>
                 <div class="card-body p-0">
