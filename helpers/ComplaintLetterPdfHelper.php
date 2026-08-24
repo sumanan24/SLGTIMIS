@@ -87,7 +87,7 @@ class ComplaintLetterPdfHelper {
         $safe = [];
         foreach (explode(';', $style) as $rule) {
             $rule = trim($rule);
-            if ($rule === '' || !str_contains($rule, ':')) {
+            if ($rule === '' || strpos($rule, ':') === false) {
                 continue;
             }
             [$prop, $val] = array_map('trim', explode(':', $rule, 2));
