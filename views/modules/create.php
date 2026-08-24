@@ -117,7 +117,7 @@
                     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
                         <div class="help-mini">Download a template and fill your modules, then import.</div>
                         <a class="btn btn-outline-success btn-sm" href="<?php echo APP_URL; ?>/modules/download-sample-excel">
-                            <i class="fas fa-download me-1"></i>Download sample Excel
+                            <i class="fas fa-download me-1"></i>Download sample CSV
                         </a>
                     </div>
 

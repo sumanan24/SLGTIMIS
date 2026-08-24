@@ -36,6 +36,69 @@ class ModuleController extends Controller {
         return trim((string) $s, '_');
     }
 
+    private function columnLetter(int $index): string {
+        $index = max(0, $index);
+        $letter = '';
+        while ($index >= 0) {
+            $letter = chr(65 + ($index % 26)) . $letter;
+            $index = (int) floor($index / 26) - 1;
+        }
+
+        return $letter;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function readCsvRows(string $path): array {
+        $handle = fopen($path, 'rb');
+        if ($handle === false) {
+            throw new RuntimeException('Could not open CSV file.');
+        }
+
+        $bom = fread($handle, 3);
+        if ($bom !== "\xEF\xBB\xBF") {
+            rewind($handle);
+        }
+
+        $rows = [];
+        $lineNum = 1;
+        while (($data = fgetcsv($handle)) !== false) {
+            if ($data === [null] || ($data === [''] && feof($handle))) {
+                continue;
+            }
+            $row = [];
+            foreach ($data as $i => $val) {
+                $row[$this->columnLetter((int) $i)] = $val;
+            }
+            $rows[$lineNum++] = $row;
+        }
+        fclose($handle);
+
+        return $rows;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function readImportRows(string $tmp, string $ext): array {
+        if ($ext === 'csv') {
+            return $this->readCsvRows($tmp);
+        }
+
+        require_once BASE_PATH . '/vendor/autoload.php';
+        if ($ext === 'xls') {
+            $reader = new \PhpOffice\PhpSpreadsheet\Reader\Xls();
+        } else {
+            $reader = new \PhpOffice\PhpSpreadsheet\Reader\Xlsx();
+        }
+        $reader->setReadDataOnly(true);
+        $spreadsheet = $reader->load($tmp);
+        $sheet = $spreadsheet->getActiveSheet();
+
+        return $sheet->toArray(null, true, true, true);
+    }
+
     /**
      * Excel/CSV import for modules.
      *
@@ -107,18 +170,7 @@ class ModuleController extends Controller {
         // Load spreadsheet rows
         $rows = [];
         try {
-            require_once BASE_PATH . '/vendor/autoload.php';
-            if ($ext === 'csv') {
-                $reader = new \PhpOffice\PhpSpreadsheet\Reader\Csv();
-                $reader->setReadDataOnly(true);
-                $spreadsheet = $reader->load($tmp);
-            } else {
-                $reader = new \PhpOffice\PhpSpreadsheet\Reader\Xlsx();
-                $reader->setReadDataOnly(true);
-                $spreadsheet = $reader->load($tmp);
-            }
-            $sheet = $spreadsheet->getActiveSheet();
-            $rows = $sheet->toArray(null, true, true, true);
+            $rows = $this->readImportRows($tmp, $ext);
         } catch (\Throwable $e) {
             error_log('ModuleController::importExcel: ' . $e->getMessage());
             $_SESSION['error'] = 'Could not read the file. Please ensure it is a valid Excel/CSV.';
@@ -206,7 +258,7 @@ class ModuleController extends Controller {
     }
 
     /**
-     * Download a sample Excel file for module import.
+     * Download a sample CSV file for module import (opens in Excel).
      */
     public function downloadSampleExcel() {
         if (!isset($_SESSION['user_id'])) {
@@ -217,43 +269,29 @@ class ModuleController extends Controller {
             return;
         }
 
-        try {
-            require_once BASE_PATH . '/vendor/autoload.php';
-            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
-            $sheet = $spreadsheet->getActiveSheet();
-            $sheet->setTitle('modules');
-
-            // Headers
-            $headers = ['module_id', 'module_name', 'credit', 'semester'];
-            $sheet->fromArray($headers, null, 'A1');
-
-            // Example rows
-            $sheet->fromArray([
-                ['G50C001M09', 'Pneumatics', 2, 2],
-                ['G50C001M10', 'Automobile Engines', 2, 2],
-            ], null, 'A2');
-
-            // Simple formatting
-            $sheet->getStyle('A1:D1')->getFont()->setBold(true);
-            $sheet->getColumnDimension('A')->setWidth(16);
-            $sheet->getColumnDimension('B')->setWidth(38);
-            $sheet->getColumnDimension('C')->setWidth(10);
-            $sheet->getColumnDimension('D')->setWidth(10);
-            $sheet->freezePane('A2');
-
-            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-
-            $fn = 'modules_import_sample.xlsx';
-            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment; filename="' . $fn . '"');
-            header('Cache-Control: max-age=0');
-            $writer->save('php://output');
-            exit();
-        } catch (\Throwable $e) {
-            error_log('ModuleController::downloadSampleExcel: ' . $e->getMessage());
-            $_SESSION['error'] = 'Could not generate sample Excel file.';
-            $this->redirect('modules/create');
+        if (ob_get_length()) {
+            ob_end_clean();
         }
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="modules_import_sample.csv"');
+        header('Cache-Control: max-age=0');
+        header('Pragma: public');
+
+        echo "\xEF\xBB\xBF";
+
+        $output = fopen('php://output', 'w');
+        if ($output === false) {
+            $_SESSION['error'] = 'Could not generate sample file.';
+            $this->redirect('modules/create');
+            return;
+        }
+
+        fputcsv($output, ['module_id', 'module_name', 'credit', 'semester']);
+        fputcsv($output, ['G50C001M09', 'Pneumatics', '2', '2']);
+        fputcsv($output, ['G50C001M10', 'Automobile Engines', '2', '2']);
+        fclose($output);
+        exit;
     }
 
     public function index() {
