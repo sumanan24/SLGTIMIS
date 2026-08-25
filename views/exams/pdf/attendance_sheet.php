@@ -19,7 +19,7 @@ include __DIR__ . '/_styles.php';
     <tr>
       <th class="num">#</th>
       <th>Reg. no.</th>
-      <th>Name</th>
+      <th>Name (initials)</th>
       <th class="sig">Signature</th>
     </tr>
   </thead>
@@ -28,7 +28,7 @@ include __DIR__ . '/_styles.php';
     <tr>
       <td class="num"><?php echo (int) $n; ?></td>
       <td><?php echo htmlspecialchars((string) ($row['student_id'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-      <td><?php echo htmlspecialchars((string) ($row['student_fullname'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+      <td><?php echo htmlspecialchars((string) ($row['display_name'] ?? $row['student_ininame'] ?? $row['student_fullname'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
       <td class="sig">&nbsp;</td>
     </tr>
     <?php endforeach; ?>

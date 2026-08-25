@@ -121,11 +121,11 @@ class GroupModel extends Model {
      * Get students in a group (only active students)
      */
     public function getGroupStudents($groupId) {
-        $sql = "SELECT gs.*, s.student_id, s.student_fullname, s.student_email
+        $sql = "SELECT gs.*, s.student_id, s.student_ininame, s.student_fullname, s.student_email
                 FROM `group_students` gs
                 INNER JOIN `student` s ON gs.student_id = s.student_id
                 WHERE gs.group_id = ? AND gs.status = 'active'
-                ORDER BY s.student_fullname ASC";
+                ORDER BY s.student_id ASC";
         
         $stmt = $this->db->prepare($sql);
         $stmt->bind_param("i", $groupId);

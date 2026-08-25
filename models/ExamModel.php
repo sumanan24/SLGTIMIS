@@ -283,7 +283,8 @@ class ExamModel extends Model {
      * @return list<array{student_id: string, student_fullname: string}>
      */
     public function getRegisteredStudentsBasicForExam(int $examId): array {
-        $sql = 'SELECT s.`student_id`, s.`student_fullname`
+        require_once BASE_PATH . '/helpers/FormatHelper.php';
+        $sql = 'SELECT s.`student_id`, s.`student_ininame`, s.`student_fullname`
                 FROM `exam_students` es
                 INNER JOIN `student` s ON s.`student_id` = es.`student_id`
                 WHERE es.`exam_id` = ?
@@ -296,10 +297,96 @@ class ExamModel extends Model {
         while ($row = $res->fetch_assoc()) {
             $out[] = [
                 'student_id' => (string) ($row['student_id'] ?? ''),
+                'student_ininame' => (string) ($row['student_ininame'] ?? ''),
                 'student_fullname' => (string) ($row['student_fullname'] ?? ''),
+                'display_name' => FormatHelper::studentInitialsName($row),
             ];
         }
         return $out;
+    }
+
+    /**
+     * Registered students for many exams in one query (exam list page).
+     *
+     * @param list<int> $examIds
+     * @return array<int, list<array{student_id: string, student_ininame: string, display_name: string}>>
+     */
+    public function getRegisteredStudentsGroupedByExamIds(array $examIds): array {
+        $examIds = array_values(array_unique(array_filter(array_map('intval', $examIds))));
+        if (empty($examIds)) {
+            return [];
+        }
+        require_once BASE_PATH . '/helpers/FormatHelper.php';
+        $ph = implode(',', array_fill(0, count($examIds), '?'));
+        $types = str_repeat('i', count($examIds));
+        $sql = "SELECT es.`exam_id`, s.`student_id`, s.`student_ininame`, s.`student_fullname`
+                FROM `exam_students` es
+                INNER JOIN `student` s ON s.`student_id` = es.`student_id`
+                WHERE es.`exam_id` IN ($ph)
+                ORDER BY es.`exam_id` ASC, s.`student_id` ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param($types, ...$examIds);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $out = [];
+        while ($row = $res->fetch_assoc()) {
+            $eid = (int) ($row['exam_id'] ?? 0);
+            if ($eid < 1) {
+                continue;
+            }
+            if (!isset($out[$eid])) {
+                $out[$eid] = [];
+            }
+            $out[$eid][] = [
+                'student_id' => (string) ($row['student_id'] ?? ''),
+                'student_ininame' => (string) ($row['student_ininame'] ?? ''),
+                'display_name' => FormatHelper::studentInitialsName($row),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Load registered students for admission PDFs in one query (preserves $studentIds order).
+     *
+     * @param list<string> $studentIds
+     * @return list<array<string, mixed>>
+     */
+    public function getExamStudentsForAdmission(int $examId, array $studentIds): array {
+        $studentIds = array_values(array_filter(array_map(static function ($id) {
+            return trim((string) $id);
+        }, $studentIds)));
+        if ($examId < 1 || empty($studentIds)) {
+            return [];
+        }
+        require_once BASE_PATH . '/helpers/FormatHelper.php';
+        $ph = implode(',', array_fill(0, count($studentIds), '?'));
+        $types = 'i' . str_repeat('s', count($studentIds));
+        $sql = "SELECT s.*
+                FROM `exam_students` es
+                INNER JOIN `student` s ON s.`student_id` = es.`student_id`
+                WHERE es.`exam_id` = ? AND es.`student_id` IN ($ph)";
+        $stmt = $this->db->prepare($sql);
+        $params = array_merge([$examId], $studentIds);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $byId = [];
+        while ($row = $res->fetch_assoc()) {
+            $sid = (string) ($row['student_id'] ?? '');
+            if ($sid === '') {
+                continue;
+            }
+            $row['display_name'] = FormatHelper::studentInitialsName($row);
+            $byId[$sid] = $row;
+        }
+        $ordered = [];
+        foreach ($studentIds as $sid) {
+            if (isset($byId[$sid])) {
+                $ordered[] = $byId[$sid];
+            }
+        }
+        return $ordered;
     }
 
     /**
@@ -307,6 +394,7 @@ class ExamModel extends Model {
      */
     public function listExamsWithCourse(): array {
         $this->ensureExamTablesStructure();
+        $this->ensureExamsSemesterColumn();
         $sql = "SELECT e.*, c.course_name,
                 (SELECT COUNT(*) FROM `exam_students` es WHERE es.exam_id = e.id) AS student_count
                 FROM `exams` e
@@ -328,7 +416,7 @@ class ExamModel extends Model {
      */
     public function findWithCourse(int $examId): ?array {
         $this->ensureExamTablesStructure();
-        $sql = "SELECT e.*, c.course_name, c.department_id
+        $sql = "SELECT e.*, c.course_name, c.department_id, c.course_nvq_level
                 FROM `exams` e
                 LEFT JOIN `course` c ON c.course_id = e.course_id
                 WHERE e.id = ?";
@@ -518,18 +606,20 @@ class ExamModel extends Model {
     public function getStudentsWithMarksForModule(int $examId, string $moduleId): array {
         $this->ensureMarksQuestionColumns();
         $moduleId = trim($moduleId);
-        $sql = "SELECT s.`student_id`, s.`student_fullname`, m.*
+        $sql = "SELECT s.`student_id`, s.`student_fullname`, s.`student_ininame`, m.*
                 FROM `exam_students` es
                 INNER JOIN `student` s ON s.`student_id` = es.`student_id`
                 LEFT JOIN `marks` m ON m.`exam_id` = es.`exam_id` AND m.`student_id` = es.`student_id` AND m.`module_id` = ?
                 WHERE es.`exam_id` = ?
-                ORDER BY s.`student_fullname` ASC";
+                ORDER BY s.`student_id` ASC";
         $stmt = $this->db->prepare($sql);
         $stmt->bind_param('si', $moduleId, $examId);
         $stmt->execute();
         $res = $stmt->get_result();
+        require_once BASE_PATH . '/helpers/FormatHelper.php';
         $rows = [];
         while ($row = $res->fetch_assoc()) {
+            $row['display_name'] = FormatHelper::studentInitialsName($row);
             $rows[] = $row;
         }
         return $rows;

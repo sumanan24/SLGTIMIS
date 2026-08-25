@@ -190,6 +190,7 @@ return [
 
     // Exams (EXAM / ADM)
     'exams' => 'ExamController@index',
+    'exams/view' => 'ExamController@showExam',
     'exams/create' => 'ExamController@create',
     'exams/store' => 'ExamController@store',
     'exams/edit' => 'ExamController@edit',
@@ -207,6 +208,7 @@ return [
     'print/admission-card' => 'PrintController@admissionCard',
     'print/admission-cards-bulk' => 'PrintController@admissionCardsBulk',
     'print/admission-cards-selected' => 'PrintController@admissionCardsSelected',
+    'print/exam-roll-stickers' => 'PrintController@examRollStickers',
 
     // Public student applications — no login (Level 05 uses /level05application/ procedural wizard folder)
     'level04application' => 'StudentApplicationController@level04',

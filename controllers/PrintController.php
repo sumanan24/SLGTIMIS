@@ -163,6 +163,47 @@ class PrintController extends Controller {
         ExamPdfHelper::streamHtml($html, 'exam_' . $examId . '_mod_' . $safe . '_second_marking.pdf');
     }
 
+    public function examRollStickers() {
+        if (!$this->checkExamsAccess()) {
+            return;
+        }
+        $examId = (int) $this->get('exam_id', 0);
+        $copies = (int) $this->get('copies', 1);
+        if ($examId < 1) {
+            $_SESSION['error'] = 'Missing exam.';
+            $this->redirect('exams');
+            return;
+        }
+        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
+        require_once BASE_PATH . '/helpers/ExamRollHelper.php';
+
+        $examModel = $this->model('ExamModel');
+        $exam = $examModel->findWithCourse($examId);
+        if (!$exam) {
+            $_SESSION['error'] = 'Exam not found.';
+            $this->redirect('exams');
+            return;
+        }
+        $students = $examModel->getRegisteredStudentsBasicForExam($examId);
+        $students = ExamRollHelper::assignRollNumbersToStudents($exam, $students);
+        if ($students === []) {
+            $_SESSION['error'] = 'No students registered for this exam.';
+            $this->redirect('exams/view?id=' . $examId);
+            return;
+        }
+        try {
+            ExamPdfHelper::streamRollStickersPdf(
+                $students,
+                $copies,
+                'exam_' . $examId . '_roll_stickers.pdf'
+            );
+        } catch (Throwable $e) {
+            error_log('PrintController::examRollStickers: ' . $e->getMessage());
+            $_SESSION['error'] = 'Could not create stickers PDF.';
+            $this->redirect('exams/view?id=' . $examId);
+        }
+    }
+
     public function admissionCard() {
         if (!$this->checkExamsAccess()) {
             return;
@@ -208,13 +249,23 @@ class PrintController extends Controller {
         $moduleRows = $this->buildAdmissionModuleRows($examModel, $moduleModel, $exam);
         $meta = $this->buildAdmissionMeta($exam, $courseModel, $departmentModel, $moduleRows);
 
+        require_once BASE_PATH . '/helpers/FormatHelper.php';
+        require_once BASE_PATH . '/helpers/ExamRollHelper.php';
+        $st['display_name'] = FormatHelper::studentInitialsName($st);
+        $rollMap = ExamRollHelper::buildRollMapForExam($exam, $examModel->getStudentIdsForExam($examId));
+        $st['exam_roll_number'] = $rollMap[$studentId] ?? '';
+        $assets = $this->admissionPdfAssets();
+
         $inner = ExamPdfHelper::renderTemplate('admission_card.php', [
             'exam' => $exam,
             'student' => $st,
             'moduleRows' => $moduleRows,
             'meta' => $meta,
-            'logo_src' => $this->admissionLogoDataUri(),
-            'principal_sig_src' => $this->principalSignatureDataUri(),
+            'logo_src' => $assets['logo'],
+            'principal_sig_src' => $assets['signature'],
+            'principal_name' => $assets['principal_name'] ?? 'R.Mathaan',
+            'exam_rules' => $this->examAdmissionRules(),
+            'layout' => $this->admissionPageLayout(count($moduleRows)),
         ]);
         $html = $this->wrapAdmissionDocument($inner);
         $fn = 'admission_' . preg_replace('/[^a-zA-Z0-9_-]+/', '_', $studentId) . '.pdf';
@@ -256,13 +307,13 @@ class PrintController extends Controller {
             return;
         }
 
-        $html = $this->buildAdmissionCardsDocumentHtml($examModel, $exam, $studentIds);
-        if ($html === null) {
-            $_SESSION['error'] = 'Could not load student records.';
+        try {
+            $this->streamAdmissionCardsPdf($examModel, $exam, $studentIds, 'exam_' . $examId . '_admission_all_students.pdf');
+        } catch (Throwable $e) {
+            error_log('PrintController::admissionCardsBulk: ' . $e->getMessage());
+            $_SESSION['error'] = 'Could not generate admission PDF. Try selecting fewer students from Admission → Select students.';
             $this->redirect('exams');
-            return;
         }
-        ExamPdfHelper::streamHtml($html, 'exam_' . $examId . '_admission_all_students.pdf');
     }
 
     /**
@@ -319,63 +370,82 @@ class PrintController extends Controller {
             return;
         }
 
-        $html = $this->buildAdmissionCardsDocumentHtml($examModel, $exam, $studentIds);
-        if ($html === null) {
-            $_SESSION['error'] = 'Could not load student records.';
+        try {
+            $suffix = count($studentIds) === 1 ? preg_replace('/[^a-zA-Z0-9_-]+/', '_', $studentIds[0]) : 'selected';
+            $this->streamAdmissionCardsPdf($examModel, $exam, $studentIds, 'exam_' . $examId . '_admission_' . $suffix . '.pdf');
+        } catch (Throwable $e) {
+            error_log('PrintController::admissionCardsSelected: ' . $e->getMessage());
+            $_SESSION['error'] = 'Could not generate admission PDF. Try fewer students at a time.';
             $this->redirect('exams/admission-select?exam_id=' . $examId);
-            return;
         }
-        $suffix = count($studentIds) === 1 ? preg_replace('/[^a-zA-Z0-9_-]+/', '_', $studentIds[0]) : 'selected';
-        ExamPdfHelper::streamHtml($html, 'exam_' . $examId . '_admission_' . $suffix . '.pdf');
     }
 
     /**
-     * @param list<string> $studentIds Must be registered on this exam, in desired order.
+     * One merged PDF — render each student separately then combine with FPDI (fast, no 120s timeout).
+     *
+     * @param list<string> $studentIds
+     * @throws RuntimeException
      */
-    private function buildAdmissionCardsDocumentHtml($examModel, array $exam, array $studentIds): ?string {
+    private function streamAdmissionCardsPdf($examModel, array $exam, array $studentIds, string $filename): void {
+        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
+        $parts = $this->buildAdmissionCardHtmlParts($examModel, $exam, $studentIds);
+        if ($parts === null || $parts === []) {
+            throw new RuntimeException('Could not load student records.');
+        }
+        ExamPdfHelper::streamAdmissionInnerPartsMerged(
+            $parts,
+            function (string $body): string {
+                return $this->wrapAdmissionDocument($body);
+            },
+            $filename
+        );
+    }
+
+    /**
+     * @param list<string> $studentIds
+     * @return list<string>|null Inner HTML fragments (one per student, 2 pages each)
+     */
+    private function buildAdmissionCardHtmlParts($examModel, array $exam, array $studentIds): ?array {
         if (empty($studentIds)) {
             return null;
         }
         $examId = (int) ($exam['id'] ?? 0);
-        $studentModel = $this->model('StudentModel');
         $moduleModel = $this->model('ModuleModel');
         $courseModel = $this->model('CourseModel');
         $departmentModel = $this->model('DepartmentModel');
         $moduleRows = $this->buildAdmissionModuleRows($examModel, $moduleModel, $exam);
         $meta = $this->buildAdmissionMeta($exam, $courseModel, $departmentModel, $moduleRows);
+        $assets = $this->admissionPdfAssets();
 
-        $logoSrc = $this->admissionLogoDataUri();
-        $principalSigSrc = $this->principalSignatureDataUri();
+        $students = $examModel->getExamStudentsForAdmission($examId, $studentIds);
+        if (empty($students)) {
+            return null;
+        }
+
+        require_once BASE_PATH . '/helpers/ExamRollHelper.php';
+        $rollMap = ExamRollHelper::buildRollMapForExam($exam, $examModel->getStudentIdsForExam($examId));
+        foreach ($students as &$st) {
+            $sid = (string) ($st['student_id'] ?? '');
+            $st['exam_roll_number'] = $rollMap[$sid] ?? '';
+        }
+        unset($st);
+
         $innerParts = [];
-        foreach ($studentIds as $sid) {
-            if (!$examModel->isStudentOnExam($examId, $sid)) {
-                continue;
-            }
-            $st = $studentModel->find($sid);
-            if (!$st) {
-                continue;
-            }
+        foreach ($students as $st) {
             $innerParts[] = ExamPdfHelper::renderTemplate('admission_card.php', [
                 'exam' => $exam,
                 'student' => $st,
                 'moduleRows' => $moduleRows,
                 'meta' => $meta,
-                'logo_src' => $logoSrc,
-                'principal_sig_src' => $principalSigSrc,
+                'logo_src' => $assets['logo'],
+                'principal_sig_src' => $assets['signature'],
+                'principal_name' => $assets['principal_name'] ?? 'R.Mathaan',
+                'exam_rules' => $this->examAdmissionRules(),
+                'layout' => $this->admissionPageLayout(count($moduleRows)),
             ]);
         }
-        if (empty($innerParts)) {
-            return null;
-        }
 
-        $last = count($innerParts) - 1;
-        $merged = [];
-        foreach ($innerParts as $i => $part) {
-            $style = ($i < $last) ? ' style="page-break-after: always;"' : '';
-            $merged[] = '<div class="admission-bulk-student"' . $style . '>' . $part . '</div>';
-        }
-
-        return $this->wrapAdmissionDocument(implode('', $merged));
+        return $innerParts;
     }
 
     /**
@@ -383,19 +453,27 @@ class PrintController extends Controller {
      */
     private function buildAdmissionModuleRows($examModel, $moduleModel, array $exam): array {
         $courseId = (string) ($exam['course_id'] ?? '');
+        $moduleIndex = [];
+        if ($courseId !== '') {
+            foreach ($moduleModel->getAllWithCourse($courseId) as $modRow) {
+                $mid = trim((string) ($modRow['module_id'] ?? ''));
+                if ($mid !== '') {
+                    $moduleIndex[$mid] = (string) ($modRow['module_name'] ?? $mid);
+                }
+            }
+        }
         $out = [];
         foreach ($examModel->decodeExamModulesList($exam) as $row) {
             $mid = trim((string) ($row['module_id'] ?? ''));
             if ($mid === '') {
                 continue;
             }
-            $mod = $moduleModel->getByCourseAndModule($courseId, $mid);
-            $name = is_array($mod) ? (string) ($mod['module_name'] ?? $mid) : $mid;
             $out[] = [
                 'code' => $mid,
-                'name' => $name,
+                'name' => $moduleIndex[$mid] ?? $mid,
                 'date_dmy' => $this->formatDateDmy((string) ($row['exam_date'] ?? '')),
                 'time' => (string) ($row['exam_time'] ?? ''),
+                'time_display' => $this->formatAdmissionTimeDisplay((string) ($row['exam_time'] ?? '')),
                 'location' => (string) ($row['location'] ?? ''),
             ];
         }
@@ -425,9 +503,10 @@ class PrintController extends Controller {
         }
 
         $nvq = is_array($course) ? trim((string) ($course['course_nvq_level'] ?? '')) : '';
-        $sem = isset($exam['semester']) && $exam['semester'] !== null && $exam['semester'] !== ''
-            ? (string) (int) $exam['semester']
-            : '';
+        $semInt = isset($exam['semester']) && $exam['semester'] !== null && $exam['semester'] !== ''
+            ? (int) $exam['semester']
+            : 0;
+        $semRoman = $semInt > 0 ? $this->semesterToRoman($semInt) : '';
         $monthYear = '';
         if (!empty($exam['exam_date'])) {
             $ts = strtotime((string) $exam['exam_date']);
@@ -435,20 +514,27 @@ class PrintController extends Controller {
                 $monthYear = date('F Y', $ts);
             }
         }
-        $nvqSem = 'Level ' . ($nvq !== '' ? $nvq : '—');
-        if ($sem !== '') {
-            $nvqSem .= ' Semester ' . $sem;
+
+        $nvqDisplay = $nvq !== '' ? $nvq : '—';
+        $nvqPadded = '';
+        if ($nvq !== '') {
+            $nvqPadded = str_pad((string) (int) preg_replace('/\D/', '', $nvq), 2, '0', STR_PAD_LEFT);
+        }
+
+        $nvqSem = 'Level ' . $nvqDisplay;
+        if ($semRoman !== '') {
+            $nvqSem .= ' Semester ' . $semRoman;
         }
 
         $subtitle = 'Common Examination';
-        if ($nvq !== '') {
-            $subtitle .= ' – NVQ Level ' . $nvq;
+        if ($nvqPadded !== '') {
+            $subtitle .= ' – NVQ Level ' . $nvqPadded;
         }
-        if ($sem !== '') {
-            $subtitle .= ' – Semester ' . $sem;
+        if ($semRoman !== '') {
+            $subtitle .= ' – Semester ' . $semRoman;
         }
         if ($monthYear !== '') {
-            $subtitle .= ' – ' . $monthYear;
+            $subtitle .= ' ' . $monthYear;
         }
 
         $centre = $this->guessExamCentre($exam, $moduleRows);
@@ -456,9 +542,53 @@ class PrintController extends Controller {
         return [
             'subtitle' => $subtitle,
             'subject_line' => $subjectLine,
+            'subject_short' => $courseName,
             'exam_centre' => $centre,
             'nvq_semester' => $nvqSem,
         ];
+    }
+
+    private function semesterToRoman(int $semester): string {
+        static $map = [
+            1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI',
+            7 => 'VII', 8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII',
+        ];
+
+        return $map[$semester] ?? (string) $semester;
+    }
+
+    private function formatAdmissionTimeDisplay(string $time): string {
+        $time = trim($time);
+        if ($time === '') {
+            return '';
+        }
+        if (preg_match('/[–—]/u', $time)) {
+            return $time;
+        }
+        $parts = preg_split('/\s*-\s*/', $time);
+        if (is_array($parts) && count($parts) === 2) {
+            $a = $this->formatSingleAdmissionTime(trim($parts[0]));
+            $b = $this->formatSingleAdmissionTime(trim($parts[1]));
+            if ($a !== '' && $b !== '') {
+                return $a . ' – ' . $b;
+            }
+        }
+
+        return $this->formatSingleAdmissionTime($time);
+    }
+
+    private function formatSingleAdmissionTime(string $time): string {
+        $time = trim($time);
+        if ($time === '') {
+            return '';
+        }
+        $ts = strtotime($time);
+        if ($ts === false) {
+            return $time;
+        }
+        $formatted = date('h.i a', $ts);
+
+        return str_replace(['AM', 'PM'], ['am', 'pm'], $formatted);
     }
 
     /**
@@ -507,6 +637,72 @@ class PrintController extends Controller {
     }
 
     /**
+     * Logo/signature paths for Dompdf (file paths are much faster than base64 on bulk export).
+     *
+     * @return array{logo: string, signature: string|null}
+     */
+    /**
+     * Layout hints for admission PDF (attendance rows fixed at 10).
+     *
+     * @return array{attendance_rows: int}
+     */
+    private function admissionPageLayout(int $moduleCount): array {
+        return [
+            'attendance_rows' => 10,
+        ];
+    }
+
+    /**
+     * Standard written-examination rules for NVQ semester admission forms.
+     *
+     * @return list<string>
+     */
+    private function examAdmissionRules(): array {
+        return [
+            'Report to the examination centre at least 30 minutes before the scheduled time of each paper.',
+            'Bring this admission form and the original National Identity Card (NIC) for verification.',
+            'No candidate will be admitted to the examination hall after the paper has commenced.',
+            'Mobile phones, smart watches, and unauthorised materials are strictly prohibited in the examination hall.',
+            'Candidates must follow all instructions given by the supervisor and invigilator.',
+            'Any malpractice, impersonation, or misconduct will result in immediate disqualification.',
+        ];
+    }
+
+    private function admissionPdfAssets(): array {
+        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
+        $logoCandidates = [
+            'assets/img/logo.png',
+            'assets/img/slgtilogo.png',
+            'public/images/slgti-logo.png',
+        ];
+        $logo = '';
+        foreach ($logoCandidates as $rel) {
+            $path = ExamPdfHelper::assetPathForPdf($rel);
+            if ($path !== null) {
+                $logo = $path;
+                break;
+            }
+        }
+        if ($logo === '') {
+            $logo = $this->admissionLogoDataUri();
+        }
+
+        $sig = ExamPdfHelper::assetPathForPdf('public/images/principal-signature.png');
+        if ($sig === null) {
+            $sig = ExamPdfHelper::assetPathForPdf('assets/img/principal-signature.png');
+        }
+        if ($sig === null) {
+            $sig = $this->principalSignatureDataUri();
+        }
+
+        return [
+            'logo' => $logo,
+            'signature' => $sig,
+            'principal_name' => 'R.Mathaan',
+        ];
+    }
+
+    /**
      * Logo for PDF header. Primary: assets/img/logo.png (black on white for print).
      */
     private function admissionLogoDataUri(): string {
@@ -551,73 +747,169 @@ class PrintController extends Controller {
 
     private function admissionPdfCss(): string {
         return '
-@page { margin: 12mm 12mm 12mm 12mm; }
-body { font-family: Helvetica, Arial, DejaVu Sans, sans-serif; color: #0f172a; }
-.admission-student { font-size: 9.5px; }
+@page { size: A4 portrait; margin: 8mm 10mm 8mm 10mm; }
+body {
+  font-family: DejaVu Sans, Helvetica, Arial, sans-serif;
+  color: #1a2332; font-size: 10pt; margin: 0; padding: 0;
+}
+
+.admission-student { font-size: 10pt; line-height: 1.3; color: #1a2332; width: 100%; }
 .admission-bulk-student { display: block; }
-.admission-onepage { page-break-inside: avoid; }
-.head-row { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-.head-row td { vertical-align: top; border: none; padding: 0; }
-.head-left { width: 78%; text-align: center; padding-right: 10px; }
-.head-right { width: 22%; text-align: right; vertical-align: middle; }
-.logo-img { height: 46px; width: auto; max-width: 190px; display: inline-block; }
-.inst { font-size: 13px; font-weight: 700; color: #0b1220; letter-spacing: 0.01em; }
-.title { font-size: 12px; font-weight: 700; margin-top: 4px; color: #0b1220; }
-.sub { font-size: 9.5px; font-weight: 600; margin-top: 3px; color: #334155; }
-.divider { height: 1px; background: #cbd5e1; margin: 6px 0 10px; }
+.admission-bulk-student + .admission-bulk-student { page-break-before: always; }
 
-.section-title { font-size: 9px; font-weight: 700; margin: 0 0 6px; color: #0f2744; letter-spacing: 0.04em; text-transform: uppercase; }
-.section-box { border: 1px solid #cbd5e1; background: #ffffff; padding: 8px 10px; margin-bottom: 9px; border-radius: 4px; }
-.info { width: 100%; border-collapse: collapse; margin-bottom: 0; }
-.info th, .info td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; vertical-align: top; }
-.info th { width: 32%; background: #f8fafc; font-weight: 600; font-size: 9px; color: #0f172a; }
-.info td { font-size: 9px; background: #fff; color: #0f172a; }
+.adm-page { width: 100%; }
+.adm-page-1 { page-break-after: always; page-break-inside: auto; }
+.adm-page-2 { page-break-after: avoid; page-break-inside: auto; }
 
-.allow-block { margin: 0; padding: 10px 10px 10px; border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 4px; }
-.allow { font-size: 9.2px; text-align: center; margin: 0 0 8px; line-height: 1.35; color: #0f172a; font-style: italic; }
-.principal-auth { text-align: left; max-width: 260px; }
-.principal-sig { min-height: 34px; margin-bottom: 0; }
-.principal-sig img { display: block; max-height: 52px; max-width: 220px; height: auto; width: auto; }
-.sig-placeholder { display: inline-block; height: 34px; width: 180px; border: 1px dashed #94a3b8; background: #fff; vertical-align: top; border-radius: 3px; }
-.principal-rule { border-top: 1px solid #94a3b8; width: 200px; margin: 4px 0 4px 0; height: 1px; font-size: 0; line-height: 0; overflow: hidden; }
-.principal-label { font-size: 8.8px; font-weight: 700; color: #0b1220; text-align: left; }
+.page-shell { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.shell-cell { vertical-align: top; padding: 0; border: none; }
+.shell-bottom { vertical-align: bottom; padding-top: 2px; }
+.adm-page-2 .section-block { margin-bottom: 4px; }
+.adm-page-2 .section-bar { padding: 3px 10px; font-size: 8.5pt; }
+.adm-page-2 .card-attached { padding-top: 6px; }
 
-.part-h2 { font-size: 9px; font-weight: 700; margin: 0 0 4px; color: #0b1220; }
-.attest-text { font-size: 9px; margin: 0 0 6px; color: #334155; }
-.grid { width: 100%; border-collapse: collapse; margin-bottom: 0; }
-.grid-p2 { width: 100%; border-collapse: collapse; margin-bottom: 9px; table-layout: fixed; }
-.grid-p2 th, .grid-p2 td { border: 1px solid #e2e8f0; padding: 6px 6px; font-size: 8.8px; vertical-align: middle; }
-.grid-p2 th { background: #f1f5f9; font-weight: 700; color: #0b1220; text-align: center; font-size: 8.6px; }
-.tbl-schedule .td-left { text-align: left; }
-.tbl-schedule .td-center { text-align: center; }
-.tbl-attendance th { text-align: center; }
-.tbl-attendance td { text-align: center; height: 18px; }
-.tbl-attendance td:nth-child(1) { text-align: left; }
-.muted { color: #666; font-style: italic; text-align: left; }
-.part-b { border: 1px solid #cbd5e1; padding: 10px 10px; margin-top: 0; background: #fff; border-radius: 4px; }
-.part-b-p1 { margin-top: 0; }
-.part-b p { margin: 3px 0; font-size: 9px; }
-.attest { width: 100%; border-collapse: collapse; margin-top: 8px; }
-.attest td { border: none; vertical-align: bottom; }
-.sig-cell { width: 55%; }
-.stamp-cell { width: 45%; text-align: right; }
-.sig-line { margin-top: 18px; border-top: 1px solid #94a3b8; padding-top: 4px; font-size: 9px; color: #0b1220; font-weight: 600; }
-.sup-p2 { margin-top: 10px; font-size: 9px; color: #0b1220; }
-.sup-compact { margin-top: 8px; }
-.sup-lines { width: 100%; }
-.sup-line { margin: 0 0 8px; }
-.sup-line-sig { margin-top: 2px; }
-.sup-label { font-weight: 600; color: #0b1220; }
-.sup-fill { display: inline-block; border-bottom: 1px solid #94a3b8; vertical-align: bottom; }
-.sup-fill-name { width: 74%; height: 12px; margin-left: 6px; }
-/* Give enough vertical room for a handwritten signature */
-.sup-fill-sig { width: 54%; height: 22px; margin-left: 6px; }
-.sup-date-wrap { float: right; white-space: nowrap; }
-.sup-fill-date { width: 120px; height: 12px; margin-left: 6px; }
-.split-row { border-collapse: collapse; margin: 0 0 7px; }
-.split-row td { border: none; padding: 0; vertical-align: top; }
-.split-left { width: 50%; padding-right: 8px; }
-.split-right { width: 50%; padding-left: 8px; }
+/* Header — logo row, then full-width centred text */
+.adm-header {
+  width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: fixed;
+  border-bottom: 1px solid #d0dce8;
+}
+.adm-header td { border: none; padding: 0; background-color: #ffffff; }
+.adm-header-logo {
+  text-align: left; vertical-align: middle;
+  padding: 0 0 4px 0; width: 100%;
+}
+.adm-header-text {
+  text-align: center; vertical-align: middle;
+  padding: 2px 0 8px; width: 100%;
+}
+.adm-logo { height: 50px; width: auto; max-width: 180px; display: block; }
+.adm-inst {
+  font-size: 12pt; font-weight: 700; color: #1e3a5f; line-height: 1.3;
+  text-align: center; margin: 0; padding: 0; white-space: nowrap;
+}
+.adm-title {
+  font-size: 11pt; font-weight: 700; color: #1e3a5f; line-height: 1.3;
+  text-transform: uppercase; letter-spacing: 0.3px; text-align: center;
+  margin: 2px 0 0; padding: 0; white-space: nowrap;
+}
+.adm-sub {
+  font-size: 9pt; font-weight: 600; color: #3d5168; margin: 2px 0 0; line-height: 1.3;
+  text-align: center; padding: 0; white-space: nowrap;
+}
+
+/* Sections */
+.section-block { margin-bottom: 6px; }
+.section-bar {
+  background-color: #1e3a5f; color: #ffffff; padding: 4px 12px;
+  font-size: 9pt; font-weight: 700; letter-spacing: 0.2px; margin: 0;
+}
+
+.card {
+  border: 1px solid #b8c9dc; background-color: #fafcff;
+  padding: 9px 12px; box-sizing: border-box;
+}
+.card-attached { border-top: none; margin-top: 0; padding-top: 8px; }
+.card-table-wrap { padding: 0; background-color: #ffffff; overflow: hidden; }
+.part-a-box { background-color: #f3f7fb; padding: 8px 12px 10px; }
+
+/* Part A — simple 2-column rows (label : | value) */
+.part-a-table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+.pa-col-label { width: 36%; }
+.pa-col-value { width: 64%; }
+.part-a-table td {
+  border: none; padding: 4px 0; vertical-align: top;
+  font-size: 9.5pt; line-height: 1.4;
+}
+.pa-label {
+  font-weight: 600; color: #1e3a5f; text-align: left;
+  padding-right: 10px; white-space: nowrap;
+}
+.pa-value {
+  text-align: left; color: #1a2332;
+  word-wrap: normal; overflow-wrap: normal;
+}
+.pa-value-id { font-weight: 700; color: #1e3a5f; }
+.pa-value-name { font-weight: 700; color: #1e3a5f; }
+
+/* Authorization */
+.auth-card { background-color: #eef4fb; border-color: #9bb8d9; margin-bottom: 6px; padding: 8px 12px; }
+.auth-row { border-collapse: collapse; table-layout: fixed; width: 100%; }
+.auth-row td { border: none; padding: 0; vertical-align: middle; }
+.auth-msg { width: 55%; padding-right: 10px; }
+.auth-principal { width: 45%; text-align: right; }
+.allow-text { font-size: 9pt; font-style: italic; margin: 0; color: #1e3a5f; line-height: 1.35; font-weight: 600; }
+
+.principal-panel {
+  background-color: #ffffff; border: 1px solid #c5d8ef;
+  padding: 6px 10px; text-align: left; display: inline-block; min-width: 138px;
+}
+.principal-sig-img { display: block; height: 28px; width: auto; max-width: 115px; margin-bottom: 1px; }
+.sig-space { display: block; height: 28px; width: 115px; border-bottom: 1px solid #9bb8d9; margin-bottom: 1px; }
+.principal-name-cell { font-size: 9.5pt; font-weight: 700; color: #1e3a5f; line-height: 1.2; }
+.principal-role-cell { font-size: 8.5pt; font-weight: 700; color: #c8102e; line-height: 1.2; }
+
+/* Module list table */
+.module-summary-table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+.module-summary-table .ms-th {
+  background-color: #2a5080; color: #ffffff; font-size: 8.5pt; font-weight: 700;
+  padding: 5px 10px; text-align: left; border: 1px solid #2a5080;
+}
+.module-summary-table .ms-th:first-child { width: 130px; }
+.module-summary-table td {
+  font-size: 9pt; line-height: 1.35; vertical-align: middle;
+  border: 1px solid #d0dce8; padding: 4px 10px;
+}
+.module-summary-table tr.ms-data td { background-color: #ffffff; }
+.module-summary-table tr.ms-alt td { background-color: #f3f7fb; }
+.ms-code { font-weight: 700; color: #1e3a5f; white-space: nowrap; width: 130px; }
+.ms-name { text-align: left; color: #1a2332; }
+
+/* Part B */
+.part-b-box { border-left: 3px solid #c8102e; }
+.part-b-text { font-size: 9pt; margin: 0 0 12px; color: #1a2332; line-height: 1.35; }
+.part-b-sign { border-collapse: collapse; table-layout: fixed; width: 100%; }
+.part-b-sign td { vertical-align: bottom; border: none; padding: 0; }
+.pb-hod { width: 40%; padding-right: 10px; }
+.pb-date { width: 22%; text-align: center; }
+.pb-stamp { width: 38%; text-align: right; }
+.pb-line { border-bottom: 1px solid #1e3a5f; height: 22px; margin-bottom: 3px; }
+.pb-stamp-box { border: 1px dashed #7a94b0; height: 42px; width: 86px; margin: 0 0 3px auto; background-color: #ffffff; }
+.pb-label { font-size: 8pt; font-weight: 700; color: #1e3a5f; text-align: left; }
+.pb-date .pb-label { text-align: center; }
+.pb-stamp-label { font-size: 8pt; font-weight: 700; color: #3d5168; text-align: right; }
+
+/* Page 2 */
+.rules-card { background-color: #fffbf0; border-color: #e8c840; border-left: 3px solid #d4a017; padding: 6px 10px 5px; }
+.exam-rules-list { margin: 0; padding: 0 0 0 16px; }
+.exam-rules-list li { font-size: 8pt; line-height: 1.3; margin-bottom: 2px; color: #3d3020; }
+
+/* Simple tables (schedule, attendance) */
+.simple-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.simple-table td {
+  border: 1px solid #d0dce8; padding: 3px 7px; font-size: 8.5pt;
+  vertical-align: middle; line-height: 1.25; color: #1a2332; background-color: #ffffff;
+}
+.simple-table .simple-head td {
+  background-color: #eef4fb; font-weight: 700; color: #1e3a5f;
+  border-color: #b8c9dc; font-size: 8.5pt; padding: 4px 7px;
+}
+.st-code { font-weight: 700; color: #1e3a5f; white-space: nowrap; }
+.st-name { text-align: left; }
+.st-center { text-align: center; }
+
+.attendance-table tbody tr.att-row td { height: 18px; padding: 2px 5px; }
+
+.supervisor-card { background-color: #fafcff; border-color: #b8c9dc; margin-bottom: 2px; padding: 5px 10px 4px; }
+.supervisor-footer { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9pt; }
+.supervisor-footer td { border: none; padding: 4px 0 0; vertical-align: bottom; }
+.sup-label { width: 168px; white-space: nowrap; text-align: left; font-weight: 600; color: #1e3a5f; }
+.sup-line { border-bottom: 1px solid #1e3a5f; height: 15px; }
+.sup-line-mid { border-bottom: 1px solid #1e3a5f; height: 15px; }
+.sup-date-label { width: 42px; text-align: right; padding-left: 12px; white-space: nowrap; font-weight: 600; color: #1e3a5f; }
+.sup-date-line { width: 115px; border-bottom: 1px solid #1e3a5f; height: 15px; }
+
+.center { text-align: center; }
+.muted { color: #6b7c90; font-style: italic; }
 ';
     }
 }

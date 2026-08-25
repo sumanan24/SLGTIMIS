@@ -85,7 +85,7 @@ $cell = static function (array $r, string $col, ?string $legacy = null): string 
                             <tr>
                                 <th rowspan="2" class="align-middle">#</th>
                                 <th rowspan="2" class="align-middle">Reg. no.</th>
-                                <th rowspan="2" class="align-middle">Name</th>
+                                <th rowspan="2" class="align-middle">Name (initials)</th>
                                 <th colspan="8" class="text-center border-primary">1st marking</th>
                                 <th colspan="8" class="text-center border-info">2nd marking</th>
                                 <th rowspan="2" class="align-middle">Admission</th>
@@ -108,7 +108,7 @@ $cell = static function (array $r, string $col, ?string $legacy = null): string 
                             <tr>
                                 <td><?php echo $i; ?></td>
                                 <td><?php echo htmlspecialchars($sid, ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo htmlspecialchars((string)($r['student_fullname'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo htmlspecialchars((string)($r['display_name'] ?? $r['student_ininame'] ?? $r['student_fullname'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <?php for ($q = 1; $q <= 7; $q++): ?>
                                     <td class="p-1">
                                         <input type="text" class="form-control form-control-sm py-0 px-1" style="min-width:3.25rem;" name="marks_first[<?php echo htmlspecialchars($sid, ENT_QUOTES, 'UTF-8'); ?>][q<?php echo $q; ?>]" inputmode="decimal"

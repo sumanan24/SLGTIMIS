@@ -1,0 +1,335 @@
+/* Exams module — list, form, admission select */
+
+.exams-page-header {
+    margin-bottom: 1rem;
+}
+
+.exams-page-header .page-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.exams-page-header .page-lead {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-bottom: 0;
+}
+
+.exams-card {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    background: #fff;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.04);
+}
+
+.exams-card .card-body {
+    padding: 0;
+}
+
+.exams-table {
+    table-layout: fixed;
+    width: 100%;
+    margin-bottom: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.exams-table col.col-id { width: 4%; }
+.exams-table col.col-course { width: 22%; }
+.exams-table col.col-sem { width: 6%; }
+.exams-table col.col-date { width: 10%; }
+.exams-table col.col-time { width: 10%; }
+.exams-table col.col-venue { width: 14%; }
+.exams-table col.col-students { width: 8%; }
+.exams-table col.col-actions { width: 16%; }
+
+.exams-table thead th {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #495057;
+    white-space: nowrap;
+    vertical-align: middle;
+    border-bottom: 2px solid #dee2e6;
+    background-color: #f8f9fa;
+}
+
+.exams-table tbody td {
+    padding: 0.625rem 0.75rem;
+    vertical-align: middle;
+    line-height: 1.4;
+    border-bottom: 1px solid #eef1f4;
+}
+
+.exams-table tbody tr.exam-main-row:hover td {
+    background-color: rgba(13, 110, 253, 0.04);
+}
+
+.exams-table-compact tbody tr.exam-main-row td {
+    border-bottom: 1px solid #eef1f4;
+}
+
+.exams-table-compact tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.exams-table td.col-course a.course-name {
+    color: #0d6efd;
+}
+
+.exams-table td.col-course a.course-name:hover {
+    color: #0a58ca;
+    text-decoration: underline !important;
+}
+
+.exams-modules-panel {
+    padding: 0.75rem 1rem 1rem;
+}
+
+.exams-modules-panel .panel-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+.exams-modules-table {
+    width: 100%;
+    margin-bottom: 0;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+    overflow: hidden;
+}
+
+.exams-modules-table thead th {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 0.5rem 0.625rem;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.exams-modules-table tbody td {
+    font-size: 0.8125rem;
+    padding: 0.5rem 0.625rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.exams-modules-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.exams-modules-table .mod-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.exams-modules-table .mod-actions {
+    white-space: nowrap;
+    text-align: right;
+}
+
+.exams-modules-table .mod-actions .btn {
+    padding: 0.15rem 0.45rem;
+    font-size: 0.75rem;
+}
+
+.exams-students-scroll {
+    max-height: 220px;
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+    background: #fff;
+}
+
+.exams-students-table {
+    width: 100%;
+    margin-bottom: 0;
+    font-size: 0.8125rem;
+}
+
+.exams-students-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 0.45rem 0.625rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.exams-students-table tbody td {
+    padding: 0.4rem 0.625rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+
+.exams-students-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.exam-roll-cell {
+    min-width: 11rem;
+}
+
+.exam-roll-no {
+    font-family: Consolas, Monaco, "Courier New", monospace;
+    font-weight: 800;
+    font-size: 16px;
+    line-height: 1.3;
+    letter-spacing: 0.01em;
+    color: #1e3a5f;
+    white-space: nowrap;
+}
+
+.exam-roll-no .roll-line1,
+.exam-roll-no .roll-line2 {
+    display: block;
+}
+
+.exam-roll-no .roll-line2 {
+    margin-top: 1px;
+}
+
+.exam-roll-id {
+    font-size: 0.8125rem;
+    font-family: Consolas, Monaco, "Courier New", monospace;
+    font-weight: 600;
+    color: #334155;
+    letter-spacing: 0.01em;
+}
+
+.exam-roll-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    background: #f8fafc;
+}
+
+.exam-roll-toolbar label {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+.exam-roll-toolbar #barcode-copies {
+    width: auto;
+    min-width: 4.5rem;
+}
+
+.exam-roll-toolbar #zebra-printer-select {
+    width: auto;
+    min-width: 12rem;
+    max-width: 18rem;
+}
+
+.exams-table .col-id,
+.exams-table .col-sem,
+.exams-table .col-students {
+    text-align: center;
+}
+
+.exams-table .col-actions {
+    text-align: right;
+}
+
+.exams-table td.col-course .course-name {
+    display: block;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.exams-table td.col-course .course-id {
+    display: block;
+    font-size: 0.8125rem;
+    color: #6c757d;
+}
+
+.exams-empty {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    color: #6c757d;
+}
+
+/* Form */
+.exam-form-wrap {
+    max-width: 960px;
+}
+
+.exam-form-section {
+    margin-bottom: 1.25rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #eef1f4;
+}
+
+.exam-form-section:last-of-type {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.exam-form-section-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #495057;
+    margin-bottom: 0.75rem;
+}
+
+.exam-form-section .form-label {
+    font-weight: 500;
+    font-size: 0.875rem;
+    margin-bottom: 0.35rem;
+}
+
+.exam-form-section .form-text {
+    font-size: 0.8125rem;
+}
+
+#modulesBox .table,
+#studentsBox .table {
+    margin-bottom: 0;
+}
+
+#modulesBox .table thead th,
+#studentsBox .table thead th {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #64748b;
+    background: #f8f9fa;
+}
+
+#studentsBox {
+    background: #fff;
+}
+
+@media (max-width: 991.98px) {
+    .exams-table col.col-actions { width: 18%; }
+    .exams-modules-table .mod-actions .btn span.btn-text {
+        display: none;
+    }
+}

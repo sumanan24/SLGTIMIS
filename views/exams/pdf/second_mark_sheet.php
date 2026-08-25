@@ -26,7 +26,7 @@ $m = static function (array $row, string $col, ?string $leg = null): string {
     <tr>
       <th class="num">#</th>
       <th>Reg. no.</th>
-      <th>Name</th>
+      <th>Name (initials)</th>
       <?php for ($q = 1; $q <= 7; $q++): ?>
         <th class="q">Q<?php echo $q; ?></th>
       <?php endfor; ?>
@@ -38,7 +38,7 @@ $m = static function (array $row, string $col, ?string $leg = null): string {
     <tr>
       <td class="num"><?php echo (int) $n; ?></td>
       <td><?php echo htmlspecialchars((string) ($row['student_id'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-      <td><?php echo htmlspecialchars((string) ($row['student_fullname'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+      <td><?php echo htmlspecialchars((string) ($row['display_name'] ?? $row['student_ininame'] ?? $row['student_fullname'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
       <?php for ($q = 1; $q <= 7; $q++): ?>
         <?php $cell = $m($row, 'marks_second_q' . $q); ?>
         <td class="q"><?php echo $cell === '' ? '&nbsp;' : $cell; ?></td>

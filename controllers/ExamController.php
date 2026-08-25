@@ -8,14 +8,61 @@ class ExamController extends Controller {
         }
         $examModel = $this->model('ExamModel');
         $exams = $examModel->listExamsWithCourse();
-        foreach ($exams as &$ex) {
-            $ex['_modules'] = $examModel->decodeExamModulesList($ex);
-        }
-        unset($ex);
         return $this->view('exams/index', [
             'title' => 'Exams',
             'page' => 'exams',
             'exams' => $exams,
+        ]);
+    }
+
+    public function showExam() {
+        if (!$this->checkExamsAccess()) {
+            return;
+        }
+        $examId = (int) $this->get('id', 0);
+        if ($examId < 1) {
+            $_SESSION['error'] = 'Invalid exam.';
+            $this->redirect('exams');
+            return;
+        }
+        $examModel = $this->model('ExamModel');
+        $exam = $examModel->findWithCourse($examId);
+        if (!$exam) {
+            $_SESSION['error'] = 'Exam not found.';
+            $this->redirect('exams');
+            return;
+        }
+
+        $moduleModel = $this->model('ModuleModel');
+        $courseId = (string) ($exam['course_id'] ?? '');
+        $moduleIndex = [];
+        if ($courseId !== '') {
+            foreach ($moduleModel->getAllWithCourse($courseId) as $modRow) {
+                $mid = trim((string) ($modRow['module_id'] ?? ''));
+                if ($mid !== '') {
+                    $moduleIndex[$mid] = (string) ($modRow['module_name'] ?? '');
+                }
+            }
+        }
+        $modules = [];
+        foreach ($examModel->decodeExamModulesList($exam) as $m) {
+            $mid = trim((string) ($m['module_id'] ?? ''));
+            if ($mid === '') {
+                continue;
+            }
+            $m['module_name'] = $moduleIndex[$mid] ?? '';
+            $modules[] = $m;
+        }
+        $students = $examModel->getRegisteredStudentsBasicForExam($examId);
+        require_once BASE_PATH . '/helpers/ExamRollHelper.php';
+        $students = ExamRollHelper::assignRollNumbersToStudents($exam, $students);
+
+        return $this->view('exams/view', [
+            'title' => 'Exam #' . $examId,
+            'page' => 'exams',
+            'exam' => $exam,
+            'modules' => $modules,
+            'students' => $students,
         ]);
     }
 
@@ -413,6 +460,11 @@ class ExamController extends Controller {
         }
         $groupModel = $this->model('GroupModel');
         $students = $groupModel->getGroupStudents($groupId);
+        require_once BASE_PATH . '/helpers/FormatHelper.php';
+        foreach ($students as &$row) {
+            $row['display_name'] = FormatHelper::studentInitialsName($row);
+        }
+        unset($row);
         return $this->json(['success' => true, 'students' => $students]);
     }
 }

@@ -1,7 +1,7 @@
 <?php
 /**
  * @var array<string,mixed> $exam
- * @var list<array{student_id: string, student_fullname: string}> $students
+ * @var list<array{student_id: string, student_ininame: string, display_name: string}> $students
  */
 $h = static function (string $path): string {
     return htmlspecialchars(rtrim(APP_URL, '/') . '/' . ltrim($path, '/'), ENT_QUOTES, 'UTF-8');
@@ -12,18 +12,20 @@ $e = static function (?string $s): string {
 $examId = (int) ($exam['id'] ?? 0);
 $courseLabel = (string) ($exam['course_name'] ?? $exam['course_id'] ?? '');
 ?>
-<div class="container-fluid py-3">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+<link rel="stylesheet" href="<?php echo $h('assets/css/exams.css'); ?>?v=<?php echo (int) @filemtime(BASE_PATH . '/assets/css/exams.css'); ?>">
+
+<div class="container-fluid px-3 px-md-4 py-3">
+    <div class="exams-page-header d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
-            <h1 class="h3 mb-0"><i class="fas fa-id-card text-primary me-2"></i>Admission download</h1>
-            <p class="text-muted small mb-0">
+            <h1 class="page-title"><i class="fas fa-id-card text-primary me-2"></i>Admission download</h1>
+            <p class="page-lead mb-0">
                 Exam #<?php echo $examId; ?>
                 <?php if ($courseLabel !== ''): ?>
                     — <?php echo $e($courseLabel); ?>
                 <?php endif; ?>
             </p>
         </div>
-        <a href="<?php echo $h('exams'); ?>" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Back to exams</a>
+        <a href="<?php echo $h('exams'); ?>" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Back to exams</a>
     </div>
 
     <?php if (!empty($_SESSION['error'])): ?>
@@ -32,8 +34,8 @@ $courseLabel = (string) ($exam['course_name'] ?? $exam['course_id'] ?? '');
         </div>
     <?php endif; ?>
 
-    <div class="card shadow-sm border-0 mb-3">
-        <div class="card-body">
+    <div class="exams-card mb-3">
+        <div class="card-body p-3 p-md-4">
             <p class="mb-2 small text-muted">Tick the students to include, then download one PDF (two pages per student).</p>
             <div class="row g-2 align-items-end mb-3">
                 <div class="col-md-6">
@@ -56,18 +58,18 @@ $courseLabel = (string) ($exam['course_name'] ?? $exam['course_id'] ?? '');
                                 <th style="width: 44px;" class="text-center">
                                     <input type="checkbox" class="form-check-input" id="admMaster" title="Select / deselect visible" aria-label="Select all visible">
                                 </th>
-                                <th>Reg. no. (student number)</th>
-                                <th>Name</th>
+                                <th>Reg. no.</th>
+                                <th>Name (with initials)</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($students as $row): ?>
-                                <tr class="adm-row" data-search="<?php echo $e(strtolower($row['student_id'] . ' ' . $row['student_fullname'])); ?>">
+                                <tr class="adm-row" data-search="<?php echo $e(strtolower($row['student_id'] . ' ' . ($row['display_name'] ?? '') . ' ' . ($row['student_ininame'] ?? ''))); ?>">
                                     <td class="text-center">
                                         <input type="checkbox" class="form-check-input adm-cb" name="student_ids[]" value="<?php echo $e($row['student_id']); ?>">
                                     </td>
                                     <td class="font-monospace"><?php echo $e($row['student_id']); ?></td>
-                                    <td><?php echo $e($row['student_fullname']); ?></td>
+                                    <td><?php echo $e($row['display_name'] ?? ''); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>

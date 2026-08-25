@@ -81,28 +81,31 @@
         return lines;
     }
 
-    function fontForRollLines(lines) {
-        // Bold ~18px on 203 DPI sticker (~36 dots high).
-        return { h: 36, w: 26 };
-    }
-
-    function cellTextZpl(x, rollNumber) {
-        var lines = rollLinesArray(rollNumber).map(escapeZpl).filter(Boolean);
+    function cellTextZpl(x, sticker) {
+        var lines = stickerLines(sticker).map(escapeZpl).filter(Boolean);
         if (!lines.length) {
             return '';
         }
-        var font = fontForRollLines(lines);
-        var lineGap = 6;
-        var blockH = (font.h * lines.length) + (lineGap * Math.max(0, lines.length - 1));
-        var top = Math.max(8, Math.floor((LABEL_H - blockH) / 2));
+        var fonts = fontsForStickerLines(sticker);
+        var lineGap = 5;
+        var blockH = 0;
+        fonts.forEach(function (font, idx) {
+            blockH += font.h;
+            if (idx > 0) {
+                blockH += lineGap;
+            }
+        });
+        var top = Math.max(6, Math.floor((LABEL_H - blockH) / 2));
         var zpl = [];
+        var y = top;
         lines.forEach(function (line, idx) {
-            var y = top + (idx * (font.h + lineGap));
+            var font = fonts[idx] || fonts[0];
             zpl.push(
                 '^FO' + x + ',' + y
                 + '^A0N,' + font.h + ',' + font.w
                 + '^FB' + LABEL_W + ',1,0,C^FD' + line + '^FS'
             );
+            y += font.h + lineGap;
         });
         return zpl.join('\n');
     }
@@ -154,6 +157,10 @@
         if (!row) {
             return '';
         }
+        var dataRoll = (row.getAttribute('data-roll-number') || '').trim();
+        if (dataRoll) {
+            return dataRoll;
+        }
         var input = row.querySelector('.roll-index-input');
         if (input && String(input.value || '').trim()) {
             return String(input.value).trim();
@@ -165,11 +172,85 @@
         return (row.getAttribute('data-enrollment') || '').trim();
     }
 
+    function readStudentIdFromRow(row) {
+        if (!row) {
+            return '';
+        }
+        var dataId = (row.getAttribute('data-student-id') || '').trim();
+        if (dataId) {
+            return dataId;
+        }
+        var idEl = row.querySelector('.exam-roll-id');
+        return idEl ? String(idEl.textContent || '').trim() : '';
+    }
+
+    function readStickerFromRow(row) {
+        return {
+            roll: readRollFromRow(row),
+            studentId: readStudentIdFromRow(row)
+        };
+    }
+
+    function normalizeStickers(list) {
+        return (list || []).map(function (item) {
+            if (typeof item === 'string') {
+                return { roll: String(item).trim(), studentId: '' };
+            }
+            return {
+                roll: String((item && item.roll) || '').trim(),
+                studentId: String((item && item.studentId) || '').trim()
+            };
+        }).filter(function (s) {
+            return !!(s.roll || s.studentId);
+        });
+    }
+
+    function stickerNumber(sticker) {
+        if (typeof sticker === 'string') {
+            return String(sticker || '').trim();
+        }
+        var sid = String((sticker && sticker.studentId) || '').trim();
+        if (sid) {
+            return sid;
+        }
+        return String((sticker && sticker.roll) || '').trim();
+    }
+
+    function stickerLines(sticker) {
+        var number = stickerNumber(sticker);
+        if (!number) {
+            return [];
+        }
+        var sid = (typeof sticker !== 'string') ? String((sticker && sticker.studentId) || '').trim() : '';
+        if (sid) {
+            return [sid];
+        }
+        return rollLinesArray(number);
+    }
+
+    function fontsForStickerLines(sticker) {
+        var lines = stickerLines(sticker);
+        return lines.map(function (line) {
+            if (lines.length === 1) {
+                var w = Math.min(22, Math.max(12, Math.floor((LABEL_W - 24) / Math.max(1, String(line).length))));
+                return { h: 32, w: w };
+            }
+            return { h: 36, w: 26 };
+        });
+    }
+
     function visibleRows(root) {
         return Array.prototype.slice.call(root.querySelectorAll('tr.admission-filter-row'))
             .filter(function (tr) {
                 return !tr.classList.contains('d-none') && !tr.classList.contains('admission-text-hidden');
             });
+    }
+
+    function studentRows(root) {
+        if (root && root.classList.contains('exam-roll-stickers-wrap')) {
+            return Array.prototype.slice.call(root.querySelectorAll('tr.exam-student-row'));
+        }
+        return visibleRows(root);
     }
 
     function showError(message) {
@@ -323,9 +404,9 @@
             + '.roll-sticker-pair{display:flex;gap:10px;padding:8px;background:#e9ecef;border:1px dashed #adb5bd;border-radius:4px;}'
             + '.roll-sticker-card{width:200px;height:100px;border:1px solid #212529;border-radius:6px;background:#fff;padding:8px 10px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(0,0,0,.08);}'
             + '.roll-sticker-card.is-empty{border-style:dashed;background:#f8f9fa;opacity:.55;}'
-            + '.roll-sticker-card .roll{width:100%;font-size:18px;font-weight:900;font-family:Consolas,Monaco,monospace;line-height:1.2;text-align:center;letter-spacing:0.02em;}'
+            + '.roll-sticker-card .roll{width:100%;font-size:16px;font-weight:900;font-family:Consolas,Monaco,monospace;line-height:1.2;text-align:center;letter-spacing:0;}'
             + '.roll-sticker-card .roll span{display:block;width:100%;}'
-            + '.roll-sticker-card .roll span.roll-line1{font-size:18px;font-weight:900;}'
+            + '.roll-sticker-card .roll span.roll-line1{font-size:16px;font-weight:900;white-space:nowrap;}'
             + '.roll-sticker-card .roll span.roll-line2{font-size:18px;font-weight:900;margin-top:2px;}'
             + '.roll-sticker-preview-meta{font-size:.875rem;color:#495057;}'
             + '.roll-sticker-printer-row{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;margin-bottom:1rem;padding:.55rem .75rem;background:#fff;border:1px solid #dee2e6;border-radius:.375rem;}'
@@ -383,7 +464,8 @@
         }
         if (modalRefresh) {
             modalRefresh.addEventListener('click', function () {
-                var root = document.querySelector('.admission-entries-page-wrap');
+                var root = document.querySelector('.exam-roll-stickers-wrap')
+                    || document.querySelector('.admission-entries-page-wrap');
                 if (root) {
                     refreshPrinterList(root, document.getElementById('roll-sticker-printer-status'));
                 }
@@ -393,53 +475,52 @@
         var modalPdfBtn = document.getElementById('btn-download-stickers-pdf-modal');
         if (modalPdfBtn) {
             modalPdfBtn.addEventListener('click', function () {
-                if (!pendingJob || !pendingJob.rolls.length) {
-                    showError('No roll numbers to download.');
+                if (!pendingJob || !pendingJob.stickers.length) {
+                    showError('No stickers to download.');
                     return;
                 }
-                downloadStickersPdf(pendingJob.rolls, pendingJob.copies, [modalPdfBtn]);
+                downloadStickersPdf(pendingJob.stickers, pendingJob.copies, [modalPdfBtn], pendingJob.root);
             });
         }
 
         return document.getElementById('rollStickerPreviewModal');
     }
 
-    function stickerCardHtml(roll, idx) {
-        if (!roll) {
+    function stickerCardHtml(sticker, idx) {
+        var number = stickerNumber(sticker);
+        if (!number) {
             return '<div class="roll-sticker-card is-empty" title="Empty"><div class="roll text-muted">—</div></div>';
         }
-        var split = splitRollLines(roll);
+        var lines = stickerLines(sticker);
         var body = '';
-        if (split.line1) {
-            body += '<span class="roll-line1">' + escapeHtml(split.line1) + '</span>';
-        }
-        if (split.line2) {
-            body += '<span class="roll-line2">' + escapeHtml(split.line2) + '</span>';
-        }
+        lines.forEach(function (line, lineIdx) {
+            body += '<span class="roll-line' + (lineIdx + 1) + '">' + escapeHtml(line) + '</span>';
+        });
         return ''
             + '<div class="roll-sticker-card" title="Label ' + (idx + 1) + '">'
             + '  <div class="roll">' + body + '</div>'
             + '</div>';
     }
 
-    function openPreview(root, rollNumbers, copies) {
+    function openPreview(root, stickers, copies) {
+        stickers = normalizeStickers(stickers);
         var modalEl = ensurePreviewModal();
         var meta = document.getElementById('rollStickerPreviewMeta');
         var grid = document.getElementById('rollStickerPreviewGrid');
         var confirmBtn = document.getElementById('btn-confirm-print-roll-stickers');
-        var previewRolls = rollNumbers.slice(0, PREVIEW_LIMIT);
-        if (previewRolls.length % 2 === 1) {
-            // Keep pair rows even in preview when truncating.
-            if (rollNumbers.length > PREVIEW_LIMIT) {
-                previewRolls = rollNumbers.slice(0, PREVIEW_LIMIT - 1);
+        var previewStickers = stickers.slice(0, PREVIEW_LIMIT);
+        if (previewStickers.length % 2 === 1) {
+            if (stickers.length > PREVIEW_LIMIT) {
+                previewStickers = stickers.slice(0, PREVIEW_LIMIT - 1);
             }
         }
-        var remaining = Math.max(0, rollNumbers.length - previewRolls.length);
-        var rows = pairCount(rollNumbers.length);
+        var remaining = Math.max(0, stickers.length - previewStickers.length);
+        var rows = pairCount(stickers.length);
+        var hasReg = stickers.some(function (s) { return !!s.studentId; });
 
         pendingJob = {
             root: root,
-            rolls: rollNumbers,
+            stickers: stickers,
             copies: copies
         };
 
@@ -451,20 +532,21 @@
         refreshPrinterList(root, document.getElementById('roll-sticker-printer-status'));
 
         if (meta) {
-            meta.innerHTML = '<strong>' + rollNumbers.length + '</strong> sticker(s)'
+            meta.innerHTML = '<strong>' + stickers.length + '</strong> sticker(s)'
                 + ' · <strong>' + rows + '</strong> print row(s) (2 parallel)'
                 + ' · <strong>' + copies + '</strong> cop' + (copies === 1 ? 'y' : 'ies') + ' each'
                 + ' · total print rows: <strong>' + (rows * copies) + '</strong>'
-                + ' · each sticker 50×25 mm landscape · roll number only'
-                + (remaining > 0 ? '<br><span class="text-muted">Showing first ' + previewRolls.length + ' labels; all ' + rollNumbers.length + ' will print.</span>' : '');
+                + ' · each sticker 50×25 mm landscape · '
+                + (hasReg ? 'student registration no.' : 'roll number only')
+                + (remaining > 0 ? '<br><span class="text-muted">Showing first ' + previewStickers.length + ' labels; all ' + stickers.length + ' will print.</span>' : '');
         }
 
         if (grid) {
             var html = '';
-            for (var i = 0; i < previewRolls.length; i += 2) {
+            for (var i = 0; i < previewStickers.length; i += 2) {
                 html += '<div class="roll-sticker-pair">'
-                    + stickerCardHtml(previewRolls[i], i)
-                    + stickerCardHtml(previewRolls[i + 1] || '', i + 1)
+                    + stickerCardHtml(previewStickers[i], i)
+                    + stickerCardHtml(previewStickers[i + 1] || null, i + 1)
                     + '</div>';
             }
             grid.innerHTML = html;
@@ -485,7 +567,7 @@
                 rememberPrinterUid(printerUid);
                 var printAllBtn = job.root.querySelector('#btn-print-all-roll-numbers');
                 hidePreviewModal();
-                printRollNumbers(job.rolls, job.copies, printerUid, [printAllBtn, confirmBtn]);
+                printRollNumbers(job.stickers, job.copies, printerUid, [printAllBtn, confirmBtn]);
             });
         }
 
@@ -548,28 +630,33 @@
         return jsPdfLoading;
     }
 
-    function drawCenteredRoll(doc, text, boxX, boxY, boxW, boxH) {
-        var lines = rollLinesArray(text);
+    function drawCenteredSticker(doc, sticker, boxX, boxY, boxW, boxH) {
+        var lines = stickerLines(sticker);
         if (!lines.length) {
             return;
         }
-        // Fixed bold font size 18px for both lines.
-        var fontSize = 18;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(fontSize);
-        var lineH = 6.8;
+        var x = boxX + (boxW / 2);
+        var usable = boxW - 2.4;
+        var single = lines.length === 1;
+        var fontSize = single ? 12 : 18;
+        var lineH = single ? 7.2 : 6.8;
         var gap = 1.8;
         var blockH = (lineH * lines.length) + (gap * Math.max(0, lines.length - 1));
-        var startY = boxY + ((boxH - blockH) / 2) + 4.8;
-        var x = boxX + (boxW / 2);
+        var startY = boxY + ((boxH - blockH) / 2) + (single ? 4.2 : 4.8);
         lines.forEach(function (line, idx) {
+            var size = fontSize;
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(fontSize);
+            doc.setFontSize(size);
+            while (size > 8 && doc.getTextWidth(line) > usable) {
+                size -= 0.4;
+                doc.setFontSize(size);
+            }
             doc.text(line, x, startY + (idx * (lineH + gap)), { align: 'center' });
         });
     }
 
-    function buildStickersPdf(JsPDF, rollNumbers, copies) {
+    function buildStickersPdf(JsPDF, stickers, copies) {
+        stickers = normalizeStickers(stickers);
         var count = COPY_OPTIONS.indexOf(copies) >= 0 ? copies : 1;
         var labelW = 50;
         var labelH = 25;
@@ -584,9 +671,9 @@
         });
         var firstPage = true;
 
-        for (var i = 0; i < rollNumbers.length; i += 2) {
-            var left = rollNumbers[i];
-            var right = rollNumbers[i + 1] || '';
+        for (var i = 0; i < stickers.length; i += 2) {
+            var left = stickers[i];
+            var right = stickers[i + 1] || null;
             for (var c = 0; c < count; c++) {
                 if (!firstPage) {
                     doc.addPage([pageW, pageH], 'landscape');
@@ -596,12 +683,12 @@
                 doc.setDrawColor(180);
                 doc.setLineWidth(0.2);
                 doc.roundedRect(0.4, 0.4, labelW - 0.8, labelH - 0.8, 1.5, 1.5, 'S');
-                drawCenteredRoll(doc, left, 0, 0, labelW, labelH);
+                drawCenteredSticker(doc, left, 0, 0, labelW, labelH);
 
                 if (right) {
                     var rx = labelW + gap;
                     doc.roundedRect(rx + 0.4, 0.4, labelW - 0.8, labelH - 0.8, 1.5, 1.5, 'S');
-                    drawCenteredRoll(doc, right, rx, 0, labelW, labelH);
+                    drawCenteredSticker(doc, right, rx, 0, labelW, labelH);
                 }
             }
         }
@@ -609,26 +696,41 @@
         return doc;
     }
 
-    function downloadStickersPdf(rollNumbers, copies, buttons) {
-        var codes = (rollNumbers || []).map(function (v) {
-            return String(v || '').trim();
-        }).filter(Boolean);
+    function serverStickersPdfUrl(root, copies) {
+        if (!root) {
+            return '';
+        }
+        var url = (root.getAttribute('data-stickers-pdf-url') || '').trim();
+        if (!url) {
+            return '';
+        }
+        var sep = url.indexOf('?') >= 0 ? '&' : '?';
+        return url + sep + 'copies=' + encodeURIComponent(copies);
+    }
 
-        if (!codes.length) {
-            showError('No student roll numbers found to download.');
+    function downloadStickersPdf(stickers, copies, buttons, root) {
+        stickers = normalizeStickers(stickers);
+        if (!stickers.length) {
+            showError('No student stickers found to download.');
+            return;
+        }
+
+        var serverUrl = serverStickersPdfUrl(root, copies);
+        if (serverUrl) {
+            window.open(serverUrl, '_blank');
             return;
         }
 
         setBusy(buttons, true);
         loadJsPdf()
             .then(function (JsPDF) {
-                var doc = buildStickersPdf(JsPDF, codes, copies);
+                var doc = buildStickersPdf(JsPDF, stickers, copies);
                 var stamp = new Date();
                 var name = 'roll-stickers-'
                     + stamp.getFullYear()
                     + String(stamp.getMonth() + 1).padStart(2, '0')
                     + String(stamp.getDate()).padStart(2, '0')
-                    + '-' + codes.length + '.pdf';
+                    + '-' + stickers.length + '.pdf';
                 doc.save(name);
             })
             .catch(function (err) {
@@ -639,26 +741,23 @@
             });
     }
 
-    function printRollNumbers(rollNumbers, copies, printerUid, buttons) {
+    function printRollNumbers(stickers, copies, printerUid, buttons) {
         var client = global.ZebraBrowserPrintClient;
         if (!client) {
             showError('Roll-number print module failed to load.');
             return;
         }
 
-        var codes = (rollNumbers || []).map(function (v) {
-            return String(v || '').trim();
-        }).filter(Boolean);
-
-        if (!codes.length) {
-            showError('No student roll numbers found to print.');
+        stickers = normalizeStickers(stickers);
+        if (!stickers.length) {
+            showError('No student stickers found to print.');
             return;
         }
 
         setBusy(buttons, true);
         client.resolvePrinter(printerUid)
             .then(function (printer) {
-                var zpl = buildPrintJobZpl(codes, copies);
+                var zpl = buildPrintJobZpl(stickers, copies);
                 return client.sendToDevice(printer, zpl).then(function () {
                     return printer;
                 });
@@ -666,8 +765,8 @@
             .then(function (printer) {
                 var label = (printer && printer.name) ? printer.name : 'Zebra printer';
                 window.alert(
-                    'Sent ' + codes.length + ' roll-number sticker(s) in '
-                    + pairCount(codes.length) + ' parallel row(s) × ' + copies
+                    'Sent ' + stickers.length + ' sticker(s) in '
+                    + pairCount(stickers.length) + ' parallel row(s) × ' + copies
                     + ' to ' + label + '.'
                 );
             })
@@ -706,12 +805,14 @@
         if (downloadPdfBtn) {
             downloadPdfBtn.addEventListener('click', function (ev) {
                 ev.preventDefault();
-                var rolls = visibleRows(root).map(readRollFromRow).filter(Boolean);
-                if (!rolls.length) {
-                    showError('No visible student roll numbers to download.');
+                var stickers = studentRows(root).map(readStickerFromRow).filter(function (s) {
+                    return !!(s.roll || s.studentId);
+                });
+                if (!stickers.length) {
+                    showError('No visible student stickers to download.');
                     return;
                 }
-                downloadStickersPdf(rolls, copiesFromUi(root), [downloadPdfBtn]);
+                downloadStickersPdf(stickers, copiesFromUi(root), [downloadPdfBtn], root);
             });
         }
 
@@ -721,20 +822,21 @@
 
         printAllBtn.addEventListener('click', function (ev) {
             ev.preventDefault();
-            var rolls = visibleRows(root).map(readRollFromRow).filter(Boolean);
-            if (!rolls.length) {
-                showError('No visible student roll numbers to print.');
+            var stickers = studentRows(root).map(readStickerFromRow).filter(function (s) {
+                return !!(s.roll || s.studentId);
+            });
+            if (!stickers.length) {
+                showError('No visible student stickers to print.');
                 return;
             }
-            openPreview(root, rolls, copiesFromUi(root));
+            openPreview(root, stickers, copiesFromUi(root));
         });
     }
 
     function init() {
-        var root = document.querySelector('.admission-entries-page-wrap');
-        if (root) {
+        document.querySelectorAll('.admission-entries-page-wrap, .exam-roll-stickers-wrap').forEach(function (root) {
             bind(root);
-        }
+        });
     }
 
     global.StudentBarcodeSticker = {
