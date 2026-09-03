@@ -135,18 +135,9 @@
                                 </a>
                             </li>
 
-                            <?php if (!empty($canAccessExamsModule)): ?>
-                            <li data-nav="exams">
-                                <a href="<?php echo APP_URL; ?>/exams" class="<?php echo (isset($page) && in_array($page, ['exams', 'exams-marks'], true)) ? 'active' : ''; ?>">
-                                    <i class="fas fa-file-signature"></i>
-                                    <span>Exams</span>
-                                </a>
-                            </li>
-                            <?php endif; ?>
-
                             <?php if (!empty($canViewDevices)): ?>
                             <li data-nav="devices" class="menu-item-has-children <?php echo (isset($page) && $page === 'devices') ? 'active' : ''; ?>">
-                                <a href="#" class="menu-toggle">
+                                <a href="<?php echo APP_URL; ?>/devices" class="menu-toggle">
                                     <i class="fas fa-laptop"></i>
                                     <span>Asset Management</span>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
@@ -168,11 +159,20 @@
                                 </ul>
                             </li>
                             <?php endif; ?>
+
+                            <?php if (!empty($canAccessExamsModule)): ?>
+                            <li data-nav="exams">
+                                <a href="<?php echo APP_URL; ?>/exams" class="<?php echo (isset($page) && in_array($page, ['exams', 'exams-marks'], true)) ? 'active' : ''; ?>">
+                                    <i class="fas fa-file-signature"></i>
+                                    <span>Exams</span>
+                                </a>
+                            </li>
+                            <?php endif; ?>
                             
                             <?php if (!$isSAO): ?>
                             <!-- Deputy Principal Education Branch - Hidden for SAO -->
                             <li data-nav="management" class="menu-item-has-children <?php 
-$educationPages = ['departments', 'courses', 'modules', 'staff'];
+$educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years'];
                             if ($isAdminOrADM) {
                                 $educationPages[] = 'staff-roles';
                             }
@@ -188,7 +188,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff'];
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
                                 <ul class="submenu" style="<?php 
-                                    $educationPages = ['departments', 'courses', 'modules', 'staff'];
+                                    $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years'];
                                     if ($isAdminOrADM) {
                                         $educationPages[] = 'staff-roles';
                                     }
@@ -201,6 +201,12 @@ $educationPages = ['departments', 'courses', 'modules', 'staff'];
                                         <a href="<?php echo APP_URL; ?>/departments" class="<?php echo (isset($page) && $page === 'departments') ? 'active' : ''; ?>">
                                             <i class="fas fa-building"></i>
                                             <span>Departments</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/academic-years" class="<?php echo (isset($page) && $page === 'academic-years') ? 'active' : ''; ?>">
+                                            <i class="fas fa-calendar-alt"></i>
+                                            <span>Academic Years</span>
                                         </a>
                                     </li>
                                     <li>
@@ -850,6 +856,12 @@ $educationPages = ['departments', 'courses', 'modules', 'staff'];
             const menuToggles = document.querySelectorAll('.menu-toggle');
             menuToggles.forEach(function(toggle) {
                 toggle.addEventListener('click', function(e) {
+                    const href = (this.getAttribute('href') || '').trim();
+                    const isRealLink = href !== '' && href !== '#';
+                    const clickedArrow = e.target.closest('.menu-arrow');
+                    if (isRealLink && !clickedArrow) {
+                        return;
+                    }
                     e.preventDefault();
                     e.stopPropagation();
                     const parent = this.parentElement;

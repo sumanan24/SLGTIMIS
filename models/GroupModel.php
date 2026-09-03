@@ -9,6 +9,28 @@ class GroupModel extends Model {
     protected function getPrimaryKey() {
         return 'id';
     }
+
+    public function __construct() {
+        parent::__construct();
+        $this->ensureCourseVersionColumn();
+    }
+
+    /**
+     * Ensure groups table has course_version (INT, default 0).
+     */
+    public function ensureCourseVersionColumn() {
+        $conn = $this->db->getConnection();
+        $res = $conn->query("SHOW COLUMNS FROM `{$this->table}` LIKE 'course_version'");
+        if ($res && $res->num_rows > 0) {
+            return;
+        }
+        $conn->query("ALTER TABLE `{$this->table}` ADD COLUMN `course_version` INT(11) NOT NULL DEFAULT 0 AFTER `course_id`");
+    }
+
+    public static function versionLabel($version) {
+        $v = (int) $version;
+        return $v === 0 ? 'Default (0)' : 'Version ' . $v;
+    }
     
     /**
      * Get all groups with course and department info
@@ -199,7 +221,7 @@ class GroupModel extends Model {
      * Students who can be added: Following enrollment for course/year, not already in any active group.
      * $groupId is accepted for API compatibility; exclusion is global (one active group membership per student).
      */
-    public function getAvailableStudents($courseId, $academicYear, $groupId = null) {
+    public function getAvailableStudents($courseId, $academicYear, $groupId = null, $courseVersion = null) {
         $sql = "SELECT s.student_id, s.student_fullname, s.student_email
                 FROM `student` s
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
@@ -212,11 +234,27 @@ class GroupModel extends Model {
                         AND gs.status = 'active'
                   )";
 
+        $hasEnrollVersion = false;
+        $verRes = $this->db->query("SHOW COLUMNS FROM `student_enroll` LIKE 'course_version'");
+        if ($verRes && $verRes->num_rows > 0) {
+            $hasEnrollVersion = true;
+        }
+
+        $useVersion = $hasEnrollVersion && $courseVersion !== null;
+        if ($useVersion) {
+            $courseVersion = (int) $courseVersion;
+            $sql .= " AND (se.course_version = ? OR (? = 0 AND (se.course_version IS NULL OR se.course_version = 0)))";
+        }
+
         $sql .= " GROUP BY s.student_id, s.student_fullname, s.student_email
                   ORDER BY s.student_fullname ASC";
 
         $stmt = $this->db->prepare($sql);
-        $stmt->bind_param('ss', $courseId, $academicYear);
+        if ($useVersion) {
+            $stmt->bind_param('ssii', $courseId, $academicYear, $courseVersion, $courseVersion);
+        } else {
+            $stmt->bind_param('ss', $courseId, $academicYear);
+        }
         $stmt->execute();
         $result = $stmt->get_result();
 

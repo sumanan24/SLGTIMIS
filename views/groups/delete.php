@@ -25,6 +25,10 @@
                                     <td><?php echo htmlspecialchars($group['course_name'] ?? 'N/A'); ?></td>
                                 </tr>
                                 <tr>
+                                    <th class="bg-light">Course version:</th>
+                                    <td><?php echo htmlspecialchars(GroupModel::versionLabel($group['course_version'] ?? 0)); ?></td>
+                                </tr>
+                                <tr>
                                     <th class="bg-light">Department:</th>
                                     <td>
                                         <span class="badge bg-info bg-opacity-10 text-info">

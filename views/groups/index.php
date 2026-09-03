@@ -32,6 +32,7 @@
                             <tr>
                                 <th class="fw-bold">Group Name</th>
                                 <th class="fw-bold">Course</th>
+                                <th class="fw-bold">Version</th>
                                 <th class="fw-bold">Department</th>
                                 <th class="fw-bold">Academic Year</th>
                                 <th class="fw-bold text-center">Students</th>
@@ -46,6 +47,7 @@
                                         <span class="fw-semibold"><?php echo htmlspecialchars($group['name']); ?></span>
                                     </td>
                                     <td><?php echo htmlspecialchars($group['course_name'] ?? 'N/A'); ?></td>
+                                    <td><?php echo htmlspecialchars(GroupModel::versionLabel($group['course_version'] ?? 0)); ?></td>
                                     <td><?php echo htmlspecialchars($group['department_name'] ?? 'N/A'); ?></td>
                                     <td><?php echo htmlspecialchars($group['academic_year'] ?? 'N/A'); ?></td>
                                     <td class="text-center">

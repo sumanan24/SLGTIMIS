@@ -426,8 +426,10 @@ class ExamController extends Controller {
         if ($courseId === '' || $semester < 1) {
             return $this->json(['success' => false, 'modules' => [], 'message' => 'Course and semester required.']);
         }
+        $versionRaw = $this->get('course_version', '');
+        $courseVersion = ($versionRaw !== null && $versionRaw !== '') ? (int) $versionRaw : null;
         $moduleModel = $this->model('ModuleModel');
-        $modules = $moduleModel->getByCourseAndSemester($courseId, $semester);
+        $modules = $moduleModel->getByCourseAndSemester($courseId, $semester, $courseVersion);
         return $this->json(['success' => true, 'modules' => $modules]);
     }
 

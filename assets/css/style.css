@@ -1024,15 +1024,16 @@ body.logged-in {
 }
 
 .sidebar-menu-adm > li[data-nav="dashboard"] { order: 1; }
-.sidebar-menu-adm > li[data-nav="management"] { order: 2; }
-.sidebar-menu-adm > li[data-nav="student-info"] { order: 3; }
-.sidebar-menu-adm > li[data-nav="hostel"] { order: 4; }
-.sidebar-menu-adm > li[data-nav="student-attendance"] { order: 5; }
-.sidebar-menu-adm > li[data-nav="staff-attendance"] { order: 6; }
-.sidebar-menu-adm > li[data-nav="payments"] { order: 7; }
-.sidebar-menu-adm > li[data-nav="student-approval"] { order: 8; }
-.sidebar-menu-adm > li[data-nav="staff-approval"] { order: 9; }
-.sidebar-menu-adm > li[data-nav="instructor-diary"] { order: 10; }
+.sidebar-menu-adm > li[data-nav="devices"] { order: 2; }
+.sidebar-menu-adm > li[data-nav="management"] { order: 3; }
+.sidebar-menu-adm > li[data-nav="student-info"] { order: 4; }
+.sidebar-menu-adm > li[data-nav="hostel"] { order: 5; }
+.sidebar-menu-adm > li[data-nav="student-attendance"] { order: 6; }
+.sidebar-menu-adm > li[data-nav="staff-attendance"] { order: 7; }
+.sidebar-menu-adm > li[data-nav="payments"] { order: 8; }
+.sidebar-menu-adm > li[data-nav="student-approval"] { order: 9; }
+.sidebar-menu-adm > li[data-nav="staff-approval"] { order: 10; }
+.sidebar-menu-adm > li[data-nav="instructor-diary"] { order: 11; }
 .sidebar-menu-adm > li[data-nav="exams"] { order: 20; }
 .sidebar-menu-adm > li[data-nav="admin-divider"],
 .sidebar-menu-adm > li[data-nav="administration"] { order: 21; }

@@ -164,7 +164,7 @@ class NavMenuModel extends Model {
             'route_path' => '',
             'icon_class' => 'fas fa-graduation-cap',
             'page_key' => '',
-            'page_keys' => ['departments', 'courses', 'modules', 'staff', 'inventory', 'groups'],
+            'page_keys' => ['departments', 'academic-years', 'courses', 'modules', 'staff', 'inventory', 'groups'],
             'sort_order' => 20,
             'is_active' => 1,
             'hide_for_sao' => 1,
@@ -173,6 +173,7 @@ class NavMenuModel extends Model {
             $inserted++;
             $children = [
                 ['Departments', 'departments', 'fas fa-building', 'departments', 10],
+                ['Academic Years', 'academic-years', 'fas fa-calendar-alt', 'academic-years', 15],
                 ['Courses', 'courses', 'fas fa-book', 'courses', 20],
                 ['Modules', 'modules', 'fas fa-cubes', 'modules', 30],
                 ['Staff', 'staff', 'fas fa-chalkboard-teacher', 'staff', 40],

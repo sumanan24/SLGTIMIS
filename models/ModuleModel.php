@@ -209,20 +209,27 @@ class ModuleModel extends Model {
      *
      * @return list<array<string, mixed>>
      */
-    public function getByCourseAndSemester(string $courseId, int $semester): array {
+    public function getByCourseAndSemester(string $courseId, int $semester, ?int $courseVersion = null): array {
         $this->ensureModuleVersionColumn();
         $this->ensureModuleCreditColumn();
         $this->ensureModuleSemesterColumn();
         $sql = "SELECT m.*, c.course_name
                 FROM `{$this->table}` m
                 LEFT JOIN `course` c ON c.course_id = m.course_id
-                WHERE m.course_id = ? AND m.semester = ?
-                ORDER BY m.module_name ASC, m.module_id ASC";
+                WHERE m.course_id = ? AND m.semester = ?";
+        if ($courseVersion !== null) {
+            $sql .= " AND m.course_version = ?";
+        }
+        $sql .= " ORDER BY m.module_name ASC, m.module_id ASC";
         $stmt = $this->db->prepare($sql);
         if (!$stmt) {
             return [];
         }
-        $stmt->bind_param('si', $courseId, $semester);
+        if ($courseVersion !== null) {
+            $stmt->bind_param('sii', $courseId, $semester, $courseVersion);
+        } else {
+            $stmt->bind_param('si', $courseId, $semester);
+        }
         $stmt->execute();
         $result = $stmt->get_result();
         $data = [];

@@ -6,14 +6,21 @@
 (function (global, document) {
     'use strict';
 
-    // Dual-column landscape stock: 2 stickers side-by-side.
-    // Each sticker 50mm wide × 25mm tall; gap ~3mm; side margins ~2mm.
+    // Print-ready 2-up strip: 4.0 in × 1.0 in, two 2.0 in labels filling the full width.
     var DPI = 203;
-    var LABEL_W = Math.round(50 * DPI / 25.4);   // ~400 dots
-    var LABEL_H = Math.round(25 * DPI / 25.4);   // ~200 dots
-    var GAP = Math.round(3 * DPI / 25.4);        // ~24 dots
-    var SIDE_MARGIN = Math.round(2 * DPI / 25.4); // ~16 dots
-    var PRINT_WIDTH = SIDE_MARGIN + LABEL_W + GAP + LABEL_W + SIDE_MARGIN;
+    var STRIP_W_IN = 4.0;
+    var STRIP_H_IN = 1.0;
+    var SIDE_MARGIN_IN = 0;
+    var LABEL_W_IN = 2.0;
+    var LABEL_H_IN = 1.0;
+    var GAP_IN = 0;
+    var MARGIN_IN = 0.18;
+    var FONT_PT = 48;
+    var LABEL_W = Math.round(LABEL_W_IN * DPI);
+    var LABEL_H = Math.round(LABEL_H_IN * DPI);
+    var GAP = Math.round(GAP_IN * DPI);
+    var SIDE_MARGIN = Math.round(SIDE_MARGIN_IN * DPI);
+    var PRINT_WIDTH = Math.round(STRIP_W_IN * DPI);
     var LEFT_X = SIDE_MARGIN;
     var RIGHT_X = SIDE_MARGIN + LABEL_W + GAP;
 
@@ -232,8 +239,10 @@
         var lines = stickerLines(sticker);
         return lines.map(function (line) {
             if (lines.length === 1) {
-                var w = Math.min(22, Math.max(12, Math.floor((LABEL_W - 24) / Math.max(1, String(line).length))));
-                return { h: 32, w: w };
+                var marginDots = Math.round(MARGIN_IN * DPI);
+                var h = Math.min(LABEL_H - 10, Math.round(FONT_PT / 72 * DPI));
+                var w = Math.max(10, Math.floor((LABEL_W - (2 * marginDots)) / Math.max(1, String(line).length)));
+                return { h: h, w: w };
             }
             return { h: 36, w: 26 };
         });
@@ -400,14 +409,14 @@
             document.head.appendChild(style);
         }
         style.textContent = ''
-            + '.roll-sticker-preview-grid{display:flex;flex-direction:column;gap:10px;align-items:center;}'
-            + '.roll-sticker-pair{display:flex;gap:10px;padding:8px;background:#e9ecef;border:1px dashed #adb5bd;border-radius:4px;}'
-            + '.roll-sticker-card{width:200px;height:100px;border:1px solid #212529;border-radius:6px;background:#fff;padding:8px 10px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(0,0,0,.08);}'
+            + '.roll-sticker-preview-grid{display:flex;flex-direction:column;gap:12px;align-items:center;}'
+            + '.roll-sticker-pair{display:flex;flex-direction:row;align-items:stretch;justify-content:flex-start;gap:0;width:4.0in;box-sizing:border-box;padding:0;background:transparent;border:none;}'
+            + '.roll-sticker-card{width:2.00in;height:1.00in;box-sizing:border-box;border:1px solid #a0a0a0;border-radius:0.06in;background:#fff;padding:0.05in 0.18in;display:flex;align-items:center;justify-content:center;overflow:hidden;}'
             + '.roll-sticker-card.is-empty{border-style:dashed;background:#f8f9fa;opacity:.55;}'
-            + '.roll-sticker-card .roll{width:100%;font-size:16px;font-weight:900;font-family:Consolas,Monaco,monospace;line-height:1.2;text-align:center;letter-spacing:0;}'
-            + '.roll-sticker-card .roll span{display:block;width:100%;}'
-            + '.roll-sticker-card .roll span.roll-line1{font-size:16px;font-weight:900;white-space:nowrap;}'
-            + '.roll-sticker-card .roll span.roll-line2{font-size:18px;font-weight:900;margin-top:2px;}'
+            + '.roll-sticker-card .roll{width:100%;font-size:48px;font-weight:700;font-family:Helvetica,Arial,sans-serif;line-height:1;text-align:center;letter-spacing:-0.05em;color:#000;}'
+            + '.roll-sticker-card .roll span{display:block;width:100%;white-space:nowrap;overflow:hidden;}'
+            + '.roll-sticker-card .roll span.roll-line1{font-size:48px;font-weight:700;}'
+            + '.roll-sticker-card .roll span.roll-line2{font-size:22pt;font-weight:700;margin-top:2px;}'
             + '.roll-sticker-preview-meta{font-size:.875rem;color:#495057;}'
             + '.roll-sticker-printer-row{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;margin-bottom:1rem;padding:.55rem .75rem;background:#fff;border:1px solid #dee2e6;border-radius:.375rem;}'
             + '.roll-sticker-printer-row label{margin:0;font-size:.8125rem;font-weight:600;}'
@@ -536,7 +545,7 @@
                 + ' · <strong>' + rows + '</strong> print row(s) (2 parallel)'
                 + ' · <strong>' + copies + '</strong> cop' + (copies === 1 ? 'y' : 'ies') + ' each'
                 + ' · total print rows: <strong>' + (rows * copies) + '</strong>'
-                + ' · each sticker 50×25 mm landscape · '
+                + ' · each strip <strong>4″ × 1″</strong> (two 2″ labels, full width) · '
                 + (hasReg ? 'student registration no.' : 'roll number only')
                 + (remaining > 0 ? '<br><span class="text-muted">Showing first ' + previewStickers.length + ' labels; all ' + stickers.length + ' will print.</span>' : '');
         }
@@ -636,36 +645,42 @@
             return;
         }
         var x = boxX + (boxW / 2);
-        var usable = boxW - 2.4;
+        var usable = boxW - (2 * MARGIN_IN);
         var single = lines.length === 1;
-        var fontSize = single ? 12 : 18;
-        var lineH = single ? 7.2 : 6.8;
-        var gap = 1.8;
-        var blockH = (lineH * lines.length) + (gap * Math.max(0, lines.length - 1));
-        var startY = boxY + ((boxH - blockH) / 2) + (single ? 4.2 : 4.8);
+        var fontSize = single ? FONT_PT : 18;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(fontSize);
+        var fontIn = fontSize / 72;
+        var y = boxY + (boxH / 2) + (fontIn * 0.35);
         lines.forEach(function (line, idx) {
-            var size = fontSize;
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(size);
-            while (size > 8 && doc.getTextWidth(line) > usable) {
-                size -= 0.4;
-                doc.setFontSize(size);
+            doc.setFontSize(fontSize);
+            var tw = (typeof doc.getTextWidth === 'function') ? doc.getTextWidth(line) : 0;
+            var opts = { align: 'center', baseline: 'alphabetic', lineHeightFactor: 1 };
+            if (single && tw > usable && line.length > 1) {
+                opts.charSpace = (usable - tw) / (line.length - 1);
             }
-            doc.text(line, x, startY + (idx * (lineH + gap)), { align: 'center' });
+            var lineY = y + (idx * (fontIn * 1.15));
+            if (!single) {
+                var blockH = fontIn * lines.length + 0.04 * Math.max(0, lines.length - 1);
+                lineY = boxY + ((boxH - blockH) / 2) + fontIn * 0.8 + (idx * (fontIn + 0.04));
+            }
+            doc.text(line, x, lineY, opts);
         });
     }
 
     function buildStickersPdf(JsPDF, stickers, copies) {
         stickers = normalizeStickers(stickers);
         var count = COPY_OPTIONS.indexOf(copies) >= 0 ? copies : 1;
-        var labelW = 50;
-        var labelH = 25;
-        var gap = 3;
-        var pageW = labelW + gap + labelW;
-        var pageH = labelH;
+        var labelW = LABEL_W_IN;
+        var labelH = LABEL_H_IN;
+        var gap = GAP_IN;
+        var side = SIDE_MARGIN_IN;
+        var pageW = STRIP_W_IN;
+        var pageH = STRIP_H_IN;
         var doc = new JsPDF({
             orientation: 'landscape',
-            unit: 'mm',
+            unit: 'in',
             format: [pageW, pageH],
             compress: true
         });
@@ -680,14 +695,14 @@
                 }
                 firstPage = false;
 
-                doc.setDrawColor(180);
-                doc.setLineWidth(0.2);
-                doc.roundedRect(0.4, 0.4, labelW - 0.8, labelH - 0.8, 1.5, 1.5, 'S');
-                drawCenteredSticker(doc, left, 0, 0, labelW, labelH);
+                doc.setDrawColor(160);
+                doc.setLineWidth(0.008);
+                doc.roundedRect(side + 0.012, 0.012, labelW - 0.024, labelH - 0.024, 0.06, 0.06, 'S');
+                drawCenteredSticker(doc, left, side, 0, labelW, labelH);
 
                 if (right) {
-                    var rx = labelW + gap;
-                    doc.roundedRect(rx + 0.4, 0.4, labelW - 0.8, labelH - 0.8, 1.5, 1.5, 'S');
+                    var rx = side + labelW + gap;
+                    doc.roundedRect(rx + 0.012, 0.012, labelW - 0.024, labelH - 0.024, 0.06, 0.06, 'S');
                     drawCenteredSticker(doc, right, rx, 0, labelW, labelH);
                 }
             }

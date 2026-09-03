@@ -162,6 +162,15 @@ $base = rtrim(APP_URL, '/');
     modulesBox.classList.remove('bg-light');
   }
 
+  function selectedGroupVersion() {
+    var opt = groupSel.options[groupSel.selectedIndex];
+    if (!opt || !opt.value) {
+      return '';
+    }
+    var ver = opt.getAttribute('data-course-version');
+    return ver === null ? '' : ver;
+  }
+
   function loadModules(courseId, semester, mergeMod) {
     if (!courseId || !semester) {
       modulesBox.innerHTML = '<span class="text-muted">Select a course and semester to load modules.</span>';
@@ -170,7 +179,12 @@ $base = rtrim(APP_URL, '/');
     }
     modulesBox.innerHTML = '<span class="text-muted">Loading…</span>';
     modulesBox.classList.add('bg-light');
-    fetch(base + '/exams/ajax/modules?course_id=' + encodeURIComponent(courseId) + '&semester=' + encodeURIComponent(semester))
+    var url = base + '/exams/ajax/modules?course_id=' + encodeURIComponent(courseId) + '&semester=' + encodeURIComponent(semester);
+    var ver = selectedGroupVersion();
+    if (ver !== '') {
+      url += '&course_version=' + encodeURIComponent(ver);
+    }
+    fetch(url)
       .then(function (r) { return r.json(); })
       .then(function (j) {
         if (!j.success) {
@@ -197,8 +211,10 @@ $base = rtrim(APP_URL, '/');
         }
         j.groups.forEach(function (g) {
           var opt = document.createElement('option');
+          var ver = (g.course_version === 0 || g.course_version) ? parseInt(g.course_version, 10) || 0 : 0;
           opt.value = g.id;
-          opt.textContent = (g.name || 'Group') + ' — ' + (g.academic_year || '') + ' (id ' + g.id + ')';
+          opt.setAttribute('data-course-version', String(ver));
+          opt.textContent = (g.name || 'Group') + ' — ' + (g.academic_year || '') + ' · v' + ver;
           groupSel.appendChild(opt);
         });
         groupSel.disabled = false;
@@ -285,6 +301,11 @@ $base = rtrim(APP_URL, '/');
 
   groupSel.addEventListener('change', function () {
     var gid = groupSel.value;
+    var cid = courseSel.value;
+    var sem = semesterSel.value;
+    if (cid && sem) {
+      loadModules(cid, sem, {});
+    }
     if (!gid) {
       studentsBox.innerHTML = '<span class="text-muted small px-1">Select a batch to load students.</span>';
       return;

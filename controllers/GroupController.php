@@ -134,6 +134,7 @@ class GroupController extends Controller {
             $courseId = trim($this->post('course_id', ''));
             $academicYear = trim($this->post('academic_year', ''));
             $status = trim($this->post('status', 'active'));
+            $courseVersion = (int) $this->post('course_version', 0);
             
             // Validation
             if (empty($name)) {
@@ -153,6 +154,13 @@ class GroupController extends Controller {
                 $this->redirect('groups/create');
                 return;
             }
+
+            $allowedVersions = $this->versionNumbersForCourse($courseModel, $courseId);
+            if (!in_array($courseVersion, $allowedVersions, true)) {
+                $_SESSION['error'] = 'Select a valid course version.';
+                $this->redirect('groups/create');
+                return;
+            }
             
             // Verify course belongs to user's department (if not ADM)
             if ($departmentId) {
@@ -168,6 +176,7 @@ class GroupController extends Controller {
             $groupData = [
                 'name' => $name,
                 'course_id' => $courseId,
+                'course_version' => $courseVersion,
                 'academic_year' => $academicYear,
                 'status' => $status,
                 'created_by' => $_SESSION['user_name'] ?? null,
@@ -236,7 +245,12 @@ class GroupController extends Controller {
         // Get available students for adding
         $availableStudents = [];
         if (!empty($group['course_id']) && !empty($group['academic_year'])) {
-            $availableStudents = $groupModel->getAvailableStudents($group['course_id'], $group['academic_year'], $id);
+            $availableStudents = $groupModel->getAvailableStudents(
+                $group['course_id'],
+                $group['academic_year'],
+                $id,
+                isset($group['course_version']) ? (int) $group['course_version'] : 0
+            );
         }
         
         $data = [
@@ -293,6 +307,7 @@ class GroupController extends Controller {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $name = trim($this->post('name', ''));
             $status = trim($this->post('status', 'active'));
+            $courseVersion = (int) $this->post('course_version', 0);
             
             // Validation
             if (empty($name)) {
@@ -300,11 +315,19 @@ class GroupController extends Controller {
                 $this->redirect('groups/edit?id=' . urlencode($id));
                 return;
             }
+
+            $allowedVersions = $this->versionNumbersForCourse($courseModel, (string) ($group['course_id'] ?? ''), $courseVersion);
+            if (!in_array($courseVersion, $allowedVersions, true)) {
+                $_SESSION['error'] = 'Select a valid course version.';
+                $this->redirect('groups/edit?id=' . urlencode($id));
+                return;
+            }
             
             // Update group
             $groupData = [
                 'name' => $name,
-                'status' => $status
+                'status' => $status,
+                'course_version' => $courseVersion
             ];
             
             $result = $groupModel->updateGroup($id, $groupData);
@@ -334,6 +357,12 @@ class GroupController extends Controller {
                 $courses = $courseModel->getCoursesWithDepartment(['department_id' => $group['department_id']]);
             }
             
+            $versions = $this->versionNumbersForCourse(
+                $courseModel,
+                (string) ($group['course_id'] ?? ''),
+                isset($group['course_version']) ? (int) $group['course_version'] : 0
+            );
+
             $data = [
                 'title' => 'Edit Group',
                 'page' => 'groups',
@@ -341,6 +370,7 @@ class GroupController extends Controller {
                 'departments' => $departments,
                 'courses' => $courses,
                 'academicYears' => $academicYears,
+                'versions' => $versions,
                 'error' => $_SESSION['error'] ?? null
             ];
             unset($_SESSION['error']);
@@ -506,9 +536,11 @@ class GroupController extends Controller {
         // Return lean payload (id + name) for dropdown
         $out = [];
         foreach ($courses as $c) {
+            $cid = (string) ($c['course_id'] ?? '');
             $out[] = [
-                'course_id' => (string) ($c['course_id'] ?? ''),
+                'course_id' => $cid,
                 'course_name' => (string) ($c['course_name'] ?? $c['course_id'] ?? ''),
+                'versions' => $this->versionNumbersForCourse($courseModel, $cid),
             ];
         }
         echo json_encode(['success' => true, 'courses' => $out]);
@@ -532,9 +564,36 @@ class GroupController extends Controller {
         }
         
         $groupModel = $this->model('GroupModel');
-        $students = $groupModel->getAvailableStudents($courseId, $academicYear, $groupId ?: null);
+        $courseVersion = null;
+        if ($groupId !== '' && $groupId !== null) {
+            $group = $groupModel->getByIdWithDetails($groupId);
+            if ($group) {
+                $courseVersion = isset($group['course_version']) ? (int) $group['course_version'] : 0;
+            }
+        }
+        $students = $groupModel->getAvailableStudents($courseId, $academicYear, $groupId ?: null, $courseVersion);
         
         $this->json(['success' => true, 'students' => $students]);
+    }
+
+    /**
+     * Version numbers for a course dropdown (always includes 0 = default).
+     *
+     * @return list<int>
+     */
+    private function versionNumbersForCourse($courseModel, $courseId, $includeVersion = null) {
+        $versions = [0];
+        if ($courseId !== '') {
+            foreach ($courseModel->getVersionsForCourse($courseId) as $row) {
+                $versions[] = (int) ($row['version_no'] ?? 0);
+            }
+        }
+        if ($includeVersion !== null) {
+            $versions[] = (int) $includeVersion;
+        }
+        $versions = array_values(array_unique($versions));
+        sort($versions, SORT_NUMERIC);
+        return $versions;
     }
 }
 

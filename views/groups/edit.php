@@ -50,7 +50,28 @@
                                        disabled>
                                 <div class="form-text">Academic year cannot be changed</div>
                             </div>
-                            
+
+                            <div class="col-md-6 mb-3">
+                                <label for="course_version" class="form-label fw-semibold">
+                                    Course version <span class="text-danger">*</span>
+                                </label>
+                                <?php
+                                $currentVer = isset($group['course_version']) ? (int) $group['course_version'] : 0;
+                                $versions = $versions ?? [0];
+                                ?>
+                                <select class="form-select" id="course_version" name="course_version" required>
+                                    <?php foreach ($versions as $v): ?>
+                                        <?php $v = (int) $v; ?>
+                                        <option value="<?php echo $v; ?>" <?php echo $currentVer === $v ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars(GroupModel::versionLabel($v)); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="form-text">Modules and enrollments for this batch use this version.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="status" class="form-label fw-semibold">
                                     Status <span class="text-danger">*</span>

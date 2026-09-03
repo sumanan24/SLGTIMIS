@@ -233,8 +233,7 @@ class ExamPdfHelper {
     }
 
     /**
-     * 2-up landscape stickers: existing student registration number only.
-     * Each sticker 50×25 mm; page is two stickers with a 3 mm gap.
+     * 2-up landscape stickers: 4.0 in × 1.0 in strip, two equal labels.
      *
      * @param list<array<string, mixed>> $students
      */
@@ -243,16 +242,18 @@ class ExamPdfHelper {
         if (!class_exists('FPDF')) {
             throw new RuntimeException('FPDF is required to create roll-number stickers.');
         }
+        require_once BASE_PATH . '/helpers/ExamStickerFpdf.php';
 
         $allowedCopies = [1, 2, 5, 10];
         $copies = in_array($copies, $allowedCopies, true) ? $copies : 1;
-        $labelW = 50.0;
-        $labelH = 25.0;
-        $gap = 3.0;
-        $pageW = $labelW + $gap + $labelW;
-        $pageH = $labelH;
+        $labelW = ExamStickerFpdf::LABEL_W_IN;
+        $labelH = ExamStickerFpdf::LABEL_H_IN;
+        $gap = ExamStickerFpdf::GAP_IN;
+        $side = ExamStickerFpdf::SIDE_MARGIN_IN;
+        $pageW = ExamStickerFpdf::STRIP_W_IN;
+        $pageH = ExamStickerFpdf::STRIP_H_IN;
 
-        $pdf = new FPDF('L', 'mm', [$pageW, $pageH]);
+        $pdf = new ExamStickerFpdf('L', 'in', [$pageW, $pageH]);
         $pdf->SetAutoPageBreak(false, 0);
         $pdf->SetMargins(0, 0, 0);
         $pdf->SetCompression(true);
@@ -263,9 +264,9 @@ class ExamPdfHelper {
             $right = $students[$i + 1] ?? null;
             for ($c = 0; $c < $copies; $c++) {
                 $pdf->AddPage('L', [$pageW, $pageH]);
-                self::drawRollStickerCell($pdf, 0, 0, $labelW, $labelH, $left);
+                self::drawRollStickerCell($pdf, $side, 0, $labelW, $labelH, $left);
                 if (is_array($right)) {
-                    self::drawRollStickerCell($pdf, $labelW + $gap, 0, $labelW, $labelH, $right);
+                    self::drawRollStickerCell($pdf, $side + $labelW + $gap, 0, $labelW, $labelH, $right);
                 }
             }
         }
@@ -282,9 +283,21 @@ class ExamPdfHelper {
      * @param array<string, mixed> $student
      */
     private static function drawRollStickerCell(\FPDF $pdf, float $x, float $y, float $w, float $h, array $student): void {
-        $pdf->SetDrawColor(180, 180, 180);
-        $pdf->SetLineWidth(0.2);
-        $pdf->Rect($x + 0.4, $y + 0.4, $w - 0.8, $h - 0.8);
+        $pdf->SetDrawColor(160, 160, 160);
+        $pdf->SetLineWidth(0.008);
+        $inset = 0.004;
+        if ($pdf instanceof ExamStickerFpdf) {
+            $pdf->roundedLabel(
+                $x + $inset,
+                $y + $inset,
+                $w - (2.0 * $inset),
+                $h - (2.0 * $inset),
+                ExamStickerFpdf::CORNER_IN,
+                'S'
+            );
+        } else {
+            $pdf->Rect($x + $inset, $y + $inset, $w - (2.0 * $inset), $h - (2.0 * $inset));
+        }
 
         $number = trim((string) ($student['student_id'] ?? ''));
         if ($number === '') {
@@ -295,15 +308,14 @@ class ExamPdfHelper {
             return;
         }
 
-        $usable = $w - 2.4;
-        $size = 12.0;
         $pdf->SetTextColor(0, 0, 0);
-        $pdf->SetFont('Helvetica', 'B', $size);
-        while ($size > 8.0 && $pdf->GetStringWidth($text) > $usable) {
-            $size -= 0.4;
-            $pdf->SetFont('Helvetica', 'B', $size);
+        if ($pdf instanceof ExamStickerFpdf) {
+            $pdf->writeStudentNumber($x, $y, $w, $h, $text, ExamStickerFpdf::FONT_SIZE_PT);
+            return;
         }
-        $lineH = max(6.0, $size * 0.42);
+
+        $pdf->SetFont('Helvetica', 'B', ExamStickerFpdf::FONT_SIZE_PT);
+        $lineH = ExamStickerFpdf::FONT_SIZE_PT / 72.0;
         $pdf->SetXY($x, $y + (($h - $lineH) / 2));
         $pdf->Cell($w, $lineH, $text, 0, 0, 'C');
     }

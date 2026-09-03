@@ -821,7 +821,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
             </select>
             <button type="button" class="btn btn-dark btn-sm" id="btn-print-all-roll-numbers" title="Preview then print all student roll-number stickers to selected Zebra printer"><i class="fas fa-eye me-1"></i> Preview &amp; Print Roll Numbers</button>
             <button type="button" class="btn btn-outline-dark btn-sm" id="btn-download-stickers-pdf" title="Download roll-number stickers as PDF (2-up landscape)"><i class="fas fa-file-pdf me-1"></i> Stickers PDF</button>
-            <span class="text-muted small">Select printer · preview · PDF download · 2 stickers parallel · landscape 50×25 mm</span>
+            <span class="text-muted small">Select printer · preview · PDF download · 2 stickers parallel · 4″ × 1″ strip</span>
         </div>
         <?php endif; ?>
 
@@ -959,7 +959,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
         </select>
         <button type="button" class="btn btn-dark btn-sm" id="btn-print-all-roll-numbers" title="Preview then print all student roll-number stickers to selected Zebra printer"><i class="fas fa-eye me-1"></i> Preview &amp; Print Roll Numbers</button>
         <button type="button" class="btn btn-outline-dark btn-sm" id="btn-download-stickers-pdf" title="Download roll-number stickers as PDF (2-up landscape)"><i class="fas fa-file-pdf me-1"></i> Stickers PDF</button>
-        <span class="text-muted small">Select printer · preview · PDF download · 2 stickers parallel · landscape 50×25 mm</span>
+        <span class="text-muted small">Select printer · preview · PDF download · 2 stickers parallel · 4″ × 1″ strip</span>
     </div>
     <?php endif; ?>
 

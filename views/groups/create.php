@@ -78,6 +78,14 @@ $onlyDeptId = $onlyDept['department_id'] ?? '';
                 <div class="help-mini mt-1" id="courseHelp">Select a department first.</div>
               </div>
 
+              <div class="col-md-6">
+                <label for="course_version" class="form-label fw-semibold">Course version <span class="req">*</span></label>
+                <select class="form-select" id="course_version" name="course_version" required disabled>
+                  <option value="">Select course first</option>
+                </select>
+                <div class="help-mini mt-1" id="versionHelp">Loads versions for the selected course.</div>
+              </div>
+
               <div class="col-md-4">
                 <label for="status" class="form-label fw-semibold">Status <span class="req">*</span></label>
                 <select class="form-select" id="status" name="status" required>
@@ -104,7 +112,41 @@ $onlyDeptId = $onlyDept['department_id'] ?? '';
 document.addEventListener('DOMContentLoaded', function() {
     const departmentSelect = document.getElementById('department_id');
     const courseSelect = document.getElementById('course_id');
+    const versionSelect = document.getElementById('course_version');
     const courseHelp = document.getElementById('courseHelp');
+    const versionHelp = document.getElementById('versionHelp');
+    const versionsByCourse = {};
+
+    function versionLabel(v) {
+        v = parseInt(v, 10) || 0;
+        return v === 0 ? 'Default (0)' : 'Version ' + v;
+    }
+
+    function fillVersions(courseId, preferred) {
+        if (!versionSelect) return;
+        versionSelect.innerHTML = '';
+        versionSelect.disabled = true;
+        if (!courseId) {
+            versionSelect.options.add(new Option('Select course first', '', true, true));
+            if (versionHelp) versionHelp.textContent = 'Select a course first.';
+            return;
+        }
+        const versions = versionsByCourse[courseId] && versionsByCourse[courseId].length
+            ? versionsByCourse[courseId]
+            : [0];
+        versionSelect.options.add(new Option('Select version', '', true, true));
+        versions.forEach(function(v) {
+            versionSelect.options.add(new Option(versionLabel(v), String(v), false, false));
+        });
+        versionSelect.disabled = false;
+        const latest = versions[versions.length - 1];
+        if (preferred !== undefined && preferred !== null && preferred !== '' && versions.indexOf(parseInt(preferred, 10)) >= 0) {
+            versionSelect.value = String(preferred);
+        } else if (latest !== undefined) {
+            versionSelect.value = String(latest);
+        }
+        if (versionHelp) versionHelp.textContent = 'Modules for this batch use this version.';
+    }
 
     function setLoading(on) {
         if (!courseHelp) return;
@@ -113,6 +155,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function loadCourses(departmentId) {
         courseSelect.innerHTML = '<option value="">Select Course</option>';
+        Object.keys(versionsByCourse).forEach(function(k) { delete versionsByCourse[k]; });
+        fillVersions('');
         if (!departmentId) {
             if (courseHelp) courseHelp.textContent = 'Select a department first.';
             return;
@@ -133,6 +177,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     option.value = course.course_id;
                     option.textContent = course.course_name + ' (' + course.course_id + ')';
                     courseSelect.appendChild(option);
+                    versionsByCourse[course.course_id] = Array.isArray(course.versions) && course.versions.length
+                        ? course.versions
+                        : [0];
                 });
                 if (courseHelp) courseHelp.textContent = courses.length ? 'Select the course for this group.' : 'No courses found for this department.';
             })
@@ -145,6 +192,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if (departmentSelect) {
         departmentSelect.addEventListener('change', function() {
             loadCourses(this.value);
+        });
+    }
+
+    if (courseSelect) {
+        courseSelect.addEventListener('change', function() {
+            fillVersions(this.value);
         });
     }
 

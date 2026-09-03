@@ -142,7 +142,7 @@ $courseId = (string) ($exam['course_id'] ?? '');
                             </select>
                             <button type="button" class="btn btn-dark btn-sm" id="btn-print-all-roll-numbers" title="Preview then print all roll-number stickers"><i class="fas fa-eye me-1"></i> Preview &amp; Print Roll Numbers</button>
                             <button type="button" class="btn btn-outline-dark btn-sm" id="btn-download-stickers-pdf" title="Download stickers as PDF (student registration no.)"><i class="fas fa-file-pdf me-1"></i> Stickers PDF</button>
-                            <span class="text-muted small">2 stickers parallel · 50×25 mm · existing student reg. no.</span>
+                            <span class="text-muted small">2 stickers parallel · 4″ × 1″ strip · student reg. no.</span>
                         </div>
                         <div class="table-responsive">
                             <table class="exams-students-table mb-0">
