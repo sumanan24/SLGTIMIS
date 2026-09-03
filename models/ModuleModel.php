@@ -43,41 +43,105 @@ class ModuleModel extends Model {
         $this->ensureModuleCreditColumn();
         $conn = $this->db->getConnection();
         $res = $conn->query("SHOW COLUMNS FROM `{$this->table}` LIKE 'semester'");
-        if ($res && $res->num_rows > 0) {
-            return;
+        if (!$res || $res->num_rows === 0) {
+            $conn->query("ALTER TABLE `{$this->table}` ADD COLUMN `semester` TINYINT UNSIGNED NULL DEFAULT NULL COMMENT 'Academic semester (e.g. 1, 2)' AFTER `credit`");
         }
-        $conn->query("ALTER TABLE `{$this->table}` ADD COLUMN `semester` TINYINT UNSIGNED NULL DEFAULT NULL COMMENT 'Academic semester (e.g. 1, 2)' AFTER `credit`");
-        $this->ensureModuleAimOptional();
+        $this->ensureUnusedModuleColumnsOptional();
     }
 
     /**
-     * module_aim is not used by SLGTI SIS imports/forms — allow NULL so inserts succeed.
+     * Columns the SIS create/import forms actually write.
+     *
+     * @return list<string>
      */
-    public function ensureModuleAimOptional() {
-        $conn = $this->db->getConnection();
-        $res = $conn->query("SHOW COLUMNS FROM `{$this->table}` LIKE 'module_aim'");
-        if (!$res || $res->num_rows === 0) {
-            return;
-        }
-        $row = $res->fetch_assoc();
-        $allowsNull = strtoupper((string) ($row['Null'] ?? '')) === 'YES';
-        $hasDefault = array_key_exists('Default', $row) && $row['Default'] !== null;
-        if ($allowsNull || $hasDefault) {
-            return;
-        }
-        $type = preg_replace('/\s+(unsigned|zerofill)/i', '', (string) ($row['Type'] ?? 'TEXT'));
-        if ($type === '') {
-            $type = 'TEXT';
-        }
-        $conn->query("ALTER TABLE `{$this->table}` MODIFY COLUMN `module_aim` {$type} NULL DEFAULT NULL");
+    private function managedModuleColumns(): array {
+        return ['course_id', 'course_version', 'module_id', 'module_name', 'credit', 'semester'];
     }
 
-    private function moduleColumnExists(string $column): bool {
+    /**
+     * Leftover schema fields (e.g. module_aim, module_learning_hours) are unused by
+     * SIS imports/forms — allow NULL so inserts succeed without them.
+     */
+    public function ensureUnusedModuleColumnsOptional() {
         $conn = $this->db->getConnection();
-        $safe = $conn->real_escape_string($column);
-        $res = $conn->query("SHOW COLUMNS FROM `{$this->table}` LIKE '{$safe}'");
+        $res = $conn->query("SHOW COLUMNS FROM `{$this->table}`");
+        if (!$res) {
+            return;
+        }
+        $managed = array_flip($this->managedModuleColumns());
+        while ($row = $res->fetch_assoc()) {
+            $field = (string) ($row['Field'] ?? '');
+            if ($field === '' || isset($managed[$field])) {
+                continue;
+            }
+            $extra = strtolower((string) ($row['Extra'] ?? ''));
+            if (strpos($extra, 'auto_increment') !== false) {
+                continue;
+            }
+            $allowsNull = strtoupper((string) ($row['Null'] ?? '')) === 'YES';
+            $hasDefault = array_key_exists('Default', $row) && $row['Default'] !== null;
+            if ($allowsNull || $hasDefault) {
+                continue;
+            }
+            $type = trim((string) ($row['Type'] ?? ''));
+            if ($type === '') {
+                continue;
+            }
+            $safeField = str_replace('`', '', $field);
+            $conn->query("ALTER TABLE `{$this->table}` MODIFY COLUMN `{$safeField}` {$type} NULL DEFAULT NULL");
+        }
+    }
 
-        return $res && $res->num_rows > 0;
+    /**
+     * @deprecated Use ensureUnusedModuleColumnsOptional()
+     */
+    public function ensureModuleAimOptional() {
+        $this->ensureUnusedModuleColumnsOptional();
+    }
+
+    /**
+     * Fallback values when leftover NOT NULL columns cannot be altered.
+     *
+     * @param array<string, mixed> $col
+     * @return mixed
+     */
+    private function defaultForUnusedModuleColumn(array $col) {
+        $type = strtolower((string) ($col['Type'] ?? ''));
+        if (preg_match('/^(tinyint|smallint|mediumint|int|bigint|decimal|float|double|bit)/', $type)) {
+            return 0;
+        }
+        if (preg_match("/^enum\\s*\\((.+)\\)/", $type, $m) && preg_match("/'((?:\\\\'|[^'])*)'/", $m[1], $ev)) {
+            return stripcslashes($ev[1]);
+        }
+        return '';
+    }
+
+    /**
+     * @param array<string, mixed> $filtered
+     */
+    private function fillUnusedModuleColumnDefaults(array &$filtered): void {
+        $conn = $this->db->getConnection();
+        $res = $conn->query("SHOW COLUMNS FROM `{$this->table}`");
+        if (!$res) {
+            return;
+        }
+        $managed = array_flip($this->managedModuleColumns());
+        while ($row = $res->fetch_assoc()) {
+            $field = (string) ($row['Field'] ?? '');
+            if ($field === '' || isset($managed[$field]) || array_key_exists($field, $filtered)) {
+                continue;
+            }
+            $extra = strtolower((string) ($row['Extra'] ?? ''));
+            if (strpos($extra, 'auto_increment') !== false) {
+                continue;
+            }
+            $allowsNull = strtoupper((string) ($row['Null'] ?? '')) === 'YES';
+            $hasDefault = array_key_exists('Default', $row) && $row['Default'] !== null;
+            if ($allowsNull || $hasDefault) {
+                continue;
+            }
+            $filtered[$field] = $this->defaultForUnusedModuleColumn($row);
+        }
     }
 
     /**
@@ -248,7 +312,7 @@ class ModuleModel extends Model {
         $this->ensureModuleVersionColumn();
         $this->ensureModuleCreditColumn();
         $this->ensureModuleSemesterColumn();
-        $this->ensureModuleAimOptional();
+        $this->ensureUnusedModuleColumnsOptional();
         $columns = ['course_id', 'course_version', 'module_id', 'module_name', 'credit', 'semester'];
         $filtered = [];
         foreach ($columns as $col) {
@@ -275,9 +339,7 @@ class ModuleModel extends Model {
             $sqlError = 'Missing course_id, course_version, module_id or module_name';
             return false;
         }
-        if ($this->moduleColumnExists('module_aim') && !array_key_exists('module_aim', $filtered)) {
-            $filtered['module_aim'] = '';
-        }
+        $this->fillUnusedModuleColumnDefaults($filtered);
         return $this->create($filtered, $sqlError);
     }
 

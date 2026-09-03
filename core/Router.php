@@ -20,15 +20,18 @@ class Router {
         // Remove leading/trailing slashes
         $uri = trim($uri, '/');
         
-        // Check if route exists
+        // Exact match first (e.g. dashboard)
         if (isset($this->routes[$uri])) {
-            $route = $this->routes[$uri];
-            return $this->dispatch($route);
+            return $this->dispatch($this->routes[$uri]);
         }
         
-        // Try to match dynamic routes
+        // Dynamic routes only (patterns that contain {param})
         foreach ($this->routes as $pattern => $route) {
-            $regex = '#^' . preg_replace('/\{[^}]+\}/', '([^/]+)', $pattern) . '$#';
+            if (strpos($pattern, '{') === false) {
+                continue;
+            }
+            $quoted = preg_quote($pattern, '#');
+            $regex = '#^' . preg_replace('/\\\\\{[^}]+\\\\\}/', '([^/]+)', $quoted) . '$#';
             if (preg_match($regex, $uri, $matches)) {
                 array_shift($matches);
                 return $this->dispatch($route, $matches);

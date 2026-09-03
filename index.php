@@ -75,21 +75,36 @@ try {
     die("Error loading core classes: " . $e->getMessage());
 }
 
-// Get the URI
-$uri = $_SERVER['REQUEST_URI'];
-$basePath = dirname($_SERVER['SCRIPT_NAME']);
+// Resolve the app-relative route path (e.g. "dashboard") from the request URI.
+$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+$path = is_string($path) ? str_replace('\\', '/', $path) : '/';
 
-// Remove base path from URI
-if ($basePath !== '/' && $basePath !== '\\') {
-    $uri = str_replace($basePath, '', $uri);
+$baseCandidates = [];
+$scriptName = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+$scriptDir = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
+if ($scriptDir !== '' && $scriptDir !== '/' && $scriptDir !== '.') {
+    $baseCandidates[] = $scriptDir;
+}
+if (defined('APP_URL')) {
+    $appPath = parse_url(APP_URL, PHP_URL_PATH);
+    if (is_string($appPath) && $appPath !== '' && $appPath !== '/') {
+        $baseCandidates[] = rtrim(str_replace('\\', '/', $appPath), '/');
+    }
+}
+$baseCandidates[] = '/SLGTIMIS';
+
+$uri = $path;
+foreach (array_unique($baseCandidates) as $base) {
+    if ($uri === $base || strpos($uri, $base . '/') === 0) {
+        $uri = substr($uri, strlen($base));
+        break;
+    }
 }
 
-// Clean up URI
-$uri = parse_url($uri, PHP_URL_PATH);
-$uri = trim($uri, '/');
-
-// If empty, set to empty string for home route
-if (empty($uri)) {
+$uri = trim((string) $uri, '/');
+if (stripos($uri, 'index.php/') === 0) {
+    $uri = substr($uri, 10);
+} elseif (strcasecmp($uri, 'index.php') === 0) {
     $uri = '';
 }
 
