@@ -1,18 +1,20 @@
 <?php
 /**
- * Minimal .env loader (KEY=VALUE). Does not override existing getenv/$_ENV.
+ * Minimal .env loader (KEY=VALUE). Empty existing getenv values are overridden by .env.
  */
 declare(strict_types=1);
 
 class EnvLoader {
     private static bool $loaded = false;
+    private static ?string $loadedPath = null;
 
     public static function load(?string $path = null): void {
-        if (self::$loaded) {
+        $file = $path ?? (defined('BASE_PATH') ? BASE_PATH . '/.env' : dirname(__DIR__) . '/.env');
+        if (self::$loaded && self::$loadedPath === $file) {
             return;
         }
         self::$loaded = true;
-        $file = $path ?? (defined('BASE_PATH') ? BASE_PATH . '/.env' : dirname(__DIR__) . '/.env');
+        self::$loadedPath = $file;
         if (!is_file($file) || !is_readable($file)) {
             return;
         }
@@ -20,8 +22,12 @@ class EnvLoader {
         if ($lines === false) {
             return;
         }
-        foreach ($lines as $line) {
-            $line = trim($line);
+        foreach ($lines as $i => $line) {
+            $line = trim((string) $line);
+            if ($i === 0) {
+                // Strip UTF-8 BOM if present
+                $line = preg_replace('/^\xEF\xBB\xBF/', '', $line) ?? $line;
+            }
             if ($line === '' || $line[0] === '#') {
                 continue;
             }
@@ -41,7 +47,9 @@ class EnvLoader {
             ) {
                 $value = substr($value, 1, -1);
             }
-            if (getenv($name) === false) {
+            $existing = getenv($name);
+            // Apply .env when unset OR empty (empty server env must not block .env)
+            if ($existing === false || $existing === '') {
                 putenv($name . '=' . $value);
                 $_ENV[$name] = $value;
             }
@@ -49,7 +57,9 @@ class EnvLoader {
     }
 
     public static function get(string $key, ?string $default = null): ?string {
-        self::load();
+        if (!self::$loaded) {
+            self::load();
+        }
         $v = getenv($key);
         if ($v === false || $v === '') {
             $v = $_ENV[$key] ?? null;
@@ -58,5 +68,14 @@ class EnvLoader {
             return $default;
         }
         return (string) $v;
+    }
+
+    /** Whether the .env file was found on the last load attempt. */
+    public static function envFileExists(): bool {
+        if (!self::$loaded) {
+            self::load();
+        }
+        $file = self::$loadedPath ?? (defined('BASE_PATH') ? BASE_PATH . '/.env' : dirname(__DIR__) . '/.env');
+        return is_file($file) && is_readable($file);
     }
 }

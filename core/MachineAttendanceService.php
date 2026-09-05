@@ -60,7 +60,7 @@ class MachineAttendanceService {
         if ($this->host === '' || $this->password === '') {
             return [
                 'ok' => false,
-                'message' => 'Machine credentials are not configured. Set STUDENT_HIKVISION_* in .env.',
+                'message' => $this->missingCredentialsMessage(),
             ];
         }
         $url = rtrim($this->getBaseUrl(), '/') . '/ISAPI/System/deviceInfo';
@@ -104,7 +104,7 @@ class MachineAttendanceService {
         if ($this->host === '' || $this->password === '') {
             return [
                 'ok' => false,
-                'message' => 'Machine credentials are not configured. Set STUDENT_HIKVISION_* in .env.',
+                'message' => $this->missingCredentialsMessage(),
                 'events' => [],
                 'users' => [],
                 'retrieved' => 0,
@@ -445,6 +445,11 @@ class MachineAttendanceService {
         return ['http_code' => $http, 'body' => (string) $response, 'error' => null];
     }
 
+    private function missingCredentialsMessage(): string {
+        return 'Machine credentials are not configured. Set password in config/student_attendance_machine.php '
+            . '(or STUDENT_HIKVISION_* in .env / student_attendance_machine.local.php), then redeploy.';
+    }
+
     private function formatUnauthorized(string $body): string {
         if (preg_match('/<lockStatus>\s*lock\s*<\/lockStatus>/i', $body)
             || preg_match('/<unlockTime>\s*(\d+)\s*<\/unlockTime>/i', $body, $m)) {
@@ -452,7 +457,7 @@ class MachineAttendanceService {
             $mins = max(1, (int) ceil(max(1, $sec) / 60));
             return 'Device admin account is temporarily locked. Wait about ' . $mins . ' minute(s) or reboot the terminal.';
         }
-        return 'HTTP 401 Unauthorized — Digest login failed. Check STUDENT_HIKVISION_USER / STUDENT_HIKVISION_PASS in .env.';
+        return 'HTTP 401 Unauthorized — Digest login failed. Check username/password in config/student_attendance_machine.php or .env.';
     }
 
     private function networkHint(string $err): string {
