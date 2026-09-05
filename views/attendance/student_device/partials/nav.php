@@ -2,35 +2,31 @@
 declare(strict_types=1);
 /** @var string $studentDeviceSection */
 /** @var array $urls */
+/** @var bool $canManageDevice */
 $sec = $studentDeviceSection ?? 'dashboard';
+$canManageDevice = array_key_exists('canManageDevice', get_defined_vars())
+    ? !empty($canManageDevice)
+    : true;
+
+$items = [
+    ['key' => 'sao', 'href' => $urls['sao'] ?? '#', 'icon' => 'fa-chart-pie', 'label' => 'SAO Dashboard', 'manage_only' => false],
+    ['key' => 'dashboard', 'href' => $urls['index'] ?? '#', 'icon' => 'fa-th-large', 'label' => 'Device', 'manage_only' => true],
+    ['key' => 'events', 'href' => $urls['events'] ?? '#', 'icon' => 'fa-clock', 'label' => 'Events', 'manage_only' => true],
+    ['key' => 'month', 'href' => $urls['month'] ?? '#', 'icon' => 'fa-calendar-alt', 'label' => 'Month report', 'manage_only' => false],
+    ['key' => 'holidays', 'href' => $urls['holidays'] ?? '#', 'icon' => 'fa-umbrella-beach', 'label' => 'Holidays / leave', 'manage_only' => true],
+    ['key' => 'users', 'href' => $urls['users'] ?? '#', 'icon' => 'fa-users', 'label' => 'Users', 'manage_only' => true],
+    ['key' => 'logs', 'href' => $urls['logs'] ?? '#', 'icon' => 'fa-history', 'label' => 'Sync logs', 'manage_only' => true],
+];
 ?>
-<nav class="list-group shadow-sm border student-device-side-nav mb-3" aria-label="Student fingerprint attendance">
-    <div class="list-group-item bg-light fw-semibold small text-uppercase text-muted py-2">
-        Fingerprint attendance
-    </div>
-    <a class="list-group-item list-group-item-action d-flex align-items-center gap-2 <?php echo $sec === 'dashboard' ? 'active' : ''; ?>"
-       href="<?php echo htmlspecialchars($urls['index'], ENT_QUOTES, 'UTF-8'); ?>">
-        <i class="fas fa-th-large fa-fw"></i><span>Dashboard</span>
-    </a>
-    <a class="list-group-item list-group-item-action d-flex align-items-center gap-2 <?php echo $sec === 'events' ? 'active' : ''; ?>"
-       href="<?php echo htmlspecialchars($urls['events'], ENT_QUOTES, 'UTF-8'); ?>">
-        <i class="fas fa-clock fa-fw"></i><span>Attendance events</span>
-    </a>
-    <a class="list-group-item list-group-item-action d-flex align-items-center gap-2 <?php echo $sec === 'users' ? 'active' : ''; ?>"
-       href="<?php echo htmlspecialchars($urls['users'], ENT_QUOTES, 'UTF-8'); ?>">
-        <i class="fas fa-users fa-fw"></i><span>Machine users</span>
-    </a>
-    <a class="list-group-item list-group-item-action d-flex align-items-center gap-2 <?php echo $sec === 'logs' ? 'active' : ''; ?>"
-       href="<?php echo htmlspecialchars($urls['logs'], ENT_QUOTES, 'UTF-8'); ?>">
-        <i class="fas fa-history fa-fw"></i><span>Sync logs</span>
-    </a>
+<nav class="sd-top-nav" aria-label="Student fingerprint attendance">
+    <?php foreach ($items as $item): ?>
+        <?php if (!empty($item['manage_only']) && !$canManageDevice) {
+            continue;
+        } ?>
+        <a class="sd-top-nav-link <?php echo $sec === $item['key'] ? 'is-active' : ''; ?>"
+           href="<?php echo htmlspecialchars($item['href'], ENT_QUOTES, 'UTF-8'); ?>">
+            <i class="fas <?php echo htmlspecialchars($item['icon'], ENT_QUOTES, 'UTF-8'); ?>"></i>
+            <span><?php echo htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8'); ?></span>
+        </a>
+    <?php endforeach; ?>
 </nav>
-<style>
-.student-device-side-nav .list-group-item.active {
-    background: var(--bs-primary);
-    border-color: var(--bs-primary);
-    color: #fff;
-}
-.student-device-side-nav .list-group-item.active i { color: rgba(255,255,255,.95) !important; }
-.student-device-side-nav .list-group-item-action i { color: #6c757d; width: 1.25rem; }
-</style>

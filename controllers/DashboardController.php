@@ -78,13 +78,21 @@ class DashboardController extends Controller {
 
             $inventorySummary = null;
             if (file_exists(BASE_PATH . '/models/InventoryModel.php')) {
-                require_once BASE_PATH . '/models/InventoryModel.php';
-                $inventoryModel = new InventoryModel();
-                if ($inventoryModel->tableExists()) {
-                    $inventorySummary = [
-                        'totalItems' => $inventoryModel->countItems(),
-                        'lowStockCount' => count($inventoryModel->getLowStockItems(null, 999)),
-                    ];
+                try {
+                    require_once BASE_PATH . '/models/InventoryModel.php';
+                    $inventoryModel = new InventoryModel();
+                    if ($inventoryModel->tableExists()) {
+                        $supportsLowStock = $inventoryModel->supportsLowStockCalculation();
+                        $inventorySummary = [
+                            'totalItems' => $inventoryModel->countItems(),
+                            'lowStockCount' => $supportsLowStock
+                                ? count($inventoryModel->getLowStockItems(null, 999))
+                                : null,
+                        ];
+                    }
+                } catch (Throwable $inventoryError) {
+                    // Inventory is an optional widget and must not blank all dashboard statistics.
+                    error_log('DashboardController::inventorySummary: ' . $inventoryError->getMessage());
                 }
             }
             

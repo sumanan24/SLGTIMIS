@@ -279,6 +279,24 @@ class UserModel extends Model {
     }
 
     /**
+     * Monthly SAO attendance dashboard (view): SAO, ADM, HOD, DIR, DPA, REG.
+     */
+    public function canViewStudentAttendanceSaoDashboard($userId): bool {
+        if ($this->isAdminOrADM($userId) || $this->isSAO($userId)) {
+            return true;
+        }
+        $role = $this->getUserRole($userId);
+        return in_array($role, ['HOD', 'DIR', 'DPA', 'REG'], true);
+    }
+
+    /**
+     * Manage leave / sync / device ops for student attendance (SAO + ADM only).
+     */
+    public function canManageStudentAttendanceSaoDashboard($userId): bool {
+        return $this->canManageStudentFingerprintAttendance($userId);
+    }
+
+    /**
      * Check if user is ADM (Administrator position) or Admin user
      */
     public function isAdminOrADM($userId) {

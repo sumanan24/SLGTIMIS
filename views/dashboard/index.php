@@ -743,8 +743,9 @@
     </div>
 
     <?php if (!empty($inventorySummary)): ?>
+    <?php $hasLowStockSummary = array_key_exists('lowStockCount', $inventorySummary) && $inventorySummary['lowStockCount'] !== null; ?>
     <div class="row g-4 mb-4">
-        <div class="col-md-4">
+        <div class="<?php echo $hasLowStockSummary ? 'col-md-4' : 'col-md-6'; ?>">
             <div class="card dashboard-stats-card" style="border-left-color: #0d9488;">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-start justify-content-between">
@@ -760,6 +761,7 @@
                 </div>
             </div>
         </div>
+        <?php if ($hasLowStockSummary): ?>
         <div class="col-md-4">
             <div class="card dashboard-stats-card" style="border-left-color: #f59e0b;">
                 <div class="card-body p-4">
@@ -776,7 +778,8 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <?php endif; ?>
+        <div class="<?php echo $hasLowStockSummary ? 'col-md-4' : 'col-md-6'; ?>">
             <div class="card dashboard-stats-card" style="border-left-color: #64748b;">
                 <div class="card-body p-4 d-flex align-items-center justify-content-between">
                     <div>

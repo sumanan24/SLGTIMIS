@@ -122,8 +122,10 @@
                                 $canViewComplaintLetters = false;
                             }
                             $canStudentFingerprintAttendance = false;
+                            $canStudentAttendanceSaoDashboard = false;
                             if (isset($_SESSION['user_id'], $userModel) && is_object($userModel)) {
                                 $canStudentFingerprintAttendance = $userModel->canManageStudentFingerprintAttendance((int) $_SESSION['user_id']);
+                                $canStudentAttendanceSaoDashboard = $userModel->canViewStudentAttendanceSaoDashboard((int) $_SESSION['user_id']);
                             }
                             $devicePages = ['devices'];
                             $busSeasonPages = ['bus-season-requests-sao', 'bus-season-payments'];
@@ -428,7 +430,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             if (!empty($hasMonthAttendanceSheetAccess)) {
                                 $studentAttendancePages[] = 'attendance-month-sheet';
                             }
-                            $studentDevicePages = ['student-device-attendance', 'student-device-attendance-events', 'student-device-attendance-users', 'student-device-attendance-logs'];
+                            $studentDevicePages = ['student-device-attendance', 'student-device-attendance-events', 'student-device-attendance-month', 'student-device-attendance-holidays', 'student-device-attendance-users', 'student-device-attendance-logs', 'student-device-attendance-sao'];
                             $hasStudentAttendanceMenu = !empty($studentAttendancePages);
                             ?>
                             <?php if ($hasStudentAttendanceMenu): ?>
@@ -475,11 +477,11 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             </li>
                             <?php endif; ?>
 
-                            <?php if (!empty($canStudentFingerprintAttendance)): ?>
+                            <?php if (!empty($canStudentFingerprintAttendance) || !empty($canStudentAttendanceSaoDashboard)): ?>
                             <li data-nav="student-fingerprint" class="<?php echo (isset($page) && in_array($page, $studentDevicePages, true)) ? 'active' : ''; ?>">
-                                <a href="<?php echo APP_URL; ?>/attendance/student-device" class="<?php echo (isset($page) && in_array($page, $studentDevicePages, true)) ? 'active' : ''; ?>">
+                                <a href="<?php echo APP_URL; ?>/attendance/student-device<?php echo empty($canStudentFingerprintAttendance) ? '/sao-dashboard' : ''; ?>" class="<?php echo (isset($page) && in_array($page, $studentDevicePages, true)) ? 'active' : ''; ?>">
                                     <i class="fas fa-fingerprint"></i>
-                                    <span>Student Fingerprint</span>
+                                    <span><?php echo !empty($canStudentFingerprintAttendance) ? 'Student Fingerprint' : 'SAO Attendance'; ?></span>
                                 </a>
                             </li>
                             <?php endif; ?>

@@ -731,6 +731,1154 @@ class StudentDeviceAttendanceModel extends Model {
         return $result['rows'];
     }
 
+    /**
+     * Distinct students seen on the device (for month-report filter).
+     *
+     * @return list<array{student_id:string,employee_no:string,student_name:string}>
+     */
+    public function listDistinctStudents(int $limit = 2000): array {
+        $this->ensureTable();
+        $limit = max(1, min(5000, $limit));
+        $rows = [];
+        $sql = "SELECT
+                    `student_id`,
+                    MAX(`employee_no`) AS `employee_no`,
+                    MAX(`student_name`) AS `student_name`
+                FROM `{$this->table}`
+                WHERE `student_id` <> ''
+                GROUP BY `student_id`
+                ORDER BY MAX(`student_name`) ASC, `student_id` ASC
+                LIMIT {$limit}";
+        $res = $this->db->query($sql);
+        if ($res) {
+            while ($r = $res->fetch_assoc()) {
+                $rows[] = [
+                    'student_id' => (string) ($r['student_id'] ?? ''),
+                    'employee_no' => (string) ($r['employee_no'] ?? ''),
+                    'student_name' => (string) ($r['student_name'] ?? ''),
+                ];
+            }
+        }
+        return $rows;
+    }
+
+    /**
+     * Month report: one row per student per day for YYYY-MM.
+     *
+     * @return array{rows: list<array<string,mixed>>, total: int, date_from: string, date_to: string}
+     */
+    public function getMonthReport(string $reportMonth, string $personId = ''): array {
+        $reportMonth = trim($reportMonth);
+        if ($reportMonth === '' || !preg_match('/^\d{4}-\d{2}$/', $reportMonth)) {
+            return ['rows' => [], 'total' => 0, 'date_from' => '', 'date_to' => ''];
+        }
+        $dateFrom = $reportMonth . '-01';
+        $ts = strtotime($dateFrom . ' 12:00:00');
+        $dateTo = $ts ? date('Y-m-t', $ts) : $dateFrom;
+
+        $filters = [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+        ];
+        $personId = trim($personId);
+        if ($personId !== '') {
+            $filters['person_id'] = $personId;
+        }
+
+        $result = $this->searchDailyGrouped($filters, 1, 20000);
+        $rows = $result['rows'];
+        usort($rows, static function (array $a, array $b): int {
+            $cmp = strcmp((string) ($a['student_name'] ?? ''), (string) ($b['student_name'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            $cmp = strcmp((string) ($a['student_id'] ?? ''), (string) ($b['student_id'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return strcmp((string) ($a['attendance_date'] ?? ''), (string) ($b['attendance_date'] ?? ''));
+        });
+
+        return [
+            'rows' => $rows,
+            'total' => count($rows),
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+        ];
+    }
+
+    /** Present when In is on/before 08:40 and Out is on/after 16:00. */
+    public const PRESENT_IN_CUTOFF = '08:40:00';
+    public const PRESENT_OUT_CUTOFF = '16:00:00';
+
+    /**
+     * Classify a day's punches.
+     *
+     * @return array{status:string,label:string,time_in:string,time_out:string,time_others:string}
+     */
+    public static function classifyDayStatus(?string $timeIn, ?string $timeOut, string $timeOthers = ''): array {
+        $in = self::normalizeTime($timeIn);
+        $out = self::normalizeTime($timeOut);
+        $others = trim($timeOthers);
+
+        if ($in === '' && $out === '') {
+            return [
+                'status' => 'absent',
+                'label' => 'Absent',
+                'time_in' => '',
+                'time_out' => '',
+                'time_others' => $others,
+            ];
+        }
+
+        $inOk = $in !== '' && $in <= self::PRESENT_IN_CUTOFF;
+        $outOk = $out !== '' && $out >= self::PRESENT_OUT_CUTOFF;
+
+        if ($inOk && $outOk) {
+            $status = 'present';
+            $label = 'Present';
+        } elseif ($in !== '' && $out !== '') {
+            $status = 'late';
+            $label = 'Late / Incomplete hours';
+        } else {
+            $status = 'incomplete';
+            $label = 'Incomplete punch';
+        }
+
+        return [
+            'status' => $status,
+            'label' => $label,
+            'time_in' => $in !== '' ? substr($in, 0, 5) : '',
+            'time_out' => $out !== '' ? substr($out, 0, 5) : '',
+            'time_others' => $others,
+        ];
+    }
+
+    private static function normalizeTime(?string $time): string {
+        $time = trim((string) $time);
+        if ($time === '' || $time === '—') {
+            return '';
+        }
+        if (preg_match('/^\d{1,2}:\d{2}(:\d{2})?$/', $time)) {
+            $parts = explode(':', $time);
+            $h = str_pad((string) ((int) $parts[0]), 2, '0', STR_PAD_LEFT);
+            $m = str_pad((string) ((int) ($parts[1] ?? 0)), 2, '0', STR_PAD_LEFT);
+            $s = str_pad((string) ((int) ($parts[2] ?? 0)), 2, '0', STR_PAD_LEFT);
+            return $h . ':' . $m . ':' . $s;
+        }
+        return '';
+    }
+
+    /**
+     * Active Following students for department / course / group (or all).
+     * One row per student (primary active group when present).
+     *
+     * @return list<array{student_id:string,student_name:string,department_id:string,course_id:string,department_name:string,course_name:string,group_id:string,group_name:string}>
+     */
+    public function listActiveStudentsForReport(
+        string $departmentId = '',
+        string $courseId = '',
+        string $academicYear = '',
+        string $groupId = '',
+        string $studentId = ''
+    ): array {
+        $gid = $groupId !== '' ? (int) $groupId : 0;
+        if ($gid > 0) {
+            $groupJoin = "INNER JOIN `group_students` gs ON gs.`student_id` = s.`student_id` AND gs.`status` = 'active' AND gs.`group_id` = {$gid}
+                INNER JOIN `groups` g ON g.`id` = gs.`group_id`";
+        } else {
+            $groupJoin = "LEFT JOIN (
+                    SELECT `student_id`, MIN(`group_id`) AS `group_id`
+                    FROM `group_students`
+                    WHERE `status` = 'active'
+                    GROUP BY `student_id`
+                ) gsp ON gsp.`student_id` = s.`student_id`
+                LEFT JOIN `groups` g ON g.`id` = gsp.`group_id`";
+        }
+
+        $sql = "SELECT
+                    s.`student_id`,
+                    COALESCE(NULLIF(TRIM(s.`student_ininame`), ''), s.`student_fullname`, s.`student_id`) AS `student_name`,
+                    c.`department_id`,
+                    se.`course_id`,
+                    d.`department_name`,
+                    c.`course_name`,
+                    COALESCE(CAST(g.`id` AS CHAR), '') AS `group_id`,
+                    COALESCE(g.`name`, '') AS `group_name`
+                FROM `student` s
+                INNER JOIN `student_enroll` se ON se.`student_id` = s.`student_id`
+                INNER JOIN `course` c ON c.`course_id` = se.`course_id`
+                LEFT JOIN `department` d ON d.`department_id` = c.`department_id`
+                {$groupJoin}
+                WHERE s.`student_status` = 'Active'
+                  AND se.`student_enroll_status` = 'Following'";
+        $types = '';
+        $params = [];
+        if ($departmentId !== '') {
+            $sql .= ' AND c.`department_id` = ?';
+            $types .= 's';
+            $params[] = $departmentId;
+        }
+        if ($courseId !== '') {
+            $sql .= ' AND se.`course_id` = ?';
+            $types .= 's';
+            $params[] = $courseId;
+        }
+        if ($academicYear !== '') {
+            $sql .= ' AND se.`academic_year` = ?';
+            $types .= 's';
+            $params[] = $academicYear;
+        }
+        if ($studentId !== '') {
+            $sql .= ' AND s.`student_id` = ?';
+            $types .= 's';
+            $params[] = $studentId;
+        }
+        $sql .= ' GROUP BY s.`student_id`, c.`department_id`, se.`course_id`, d.`department_name`, c.`course_name`, g.`id`, g.`name`, s.`student_ininame`, s.`student_fullname`
+                  ORDER BY d.`department_name` ASC, g.`name` ASC, `student_name` ASC, s.`student_id` ASC';
+
+        $rows = [];
+        if ($types === '') {
+            $res = $this->db->query($sql);
+        } else {
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                return [];
+            }
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $res = $stmt->get_result();
+        }
+        if ($res) {
+            while ($r = $res->fetch_assoc()) {
+                $rows[] = [
+                    'student_id' => (string) ($r['student_id'] ?? ''),
+                    'student_name' => (string) ($r['student_name'] ?? ''),
+                    'department_id' => (string) ($r['department_id'] ?? ''),
+                    'course_id' => (string) ($r['course_id'] ?? ''),
+                    'department_name' => (string) ($r['department_name'] ?? ''),
+                    'course_name' => (string) ($r['course_name'] ?? ''),
+                    'group_id' => (string) ($r['group_id'] ?? ''),
+                    'group_name' => (string) ($r['group_name'] ?? ''),
+                ];
+            }
+        }
+        return $rows;
+    }
+
+    /**
+     * Punch map for students in a date range: student_id|date => day row.
+     *
+     * @param list<string> $studentIds
+     * @return array<string, array<string,mixed>>
+     */
+    public function getDailyPunchMapForStudents(array $studentIds, string $dateFrom, string $dateTo): array {
+        $this->ensureTable();
+        $studentIds = array_values(array_unique(array_filter(array_map('strval', $studentIds))));
+        if ($studentIds === []) {
+            return [];
+        }
+
+        $map = [];
+        foreach (array_chunk($studentIds, 200) as $chunk) {
+            $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+            $sql = "SELECT
+                        `student_id`,
+                        MAX(`employee_no`) AS `employee_no`,
+                        MAX(`student_name`) AS `student_name`,
+                        `attendance_date`,
+                        GROUP_CONCAT(`attendance_time` ORDER BY `attendance_time` ASC SEPARATOR ',') AS `times_csv`
+                    FROM `{$this->table}`
+                    WHERE `student_id` IN ({$placeholders})
+                      AND `attendance_date` BETWEEN ? AND ?
+                    GROUP BY `student_id`, `attendance_date`";
+            $types = str_repeat('s', count($chunk)) . 'ss';
+            $params = $chunk;
+            $params[] = $dateFrom;
+            $params[] = $dateTo;
+
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                continue;
+            }
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) {
+                $times = array_map('trim', explode(',', (string) ($r['times_csv'] ?? '')));
+                $split = self::splitDayTimes($times);
+                $sid = (string) ($r['student_id'] ?? '');
+                $d = (string) ($r['attendance_date'] ?? '');
+                $map[$sid . '|' . $d] = [
+                    'student_id' => $sid,
+                    'employee_no' => (string) ($r['employee_no'] ?? ''),
+                    'student_name' => (string) ($r['student_name'] ?? ''),
+                    'attendance_date' => $d,
+                    'time_in' => $split['in'],
+                    'time_out' => $split['out'],
+                    'time_others' => $split['others'],
+                ];
+            }
+            $stmt->close();
+        }
+        return $map;
+    }
+
+    /**
+     * Status report for a month (paginated). Working days exclude weekends,
+     * public holidays, and SAO/ADM leave. Day detail rows are built only for the current page.
+     *
+     * @return array<string,mixed>
+     */
+    public function buildStatusReport(
+        string $reportMonth,
+        string $departmentId = '',
+        string $courseId = '',
+        string $academicYear = '',
+        int $page = 1,
+        int $perPage = 20
+    ): array {
+        require_once BASE_PATH . '/helpers/SriLankaPublicHolidays.php';
+        require_once BASE_PATH . '/models/StudentAttendanceHolidayModel.php';
+
+        $emptySummary = [
+            'students' => 0,
+            'working_days' => 0,
+            'present' => 0,
+            'absent' => 0,
+            'late' => 0,
+            'incomplete' => 0,
+            'leave' => 0,
+        ];
+        if (!preg_match('/^\d{4}-\d{2}$/', $reportMonth)) {
+            return [
+                'students' => [],
+                'working_days' => [],
+                'excluded_days' => [],
+                'summary' => $emptySummary,
+                'date_from' => '',
+                'date_to' => '',
+                'page' => 1,
+                'per_page' => $perPage,
+                'total_students' => 0,
+                'total_pages' => 0,
+            ];
+        }
+
+        $page = max(1, $page);
+        $perPage = max(5, min(50, $perPage));
+
+        $dateFrom = $reportMonth . '-01';
+        $dateTo = date('Y-m-t', strtotime($dateFrom . ' 12:00:00'));
+        $today = (new DateTimeImmutable('now', new DateTimeZone('Asia/Colombo')))->format('Y-m-d');
+        if ($dateTo > $today) {
+            $dateTo = $today;
+        }
+        if ($dateFrom > $dateTo) {
+            return [
+                'students' => [],
+                'working_days' => [],
+                'excluded_days' => [],
+                'summary' => $emptySummary,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'page' => 1,
+                'per_page' => $perPage,
+                'total_students' => 0,
+                'total_pages' => 0,
+                'in_cutoff' => substr(self::PRESENT_IN_CUTOFF, 0, 5),
+                'out_cutoff' => substr(self::PRESENT_OUT_CUTOFF, 0, 5),
+            ];
+        }
+        $holidayModel = new StudentAttendanceHolidayModel();
+
+        $excluded = [];
+        $workingDays = [];
+        $start = new DateTimeImmutable($dateFrom);
+        $end = new DateTimeImmutable($dateTo);
+        for ($d = $start; $d <= $end; $d = $d->modify('+1 day')) {
+            $ymd = $d->format('Y-m-d');
+            $w = (int) $d->format('w');
+            if ($w === 0 || $w === 6) {
+                $excluded[$ymd] = ['reason' => 'weekend', 'label' => 'Weekend'];
+                continue;
+            }
+            if (SriLankaPublicHolidays::isPublicHoliday($ymd)) {
+                $excluded[$ymd] = ['reason' => 'public_holiday', 'label' => 'Public holiday'];
+                continue;
+            }
+            $workingDays[] = [
+                'date' => $ymd,
+                'day' => $d->format('d'),
+                'day_name' => $d->format('D'),
+                'day_full' => $d->format('l'),
+            ];
+        }
+
+        $allStudents = $this->listActiveStudentsForReport($departmentId, $courseId, $academicYear);
+        $totalStudents = count($allStudents);
+        $totalPages = $totalStudents > 0 ? (int) ceil($totalStudents / $perPage) : 0;
+        if ($totalPages > 0 && $page > $totalPages) {
+            $page = $totalPages;
+        }
+        $offset = ($page - 1) * $perPage;
+        $pageStudents = array_slice($allStudents, $offset, $perPage);
+        $ids = array_column($pageStudents, 'student_id');
+        $punchMap = $this->getDailyPunchMapForStudents($ids, $dateFrom, $dateTo);
+
+        $summary = [
+            'students' => count($pageStudents),
+            'working_days' => count($workingDays),
+            'present' => 0,
+            'absent' => 0,
+            'late' => 0,
+            'incomplete' => 0,
+            'leave' => 0,
+        ];
+
+        $leaveCache = [];
+        $reportStudents = [];
+        foreach ($pageStudents as $st) {
+            $deptKey = (string) ($st['department_id'] ?? $departmentId);
+            $courseKey = (string) ($st['course_id'] ?? $courseId);
+            $cacheKey = $deptKey . '|' . $courseKey;
+            if (!isset($leaveCache[$cacheKey])) {
+                $leaveCache[$cacheKey] = $holidayModel->mapForScope($dateFrom, $dateTo, $deptKey, $courseKey);
+            }
+            $leaveMap = $leaveCache[$cacheKey];
+
+            $days = [];
+            $stPresent = 0;
+            $stAbsent = 0;
+            $stLate = 0;
+            $stIncomplete = 0;
+            $stLeave = 0;
+
+            foreach ($workingDays as $wd) {
+                $ymd = $wd['date'];
+                if (isset($leaveMap[$ymd])) {
+                    $leave = $leaveMap[$ymd];
+                    $type = (string) ($leave['leave_type'] ?? 'holiday');
+                    $title = trim((string) ($leave['title'] ?? ''));
+                    $label = $type === 'special_leave' ? 'Special leave' : 'Holiday';
+                    if ($title !== '') {
+                        $label .= ': ' . $title;
+                    }
+                    $days[] = [
+                        'date' => $ymd,
+                        'day_name' => $wd['day_name'],
+                        'day_full' => $wd['day_full'],
+                        'status' => 'leave',
+                        'label' => $label,
+                        'time_in' => '',
+                        'time_out' => '',
+                        'time_others' => '',
+                        'counted' => false,
+                    ];
+                    $stLeave++;
+                    $summary['leave']++;
+                    continue;
+                }
+
+                $key = $st['student_id'] . '|' . $ymd;
+                $punch = $punchMap[$key] ?? null;
+                $classified = self::classifyDayStatus(
+                    $punch['time_in'] ?? '',
+                    $punch['time_out'] ?? '',
+                    $punch['time_others'] ?? ''
+                );
+                $days[] = [
+                    'date' => $ymd,
+                    'day_name' => $wd['day_name'],
+                    'day_full' => $wd['day_full'],
+                    'counted' => true,
+                    'status' => $classified['status'],
+                    'label' => $classified['label'],
+                    'time_in' => $classified['time_in'],
+                    'time_out' => $classified['time_out'],
+                    'time_others' => $classified['time_others'],
+                ];
+
+                if ($classified['status'] === 'present') {
+                    $stPresent++;
+                    $summary['present']++;
+                } elseif ($classified['status'] === 'late') {
+                    $stLate++;
+                    $summary['late']++;
+                } elseif ($classified['status'] === 'incomplete') {
+                    $stIncomplete++;
+                    $summary['incomplete']++;
+                } else {
+                    $stAbsent++;
+                    $summary['absent']++;
+                }
+            }
+
+            $countedDays = $stPresent + $stAbsent + $stLate + $stIncomplete;
+            $reportStudents[] = [
+                'student_id' => $st['student_id'],
+                'student_name' => $st['student_name'],
+                'department_id' => $st['department_id'],
+                'department_name' => $st['department_name'],
+                'course_id' => $st['course_id'],
+                'course_name' => $st['course_name'],
+                'present' => $stPresent,
+                'absent' => $stAbsent,
+                'late' => $stLate,
+                'incomplete' => $stIncomplete,
+                'leave' => $stLeave,
+                'counted_days' => $countedDays,
+                'attendance_pct' => $countedDays > 0 ? round(($stPresent / $countedDays) * 100, 1) : 0.0,
+                'days' => $days,
+            ];
+        }
+
+        return [
+            'students' => $reportStudents,
+            'working_days' => $workingDays,
+            'excluded_days' => $excluded,
+            'summary' => $summary,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'in_cutoff' => substr(self::PRESENT_IN_CUTOFF, 0, 5),
+            'out_cutoff' => substr(self::PRESENT_OUT_CUTOFF, 0, 5),
+            'page' => $page,
+            'per_page' => $perPage,
+            'total_students' => $totalStudents,
+            'total_pages' => $totalPages,
+        ];
+    }
+
+    /**
+     * Common month matrix: columns = weekdays (no weekends), cells = 1 / 0 / H,
+     * with attendance %, allowance tiers, and bank details.
+     *
+     * @return array<string,mixed>
+     */
+    public function buildMatrixMonthReport(
+        string $reportMonth,
+        string $departmentId = '',
+        string $courseId = '',
+        string $academicYear = '',
+        string $studentId = '',
+        bool $eligibleOnly = false,
+        int $page = 1,
+        int $perPage = 50,
+        string $courseMode = ''
+    ): array {
+        require_once BASE_PATH . '/helpers/SriLankaPublicHolidays.php';
+        require_once BASE_PATH . '/models/StudentAttendanceHolidayModel.php';
+
+        $emptySummary = [
+            'students' => 0,
+            'working_days' => 0,
+            'effective_working_days' => 0,
+            'present' => 0,
+            'absent' => 0,
+            'holiday' => 0,
+            'total_allowance' => 0,
+            'above_90' => 0,
+            'above_75' => 0,
+            'below_75' => 0,
+        ];
+        if (!preg_match('/^\d{4}-\d{2}$/', $reportMonth)) {
+            return [
+                'students' => [],
+                'columns' => [],
+                'summary' => $emptySummary,
+                'date_from' => '',
+                'date_to' => '',
+                'page' => 1,
+                'per_page' => $perPage,
+                'total_students' => 0,
+                'total_pages' => 0,
+                'allowance_high' => 7500,
+                'allowance_mid' => 6000,
+                'in_cutoff' => substr(self::PRESENT_IN_CUTOFF, 0, 5),
+                'out_cutoff' => substr(self::PRESENT_OUT_CUTOFF, 0, 5),
+            ];
+        }
+
+        $page = max(1, $page);
+        $perPage = max(10, min(100, $perPage));
+
+        $dateFrom = $reportMonth . '-01';
+        $monthEnd = date('Y-m-t', strtotime($dateFrom . ' 12:00:00'));
+        $today = (new DateTimeImmutable('now', new DateTimeZone('Asia/Colombo')))->format('Y-m-d');
+        $dateTo = $monthEnd > $today ? $today : $monthEnd;
+        if ($dateFrom > $dateTo) {
+            return [
+                'students' => [],
+                'columns' => [],
+                'summary' => $emptySummary,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'page' => 1,
+                'per_page' => $perPage,
+                'total_students' => 0,
+                'total_pages' => 0,
+                'allowance_high' => ($reportMonth >= '2026-01') ? 7500 : 5000,
+                'allowance_mid' => ($reportMonth >= '2026-01') ? 6000 : 4000,
+                'in_cutoff' => substr(self::PRESENT_IN_CUTOFF, 0, 5),
+                'out_cutoff' => substr(self::PRESENT_OUT_CUTOFF, 0, 5),
+            ];
+        }
+
+        $allowanceHigh = ($reportMonth >= '2026-01') ? 7500 : 5000;
+        $allowanceMid = ($reportMonth >= '2026-01') ? 6000 : 4000;
+        $holidayModel = new StudentAttendanceHolidayModel();
+
+        // Weekday columns only (no Sat/Sun). Public holidays + SAO leave shown as H.
+        $columns = [];
+        $start = new DateTimeImmutable($dateFrom);
+        $end = new DateTimeImmutable($dateTo);
+        for ($d = $start; $d <= $end; $d = $d->modify('+1 day')) {
+            $ymd = $d->format('Y-m-d');
+            $w = (int) $d->format('w');
+            if ($w === 0 || $w === 6) {
+                continue;
+            }
+            $isPublic = SriLankaPublicHolidays::isPublicHoliday($ymd);
+            $columns[] = [
+                'date' => $ymd,
+                'day' => $d->format('d'),
+                'day_name' => $d->format('D'),
+                'is_public_holiday' => $isPublic,
+            ];
+        }
+
+        $allStudents = $this->listStudentsForMatrixReport(
+            $departmentId,
+            $courseId,
+            $academicYear,
+            $studentId,
+            $eligibleOnly,
+            $reportMonth,
+            $courseMode
+        );
+        $totalStudents = count($allStudents);
+        $totalPages = $totalStudents > 0 ? (int) ceil($totalStudents / $perPage) : 0;
+        if ($totalPages > 0 && $page > $totalPages) {
+            $page = $totalPages;
+        }
+        $offset = ($page - 1) * $perPage;
+        // Summary uses all students; page slice for display only when perPage > 0
+        $ids = array_column($allStudents, 'student_id');
+        $punchMap = $this->getDailyPunchMapForStudents($ids, $dateFrom, $dateTo);
+
+        $leaveCache = [];
+        $summary = $emptySummary;
+        $summary['working_days'] = count($columns);
+        $reportStudents = [];
+
+        foreach ($allStudents as $st) {
+            $deptKey = (string) ($st['department_id'] ?? $departmentId);
+            $courseKey = (string) ($st['course_id'] ?? $courseId);
+            $cacheKey = $deptKey . '|' . $courseKey;
+            if (!isset($leaveCache[$cacheKey])) {
+                $leaveCache[$cacheKey] = $holidayModel->mapForScope($dateFrom, $dateTo, $deptKey, $courseKey);
+            }
+            $leaveMap = $leaveCache[$cacheKey];
+
+            $dayByDay = [];
+            $presentDays = 0;
+            $absentDays = 0;
+            $holidayDays = 0;
+
+            foreach ($columns as $col) {
+                $ymd = $col['date'];
+                if (!empty($col['is_public_holiday']) || isset($leaveMap[$ymd])) {
+                    $dayByDay[$ymd] = 'H';
+                    $holidayDays++;
+                    continue;
+                }
+                $punch = $punchMap[$st['student_id'] . '|' . $ymd] ?? null;
+                $classified = self::classifyDayStatus(
+                    $punch['time_in'] ?? '',
+                    $punch['time_out'] ?? '',
+                    $punch['time_others'] ?? ''
+                );
+                if ($classified['status'] === 'present') {
+                    $dayByDay[$ymd] = '1';
+                    $presentDays++;
+                } else {
+                    $dayByDay[$ymd] = '0';
+                    $absentDays++;
+                }
+            }
+
+            $effective = $presentDays + $absentDays;
+            $pct = $effective > 0 ? round(($presentDays / $effective) * 100, 1) : 0.0;
+
+            $isEligible = !empty($st['allowance_eligible']);
+            if ($isEligible && !empty($st['allowance_eligible_date'])) {
+                $eligibleYm = substr((string) $st['allowance_eligible_date'], 0, 7);
+                if ($reportMonth < $eligibleYm) {
+                    $isEligible = false;
+                }
+            }
+            $allowance = 0;
+            if ($isEligible) {
+                if ($pct >= 90) {
+                    $allowance = $allowanceHigh;
+                } elseif ($pct >= 75) {
+                    $allowance = $allowanceMid;
+                }
+            }
+
+            $summary['present'] += $presentDays;
+            $summary['absent'] += $absentDays;
+            $summary['holiday'] += $holidayDays;
+            $summary['total_allowance'] += $allowance;
+            if ($pct >= 90) {
+                $summary['above_90']++;
+            } elseif ($pct >= 75) {
+                $summary['above_75']++;
+            } else {
+                $summary['below_75']++;
+            }
+
+            $reportStudents[] = [
+                'student_id' => $st['student_id'],
+                'student_name' => $st['student_name'],
+                'student_fullname' => $st['student_fullname'],
+                'student_nic' => $st['student_nic'],
+                'department_id' => $st['department_id'],
+                'department_name' => $st['department_name'],
+                'course_id' => $st['course_id'],
+                'course_name' => $st['course_name'],
+                'course_mode' => $st['course_mode'] ?? '',
+                'course_mode_label' => $st['course_mode_label'] ?? '',
+                'bank_name' => $st['bank_name'],
+                'bank_account_no' => $st['bank_account_no'],
+                'bank_branch' => $st['bank_branch'],
+                'allowance_eligible' => $isEligible ? 1 : 0,
+                'day_by_day' => $dayByDay,
+                'present_days' => $presentDays,
+                'absent_days' => $absentDays,
+                'holiday_days' => $holidayDays,
+                'effective_working_days' => $effective,
+                'attendance_percentage' => $pct,
+                'allowance' => $allowance,
+            ];
+        }
+
+        $summary['students'] = $totalStudents;
+        if ($reportStudents !== []) {
+            $summary['effective_working_days'] = (int) $reportStudents[0]['effective_working_days'];
+        } else {
+            $summary['effective_working_days'] = count($columns);
+        }
+
+        $pageStudents = array_slice($reportStudents, $offset, $perPage);
+
+        return [
+            'students' => $pageStudents,
+            'all_students' => $reportStudents,
+            'columns' => $columns,
+            'summary' => $summary,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'page' => $page,
+            'per_page' => $perPage,
+            'total_students' => $totalStudents,
+            'total_pages' => $totalPages,
+            'allowance_high' => $allowanceHigh,
+            'allowance_mid' => $allowanceMid,
+            'in_cutoff' => substr(self::PRESENT_IN_CUTOFF, 0, 5),
+            'out_cutoff' => substr(self::PRESENT_OUT_CUTOFF, 0, 5),
+        ];
+    }
+
+    /**
+     * Active + Following students with bank + allowance fields for matrix month report.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function listStudentsForMatrixReport(
+        string $departmentId = '',
+        string $courseId = '',
+        string $academicYear = '',
+        string $studentId = '',
+        bool $eligibleOnly = false,
+        string $reportMonth = '',
+        string $courseMode = ''
+    ): array {
+        $normalizedMode = self::normalizeCourseMode($courseMode);
+
+        $sql = "SELECT
+                    s.`student_id`,
+                    COALESCE(NULLIF(TRIM(s.`student_ininame`), ''), s.`student_fullname`, s.`student_id`) AS `student_name`,
+                    COALESCE(s.`student_fullname`, '') AS `student_fullname`,
+                    COALESCE(s.`student_nic`, '') AS `student_nic`,
+                    COALESCE(s.`bank_name`, '') AS `bank_name`,
+                    COALESCE(s.`bank_account_no`, '') AS `bank_account_no`,
+                    COALESCE(s.`bank_branch`, '') AS `bank_branch`,
+                    COALESCE(s.`allowance_eligible`, 0) AS `allowance_eligible`,
+                    s.`allowance_eligible_date`,
+                    c.`department_id`,
+                    se.`course_id`,
+                    se.`course_mode`,
+                    d.`department_name`,
+                    c.`course_name`
+                FROM `student` s
+                INNER JOIN `student_enroll` se ON se.`student_id` = s.`student_id`
+                INNER JOIN `course` c ON c.`course_id` = se.`course_id`
+                LEFT JOIN `department` d ON d.`department_id` = c.`department_id`
+                WHERE s.`student_status` = 'Active'
+                  AND se.`student_enroll_status` = 'Following'";
+        $types = '';
+        $params = [];
+        if ($departmentId !== '') {
+            $sql .= ' AND c.`department_id` = ?';
+            $types .= 's';
+            $params[] = $departmentId;
+        }
+        if ($courseId !== '') {
+            $sql .= ' AND se.`course_id` = ?';
+            $types .= 's';
+            $params[] = $courseId;
+        }
+        if ($academicYear !== '') {
+            $sql .= ' AND se.`academic_year` = ?';
+            $types .= 's';
+            $params[] = $academicYear;
+        }
+        if ($normalizedMode !== '') {
+            $sql .= ' AND LOWER(TRIM(se.`course_mode`)) = LOWER(TRIM(?))';
+            $types .= 's';
+            $params[] = $normalizedMode;
+        }
+        if ($studentId !== '') {
+            $sql .= ' AND s.`student_id` = ?';
+            $types .= 's';
+            $params[] = $studentId;
+        }
+        if ($eligibleOnly) {
+            $sql .= ' AND s.`allowance_eligible` = 1';
+            if ($reportMonth !== '' && preg_match('/^\d{4}-\d{2}$/', $reportMonth)) {
+                $sql .= " AND (s.`allowance_eligible_date` IS NULL OR DATE_FORMAT(s.`allowance_eligible_date`, '%Y-%m') <= ?)";
+                $types .= 's';
+                $params[] = $reportMonth;
+            }
+        }
+        $sql .= ' GROUP BY s.`student_id`, c.`department_id`, se.`course_id`, se.`course_mode`, d.`department_name`, c.`course_name`,
+                    s.`student_ininame`, s.`student_fullname`, s.`student_nic`, s.`bank_name`, s.`bank_account_no`,
+                    s.`bank_branch`, s.`allowance_eligible`, s.`allowance_eligible_date`
+                  ORDER BY d.`department_name` ASC, `student_name` ASC, s.`student_id` ASC';
+
+        $rows = [];
+        if ($types === '') {
+            $res = $this->db->query($sql);
+        } else {
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                return [];
+            }
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $res = $stmt->get_result();
+        }
+        if ($res) {
+            while ($r = $res->fetch_assoc()) {
+                $mode = (string) ($r['course_mode'] ?? '');
+                $modeLabel = self::courseModeLabel($mode);
+                $rows[] = [
+                    'student_id' => (string) ($r['student_id'] ?? ''),
+                    'student_name' => (string) ($r['student_name'] ?? ''),
+                    'student_fullname' => (string) ($r['student_fullname'] ?? ''),
+                    'student_nic' => (string) ($r['student_nic'] ?? ''),
+                    'bank_name' => (string) ($r['bank_name'] ?? ''),
+                    'bank_account_no' => (string) ($r['bank_account_no'] ?? ''),
+                    'bank_branch' => (string) ($r['bank_branch'] ?? ''),
+                    'allowance_eligible' => (int) ($r['allowance_eligible'] ?? 0),
+                    'allowance_eligible_date' => $r['allowance_eligible_date'] ?? null,
+                    'department_id' => (string) ($r['department_id'] ?? ''),
+                    'course_id' => (string) ($r['course_id'] ?? ''),
+                    'course_mode' => $mode,
+                    'course_mode_label' => $modeLabel,
+                    'department_name' => (string) ($r['department_name'] ?? ''),
+                    'course_name' => (string) ($r['course_name'] ?? ''),
+                ];
+            }
+        }
+        return $rows;
+    }
+
+    /** Normalize UI course mode to DB enum Full / Part. */
+    public static function normalizeCourseMode(string $courseMode): string {
+        $courseMode = trim($courseMode);
+        if ($courseMode === '') {
+            return '';
+        }
+        $lower = strtolower($courseMode);
+        if (in_array($lower, ['full', 'full time', 'fulltime', 'ft'], true)) {
+            return 'Full';
+        }
+        if (in_array($lower, ['part', 'part time', 'parttime', 'pt'], true)) {
+            return 'Part';
+        }
+        return '';
+    }
+
+    public static function courseModeLabel(string $mode): string {
+        $n = self::normalizeCourseMode($mode);
+        if ($n === 'Full') {
+            return 'Full Time';
+        }
+        if ($n === 'Part') {
+            return 'Part Time';
+        }
+        return $mode !== '' ? $mode : '—';
+    }
+
+    /**
+     * Monthly SAO dashboard: summary KPIs + students with ≥N consecutive unauthorized absences.
+     *
+     * @return array<string,mixed>
+     */
+    public function buildSaoDashboard(
+        string $reportMonth,
+        string $departmentId = '',
+        string $groupId = '',
+        string $studentId = '',
+        string $statusFilter = 'flagged',
+        int $consecutiveThreshold = 3
+    ): array {
+        require_once BASE_PATH . '/helpers/SriLankaPublicHolidays.php';
+        require_once BASE_PATH . '/models/StudentAttendanceHolidayModel.php';
+
+        $consecutiveThreshold = max(2, min(15, $consecutiveThreshold));
+        $empty = [
+            'flagged' => [],
+            'summary' => [
+                'students' => 0,
+                'working_days' => 0,
+                'present' => 0,
+                'absent' => 0,
+                'late' => 0,
+                'incomplete' => 0,
+                'leave' => 0,
+                'flagged' => 0,
+                'avg_attendance_pct' => 0.0,
+            ],
+            'working_days' => [],
+            'date_from' => '',
+            'date_to' => '',
+            'in_cutoff' => substr(self::PRESENT_IN_CUTOFF, 0, 5),
+            'out_cutoff' => substr(self::PRESENT_OUT_CUTOFF, 0, 5),
+            'consecutive_threshold' => $consecutiveThreshold,
+        ];
+
+        if (!preg_match('/^\d{4}-\d{2}$/', $reportMonth)) {
+            return $empty;
+        }
+
+        $dateFrom = $reportMonth . '-01';
+        $dateTo = date('Y-m-t', strtotime($dateFrom . ' 12:00:00'));
+        $today = (new DateTimeImmutable('now', new DateTimeZone('Asia/Colombo')))->format('Y-m-d');
+        if ($dateTo > $today) {
+            $dateTo = $today;
+        }
+        if ($dateFrom > $dateTo) {
+            return $empty;
+        }
+        $holidayModel = new StudentAttendanceHolidayModel();
+
+        $workingDays = [];
+        $start = new DateTimeImmutable($dateFrom);
+        $end = new DateTimeImmutable($dateTo);
+        for ($d = $start; $d <= $end; $d = $d->modify('+1 day')) {
+            $ymd = $d->format('Y-m-d');
+            $w = (int) $d->format('w');
+            if ($w === 0 || $w === 6) {
+                continue;
+            }
+            if (SriLankaPublicHolidays::isPublicHoliday($ymd)) {
+                continue;
+            }
+            $workingDays[] = [
+                'date' => $ymd,
+                'day_name' => $d->format('D'),
+            ];
+        }
+
+        $students = $this->listActiveStudentsForReport($departmentId, '', '', $groupId, $studentId);
+        $ids = array_column($students, 'student_id');
+        $punchMap = $this->getDailyPunchMapForStudents($ids, $dateFrom, $dateTo);
+
+        $summary = [
+            'students' => count($students),
+            'working_days' => count($workingDays),
+            'present' => 0,
+            'absent' => 0,
+            'late' => 0,
+            'incomplete' => 0,
+            'leave' => 0,
+            'flagged' => 0,
+            'avg_attendance_pct' => 0.0,
+        ];
+
+        $leaveCache = [];
+        $flagged = [];
+        $pctSum = 0.0;
+        $pctN = 0;
+
+        foreach ($students as $st) {
+            $deptKey = (string) ($st['department_id'] ?? $departmentId);
+            $courseKey = (string) ($st['course_id'] ?? '');
+            $cacheKey = $deptKey . '|' . $courseKey;
+            if (!isset($leaveCache[$cacheKey])) {
+                $leaveCache[$cacheKey] = $holidayModel->mapForScope($dateFrom, $dateTo, $deptKey, $courseKey);
+            }
+            $leaveMap = $leaveCache[$cacheKey];
+
+            $stPresent = 0;
+            $stAbsent = 0;
+            $stLate = 0;
+            $stIncomplete = 0;
+            $stLeave = 0;
+            $streak = 0;
+            $streakDates = [];
+            $bestStreak = 0;
+            $bestDates = [];
+
+            foreach ($workingDays as $wd) {
+                $ymd = $wd['date'];
+                if (isset($leaveMap[$ymd])) {
+                    $stLeave++;
+                    $summary['leave']++;
+                    // Authorized leave breaks unauthorized absence streak
+                    $streak = 0;
+                    $streakDates = [];
+                    continue;
+                }
+
+                $punch = $punchMap[$st['student_id'] . '|' . $ymd] ?? null;
+                $classified = self::classifyDayStatus(
+                    $punch['time_in'] ?? '',
+                    $punch['time_out'] ?? '',
+                    $punch['time_others'] ?? ''
+                );
+                $status = $classified['status'];
+
+                if ($status === 'present') {
+                    $stPresent++;
+                    $summary['present']++;
+                    $streak = 0;
+                    $streakDates = [];
+                } elseif ($status === 'late') {
+                    $stLate++;
+                    $summary['late']++;
+                    $streak = 0;
+                    $streakDates = [];
+                } elseif ($status === 'incomplete') {
+                    $stIncomplete++;
+                    $summary['incomplete']++;
+                    $streak = 0;
+                    $streakDates = [];
+                } else {
+                    $stAbsent++;
+                    $summary['absent']++;
+                    $streak++;
+                    $streakDates[] = $ymd;
+                    if ($streak > $bestStreak) {
+                        $bestStreak = $streak;
+                        $bestDates = $streakDates;
+                    }
+                }
+            }
+
+            $counted = $stPresent + $stAbsent + $stLate + $stIncomplete;
+            $pct = $counted > 0 ? round(($stPresent / $counted) * 100, 1) : 0.0;
+            if ($counted > 0) {
+                $pctSum += $pct;
+                $pctN++;
+            }
+
+            $isFlagged = $bestStreak >= $consecutiveThreshold;
+            if ($isFlagged) {
+                $summary['flagged']++;
+            }
+
+            $include = false;
+            if ($statusFilter === 'all') {
+                $include = true;
+            } elseif ($statusFilter === '' || $statusFilter === 'flagged') {
+                $include = $isFlagged;
+            } elseif ($statusFilter === 'low') {
+                $include = $pct < 80.0 && $counted > 0;
+            } elseif ($statusFilter === 'ok') {
+                $include = !$isFlagged && $pct >= 80.0;
+            }
+            if ($studentId !== '') {
+                $include = true;
+            }
+
+            if (!$include) {
+                continue;
+            }
+
+            $flagged[] = [
+                'student_id' => $st['student_id'],
+                'student_name' => $st['student_name'],
+                'department_id' => $st['department_id'],
+                'department_name' => $st['department_name'],
+                'course_id' => $st['course_id'],
+                'course_name' => $st['course_name'],
+                'group_id' => $st['group_id'],
+                'group_name' => $st['group_name'] !== '' ? $st['group_name'] : '—',
+                'present' => $stPresent,
+                'absent' => $stAbsent,
+                'late' => $stLate,
+                'incomplete' => $stIncomplete,
+                'leave' => $stLeave,
+                'leave_days' => $bestStreak,
+                'leave_dates' => $bestDates,
+                'leave_dates_label' => $bestDates !== [] ? implode(', ', $bestDates) : '—',
+                'attendance_pct' => $pct,
+                'flagged' => $isFlagged,
+                'status_label' => $isFlagged ? 'Flagged' : ($pct < 80 ? 'Low attendance' : 'OK'),
+            ];
+        }
+
+        usort($flagged, static function (array $a, array $b): int {
+            $cmp = ($b['leave_days'] <=> $a['leave_days']);
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return ($a['attendance_pct'] <=> $b['attendance_pct']);
+        });
+
+        $summary['avg_attendance_pct'] = $pctN > 0 ? round($pctSum / $pctN, 1) : 0.0;
+
+        return [
+            'flagged' => $flagged,
+            'summary' => $summary,
+            'working_days' => $workingDays,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'in_cutoff' => substr(self::PRESENT_IN_CUTOFF, 0, 5),
+            'out_cutoff' => substr(self::PRESENT_OUT_CUTOFF, 0, 5),
+            'consecutive_threshold' => $consecutiveThreshold,
+        ];
+    }
+
+    /**
+     * Single student row for warning letter (same rules as dashboard).
+     *
+     * @return array<string,mixed>|null
+     */
+    public function getSaoDashboardStudentRow(string $reportMonth, string $studentId, string $departmentId = ''): ?array {
+        $dash = $this->buildSaoDashboard($reportMonth, $departmentId, '', $studentId, 'all', 3);
+        foreach ($dash['flagged'] as $row) {
+            if ((string) ($row['student_id'] ?? '') === $studentId) {
+                return $row;
+            }
+        }
+        return null;
+    }
+
     /** @return list<array<string,mixed>> */
     public function listUnmatched(int $limit = 100): array {
         $this->ensureTable();

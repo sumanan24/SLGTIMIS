@@ -95,9 +95,30 @@ class InventoryModel extends Model {
     }
 
     /**
+     * Older SLGTIMIS databases use inventory_quantity/inventory_status and
+     * have no reorder level. Only calculate low stock for the current schema.
+     */
+    public function supportsLowStockCalculation() {
+        foreach (['status', 'quantity', 'reorder_level'] as $column) {
+            $result = $this->db->query(
+                "SHOW COLUMNS FROM `{$this->table}` LIKE '" . $this->db->escape($column) . "'"
+            );
+            if (!$result || $result->num_rows === 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     public function getLowStockItems($departmentId = null, $limit = 20) {
+        if (!$this->supportsLowStockCalculation()) {
+            return [];
+        }
+
         $limit = max(1, min(100, (int)$limit));
         $sql = "SELECT i.*, d.`department_name` FROM `{$this->table}` i
                 LEFT JOIN `department` d ON i.`department_id` = d.`department_id`

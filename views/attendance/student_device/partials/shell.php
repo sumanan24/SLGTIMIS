@@ -12,7 +12,7 @@ $e = static function ($v): string {
 $pageTitle = $pageTitle ?? 'Student fingerprint attendance';
 $pageSubtitle = $pageSubtitle ?? '';
 ?>
-<div class="container-fluid px-3 px-sm-4 py-3 student-device-page">
+<div class="student-device-page sd-fullpage">
     <?php include __DIR__ . '/styles.php'; ?>
 
     <?php if (!empty($_SESSION['flash_success'])): ?>
@@ -28,27 +28,26 @@ $pageSubtitle = $pageSubtitle ?? '';
         </div>
     <?php endif; ?>
 
-    <div class="row g-3 g-lg-4">
-        <div class="col-12 col-md-3 col-lg-2">
-            <?php include __DIR__ . '/nav.php'; ?>
-        </div>
-        <div class="col-12 col-md-9 col-lg-10 min-w-0">
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-                <div>
-                    <h4 class="mb-1 fw-bold"><?php echo $e($pageTitle); ?></h4>
-                    <?php if ($pageSubtitle !== ''): ?>
-                        <div class="text-muted small"><?php echo $e($pageSubtitle); ?></div>
-                    <?php endif; ?>
-                </div>
-                <?php if (!empty($headerActions)) {
-                    echo $headerActions;
-                } ?>
+    <?php include __DIR__ . '/nav.php'; ?>
+
+    <div class="sd-fullpage-body">
+        <div class="sd-page-head">
+            <div class="sd-page-head-text">
+                <h1 class="sd-page-title"><?php echo $e($pageTitle); ?></h1>
+                <?php if ($pageSubtitle !== ''): ?>
+                    <p class="sd-page-lead"><?php echo $e($pageSubtitle); ?></p>
+                <?php endif; ?>
             </div>
-            <?php
-            if (!empty($contentPartial) && is_file($contentPartial)) {
-                include $contentPartial;
-            }
-            ?>
+            <?php if (!empty($headerActions)) {
+                echo $headerActions;
+            } ?>
         </div>
+        <?php
+        if (!empty($contentPartial) && is_file($contentPartial)) {
+            include $contentPartial;
+        } elseif (!empty($contentHtml)) {
+            echo $contentHtml;
+        }
+        ?>
     </div>
 </div>
