@@ -16,8 +16,9 @@
     RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^ - [L]
     
-    # Allow direct access to existing directories
+    # Allow direct access only for static asset directories (not app routes like /dashboard)
     RewriteCond %{REQUEST_FILENAME} -d
+    RewriteCond %{REQUEST_URI} ^/SLGTIMIS/(assets|uploads|vendor|staff_attendance)(/|$) [NC]
     RewriteRule ^ - [L]
     
     # Don't rewrite if it's index.php itself
@@ -27,7 +28,6 @@
     
     # Rewrite all other requests to index.php
     RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^(.*)$ index.php [QSA,L]
 </IfModule>
 

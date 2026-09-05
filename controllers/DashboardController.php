@@ -111,13 +111,48 @@ class DashboardController extends Controller {
             ];
             
             return $this->view('dashboard/index', $data);
-        } catch (Exception $e) {
-            $data = [
-                'title' => 'Dashboard Error',
-                'error' => 'Error loading dashboard: ' . $e->getMessage()
-            ];
-            return $this->view('errors/404', $data);
+        } catch (Throwable $e) {
+            error_log('DashboardController::index: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+            $data = $this->fallbackDashboardData($e);
+            try {
+                return $this->view('dashboard/index', $data);
+            } catch (Throwable $e2) {
+                error_log('DashboardController::index view: ' . $e2->getMessage());
+                return $this->view('errors/app', [
+                    'title' => 'Dashboard Error',
+                    'page' => 'dashboard',
+                    'error' => 'Error loading dashboard: ' . $e->getMessage(),
+                ]);
+            }
         }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fallbackDashboardData(Throwable $e): array {
+        return [
+            'title' => 'Dashboard',
+            'page' => 'dashboard',
+            'user_name' => $_SESSION['user_name'] ?? 'User',
+            'totalStudents' => 0,
+            'totalStudentsByYear' => 0,
+            'totalStaff' => 0,
+            'totalCourses' => 0,
+            'recentStudents' => [],
+            'nvqStats' => [],
+            'nvqStatsByDepartment' => [],
+            'courseEnrollmentByDepartment' => [],
+            'religionStats' => [],
+            'genderStats' => [],
+            'departmentStats' => [],
+            'districtStats' => [],
+            'provinceStats' => [],
+            'academicYears' => [],
+            'selectedAcademicYear' => '',
+            'inventorySummary' => null,
+            'error' => 'Unable to load some dashboard statistics. ' . $e->getMessage(),
+        ];
     }
 }
 

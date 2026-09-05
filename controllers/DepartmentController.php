@@ -18,22 +18,29 @@ class DepartmentController extends Controller {
         }
         
         $departmentModel = $this->model('DepartmentModel');
-        $perPage = 20;
+        $perPage = 12;
         $page = max(1, (int) $this->get('page', 1));
+        $search = trim((string) $this->get('search', ''));
         
         // Get user's department if user is HOD, IN1, IN2, or IN3 - show only their department
         $userDepartmentId = $this->getUserDepartment();
         if ($userDepartmentId) {
-            $dept = $departmentModel->getById($userDepartmentId);
+            $dept = $departmentModel->getByIdWithCounts($userDepartmentId);
             $departments = $dept ? [$dept] : [];
+            if ($search !== '' && $dept) {
+                $haystack = strtolower(($dept['department_id'] ?? '') . ' ' . ($dept['department_name'] ?? ''));
+                if (strpos($haystack, strtolower($search)) === false) {
+                    $departments = [];
+                }
+            }
             $total = count($departments);
             $totalPages = 1;
             $currentPage = 1;
         } else {
-            $total = $departmentModel->getTotalDepartments();
+            $total = $departmentModel->getTotalDepartments($search);
             $totalPages = max(1, (int) ceil($total / $perPage));
             $currentPage = min($page, $totalPages);
-            $departments = $departmentModel->getDepartmentsPage($currentPage, $perPage);
+            $departments = $departmentModel->getDepartmentsPage($currentPage, $perPage, $search);
         }
         
         // Check if user is ADM for edit permissions
@@ -50,6 +57,7 @@ class DepartmentController extends Controller {
             'totalPages' => $totalPages,
             'total' => $total,
             'perPage' => $perPage,
+            'search' => $search,
             'isHOD' => $userDepartmentId ? true : false,
             'hodDepartmentId' => $userDepartmentId,
             'isADM' => $isADM,
@@ -77,7 +85,7 @@ class DepartmentController extends Controller {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $departmentModel = $this->model('DepartmentModel');
             
-            $department_id = trim($this->post('department_id', ''));
+            $department_id = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', trim($this->post('department_id', ''))));
             $department_name = trim($this->post('department_name', ''));
             
             // Validation

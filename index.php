@@ -67,6 +67,7 @@ try {
     require_once BASE_PATH . '/core/View.php';
     require_once BASE_PATH . '/core/Controller.php';
     require_once BASE_PATH . '/core/Router.php';
+    require_once BASE_PATH . '/core/RequestPath.php';
     
     // Initialize security tables (creates tables if they don't exist)
     require_once BASE_PATH . '/core/init_security_tables.php';
@@ -76,37 +77,7 @@ try {
 }
 
 // Resolve the app-relative route path (e.g. "dashboard") from the request URI.
-$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-$path = is_string($path) ? str_replace('\\', '/', $path) : '/';
-
-$baseCandidates = [];
-$scriptName = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
-$scriptDir = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
-if ($scriptDir !== '' && $scriptDir !== '/' && $scriptDir !== '.') {
-    $baseCandidates[] = $scriptDir;
-}
-if (defined('APP_URL')) {
-    $appPath = parse_url(APP_URL, PHP_URL_PATH);
-    if (is_string($appPath) && $appPath !== '' && $appPath !== '/') {
-        $baseCandidates[] = rtrim(str_replace('\\', '/', $appPath), '/');
-    }
-}
-$baseCandidates[] = '/SLGTIMIS';
-
-$uri = $path;
-foreach (array_unique($baseCandidates) as $base) {
-    if ($uri === $base || strpos($uri, $base . '/') === 0) {
-        $uri = substr($uri, strlen($base));
-        break;
-    }
-}
-
-$uri = trim((string) $uri, '/');
-if (stripos($uri, 'index.php/') === 0) {
-    $uri = substr($uri, 10);
-} elseif (strcasecmp($uri, 'index.php') === 0) {
-    $uri = '';
-}
+$uri = RequestPath::resolve();
 
 // Check session timeout for logged-in users (after URI is determined and all classes are loaded)
 // Only check timeout if NOT already on login or home page to avoid redirect loops

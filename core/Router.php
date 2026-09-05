@@ -18,11 +18,26 @@ class Router {
         $uri = strtok($uri, '?');
         
         // Remove leading/trailing slashes
-        $uri = trim($uri, '/');
+        $uri = trim((string) $uri, '/');
+
+        // Leftover project folder from rewrite / ErrorDocument
+        while (stripos($uri, 'slgtimis/') === 0) {
+            $uri = substr($uri, 9);
+        }
+        if (strcasecmp($uri, 'slgtimis') === 0) {
+            $uri = '';
+        }
         
         // Exact match first (e.g. dashboard)
         if (isset($this->routes[$uri])) {
             return $this->dispatch($this->routes[$uri]);
+        }
+
+        $lower = strtolower($uri);
+        foreach ($this->routes as $pattern => $route) {
+            if (strpos((string) $pattern, '{') === false && strtolower((string) $pattern) === $lower) {
+                return $this->dispatch($route);
+            }
         }
         
         // Dynamic routes only (patterns that contain {param})
@@ -37,6 +52,8 @@ class Router {
                 return $this->dispatch($route, $matches);
             }
         }
+
+        error_log('Router 404: uri=' . $uri);
         
         // 404 Not Found
         http_response_code(404);

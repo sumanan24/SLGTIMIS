@@ -158,12 +158,13 @@ class HODDashboardController extends Controller {
             ];
             
             return $this->view('hod/dashboard', $data);
-        } catch (Exception $e) {
-            $data = [
+        } catch (Throwable $e) {
+            error_log('HODDashboardController::index: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+            return $this->view('errors/app', [
                 'title' => 'Dashboard Error',
-                'error' => 'Error loading dashboard: ' . $e->getMessage()
-            ];
-            return $this->view('errors/404', $data);
+                'page' => 'dashboard',
+                'error' => 'Error loading dashboard: ' . $e->getMessage(),
+            ]);
         }
     }
     

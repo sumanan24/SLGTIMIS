@@ -629,6 +629,12 @@
 </style>
 
 <div class="dashboard-container">
+    <?php if (!empty($error)): ?>
+        <div class="alert alert-warning d-flex align-items-center" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <div><?php echo htmlspecialchars((string) $error); ?></div>
+        </div>
+    <?php endif; ?>
     <!-- Welcome Card with Academic Year Filter -->
     <div class="card dashboard-welcome-card">
         <div class="card-body">

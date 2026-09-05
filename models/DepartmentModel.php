@@ -18,19 +18,52 @@ class DepartmentModel extends Model {
     }
 
     /**
-     * Get departments with pagination
+     * Base select with course and staff counts.
      */
-    public function getDepartmentsPage($page = 1, $perPage = 20) {
+    private function selectWithCountsSql() {
+        return "SELECT d.*,
+                    COALESCE(c.cnt, 0) AS course_count,
+                    COALESCE(s.cnt, 0) AS staff_count
+                FROM `{$this->table}` d
+                LEFT JOIN (
+                    SELECT `department_id`, COUNT(*) AS cnt
+                    FROM `course`
+                    GROUP BY `department_id`
+                ) c ON c.`department_id` = d.`department_id`
+                LEFT JOIN (
+                    SELECT `department_id`, COUNT(*) AS cnt
+                    FROM `staff`
+                    GROUP BY `department_id`
+                ) s ON s.`department_id` = d.`department_id`";
+    }
+
+    /**
+     * Get departments with pagination and optional search.
+     */
+    public function getDepartmentsPage($page = 1, $perPage = 20, $search = '') {
         $page = max(1, (int) $page);
         $perPage = max(1, min(100, (int) $perPage));
         $offset = ($page - 1) * $perPage;
+        $search = trim((string) $search);
 
-        $sql = "SELECT * FROM `{$this->table}` ORDER BY `department_name` ASC LIMIT ? OFFSET ?";
+        $sql = $this->selectWithCountsSql();
+        if ($search !== '') {
+            $sql .= " WHERE d.`department_id` LIKE ? OR d.`department_name` LIKE ?";
+        }
+        $sql .= " ORDER BY d.`department_name` ASC LIMIT ? OFFSET ?";
+
         $stmt = $this->db->prepare($sql);
         if (!$stmt) {
             return [];
         }
-        $stmt->bind_param('ii', $perPage, $offset);
+
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+            $stmt->bind_param('ssii', $like, $like, $perPage, $offset);
+        } else {
+            $stmt->bind_param('ii', $perPage, $offset);
+        }
+
         $stmt->execute();
         $result = $stmt->get_result();
 
@@ -46,10 +79,47 @@ class DepartmentModel extends Model {
     }
 
     /**
-     * Get total department count
+     * Get total department count, optionally filtered by search.
      */
-    public function getTotalDepartments() {
-        return (int) $this->count();
+    public function getTotalDepartments($search = '') {
+        $search = trim((string) $search);
+        if ($search === '') {
+            return (int) $this->count();
+        }
+
+        $sql = "SELECT COUNT(*) AS total FROM `{$this->table}`
+                WHERE `department_id` LIKE ? OR `department_name` LIKE ?";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return 0;
+        }
+        $like = '%' . $search . '%';
+        $stmt->bind_param('ss', $like, $like);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $total = 0;
+        if ($result && ($row = $result->fetch_assoc())) {
+            $total = (int) ($row['total'] ?? 0);
+        }
+        $stmt->close();
+        return $total;
+    }
+
+    /**
+     * Get one department with course and staff counts.
+     */
+    public function getByIdWithCounts($id) {
+        $sql = $this->selectWithCountsSql() . " WHERE d.`department_id` = ? LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return $this->getById($id);
+        }
+        $stmt->bind_param('s', $id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = ($result && $result->num_rows > 0) ? $result->fetch_assoc() : null;
+        $stmt->close();
+        return $row;
     }
 
     /**
