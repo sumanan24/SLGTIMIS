@@ -405,9 +405,16 @@ class MachineAttendanceService {
      * @return array{http_code: int, body: string, error: ?string}
      */
     private function request(string $method, string $url, ?string $body, ?string $contentType, int $timeout): array {
-        if (!function_exists('curl_init')) {
-            return ['http_code' => 0, 'body' => '', 'error' => 'PHP curl extension is required.'];
+        if (function_exists('curl_init')) {
+            return $this->requestWithCurl($method, $url, $body, $contentType, $timeout);
         }
+        return $this->requestWithStreams($method, $url, $body, $contentType, $timeout);
+    }
+
+    /**
+     * @return array{http_code: int, body: string, error: ?string}
+     */
+    private function requestWithCurl(string $method, string $url, ?string $body, ?string $contentType, int $timeout): array {
         $ch = curl_init($url);
         $opts = [
             CURLOPT_RETURNTRANSFER => true,
@@ -443,6 +450,49 @@ class MachineAttendanceService {
             return ['http_code' => 0, 'body' => '', 'error' => $err !== '' ? $err : 'Request failed'];
         }
         return ['http_code' => $http, 'body' => (string) $response, 'error' => null];
+    }
+
+    /**
+     * Digest via PHP streams when ext-curl is missing (same fallback as staff sync).
+     *
+     * @return array{http_code: int, body: string, error: ?string}
+     */
+    private function requestWithStreams(string $method, string $url, ?string $body, ?string $contentType, int $timeout): array {
+        if (!ini_get('allow_url_fopen')) {
+            return [
+                'http_code' => 0,
+                'body' => '',
+                'error' => 'PHP curl is not enabled. Enable extension=curl in php.ini, or set allow_url_fopen=On for Digest fallback.',
+            ];
+        }
+        $digestClient = (defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__))
+            . '/staff_attendance/includes/digest_http_client.php';
+        if (!is_file($digestClient)) {
+            return [
+                'http_code' => 0,
+                'body' => '',
+                'error' => 'PHP curl extension is required (Digest fallback client missing).',
+            ];
+        }
+        require_once $digestClient;
+        $r = attendance_digest_request(
+            $method,
+            $url,
+            $body,
+            $contentType,
+            $this->username,
+            $this->password,
+            $timeout,
+            false
+        );
+        if ($r['error'] !== null && (int) $r['http_code'] === 0) {
+            return ['http_code' => 0, 'body' => '', 'error' => $r['error']];
+        }
+        return [
+            'http_code' => (int) $r['http_code'],
+            'body' => (string) $r['body'],
+            'error' => null,
+        ];
     }
 
     private function missingCredentialsMessage(): string {

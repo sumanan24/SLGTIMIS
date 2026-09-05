@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * HTTP POST with Digest auth using only PHP streams (no ext-curl).
+ * HTTP Digest client using only PHP streams (no ext-curl).
  * Used when Hikvision sync runs on hosts without php-curl.
  */
 
@@ -173,5 +173,94 @@ function attendance_digest_post_json(string $url, string $jsonBody, string $user
         'http_code' => $second['status'],
         'body' => $second['body'],
         'error' => 'HTTP ' . $second['status'] . ' — ' . substr($second['body'], 0, 400),
+    ];
+}
+
+/**
+ * GET/POST with HTTP Digest via PHP streams (no ext-curl).
+ *
+ * @return array{ok: bool, http_code: int, body: string, error: ?string}
+ */
+function attendance_digest_request(
+    string $method,
+    string $url,
+    ?string $body,
+    ?string $contentType,
+    string $user,
+    string $pass,
+    int $timeoutSec,
+    bool $verifySsl = false
+): array {
+    if (!filter_var($url, FILTER_VALIDATE_URL)) {
+        return ['ok' => false, 'http_code' => 0, 'body' => '', 'error' => 'Invalid URL'];
+    }
+
+    $method = strtoupper($method);
+    $payload = $body ?? '';
+    $baseHeaders = [];
+    if ($contentType !== null && $contentType !== '') {
+        $baseHeaders[] = 'Content-Type: ' . $contentType;
+    }
+    if ($payload !== '') {
+        $baseHeaders[] = 'Content-Length: ' . strlen($payload);
+    }
+
+    $first = attendance_stream_http_request($url, $method, $baseHeaders, $payload, $timeoutSec, $verifySsl);
+    if ($first['error'] !== null) {
+        return ['ok' => false, 'http_code' => 0, 'body' => '', 'error' => $first['error']];
+    }
+
+    if ($first['status'] >= 200 && $first['status'] < 300) {
+        return ['ok' => true, 'http_code' => $first['status'], 'body' => $first['body'], 'error' => null];
+    }
+
+    if ($first['status'] !== 401) {
+        return [
+            'ok' => $first['status'] >= 200 && $first['status'] < 300,
+            'http_code' => $first['status'],
+            'body' => $first['body'],
+            'error' => null,
+        ];
+    }
+
+    $www = '';
+    foreach ($first['headers'] as $h) {
+        if (stripos($h, 'WWW-Authenticate:') === 0) {
+            $www = trim(substr($h, strlen('WWW-Authenticate:')));
+            break;
+        }
+    }
+    if ($www === '' || stripos($www, 'Digest') !== 0) {
+        return ['ok' => false, 'http_code' => 401, 'body' => $first['body'], 'error' => null];
+    }
+
+    $parsed = attendance_parse_digest_params($www);
+    $realm = $parsed['realm'] ?? '';
+    $nonce = $parsed['nonce'] ?? '';
+    $qopList = $parsed['qop'] ?? 'auth';
+    $opaque = $parsed['opaque'] ?? '';
+
+    if ($realm === '' || $nonce === '') {
+        return ['ok' => false, 'http_code' => 401, 'body' => $first['body'], 'error' => 'Incomplete Digest challenge from device.'];
+    }
+
+    $p = parse_url($url);
+    if ($p === false || empty($p['host'])) {
+        return ['ok' => false, 'http_code' => 0, 'body' => '', 'error' => 'Could not parse device URL.'];
+    }
+    $uri = ($p['path'] ?? '/') . (isset($p['query']) ? '?' . $p['query'] : '');
+
+    $auth = attendance_build_digest_authorization($method, $uri, $user, $pass, $realm, $nonce, $qopList, $opaque);
+    $secondHeaders = array_merge($baseHeaders, ['Authorization: ' . $auth]);
+    $second = attendance_stream_http_request($url, $method, $secondHeaders, $payload, $timeoutSec, $verifySsl);
+    if ($second['error'] !== null) {
+        return ['ok' => false, 'http_code' => 0, 'body' => '', 'error' => $second['error']];
+    }
+
+    return [
+        'ok' => $second['status'] >= 200 && $second['status'] < 300,
+        'http_code' => $second['status'],
+        'body' => $second['body'],
+        'error' => null,
     ];
 }
