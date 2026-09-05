@@ -103,10 +103,10 @@
                                     <?php if ($canManageStaff): ?>
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm" role="group">
-                                            <a href="<?php echo APP_URL; ?>/staff/edit?id=<?php echo urlencode($member['staff_id']); ?>" class="btn btn-outline-primary">
+                                            <a href="<?php echo APP_URL; ?>/staff/edit?id=<?php echo urlencode($member['staff_id']); ?>" class="btn btn-outline-primary" title="Edit">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            <a href="<?php echo APP_URL; ?>/staff/delete?id=<?php echo urlencode($member['staff_id']); ?>" class="btn btn-outline-danger" onclick="return confirm('Are you sure you want to delete this staff member?');">
+                                            <a href="<?php echo APP_URL; ?>/staff/delete?id=<?php echo urlencode($member['staff_id']); ?>" class="btn btn-outline-danger" onclick="return confirm('Are you sure you want to delete this staff member?');" title="Delete">
                                                 <i class="fas fa-trash"></i>
                                             </a>
                                         </div>

@@ -1,2 +1,6 @@
 # Local logs
 error.log
+
+# Secrets (machine credentials, local overrides)
+.env
+config/student_attendance_machine.local.php

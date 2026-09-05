@@ -339,6 +339,7 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
         'total_received' => 0,
         'debug' => [],
         'error' => null,
+        'unlock_seconds' => 0,
     ];
 
     $connectT = defined('HIKVISION_CURL_CONNECT_TIMEOUT') ? (int) HIKVISION_CURL_CONNECT_TIMEOUT : 10;
@@ -359,6 +360,7 @@ function attendance_run_hikvision_sync(DateTimeInterface $start, DateTimeInterfa
             $out['total_received'] += $part['total_received'];
             if (!empty($part['error'])) {
                 $out['error'] = $part['error'];
+                $out['unlock_seconds'] = (int) ($part['unlock_seconds'] ?? 0);
                 $out['debug'] = $mergedDebug;
                 return $out;
             }
@@ -565,6 +567,50 @@ function attendance_hikvision_curl_error_hint(string $curlErr): string
 }
 
 /**
+ * Human-readable device HTTP error (detects temporary admin lockout from userCheck XML).
+ *
+ * @return array{message: string, unlock_seconds: int}
+ */
+function attendance_hikvision_format_http_error(int $httpCode, string $body): array
+{
+    $lockStatus = '';
+    $unlockTime = 0;
+    if (preg_match('/<lockStatus>\s*([^<]+)\s*<\/lockStatus>/i', $body, $m)) {
+        $lockStatus = strtolower(trim($m[1]));
+    }
+    if (preg_match('/<unlockTime>\s*(\d+)\s*<\/unlockTime>/i', $body, $m)) {
+        $unlockTime = (int) $m[1];
+    }
+
+    if ($httpCode === 401 && ($lockStatus === 'lock' || $unlockTime > 0)) {
+        $mins = max(1, (int) ceil(max(1, $unlockTime) / 60));
+        return [
+            'message' => 'Device admin account is temporarily locked after failed logins. '
+                . 'Wait about ' . $mins . ' minute(s) (≈' . $unlockTime . 's), or reboot the terminal, '
+                . 'then open Device sync. Do not keep refreshing — that extends the lock.',
+            'unlock_seconds' => max(60, $unlockTime),
+        ];
+    }
+
+    if ($httpCode === 401) {
+        return [
+            'message' => 'HTTP 401 Unauthorized — Digest login failed. Check HIKVISION_USER / HIKVISION_PASS in staff_attendance/config.php (HTTP port 80).',
+            'unlock_seconds' => 0,
+        ];
+    }
+
+    $snippet = preg_replace('/\s+/', ' ', trim(strip_tags($body)));
+    if (strlen($snippet) > 180) {
+        $snippet = substr($snippet, 0, 180) . '…';
+    }
+
+    return [
+        'message' => 'HTTP ' . $httpCode . ($snippet !== '' ? (' — ' . $snippet) : ''),
+        'unlock_seconds' => 0,
+    ];
+}
+
+/**
  * POST to Hikvision ISAPI: prefer ext-curl; otherwise HTTP Digest via PHP streams (allow_url_fopen).
  *
  * @return array{http_code: int, body: string, error: ?string}
@@ -641,6 +687,7 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
         'total_received' => 0,
         'debug' => [],
         'error' => null,
+        'unlock_seconds' => 0,
     ];
 
     $tz = new DateTimeZone(defined('STAFF_TIMEZONE') ? STAFF_TIMEZONE : 'Asia/Colombo');
@@ -689,14 +736,22 @@ function attendance_run_hikvision_sync_inner(DateTimeInterface $start, DateTimeI
         $body = json_encode($payload, JSON_UNESCAPED_SLASHES);
         $req = attendance_hikvision_isapi_post($url, $body, $connectT, $timeoutT);
         if ($req['error'] !== null) {
-            $out['error'] = $req['error'];
+            $fmt = attendance_hikvision_format_http_error((int) $req['http_code'], (string) ($req['body'] ?? ''));
+            if ((int) $req['http_code'] === 401 || $fmt['unlock_seconds'] > 0) {
+                $out['error'] = $fmt['message'];
+                $out['unlock_seconds'] = $fmt['unlock_seconds'];
+            } else {
+                $out['error'] = $req['error'];
+            }
             $out['debug'] = $debug;
             return $out;
         }
         $httpCode = $req['http_code'];
         $response = $req['body'];
         if ($httpCode < 200 || $httpCode >= 300) {
-            $out['error'] = 'HTTP ' . $httpCode . ' — ' . substr((string) $response, 0, 500);
+            $fmt = attendance_hikvision_format_http_error($httpCode, (string) $response);
+            $out['error'] = $fmt['message'];
+            $out['unlock_seconds'] = $fmt['unlock_seconds'];
             $out['debug'] = $debug;
             return $out;
         }

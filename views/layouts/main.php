@@ -121,6 +121,10 @@
                             if (!isset($canViewComplaintLetters)) {
                                 $canViewComplaintLetters = false;
                             }
+                            $canStudentFingerprintAttendance = false;
+                            if (isset($_SESSION['user_id'], $userModel) && is_object($userModel)) {
+                                $canStudentFingerprintAttendance = $userModel->canManageStudentFingerprintAttendance((int) $_SESSION['user_id']);
+                            }
                             $devicePages = ['devices'];
                             $busSeasonPages = ['bus-season-requests-sao', 'bus-season-payments'];
                             $paymentsPages = ['payments', 'payments-create', 'payments-edit', 'payments-delete'];
@@ -424,6 +428,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             if (!empty($hasMonthAttendanceSheetAccess)) {
                                 $studentAttendancePages[] = 'attendance-month-sheet';
                             }
+                            $studentDevicePages = ['student-device-attendance', 'student-device-attendance-events', 'student-device-attendance-users', 'student-device-attendance-logs'];
                             $hasStudentAttendanceMenu = !empty($studentAttendancePages);
                             ?>
                             <?php if ($hasStudentAttendanceMenu): ?>
@@ -467,6 +472,15 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                     </li>
                                     <?php endif; ?>
                                 </ul>
+                            </li>
+                            <?php endif; ?>
+
+                            <?php if (!empty($canStudentFingerprintAttendance)): ?>
+                            <li data-nav="student-fingerprint" class="<?php echo (isset($page) && in_array($page, $studentDevicePages, true)) ? 'active' : ''; ?>">
+                                <a href="<?php echo APP_URL; ?>/attendance/student-device" class="<?php echo (isset($page) && in_array($page, $studentDevicePages, true)) ? 'active' : ''; ?>">
+                                    <i class="fas fa-fingerprint"></i>
+                                    <span>Student Fingerprint</span>
+                                </a>
                             </li>
                             <?php endif; ?>
 

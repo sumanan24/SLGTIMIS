@@ -86,9 +86,9 @@ define('ATT_PAGE_SIZE', 25);
 define('STAFF_ATT_DASHBOARD_AUTO_SYNC', true);
 
 /**
- * Seconds between automatic pulls. 0 = every time you open the dashboard.
+ * Seconds between automatic pulls. Avoid 0 while debugging auth — every refresh can prolong device lockout.
  */
-define('STAFF_ATT_DASHBOARD_SYNC_COOLDOWN', 0);
+define('STAFF_ATT_DASHBOARD_SYNC_COOLDOWN', 120);
 
 /**
  * Hikvision sync window for dashboard auto-sync only — keep short so sync does not run too long.

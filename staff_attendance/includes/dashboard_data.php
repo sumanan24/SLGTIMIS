@@ -106,6 +106,24 @@ function staff_attendance_load_dashboard_state(): array
     $data = staff_attendance_dashboard_fetch_from_db($dateFrom, $dateTo, $employeeNo);
 
     $nowTs = time();
+    $lockUntil = (int) ($_SESSION['staff_attendance_device_lock_until'] ?? 0);
+    if ($lockUntil > $nowTs) {
+        $remain = $lockUntil - $nowTs;
+        $mins = max(1, (int) ceil($remain / 60));
+        $_SESSION['flash_error'] = 'Device admin is still locked. Wait about ' . $mins
+            . ' more minute(s), or reboot the terminal. Dashboard sync is paused until then.';
+        return [
+            'summaryDays' => $summaryDays,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'employeeNo' => $employeeNo,
+            'todayYmd' => $todayYmd,
+            'employees' => $data['employees'],
+            'grouped' => $data['grouped'],
+            'dbError' => $data['dbError'],
+        ];
+    }
+
     $lastAuto = (int) ($_SESSION['staff_attendance_last_auto_sync'] ?? 0);
 
     $shouldSync = false;
@@ -131,8 +149,13 @@ function staff_attendance_load_dashboard_state(): array
         $_SESSION['staff_attendance_last_auto_sync'] = $nowTs;
 
         if (!$result['ok']) {
+            $unlock = (int) ($result['unlock_seconds'] ?? 0);
+            if ($unlock > 0) {
+                $_SESSION['staff_attendance_device_lock_until'] = $nowTs + $unlock + 30;
+            }
             $_SESSION['flash_error'] = $result['error'] ?? 'Automatic sync failed.';
         } else {
+            unset($_SESSION['staff_attendance_device_lock_until']);
             $data = staff_attendance_dashboard_fetch_from_db($dateFrom, $dateTo, $employeeNo);
         }
     }

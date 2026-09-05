@@ -1765,6 +1765,7 @@ class AttendanceController extends Controller {
             return;
         }
         require_once BASE_PATH . '/staff_attendance/config.php';
+        require_once BASE_PATH . '/models/UserModel.php';
 
         $urls = $this->staffDeviceNavUrls();
         $tz = new DateTimeZone(STAFF_TIMEZONE);
@@ -1917,6 +1918,7 @@ class AttendanceController extends Controller {
             if ($result['ok']) {
                 $tr = (int) ($result['total_received'] ?? 0);
                 $ins = (int) ($result['inserted'] ?? 0);
+                unset($_SESSION['staff_attendance_device_lock_until']);
                 $_SESSION['flash_success'] = sprintf(
                     'Sync finished. Total received: %d — Total inserted: %d (duplicates skipped: %d, invalid: %d, not in staff list: %d).',
                     $tr,
@@ -1926,6 +1928,10 @@ class AttendanceController extends Controller {
                     (int) ($result['skipped_not_in_directory'] ?? 0)
                 );
             } else {
+                $unlock = (int) ($result['unlock_seconds'] ?? 0);
+                if ($unlock > 0) {
+                    $_SESSION['staff_attendance_device_lock_until'] = time() + $unlock + 30;
+                }
                 $_SESSION['flash_error'] = $result['error'] ?? 'Sync failed.';
             }
 
@@ -1957,7 +1963,7 @@ class AttendanceController extends Controller {
             'showResult' => $showResult,
         ]);
     }
-    
+
     /**
      * View machine attendance records directly from device
      */

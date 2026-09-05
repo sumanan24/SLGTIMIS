@@ -1265,3 +1265,686 @@
 [03-Sep-2026 14:45:23 UTC] Database::connect - Connection successful to sisslgti
 [03-Sep-2026 14:45:30 UTC] Database::connect - Connection successful to sisslgti
 [03-Sep-2026 14:45:49 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:18:28 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:18:31 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:18:32 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:18:32 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:19:11 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:21:22 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:21:38 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:21:44 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:28:42 UTC] PHP Fatal error:  Maximum execution time of 120 seconds exceeded in C:\wamp64\www\SLGTIMIS\index.php on line 54
+[05-Sep-2026 07:28:42 UTC] PHP Stack trace:
+[05-Sep-2026 07:28:42 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Sep-2026 07:28:42 UTC] PHP Fatal error:  Maximum execution time of 120 seconds exceeded in C:\wamp64\www\SLGTIMIS\index.php on line 54
+[05-Sep-2026 07:28:42 UTC] PHP Stack trace:
+[05-Sep-2026 07:28:42 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Sep-2026 07:28:42 UTC] PHP Fatal error:  Maximum execution time of 120 seconds exceeded in C:\wamp64\www\SLGTIMIS\index.php on line 54
+[05-Sep-2026 07:28:42 UTC] PHP Stack trace:
+[05-Sep-2026 07:28:42 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Sep-2026 07:28:42 UTC] PHP Fatal error:  Maximum execution time of 120 seconds exceeded in C:\wamp64\www\SLGTIMIS\index.php on line 54
+[05-Sep-2026 07:28:42 UTC] PHP Stack trace:
+[05-Sep-2026 07:28:42 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Sep-2026 07:28:42 UTC] PHP Fatal error:  Maximum execution time of 120 seconds exceeded in C:\wamp64\www\SLGTIMIS\index.php on line 54
+[05-Sep-2026 07:28:42 UTC] PHP Stack trace:
+[05-Sep-2026 07:28:42 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Sep-2026 07:28:42 UTC] PHP Fatal error:  Maximum execution time of 120 seconds exceeded in C:\wamp64\www\SLGTIMIS\index.php on line 54
+[05-Sep-2026 07:28:42 UTC] PHP Stack trace:
+[05-Sep-2026 07:28:42 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Sep-2026 07:28:42 UTC] PHP Fatal error:  Maximum execution time of 120 seconds exceeded in C:\wamp64\www\SLGTIMIS\index.php on line 54
+[05-Sep-2026 07:28:42 UTC] PHP Stack trace:
+[05-Sep-2026 07:28:42 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Sep-2026 07:28:42 UTC] PHP Fatal error:  Maximum execution time of 120 seconds exceeded in C:\wamp64\www\SLGTIMIS\index.php on line 54
+[05-Sep-2026 07:28:42 UTC] PHP Stack trace:
+[05-Sep-2026 07:28:42 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Sep-2026 07:28:42 UTC] PHP Fatal error:  Maximum execution time of 120 seconds exceeded in C:\wamp64\www\SLGTIMIS\index.php on line 54
+[05-Sep-2026 07:28:42 UTC] PHP Stack trace:
+[05-Sep-2026 07:28:42 UTC] PHP   1. {main}() C:\wamp64\www\SLGTIMIS\index.php:0
+[05-Sep-2026 07:28:42 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:28:42 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:28:42 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:28:46 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:28:50 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:29:02 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:29:02 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/ISAPI/AccessControl/UserInfo/Record?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[05-Sep-2026 07:29:02 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"statusCode":	1,
+	"statusString":	"OK",
+	"subStatusCode":	"ok"
+}
+[05-Sep-2026 07:29:02 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:29:02 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[05-Sep-2026 07:29:02 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788593342",
+		"responseStatusStrg":	"MORE",
+		"numOfMatches":	30,
+		"totalMatches":	219,
+		"UserInfo":	[{
+				"employeeNo":	"6015",
+				"name":	"V.Kirushanthan",
+				"userType":	"normal",
+				"sortByNamePosition":	0,
+				"sortByNameFlag":	"V",
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2025-07-14T00:00:00",
+					"endTime":	"2035-07-13T23:59:59",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	1,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}, {
+				"employeeNo":	"10350",
+				"name":	"V.Thamilviliy",
+				"userType":	"normal",
+				"sortByNamePosition":	1,
+				"sortByName
+[05-Sep-2026 07:29:44 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:29:45 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[05-Sep-2026 07:29:45 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788593384",
+		"responseStatusStrg":	"MORE",
+		"numOfMatches":	30,
+		"totalMatches":	219,
+		"UserInfo":	[{
+				"employeeNo":	"6015",
+				"name":	"V.Kirushanthan",
+				"userType":	"normal",
+				"sortByNamePosition":	0,
+				"sortByNameFlag":	"V",
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2025-07-14T00:00:00",
+					"endTime":	"2035-07-13T23:59:59",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	1,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}, {
+				"employeeNo":	"10350",
+				"name":	"V.Thamilviliy",
+				"userType":	"normal",
+				"sortByNamePosition":	1,
+				"sortByName
+[05-Sep-2026 07:30:43 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:30:58 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:30:59 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[05-Sep-2026 07:30:59 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788593458",
+		"responseStatusStrg":	"MORE",
+		"numOfMatches":	30,
+		"totalMatches":	219,
+		"UserInfo":	[{
+				"employeeNo":	"6015",
+				"name":	"V.Kirushanthan",
+				"userType":	"normal",
+				"sortByNamePosition":	0,
+				"sortByNameFlag":	"V",
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2025-07-14T00:00:00",
+					"endTime":	"2035-07-13T23:59:59",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	1,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}, {
+				"employeeNo":	"10350",
+				"name":	"V.Thamilviliy",
+				"userType":	"normal",
+				"sortByNamePosition":	1,
+				"sortByName
+[05-Sep-2026 07:30:59 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:31:45 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:31:45 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/ISAPI/Intelligent/FDLib/FDSearch/Delete?format=json&faceLibType=blackFD&FDID=1, Method: PUT, HTTP Code: 200, Content-Type: application/json
+[05-Sep-2026 07:31:45 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"statusCode":	1,
+	"statusString":	"OK",
+	"subStatusCode":	"ok"
+}
+[05-Sep-2026 07:31:46 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/ISAPI/AccessControl/CaptureFaceData?format=json, Method: POST, HTTP Code: 400, Content-Type: application/json
+[05-Sep-2026 07:31:46 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"statusCode":	6,
+	"statusString":	"Invalid Content",
+	"subStatusCode":	"badParameters",
+	"errorCode":	1610612737,
+	"errorMsg":	"badParameters"
+}
+[05-Sep-2026 07:31:46 UTC] Hikvision HTTP Error: 400, Response: {
+	"statusCode":	6,
+	"statusString":	"Invalid Content",
+	"subStatusCode":	"badParameters",
+	"errorCode":	1610612737,
+	"errorMsg":	"badParameters"
+}
+[05-Sep-2026 07:31:46 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:32:02 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:32:03 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/ISAPI/Intelligent/FDLib/FDSearch/Delete?format=json&faceLibType=blackFD&FDID=1, Method: PUT, HTTP Code: 200, Content-Type: application/json
+[05-Sep-2026 07:32:03 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"statusCode":	1,
+	"statusString":	"OK",
+	"subStatusCode":	"ok"
+}
+[05-Sep-2026 07:32:03 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/ISAPI/AccessControl/CaptureFaceData?format=json, Method: POST, HTTP Code: 400, Content-Type: application/json
+[05-Sep-2026 07:32:03 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"statusCode":	6,
+	"statusString":	"Invalid Content",
+	"subStatusCode":	"badParameters",
+	"errorCode":	1610612737,
+	"errorMsg":	"badParameters"
+}
+[05-Sep-2026 07:32:03 UTC] Hikvision HTTP Error: 400, Response: {
+	"statusCode":	6,
+	"statusString":	"Invalid Content",
+	"subStatusCode":	"badParameters",
+	"errorCode":	1610612737,
+	"errorMsg":	"badParameters"
+}
+[05-Sep-2026 07:32:03 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:32:45 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:32:45 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[05-Sep-2026 07:32:45 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788593565",
+		"responseStatusStrg":	"MORE",
+		"numOfMatches":	30,
+		"totalMatches":	219,
+		"UserInfo":	[{
+				"employeeNo":	"6015",
+				"name":	"V.Kirushanthan",
+				"userType":	"normal",
+				"sortByNamePosition":	0,
+				"sortByNameFlag":	"V",
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2025-07-14T00:00:00",
+					"endTime":	"2035-07-13T23:59:59",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	1,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}, {
+				"employeeNo":	"10350",
+				"name":	"V.Thamilviliy",
+				"userType":	"normal",
+				"sortByNamePosition":	1,
+				"sortByName
+[05-Sep-2026 07:32:46 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:33:12 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:33:18 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:33:34 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:36:42 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:36:48 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:36:48 UTC] Hikvision makeRequest - URL: https://172.16.0.230:443/ISAPI/Intelligent/FDLib/FDSearch/Delete?format=json&faceLibType=blackFD&FDID=1, Method: PUT, HTTP Code: 200, Content-Type: application/json
+[05-Sep-2026 07:36:48 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"statusCode":	1,
+	"statusString":	"OK",
+	"subStatusCode":	"ok"
+}
+[05-Sep-2026 07:36:59 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:48:43 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:48:43 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:48:48 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:48:50 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:18:50 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230:80/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 401, Content-Type: application/xml
+[05-Sep-2026 13:18:50 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>unlock</lockStatus>
+<unlockTime>0</unlockTime>
+<retryLoginTime>4</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 13:18:50 Asia/Colombo] Hikvision HTTP Error: 401, Response: <?xml version="1.0" encoding="UTF-8"?>
+<userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>unlock</lockStatus>
+<unlockTime>0</unlockTime>
+<retryLoginTime>4</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 13:18:50 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230:80/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 401, Content-Type: application/xml
+[05-Sep-2026 13:18:50 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>unlock</lockStatus>
+<unlockTime>0</unlockTime>
+<retryLoginTime>3</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 13:18:50 Asia/Colombo] Hikvision HTTP Error: 401, Response: <?xml version="1.0" encoding="UTF-8"?>
+<userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>unlock</lockStatus>
+<unlockTime>0</unlockTime>
+<retryLoginTime>3</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 13:18:50 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230:80/System/deviceInfo, Method: GET, HTTP Code: 404, Content-Type: text/html
+[05-Sep-2026 13:18:50 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <!DOCTYPE html>
+<html><head><title>Document Error: Not Found</title></head>
+<body><h2>Access Error: 404 -- Not Found</h2>
+<p>Can't locate document: /System/deviceInfo</p>
+</body>
+</html>
+
+[05-Sep-2026 13:18:50 Asia/Colombo] Hikvision HTTP Error: 404, Response: <!DOCTYPE html>
+<html><head><title>Document Error: Not Found</title></head>
+<body><h2>Access Error: 404 -- Not Found</h2>
+<p>Can't locate document: /System/deviceInfo</p>
+</body>
+</html>
+
+[05-Sep-2026 13:18:50 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230:80/, Method: GET, HTTP Code: 301, Content-Type: text/html
+[05-Sep-2026 13:18:50 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <!DOCTYPE html>
+<html><head><title>Moved Permanently</title></head>
+<body><h1>Moved Permanently</h1>
+<p>The document has moved <a href="https://172.16.0.230:443">here</a>.</p>
+<address>App-webs/ at defaultHost Port 80</address></body>
+</html>
+
+[05-Sep-2026 13:18:50 Asia/Colombo] [BiometricEnrollment] testMachine#1: Connection successful (unexpected response format)
+[05-Sep-2026 07:48:50 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:48:54 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:49:00 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:49:03 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:49:13 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:49:20 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:19:20 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230:80/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:19:20 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>unlock</lockStatus>
+<unlockTime>0</unlockTime>
+<retryLoginTime>2</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 13:19:20 Asia/Colombo] Hikvision HTTP Error: 401, Response: <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>unlock</lockStatus>
+<unlockTime>0</unlockTime>
+<retryLoginTime>2</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 07:49:31 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:19:31 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230:80/ISAPI/AccessControl/UserInfo/Record?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:19:31 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>unlock</lockStatus>
+<unlockTime>0</unlockTime>
+<retryLoginTime>1</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 13:19:31 Asia/Colombo] Hikvision HTTP Error: 401, Response: <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>unlock</lockStatus>
+<unlockTime>0</unlockTime>
+<retryLoginTime>1</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 13:19:31 Asia/Colombo] [BiometricEnrollment] ensureMachineUser: Mukilan@1 HTTP Error: 401 - Response: <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>unlock</
+[05-Sep-2026 07:49:31 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:19:31 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230:80/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:19:31 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1800</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 13:19:31 Asia/Colombo] Hikvision HTTP Error: 401, Response: <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1800</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 07:49:49 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:52:23 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:52:30 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:52:35 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:52:37 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:52:45 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:22:45 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230:80/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:22:45 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1605</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 07:52:49 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:22:49 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230:80/ISAPI/AccessControl/UserInfo/Record?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:22:49 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1601</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 13:22:49 Asia/Colombo] [BiometricEnrollment] ensureMachineUser: Rajkumar@1 HTTP 401 Unauthorized — Digest login failed. Use the same host/port/user/password as Device sync (typically HTTP port 80, not HTTPS 443). Check biometric machine settings.
+[05-Sep-2026 07:52:49 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:22:49 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230:80/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:22:49 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1601</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 07:57:09 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:27:09 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:27:09 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1342</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 07:57:30 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:57:40 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:27:40 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:27:40 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1311</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 07:57:55 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:27:55 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:27:55 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1296</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 07:57:55 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:27:55 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:27:55 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1296</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 07:57:55 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:27:55 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:27:55 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1295</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 07:57:55 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:27:55 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:27:55 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1295</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 07:57:55 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:27:55 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:27:55 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1295</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 07:57:56 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:27:56 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:27:56 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1295</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 07:58:00 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:28:00 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230/ISAPI/AccessControl/UserInfo/Record?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:28:00 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1290</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 13:28:00 Asia/Colombo] [BiometricEnrollment] ensureMachineUser: SAO@1 HTTP 401 — device admin account is temporarily locked after failed logins (wait ~22 min / 1290s, or reboot the terminal). Then retry Test on Biometric machines. URL: http://172.16.0.230/ISAPI/AccessControl/UserInfo/Record?format=json
+[05-Sep-2026 07:58:00 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 13:28:00 Asia/Colombo] Hikvision makeRequest - URL: http://172.16.0.230/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[05-Sep-2026 13:28:00 Asia/Colombo] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1290</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[05-Sep-2026 07:58:13 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:58:21 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:58:22 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:58:24 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 07:58:27 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:01:57 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:02:03 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:02:07 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:02:12 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:02:12 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:02:12 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:02:48 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:02:48 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:02:48 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:02:51 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:09:19 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:09:23 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:09:37 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:12:42 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:19:33 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:33:57 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:34:16 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:38:58 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:39:07 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:39:15 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:39:43 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:57:42 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 08:57:46 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:44:38 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:44:38 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:44:42 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:44:42 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:45:11 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:45:28 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:45:35 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:45:38 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:45:39 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:46:06 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:46:07 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:46:15 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:46:16 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:47:34 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:47:35 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:51:12 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:51:18 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:51:33 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:51:33 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:52:11 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:52:12 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:52:49 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:52:49 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:53:16 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:53:18 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:53:18 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:53:35 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:53:36 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 09:53:37 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:03:33 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:03:35 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:03:37 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:08:40 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:08:58 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:09:00 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:09:43 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:11:11 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:11:13 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:11:16 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:12:56 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:12:59 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:13:01 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:13:17 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:13:19 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:25:07 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:25:09 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:25:11 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:25:11 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:25:12 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:27:40 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:28:26 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:28:29 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:28:46 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:28:53 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:28:56 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:31:14 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:31:16 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:31:19 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:33:19 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:33:22 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:33:45 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:34:27 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:34:30 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:34:32 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:38:57 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:39:59 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:40:14 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:40:14 UTC] Router 404: uri=attendance/student-device/events
+[05-Sep-2026 10:40:17 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:40:24 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:40:29 UTC] Database::connect - Connection successful to sisslgti
+[05-Sep-2026 10:40:44 UTC] Database::connect - Connection successful to sisslgti
