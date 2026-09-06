@@ -418,6 +418,8 @@ class HikvisionIntegration {
             CURLOPT_CONNECTTIMEOUT => min(15, max(3, $timeout)),
             CURLOPT_TIMEOUT => $timeout,
             CURLOPT_FOLLOWLOCATION => false,
+            // Digest + POST often breaks if curl sends Expect: 100-continue
+            CURLOPT_HTTPHEADER => ['Expect:'],
         ];
         if (defined('CURL_IPRESOLVE_V4')) {
             $opts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
@@ -430,19 +432,37 @@ class HikvisionIntegration {
         return $ch;
     }
 
+    /**
+     * Warm Digest challenge/response with a cheap GET before Capture/Download POSTs.
+     */
+    private function warmDigestAuth(): void {
+        try {
+            $this->makeRequestDetailed(
+                $this->baseUrl . '/System/deviceInfo',
+                'GET',
+                null,
+                null,
+                min(12, max(5, (int) $this->timeout))
+            );
+        } catch (Throwable $e) {
+            // ignore — Capture will report auth errors
+        }
+    }
+
+    public function hasPasswordConfigured(): bool {
+        return trim($this->password) !== '';
+    }
+
     private function makeRequest($url, $method = 'GET', $data = null, $contentType = 'application/json', $timeoutOverride = null) {
         $timeout = $timeoutOverride !== null ? (int) $timeoutOverride : (int) $this->timeout;
         $ch = $this->createDigestCurl($url, $timeout);
 
-        $headers = [];
-        // Only send Content-Type when there is a body (sync lib does the same for POST)
+        $headers = ['Expect:'];
         $method = strtoupper((string) $method);
         if ($data !== null && $data !== '' && $contentType) {
             $headers[] = 'Content-Type: ' . $contentType;
         }
-        if ($headers !== []) {
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        }
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
         if ($method === 'POST') {
             curl_setopt($ch, CURLOPT_POST, true);
@@ -1551,6 +1571,13 @@ class HikvisionIntegration {
         if ($employeeNo === '') {
             return ['ok' => false, 'message' => 'Employee No is required.'];
         }
+        if (!$this->hasPasswordConfigured()) {
+            return [
+                'ok' => false,
+                'message' => 'Finger capture blocked: STUDENT_HIKVISION_PASS is empty on this server. '
+                    . 'Set the same password as the MAIN terminal web login in production .env, then retry.',
+            ];
+        }
         $fingerNo = max(1, min(10, $fingerNo));
         $slotLabel = 'Finger 0' . $fingerNo;
         $errors = [];
@@ -1566,10 +1593,16 @@ class HikvisionIntegration {
                 if (!empty($ui['ok'])) {
                     return $ui;
                 }
-                $detail = $errors !== [] ? implode('; ', array_slice(array_unique($errors), 0, 3)) : 'no finger data';
+                $detail = $errors !== [] ? implode('; ', array_slice(array_unique($errors), 0, 4)) : 'no finger data';
+                $authHint = '';
+                if (stripos($detail, '401') !== false || stripos($detail, 'Unauthorized') !== false) {
+                    $authHint = ' Auth failed for CaptureFingerPrint — confirm production .env STUDENT_HIKVISION_PASS '
+                        . 'matches MAIN (' . $this->host . ') web UI password for user "' . $this->username . '". '
+                        . 'If the admin account is locked, wait/reboot the terminal, then Test Connection.';
+                }
                 return [
                     'ok' => false,
-                    'message' => $slotLabel . ' capture failed. Ask the student to place a finger on the scanner, then try again. (' . $detail . ')',
+                    'message' => $slotLabel . ' capture failed. Ask the student to place a finger on the scanner, then try again. (' . $detail . ')' . $authHint,
                     'response' => $captured['raw'] ?? null,
                 ];
             }
@@ -1600,83 +1633,96 @@ class HikvisionIntegration {
      * @return array{fingerData:?string, quality:mixed, raw:mixed}
      */
     private function captureFingerPrintData(int $fingerNo, array &$errors): array {
-        $attempts = [
+        $this->warmDigestAuth();
+
+        $payloads = [
             [
-                'url' => $this->baseUrl . '/AccessControl/CaptureFingerPrint?format=json',
+                'path' => '/AccessControl/CaptureFingerPrint?format=json',
                 'body' => json_encode(['CaptureFingerPrintCond' => ['fingerNo' => $fingerNo]]),
                 'ct' => 'application/json',
             ],
             [
-                'url' => $this->baseUrl . '/AccessControl/CaptureFingerPrint',
+                'path' => '/AccessControl/CaptureFingerPrint',
                 'body' => '<?xml version="1.0" encoding="UTF-8"?>'
                     . '<CaptureFingerPrintCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">'
                     . '<fingerNo>' . $fingerNo . '</fingerNo>'
                     . '</CaptureFingerPrintCond>',
-                'ct' => 'application/xml; charset="UTF-8"',
+                'ct' => 'application/xml; charset=UTF-8',
             ],
             [
-                'url' => $this->baseUrl . '/AccessControl/CaptureFingerPrint?format=json',
+                'path' => '/AccessControl/CaptureFingerPrint?format=json',
                 'body' => json_encode(['CaptureFingerPrintCond' => ['fingerNo' => $fingerNo, 'employeeNo' => '']]),
                 'ct' => 'application/json',
             ],
         ];
 
-        foreach ($attempts as $i => $att) {
-            $res = $this->makeRequestDetailed($att['url'], 'POST', $att['body'], $att['ct'], 70);
-            $decoded = $res['decoded'];
-            if ($res['http_code'] >= 400) {
-                $errors[] = 'Capture#' . ($i + 1) . ' HTTP ' . $res['http_code'] . ' '
-                    . $this->hikvisionErrorMessage(is_array($decoded) ? $decoded : null, substr($res['body'], 0, 120));
-                continue;
-            }
-            $fpBlock = is_array($decoded) ? ($decoded['CaptureFingerPrint'] ?? $decoded) : null;
-            $printData = is_array($fpBlock)
-                ? ($fpBlock['fingerData'] ?? $fpBlock['fingerprintData'] ?? null)
-                : null;
-            // Some firmwares nest under ResponseStatus-like wrappers or return Progress first
-            if ((!is_string($printData) || $printData === '') && is_string($res['body']) && $res['body'] !== '') {
-                if (preg_match('/<(?:fingerData|fingerprintData)>([^<]+)</i', $res['body'], $m)) {
-                    $printData = html_entity_decode($m[1], ENT_QUOTES | ENT_XML1, 'UTF-8');
+        $attemptNo = 0;
+        foreach ($payloads as $att) {
+            foreach (['POST', 'PUT'] as $method) {
+                $attemptNo++;
+                $url = $this->baseUrl . $att['path'];
+                $res = $this->makeRequestDetailed($url, $method, $att['body'], $att['ct'], 70);
+                $decoded = $res['decoded'];
+                if ($res['http_code'] === 401) {
+                    $errors[] = 'Capture#' . $attemptNo . ' HTTP 401 '
+                        . ($res['error'] !== '' ? $res['error'] : 'Unauthorized');
+                    if ($attemptNo >= 2) {
+                        return ['fingerData' => null, 'quality' => null, 'raw' => $decoded ?? $res['body']];
+                    }
+                    continue;
                 }
-            }
-            if (is_string($printData) && $printData !== '') {
-                return [
-                    'fingerData' => $printData,
-                    'quality' => is_array($fpBlock) ? ($fpBlock['fingerPrintQuality'] ?? $fpBlock['fingerNo'] ?? null) : null,
-                    'raw' => $decoded ?? $res['body'],
-                ];
-            }
-            // Poll progress endpoint (XML devices)
-            for ($p = 0; $p < 20; $p++) {
-                usleep(500000);
-                $prog = $this->makeRequestDetailed(
-                    $this->baseUrl . '/AccessControl/CaptureFingerPrint/Progress',
-                    'GET',
-                    null,
-                    'application/xml',
-                    15
-                );
-                if ($prog['http_code'] >= 400) {
-                    break;
+                if ($res['http_code'] >= 400) {
+                    $errors[] = 'Capture#' . $attemptNo . ' HTTP ' . $res['http_code'] . ' '
+                        . $this->hikvisionErrorMessage(is_array($decoded) ? $decoded : null, substr($res['body'], 0, 120));
+                    continue;
                 }
-                $block = is_array($prog['decoded'])
-                    ? ($prog['decoded']['CaptureFingerPrint'] ?? $prog['decoded'])
+                $fpBlock = is_array($decoded) ? ($decoded['CaptureFingerPrint'] ?? $decoded) : null;
+                $printData = is_array($fpBlock)
+                    ? ($fpBlock['fingerData'] ?? $fpBlock['fingerprintData'] ?? null)
                     : null;
-                $data = is_array($block) ? ($block['fingerData'] ?? $block['fingerprintData'] ?? null) : null;
-                if ((!is_string($data) || $data === '') && is_string($prog['body'])) {
-                    if (preg_match('/<(?:fingerData|fingerprintData)>([^<]+)</i', $prog['body'], $m2)) {
-                        $data = html_entity_decode($m2[1], ENT_QUOTES | ENT_XML1, 'UTF-8');
+                if ((!is_string($printData) || $printData === '') && is_string($res['body']) && $res['body'] !== '') {
+                    if (preg_match('/<(?:fingerData|fingerprintData)>([^<]+)</i', $res['body'], $m)) {
+                        $printData = html_entity_decode($m[1], ENT_QUOTES | ENT_XML1, 'UTF-8');
                     }
                 }
-                if (is_string($data) && $data !== '') {
+                if (is_string($printData) && $printData !== '') {
                     return [
-                        'fingerData' => $data,
-                        'quality' => is_array($block) ? ($block['fingerPrintQuality'] ?? null) : null,
-                        'raw' => $prog['decoded'] ?? $prog['body'],
+                        'fingerData' => $printData,
+                        'quality' => is_array($fpBlock) ? ($fpBlock['fingerPrintQuality'] ?? $fpBlock['fingerNo'] ?? null) : null,
+                        'raw' => $decoded ?? $res['body'],
                     ];
                 }
+                for ($p = 0; $p < 20; $p++) {
+                    usleep(500000);
+                    $prog = $this->makeRequestDetailed(
+                        $this->baseUrl . '/AccessControl/CaptureFingerPrint/Progress',
+                        'GET',
+                        null,
+                        'application/xml',
+                        15
+                    );
+                    if ($prog['http_code'] >= 400) {
+                        break;
+                    }
+                    $block = is_array($prog['decoded'])
+                        ? ($prog['decoded']['CaptureFingerPrint'] ?? $prog['decoded'])
+                        : null;
+                    $data = is_array($block) ? ($block['fingerData'] ?? $block['fingerprintData'] ?? null) : null;
+                    if ((!is_string($data) || $data === '') && is_string($prog['body'])) {
+                        if (preg_match('/<(?:fingerData|fingerprintData)>([^<]+)</i', $prog['body'], $m2)) {
+                            $data = html_entity_decode($m2[1], ENT_QUOTES | ENT_XML1, 'UTF-8');
+                        }
+                    }
+                    if (is_string($data) && $data !== '') {
+                        return [
+                            'fingerData' => $data,
+                            'quality' => is_array($block) ? ($block['fingerPrintQuality'] ?? null) : null,
+                            'raw' => $prog['decoded'] ?? $prog['body'],
+                        ];
+                    }
+                }
+                $errors[] = 'Capture#' . $attemptNo . ' ' . $method . ' — no fingerData (place finger on scanner)';
             }
-            $errors[] = 'Capture#' . ($i + 1) . ' returned no fingerData';
         }
 
         return ['fingerData' => null, 'quality' => null, 'raw' => null];
@@ -1843,14 +1889,12 @@ class HikvisionIntegration {
             ];
         }
 
-        $headers = [];
+        $headers = ['Expect:'];
         $method = strtoupper((string) $method);
         if ($data !== null && $data !== '' && $contentType) {
             $headers[] = 'Content-Type: ' . $contentType;
         }
-        if ($headers !== []) {
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        }
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
         if ($method === 'POST') {
             curl_setopt($ch, CURLOPT_POST, true);
