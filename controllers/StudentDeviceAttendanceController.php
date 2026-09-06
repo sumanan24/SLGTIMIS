@@ -1200,10 +1200,13 @@ class StudentDeviceAttendanceController extends Controller {
 
         $forceProbe = (string) $this->get('probe', '') === '1';
         $cached = $_SESSION['student_att_device_status'] ?? null;
-        $cacheFresh = is_array($cached) && !empty($cached['devices']) && !empty($cached['tested_at'])
-            && (time() - strtotime((string) $cached['tested_at'])) < 120;
+        // Never auto-probe on page load — only when user clicks Test (probe=1) or connectionTest.
+        // Auto-probe during admin lockout makes lockouts worse.
+        $lockoutUntil = (int) ($_SESSION['student_att_lockout_until'] ?? 0);
+        $inLockout = $lockoutUntil > time();
         $shouldProbe = HikvisionIntegration::isCurlAvailable()
-            && ($forceProbe || ($tab === 'overview' && !$cacheFresh));
+            && $forceProbe
+            && !$inLockout;
 
         if ($shouldProbe) {
             $deviceStatuses = $cred->probeDeviceStatuses();
@@ -1212,6 +1215,7 @@ class StudentDeviceAttendanceController extends Controller {
                 'tested_at' => date('Y-m-d H:i:s'),
             ];
             $cached = $_SESSION['student_att_device_status'];
+            $this->rememberDeviceLockout($deviceStatuses);
         } elseif (is_array($cached) && !empty($cached['devices'])) {
             $deviceStatuses = $cached['devices'];
         } else {
@@ -1225,7 +1229,9 @@ class StudentDeviceAttendanceController extends Controller {
                     'role' => (string) ($d['role'] ?? ''),
                     'label' => (string) ($d['label'] ?? ''),
                     'online' => null,
-                    'message' => 'Not tested',
+                    'message' => $inLockout
+                        ? ('Admin lock cooldown — wait until ' . date('H:i:s', $lockoutUntil) . ', or reboot terminals')
+                        : 'Not tested — click Test',
                 ];
             }
         }
@@ -2431,6 +2437,14 @@ class StudentDeviceAttendanceController extends Controller {
         if (!$this->requireAccess()) {
             return;
         }
+        $lockoutUntil = (int) ($_SESSION['student_att_lockout_until'] ?? 0);
+        if ($lockoutUntil > time() && (string) $this->get('force', '') !== '1') {
+            $_SESSION['flash_error'] = 'Admin lock cooldown active until ' . date('H:i', $lockoutUntil)
+                . '. Reboot the terminals to unlock sooner, or wait. '
+                . 'To force a test anyway use Test after reboot only.';
+            $this->redirect('attendance/student-device');
+            return;
+        }
         @set_time_limit(90);
         require_once BASE_PATH . '/core/HikvisionIntegration.php';
         $cred = $this->credentialSyncService();
@@ -2439,6 +2453,7 @@ class StudentDeviceAttendanceController extends Controller {
             'devices' => $probes,
             'tested_at' => date('Y-m-d H:i:s'),
         ];
+        $this->rememberDeviceLockout($probes);
 
         $online = 0;
         $locked = 0;
@@ -2471,15 +2486,49 @@ class StudentDeviceAttendanceController extends Controller {
         }
 
         if ($online > 0) {
+            unset($_SESSION['student_att_lockout_until']);
             $_SESSION['flash_success'] = "Devices online: {$online}/" . count($probes) . ' — ' . implode(' · ', $lines);
         } elseif ($locked > 0) {
-            $_SESSION['flash_error'] = 'Admin account locked on the terminals after failed logins. '
-                . 'Wait ~15–20 minutes OR reboot MAIN + readers, confirm password in device web UI, '
-                . 'then click Test all once. Do not keep testing while locked.';
+            $until = (int) ($_SESSION['student_att_lockout_until'] ?? (time() + 1200));
+            $_SESSION['flash_error'] = 'Admin locked on the terminals. '
+                . 'Do not Test again until ' . date('H:i', $until)
+                . ' (or reboot MAIN + readers now). Wrong password causes this — confirm login at http://172.16.0.26 first.';
         } else {
             $_SESSION['flash_error'] = 'All devices offline — ' . implode(' · ', $lines);
         }
         $this->redirect('attendance/student-device');
+    }
+
+    /**
+     * Remember device admin lockout so we do not keep probing and extending the lock.
+     *
+     * @param list<array<string,mixed>> $probes
+     */
+    private function rememberDeviceLockout(array $probes): void {
+        $locked = false;
+        foreach ($probes as $p) {
+            if (!empty($p['locked']) || stripos((string) ($p['message'] ?? ''), 'locked') !== false) {
+                $locked = true;
+                break;
+            }
+        }
+        if ($locked) {
+            // ~20 minutes cooldown unless already set further out
+            $until = time() + 20 * 60;
+            $prev = (int) ($_SESSION['student_att_lockout_until'] ?? 0);
+            $_SESSION['student_att_lockout_until'] = max($prev, $until);
+        } else {
+            $anyOnline = false;
+            foreach ($probes as $p) {
+                if (!empty($p['online'])) {
+                    $anyOnline = true;
+                    break;
+                }
+            }
+            if ($anyOnline) {
+                unset($_SESSION['student_att_lockout_until']);
+            }
+        }
     }
 
     /**
