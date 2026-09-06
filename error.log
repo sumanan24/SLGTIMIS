@@ -51496,3 +51496,1566 @@
 <retryLoginTime>0</retryLoginTime>
 </userCheck>
 
+[06-Sep-2026 10:07:02 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 10:07:02 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:02 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689222",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM001",
+				"name":	"S.THILIPREKSAN",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:02 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:02 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689222",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM002",
+				"name":	"M.JAWAHIR MOHAMED JASEEM",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:03 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:03 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689223",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM003",
+				"name":	"M.I.H.MAHDHI",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:03 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:03 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689223",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM004",
+				"name":	"R.HABBAB",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:04 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:04 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689224",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM005",
+				"name":	"L R S V RAMANAYAKA",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:04 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:04 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689224",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM007",
+				"name":	"K.KAVIYARASAN",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:04 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:04 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689224",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM008",
+				"name":	"U.OLITHA DAMSITH UYANWATTA",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:05 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:05 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689225",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM009",
+				"name":	"N.SARALINIYAN",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:05 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:05 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689225",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM010",
+				"name":	"H.A.H.C. HETTI ARACHCHI",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:06 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:06 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689226",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM011",
+				"name":	"N.SUJEEVA",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:06 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:06 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689226",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM012",
+				"name":	"R.M.A.T.RATHNAYAKA",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:06 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:06 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689226",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM016",
+				"name":	"P.PIRANAVAN",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:09 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 10:07:09 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 10:07:09 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:09 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689229",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM001",
+				"name":	"S.THILIPREKSAN",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:09 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:09 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689229",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM002",
+				"name":	"M.JAWAHIR MOHAMED JASEEM",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:10 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:10 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689230",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM003",
+				"name":	"M.I.H.MAHDHI",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:10 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:10 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689230",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM004",
+				"name":	"R.HABBAB",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:10 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:10 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689230",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM005",
+				"name":	"L R S V RAMANAYAKA",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:11 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:11 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689231",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM007",
+				"name":	"K.KAVIYARASAN",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:11 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:11 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689231",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM008",
+				"name":	"U.OLITHA DAMSITH UYANWATTA",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:11 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:11 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689231",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM009",
+				"name":	"N.SARALINIYAN",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:12 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:12 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689232",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM010",
+				"name":	"H.A.H.C. HETTI ARACHCHI",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:12 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:12 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689232",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM011",
+				"name":	"N.SUJEEVA",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:13 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:13 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689232",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM012",
+				"name":	"R.M.A.T.RATHNAYAKA",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:13 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:13 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689233",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM016",
+				"name":	"P.PIRANAVAN",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:21 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 10:07:23 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 10:07:23 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 10:07:25 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 10:07:27 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 10:07:29 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 10:07:29 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:29 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689249",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM001",
+				"name":	"S.THILIPREKSAN",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:29 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:29 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689249",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM002",
+				"name":	"M.JAWAHIR MOHAMED JASEEM",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:30 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:30 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689250",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM003",
+				"name":	"M.I.H.MAHDHI",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:30 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:30 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689250",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM004",
+				"name":	"R.HABBAB",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:30 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:30 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689250",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM005",
+				"name":	"L R S V RAMANAYAKA",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:31 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:31 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689251",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM007",
+				"name":	"K.KAVIYARASAN",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:31 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:31 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689251",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM008",
+				"name":	"U.OLITHA DAMSITH UYANWATTA",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:31 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:31 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689251",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM009",
+				"name":	"N.SARALINIYAN",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:32 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:32 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689252",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM010",
+				"name":	"H.A.H.C. HETTI ARACHCHI",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:32 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:32 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689252",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM011",
+				"name":	"N.SUJEEVA",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:32 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:32 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689252",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM012",
+				"name":	"R.M.A.T.RATHNAYAKA",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:33 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 200, Content-Type: application/json
+[06-Sep-2026 10:07:33 UTC] Hikvision makeRequest - Raw response (first 1000 chars): {
+	"UserInfoSearch":	{
+		"searchID":	"1788689253",
+		"responseStatusStrg":	"OK",
+		"numOfMatches":	1,
+		"totalMatches":	1,
+		"UserInfo":	[{
+				"employeeNo":	"254AM016",
+				"name":	"P.PIRANAVAN",
+				"userType":	"normal",
+				"onlyVerify":	false,
+				"closeDelayEnabled":	false,
+				"Valid":	{
+					"enable":	true,
+					"beginTime":	"2026-09-06T10:59:06",
+					"endTime":	"2036-09-06T10:59:06",
+					"timeType":	"local"
+				},
+				"belongGroup":	"",
+				"password":	"",
+				"doorRight":	"1",
+				"RightPlan":	[{
+						"doorNo":	1,
+						"planTemplateNo":	"1"
+					}],
+				"maxOpenDoorTime":	0,
+				"openDoorTime":	0,
+				"roomNumber":	0,
+				"floorNumber":	0,
+				"localUIRight":	false,
+				"gender":	"male",
+				"numOfCard":	0,
+				"numOfFP":	0,
+				"numOfFace":	0,
+				"groupId":	0,
+				"localAtndPlanTemplateId":	0,
+				"PersonInfoExtends":	[{
+						"value":	""
+					}]
+			}]
+	}
+}
+[06-Sep-2026 10:07:35 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 10:07:38 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 10:07:38 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 10:08:37 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 10:10:27 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 10:10:34 UTC] Database::connect - Connection successful to sisslgti

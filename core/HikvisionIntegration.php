@@ -505,16 +505,16 @@ class HikvisionIntegration {
      * LAN-only device health check (no Internet / external DNS).
      *
      * Status:
-     *   online      — TCP + HTTP + Digest auth + deviceInfo OK
-     *   auth_error  — LAN reachable but login failed / locked / HTTP 401/403
-     *   offline     — TCP/HTTP unreachable (timeout, refused, etc.)
+     *   online      — HTTP + Digest auth + deviceInfo OK
+     *   auth_error  — device reachable but login failed / locked / HTTP 401/403
+     *   offline     — SIS server cannot reach device (timeout, refused, no route)
      *   invalid_config — missing host/password/cURL
      *
      * @return array{
      *   status: string,
      *   online: bool,
      *   locked: bool,
-     *   tcp_ok: bool,
+     *   tcp_ok: bool|null,
      *   http_ok: bool,
      *   auth_ok: bool,
      *   http_code: int,
@@ -523,17 +523,19 @@ class HikvisionIntegration {
      *   reason: string,
      *   message: string,
      *   model: string,
-     *   checked_at: string
+     *   checked_at: string,
+     *   sis_server: string
      * }
      */
     public function diagnoseLanConnection(bool $attemptAuth = true): array {
         $checkedAt = date('Y-m-d H:i:s');
         $port = $this->port > 0 ? $this->port : ($this->ssl ? 443 : 80);
+        $sisServer = $this->detectSisServerIdentity();
         $base = [
             'status' => 'offline',
             'online' => false,
             'locked' => false,
-            'tcp_ok' => false,
+            'tcp_ok' => null,
             'http_ok' => false,
             'auth_ok' => false,
             'http_code' => 0,
@@ -543,123 +545,229 @@ class HikvisionIntegration {
             'message' => 'Device unreachable',
             'model' => '',
             'checked_at' => $checkedAt,
+            'sis_server' => $sisServer,
         ];
 
-        if ($this->host === '' || !filter_var($this->host, FILTER_VALIDATE_IP)) {
-            return array_merge($base, [
+        $host = trim($this->host);
+        if ($host === '' || filter_var($host, FILTER_VALIDATE_IP) === false) {
+            return [
                 'status' => 'invalid_config',
+                'online' => false,
+                'locked' => false,
+                'tcp_ok' => false,
+                'http_ok' => false,
+                'auth_ok' => false,
+                'http_code' => 0,
+                'port' => $port,
                 'category' => 'config',
                 'reason' => 'Invalid configuration',
                 'message' => 'Invalid configuration — device host IP missing or invalid',
-            ]);
+                'model' => '',
+                'checked_at' => $checkedAt,
+                'sis_server' => $sisServer,
+            ];
         }
+        // Keep trimmed host for probes
+        $this->host = $host;
 
         if (!self::isCurlAvailable()) {
-            return array_merge($base, [
+            return [
                 'status' => 'invalid_config',
+                'online' => false,
+                'locked' => false,
+                'tcp_ok' => false,
+                'http_ok' => false,
+                'auth_ok' => false,
+                'http_code' => 0,
+                'port' => $port,
                 'category' => 'config',
                 'reason' => 'Invalid configuration',
-                'message' => 'Invalid configuration — PHP cURL not installed on this server',
-            ]);
+                'message' => 'Invalid configuration — PHP cURL not installed on SIS server (' . $sisServer . ')',
+                'model' => '',
+                'checked_at' => $checkedAt,
+                'sis_server' => $sisServer,
+            ];
         }
 
-        // 1) TCP connect on Hikvision HTTP(S) port (LAN only)
-        $tcp = $this->probeTcpPort($this->host, $port, 3);
-        if (empty($tcp['ok'])) {
-            $reason = (string) ($tcp['reason'] ?? 'Device unreachable');
-            error_log('[Hikvision LAN] ' . $this->host . ':' . $port . ' TCP fail: ' . $reason);
-            return array_merge($base, [
-                'status' => 'offline',
-                'category' => $reason === 'Timeout' ? 'firewall_port' : 'routing',
-                'reason' => $reason,
-                'message' => 'OFFLINE — ' . $reason . ' (TCP ' . $this->host . ':' . $port . '). Check cable/VLAN/firewall.',
-            ]);
-        }
-        $base['tcp_ok'] = true;
-
-        // 2) HTTP reachability WITHOUT credentials (expect 401 from Hikvision = HTTP stack OK)
+        // 1) Prefer cURL HTTP reachability (works even when fsockopen is disabled)
         $http = $this->probeHttpReachable($port, 5);
         $base['http_code'] = (int) ($http['http_code'] ?? 0);
+
+        // 2) Optional TCP probe (informational; skipped if fsockopen disabled)
+        $tcp = $this->probeTcpPort($host, $port, 3);
+        if (!empty($tcp['skipped'])) {
+            $base['tcp_ok'] = null;
+        } else {
+            $base['tcp_ok'] = !empty($tcp['ok']);
+        }
+
         if (empty($http['ok'])) {
             $reason = (string) ($http['reason'] ?? 'Device unreachable');
-            error_log('[Hikvision LAN] ' . $this->host . ' HTTP fail: ' . $reason);
-            return array_merge($base, [
+            // Prefer TCP reason when HTTP timed out with no detail
+            if (($reason === 'Device unreachable' || $reason === 'Timeout')
+                && empty($tcp['skipped'])
+                && empty($tcp['ok'])
+                && !empty($tcp['reason'])
+            ) {
+                $reason = (string) $tcp['reason'];
+            }
+            $category = ($reason === 'Timeout' || $reason === 'Connection refused') ? 'firewall_port' : 'routing';
+            error_log('[Hikvision LAN] SIS=' . $sisServer . ' cannot reach ' . $host . ':' . $port . ' — ' . $reason);
+            return [
                 'status' => 'offline',
-                'category' => 'http',
+                'online' => false,
+                'locked' => false,
+                'tcp_ok' => $base['tcp_ok'],
+                'http_ok' => false,
+                'auth_ok' => false,
+                'http_code' => (int) ($http['http_code'] ?? 0),
+                'port' => $port,
+                'category' => $category,
                 'reason' => $reason,
-                'message' => 'OFFLINE — LAN TCP OK but HTTP failed: ' . $reason,
-            ]);
+                'message' => 'OFFLINE — SIS server (' . $sisServer . ') cannot reach '
+                    . $host . ':' . $port . ' (' . $reason . '). '
+                    . 'Fix routing/VLAN/firewall between the SIS host and Hikvision LAN 172.16.0.0/24. '
+                    . 'Internet is not required; this is a local network path problem.',
+                'model' => '',
+                'checked_at' => $checkedAt,
+                'sis_server' => $sisServer,
+            ];
         }
         $base['http_ok'] = true;
+        // If TCP probe ran and failed but HTTP works, ignore TCP quirk
+        if ($base['tcp_ok'] === false) {
+            $base['tcp_ok'] = true;
+        }
 
         if (!$attemptAuth) {
-            return array_merge($base, [
+            return [
                 'status' => 'auth_error',
+                'online' => false,
+                'locked' => false,
+                'tcp_ok' => $base['tcp_ok'],
+                'http_ok' => true,
+                'auth_ok' => false,
+                'http_code' => $base['http_code'],
+                'port' => $port,
                 'category' => 'auth',
                 'reason' => 'Authentication skipped',
-                'message' => 'LAN OK (TCP+HTTP) — auth skipped to avoid admin lockout after earlier failure',
-            ]);
+                'message' => 'LAN OK from SIS (' . $sisServer . ') — auth skipped to avoid admin lockout',
+                'model' => '',
+                'checked_at' => $checkedAt,
+                'sis_server' => $sisServer,
+            ];
         }
 
         if (!$this->hasPasswordConfigured()) {
-            return array_merge($base, [
+            return [
                 'status' => 'invalid_config',
+                'online' => false,
+                'locked' => false,
+                'tcp_ok' => $base['tcp_ok'],
+                'http_ok' => true,
+                'auth_ok' => false,
+                'http_code' => $base['http_code'],
+                'port' => $port,
                 'category' => 'config',
                 'reason' => 'Invalid configuration',
-                'message' => 'LAN OK — password empty on this server (set STUDENT_HIKVISION_PASS / HIKVISION_PASS)',
-            ]);
+                'message' => 'Device reachable from SIS — password empty on this server '
+                    . '(set HIKVISION_PASS / STUDENT_HIKVISION_PASS in .env on ' . $sisServer . ')',
+                'model' => '',
+                'checked_at' => $checkedAt,
+                'sis_server' => $sisServer,
+            ];
         }
 
         // 3) ONE Digest auth + deviceInfo (never retry here)
         $auth = $this->assertDigestLogin();
-        $base['http_code'] = (int) ($auth['http_code'] ?? $base['http_code']);
+        $httpCode = (int) ($auth['http_code'] ?? $base['http_code']);
         if (empty($auth['ok'])) {
             $msg = (string) ($auth['message'] ?? 'Authentication failed');
             $locked = stripos($msg, 'locked') !== false;
             $reason = 'Authentication failed';
-            if ($base['http_code'] === 403 || stripos($msg, '403') !== false) {
+            if ($httpCode === 403 || stripos($msg, '403') !== false) {
                 $reason = 'HTTP 403';
-            } elseif ($base['http_code'] === 401 || stripos($msg, '401') !== false) {
+            } elseif ($httpCode === 401 || stripos($msg, '401') !== false) {
                 $reason = 'HTTP 401';
             }
-            error_log('[Hikvision LAN] ' . $this->host . ' AUTH fail: ' . $reason . ' — ' . substr($msg, 0, 180));
-            return array_merge($base, [
+            error_log('[Hikvision LAN] ' . $host . ' AUTH fail from SIS=' . $sisServer . ': ' . $reason);
+            return [
                 'status' => 'auth_error',
+                'online' => false,
                 'locked' => $locked,
+                'tcp_ok' => $base['tcp_ok'],
+                'http_ok' => true,
+                'auth_ok' => false,
+                'http_code' => $httpCode,
+                'port' => $port,
                 'category' => 'auth',
                 'reason' => $reason,
                 'message' => 'AUTH ERROR — ' . $msg,
-            ]);
+                'model' => '',
+                'checked_at' => $checkedAt,
+                'sis_server' => $sisServer,
+            ];
         }
 
-        return array_merge($base, [
+        return [
             'status' => 'online',
             'online' => true,
+            'locked' => false,
+            'tcp_ok' => true,
+            'http_ok' => true,
             'auth_ok' => true,
+            'http_code' => $httpCode > 0 ? $httpCode : 200,
+            'port' => $port,
             'category' => 'ok',
             'reason' => 'OK',
-            'message' => 'ONLINE — LAN + Digest auth + deviceInfo OK',
+            'message' => 'ONLINE — reachable from SIS (' . $sisServer . ') + Digest auth OK',
             'model' => (string) ($auth['model'] ?? ''),
-        ]);
+            'checked_at' => $checkedAt,
+            'sis_server' => $sisServer,
+        ];
+    }
+
+    /** Identity of the PHP host running this check (helps diagnose routing). */
+    private function detectSisServerIdentity(): string {
+        $parts = [];
+        $addr = (string) ($_SERVER['SERVER_ADDR'] ?? '');
+        if ($addr !== '') {
+            $parts[] = $addr;
+        }
+        $name = (string) (@gethostname() ?: '');
+        if ($name !== '' && $name !== $addr) {
+            $parts[] = $name;
+        }
+        if (defined('SIS_LAN_IP') && SIS_LAN_IP !== '') {
+            $parts[] = 'configured-lan=' . SIS_LAN_IP;
+        }
+        return $parts !== [] ? implode(' / ', $parts) : 'sis.slgti.ac.lk-host';
     }
 
     /**
-     * @return array{ok:bool,reason:string}
+     * @return array{ok:bool,reason:string,skipped?:bool}
      */
     private function probeTcpPort(string $host, int $port, int $timeoutSec = 3): array {
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+        if (!function_exists('fsockopen') || in_array('fsockopen', $disabled, true)) {
+            return ['ok' => false, 'reason' => 'TCP probe unavailable', 'skipped' => true];
+        }
         $errno = 0;
         $errstr = '';
         $fp = @fsockopen($host, $port, $errno, $errstr, max(1, $timeoutSec));
-        if (is_resource($fp) || $fp instanceof \Socket) {
+        if ($fp !== false && $fp !== null) {
             fclose($fp);
             return ['ok' => true, 'reason' => 'OK'];
         }
         $err = strtolower(trim($errstr . ' ' . $errno));
-        if (str_contains($err, 'timed out') || str_contains($err, 'timeout') || $errno === 10060) {
+        if (str_contains($err, 'timed out') || str_contains($err, 'timeout') || $errno === 10060 || $errno === 110) {
             return ['ok' => false, 'reason' => 'Timeout'];
         }
         if (str_contains($err, 'refused') || $errno === 10061 || $errno === 111) {
             return ['ok' => false, 'reason' => 'Connection refused'];
+        }
+        if (str_contains($err, 'network is unreachable') || str_contains($err, 'no route') || $errno === 101 || $errno === 113) {
+            return ['ok' => false, 'reason' => 'Device unreachable'];
         }
         if ($errstr !== '') {
             return ['ok' => false, 'reason' => 'Device unreachable (' . trim($errstr) . ')'];

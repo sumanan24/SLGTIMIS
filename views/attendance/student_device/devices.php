@@ -106,6 +106,14 @@ ob_start();
     </nav>
 
     <?php if ($deviceTab === 'overview'): ?>
+        <div class="alert alert-warning mb-3 small">
+            <strong>Important:</strong> Device Test runs from the <em>SIS web server</em>
+            (<code>sis.slgti.ac.lk</code> / LAN <code>172.16.1.245</code>), not from your PC.
+            Your PC can ping <code>172.16.0.26</code> while SIS still shows OFFLINE if the server has
+            no route/VLAN to <code>172.16.0.0/24</code>. Ask network admin to allow
+            <code>172.16.1.245 → 172.16.0.26–29 TCP/80</code>.
+        </div>
+
         <div class="sd-devices-kpi">
             <div class="sd-kpi"><span class="sd-kpi-label">Devices</span><strong><?php echo (int) $kpi['devices']; ?></strong></div>
             <div class="sd-kpi"><span class="sd-kpi-label">Online</span><strong><?php echo (int) $kpi['online']; ?></strong></div>

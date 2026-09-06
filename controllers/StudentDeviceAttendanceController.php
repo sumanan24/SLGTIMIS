@@ -1208,6 +1208,7 @@ class StudentDeviceAttendanceController extends Controller {
 
                     $lines = [];
                     $online = 0;
+                    $sisHint = '';
                     foreach ($statuses as $s) {
                         if ($action === 'test_one' && $deviceHost !== '' && ($s['host'] ?? '') !== $deviceHost) {
                             continue;
@@ -1216,12 +1217,19 @@ class StudentDeviceAttendanceController extends Controller {
                         if (!empty($s['online'])) {
                             $online++;
                         }
+                        if ($sisHint === '' && !empty($s['sis_server'])) {
+                            $sisHint = (string) $s['sis_server'];
+                        }
                         $lines[] = ($s['host'] ?? '') . ': ' . $st
                             . (!empty($s['reason']) && $st !== 'ONLINE' ? ' (' . $s['reason'] . ')' : '');
                     }
                     $msg = ($action === 'test_all'
                         ? "Online {$online}/" . count($cred->devices()) . ' — '
                         : '') . implode(' · ', $lines);
+                    if ($online === 0 && $sisHint !== '') {
+                        $msg .= ' · Probed from SIS host: ' . $sisHint
+                            . ' — if all show OFFLINE/unreachable, that host has no route to 172.16.0.0/24 (fix VLAN/firewall on the server, not the browser PC).';
+                    }
                     $anyAuth = false;
                     foreach ($statuses as $s) {
                         if (($s['status'] ?? '') === 'auth_error') {
