@@ -2235,8 +2235,7 @@ class StudentDeviceAttendanceController extends Controller {
             }
 
             if ($action === 'add_face') {
-                // Prefer MIS profile photo; fallback to on-device terminal enrollment.
-                // If face already exists and this is not a Replace, treat as success (read photo).
+                // Face ID from MAIN terminal camera only (no student profile photo upload).
                 $enroll = ['ok' => false, 'message' => 'Face enroll failed.'];
                 $forceReplace = (string) $this->post('replace_face', '') === '1';
                 $existing = $hik->getFacePhoto($employeeNo);
@@ -2252,31 +2251,18 @@ class StudentDeviceAttendanceController extends Controller {
                         $this->clearMachineFaceCache($employeeNo);
                         usleep(300000);
                     }
-                    $jpeg = $this->loadStudentProfileJpegBytes($studentId);
-                    if ($jpeg !== null) {
-                        $enroll = $hik->enrollFaceFromJpeg($employeeNo, $jpeg);
-                        if (!empty($enroll['ok'])) {
-                            $enroll['message'] = ($enroll['message'] ?? 'Face enrolled.') . ' (from student profile photo)';
-                        }
-                    }
-                    if (empty($enroll['ok'])) {
-                        $onDevice = $hik->enrollFaceOnDevice($employeeNo);
-                        if (!empty($onDevice['ok'])) {
-                            $enroll = $onDevice;
-                        } elseif ($jpeg === null) {
-                            $enroll = [
-                                'ok' => false,
-                                'message' => 'No student profile photo found, and on-device face enroll failed: '
-                                    . ($onDevice['message'] ?? 'unknown'),
-                            ];
-                        } else {
-                            $enroll = [
-                                'ok' => false,
-                                'message' => 'Profile photo upload failed ('
-                                    . ($enroll['message'] ?? 'error')
-                                    . '). On-device: ' . ($onDevice['message'] ?? 'failed'),
-                            ];
-                        }
+                    $onDevice = $hik->enrollFaceOnDevice($employeeNo);
+                    if (!empty($onDevice['ok'])) {
+                        $enroll = $onDevice;
+                        $enroll['message'] = ($onDevice['message'] ?? 'Face enrolled.')
+                            . ' (captured on terminal camera)';
+                    } else {
+                        $enroll = [
+                            'ok' => false,
+                            'message' => 'On-device Face ID failed. Ask the student to stand at MAIN ('
+                                . $machineId . ') facing the camera, then try Add again. '
+                                . ($onDevice['message'] ?? ''),
+                        ];
                     }
                     if (!empty($enroll['ok'])) {
                         $fresh = $hik->getFacePhoto($employeeNo);

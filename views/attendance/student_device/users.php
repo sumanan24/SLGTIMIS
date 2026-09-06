@@ -18,7 +18,7 @@ $e = static function ($v): string {
 
 $studentDeviceSection = 'users';
 $pageTitle = 'Student fingerprints';
-$pageSubtitle = 'Filter or search, then enroll Finger 01 / 02 and Face ID on the machine';
+$pageSubtitle = 'Filter or search, then enroll Finger 01 / 02 and Face ID on the MAIN terminal camera';
 $cards = $cards ?? [];
 $search = (string) ($search ?? '');
 $machineHost = (string) ($machineHost ?? '');
@@ -338,7 +338,7 @@ ob_start();
                                             <?php endif; ?>
                                             <button type="submit" name="action" value="add_face"
                                                     class="btn btn-sm <?php echo $hasFace ? 'btn-outline-success' : 'btn-success'; ?>"
-                                                    onclick="return confirm('<?php echo $hasFace ? ($photoUrl !== '' ? 'Replace Face ID using student profile photo?' : 'Replace Face ID on the terminal camera. Student must stand at the device.') : ($photoUrl !== '' ? 'Upload Face ID from student profile photo?' : 'No profile photo — enroll Face ID on the terminal camera. Student must stand at the device.'); ?>');">
+                                                    onclick="return confirm('<?php echo $hasFace ? 'Replace Face ID using the MAIN terminal camera? Student must stand at the device.' : 'Enroll Face ID using the MAIN terminal camera. Student must stand at the device and look at the camera.'; ?>');">
                                                 <?php echo $hasFace ? 'Replace' : 'Add'; ?>
                                             </button>
                                         </form>
