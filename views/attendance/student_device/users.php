@@ -59,10 +59,12 @@ $filterHiddens = static function () use ($e, $departmentId, $courseId, $academic
 
 ob_start();
 ?>
-<span class="sd-summary-chip"><?php echo count($cards); ?> result<?php echo count($cards) === 1 ? '' : 's'; ?></span>
-<?php if ($machineHost !== ''): ?>
-    <span class="sd-summary-chip sd-summary-chip-muted"><i class="fas fa-server me-1"></i><?php echo $e($machineHost); ?></span>
-<?php endif; ?>
+<div class="sd-page-head-actions">
+    <span class="sd-summary-chip"><?php echo count($cards); ?> result<?php echo count($cards) === 1 ? '' : 's'; ?></span>
+    <?php if ($machineHost !== ''): ?>
+        <span class="sd-summary-chip sd-summary-chip-muted"><i class="fas fa-server me-1"></i><?php echo $e($machineHost); ?></span>
+    <?php endif; ?>
+</div>
 <?php
 $headerActions = ob_get_clean();
 
@@ -132,7 +134,7 @@ ob_start();
                            autocomplete="off">
                 </div>
                 <div class="sd-field sd-users-search-btns">
-                    <label class="form-label" aria-hidden="true">&nbsp;</label>
+                    <label class="form-label sd-users-btns-label" aria-hidden="true">&nbsp;</label>
                     <div class="sd-users-btn-row">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-search me-1"></i>Search

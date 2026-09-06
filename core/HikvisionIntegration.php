@@ -69,15 +69,18 @@ class HikvisionIntegration {
     }
 
     /** Student fingerprint terminal (config/student_attendance_machine.php + .env). */
-    public static function fromStudentAttendanceConfig(): self {
+    public static function fromStudentAttendanceConfig(?string $hostOverride = null): self {
         $config = require BASE_PATH . '/config/student_attendance_machine.php';
         $https = !empty($config['ssl']);
         $port = (int) ($config['port'] ?? 0);
         if ($port <= 0) {
             $port = $https ? 443 : 80;
         }
+        $host = $hostOverride !== null && trim($hostOverride) !== ''
+            ? trim($hostOverride)
+            : (string) ($config['host'] ?? '');
         return new self([
-            'host' => (string) ($config['host'] ?? ''),
+            'host' => $host,
             'port' => $port,
             'username' => (string) ($config['username'] ?? 'admin'),
             'password' => (string) ($config['password'] ?? ''),
@@ -86,9 +89,34 @@ class HikvisionIntegration {
         ]);
     }
 
+    /**
+     * Client for one device entry from student_attendance_machine.php `devices` list.
+     *
+     * @param array{host:string,username?:string,password?:string,ssl?:bool,port?:int,timeout?:int} $device
+     */
+    public static function fromStudentDevice(array $device): self {
+        $https = !empty($device['ssl']);
+        $port = (int) ($device['port'] ?? 0);
+        if ($port <= 0) {
+            $port = $https ? 443 : 80;
+        }
+        return new self([
+            'host' => trim((string) ($device['host'] ?? '')),
+            'port' => $port,
+            'username' => (string) ($device['username'] ?? 'admin'),
+            'password' => (string) ($device['password'] ?? ''),
+            'timeout' => max(15, (int) ($device['timeout'] ?? 60)),
+            'ssl' => $https,
+        ]);
+    }
+
     /** Endpoint base used for requests (for diagnostics). */
     public function getBaseUrl(): string {
         return $this->baseUrl;
+    }
+
+    public function getHost(): string {
+        return $this->host;
     }
 
     public function getAuthUser(): string {
@@ -917,7 +945,7 @@ class HikvisionIntegration {
                 }
                 $position += $batch;
             }
-            // UserInfo often omits numOfFP on some firmwares — enrich from FingerPrint/Count + slot probe.
+            // UserInfo often omits numOfFP — enrich only for single-employee lookup.
             if ($employeeNo !== '' && $users !== []) {
                 foreach ($users as &$u) {
                     if ((string) ($u['employee_no'] ?? '') !== $employeeNo) {
@@ -938,7 +966,56 @@ class HikvisionIntegration {
     }
 
     /**
-     * Live fingerprint slots for one employee (Count + Upload probe for IDs 1–2).
+     * UserInfo/Search without FingerPrintUpload probes (fast — for metadata only).
+     *
+     * @return array{ok: bool, message: string, users: list<array<string,mixed>>}
+     */
+    public function searchUsersLite(int $maxResults = 5, string $employeeNo = ''): array {
+        $employeeNo = trim($employeeNo);
+        $pageSize = max(1, min(50, $maxResults));
+        $users = [];
+        try {
+            $search = [
+                'UserInfoSearchCond' => [
+                    'searchID' => 'lite' . time(),
+                    'searchResultPosition' => 0,
+                    'maxResults' => $pageSize,
+                ],
+            ];
+            if ($employeeNo !== '') {
+                $search['UserInfoSearchCond']['EmployeeNoList'] = [
+                    ['employeeNo' => $employeeNo],
+                ];
+            }
+            $url = $this->baseUrl . '/AccessControl/UserInfo/Search?format=json';
+            $response = $this->makeRequest($url, 'POST', json_encode($search), 'application/json');
+            $list = $response['UserInfoSearch']['UserInfo'] ?? null;
+            if ($list === null) {
+                return ['ok' => true, 'message' => 'OK', 'users' => []];
+            }
+            if (!isset($list[0])) {
+                $list = [$list];
+            }
+            foreach ($list as $user) {
+                if (!is_array($user)) {
+                    continue;
+                }
+                $users[] = [
+                    'employee_no' => (string) ($user['employeeNo'] ?? ''),
+                    'name' => (string) ($user['name'] ?? ''),
+                    'user_type' => (string) ($user['userType'] ?? 'normal'),
+                    'finger_count' => (int) ($user['numOfFP'] ?? $user['numOfFingerPrint'] ?? $user['fingerPrintNum'] ?? 0),
+                    'face_count' => (int) ($user['numOfFace'] ?? $user['faceNum'] ?? 0),
+                ];
+            }
+            return ['ok' => true, 'message' => 'OK', 'users' => $users];
+        } catch (Exception $e) {
+            return ['ok' => false, 'message' => $e->getMessage(), 'users' => $users];
+        }
+    }
+
+    /**
+     * Live fingerprint slots for one employee (Count + optional short Upload probe).
      *
      * @return array{ok: bool, message: string, count: int, slots: list<int>}
      */
@@ -956,7 +1033,7 @@ class HikvisionIntegration {
             'GET',
             null,
             'application/json',
-            20
+            8
         );
         if ($countRes['ok'] && is_array($countRes['decoded'])) {
             $list = $countRes['decoded']['FingerPrintCountList'] ?? null;
@@ -1003,7 +1080,7 @@ class HikvisionIntegration {
                     'POST',
                     $body,
                     'application/json',
-                    25
+                    6
                 );
                 if (!$res['ok'] || !is_array($res['decoded'])) {
                     continue;
@@ -1031,6 +1108,170 @@ class HikvisionIntegration {
             'count' => $count,
             'slots' => array_values($slots),
         ];
+    }
+
+    /**
+     * Read fingerprint template bytes from this device (ISAPI FingerPrintUpload).
+     * Used to copy credentials from MAIN → readers without re-enrolling.
+     *
+     * @return array{ok: bool, message: string, fingerData?: string, fingerPrintID?: int}
+     */
+    public function extractFingerPrintTemplate(string $employeeNo, int $fingerPrintID): array {
+        $employeeNo = trim($employeeNo);
+        $fingerPrintID = (int) $fingerPrintID;
+        if ($employeeNo === '' || $fingerPrintID < 1) {
+            return ['ok' => false, 'message' => 'Employee No and finger ID are required.'];
+        }
+
+        $bodies = [
+            json_encode([
+                'FingerPrintCond' => [
+                    'searchID' => 'ext' . $fingerPrintID . time(),
+                    'employeeNo' => $employeeNo,
+                    'cardReaderNo' => 1,
+                    'fingerPrintID' => $fingerPrintID,
+                ],
+            ]),
+            json_encode([
+                'FingerPrintCond' => [
+                    'searchID' => 'extb' . $fingerPrintID . time(),
+                    'employeeNo' => $employeeNo,
+                    'enableCardReader' => [1],
+                    'fingerPrintID' => $fingerPrintID,
+                ],
+            ]),
+        ];
+
+        $lastMsg = 'No fingerData returned.';
+        foreach ($bodies as $body) {
+            $res = $this->makeRequestDetailed(
+                $this->baseUrl . '/AccessControl/FingerPrintUpload?format=json',
+                'POST',
+                $body,
+                'application/json',
+                30
+            );
+            if (!$res['ok']) {
+                $lastMsg = $this->hikvisionErrorMessage(
+                    is_array($res['decoded']) ? $res['decoded'] : null,
+                    'FingerPrintUpload HTTP ' . $res['http_code'] . ($res['error'] !== '' ? ' ' . $res['error'] : '')
+                );
+                continue;
+            }
+            $data = $this->findFingerDataInResponse($res['decoded'], $res['body']);
+            if ($data !== null && $data !== '') {
+                return [
+                    'ok' => true,
+                    'message' => 'OK',
+                    'fingerData' => $data,
+                    'fingerPrintID' => $fingerPrintID,
+                ];
+            }
+            $lastMsg = 'FingerPrintUpload OK but fingerData empty (firmware may block template export).';
+        }
+
+        // XML fallback
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'
+            . '<FingerPrintCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">'
+            . '<searchID>extx' . $fingerPrintID . time() . '</searchID>'
+            . '<employeeNo>' . htmlspecialchars($employeeNo, ENT_XML1) . '</employeeNo>'
+            . '<cardReaderNo>1</cardReaderNo>'
+            . '<fingerPrintID>' . $fingerPrintID . '</fingerPrintID>'
+            . '</FingerPrintCond>';
+        $res = $this->makeRequestDetailed(
+            $this->baseUrl . '/AccessControl/FingerPrintUpload',
+            'POST',
+            $xml,
+            'application/xml; charset="UTF-8"',
+            30
+        );
+        if ($res['ok']) {
+            $data = $this->findFingerDataInResponse($res['decoded'], $res['body']);
+            if ($data !== null && $data !== '') {
+                return [
+                    'ok' => true,
+                    'message' => 'OK',
+                    'fingerData' => $data,
+                    'fingerPrintID' => $fingerPrintID,
+                ];
+            }
+        } else {
+            $lastMsg = $this->hikvisionErrorMessage(
+                is_array($res['decoded']) ? $res['decoded'] : null,
+                'FingerPrintUpload XML HTTP ' . $res['http_code']
+            );
+        }
+
+        return ['ok' => false, 'message' => $lastMsg, 'fingerPrintID' => $fingerPrintID];
+    }
+
+    /**
+     * Write fingerprint template to this device (ISAPI FingerPrintDownload).
+     *
+     * @return array{ok: bool, message: string, response?: mixed}
+     */
+    public function pushFingerPrintTemplate(string $employeeNo, int $fingerPrintID, string $fingerData): array {
+        $employeeNo = trim($employeeNo);
+        $fingerData = trim($fingerData);
+        if ($employeeNo === '' || $fingerData === '' || $fingerPrintID < 1) {
+            return ['ok' => false, 'message' => 'Employee No, finger ID and fingerData are required.'];
+        }
+        $errors = [];
+        $res = $this->downloadFingerPrintToUser($employeeNo, $fingerPrintID, $fingerData, $errors);
+        if (!empty($res['ok'])) {
+            return ['ok' => true, 'message' => 'Fingerprint pushed to ' . $this->host, 'response' => $res['response'] ?? null];
+        }
+        return [
+            'ok' => false,
+            'message' => $res['message'] ?? ('Push failed: ' . implode('; ', $errors)),
+            'response' => $res['response'] ?? null,
+        ];
+    }
+
+    /**
+     * @param mixed $decoded
+     */
+    private function findFingerDataInResponse($decoded, string $body): ?string {
+        if (is_array($decoded)) {
+            $candidates = [
+                $decoded['FingerPrintInfo'] ?? null,
+                $decoded['FingerPrintCfg'] ?? null,
+                $decoded,
+            ];
+            foreach ($candidates as $block) {
+                if (!is_array($block)) {
+                    continue;
+                }
+                foreach (['fingerData', 'FingerData', 'printData', 'fingerPrintData'] as $k) {
+                    if (!empty($block[$k]) && is_string($block[$k]) && strlen($block[$k]) > 20) {
+                        return $block[$k];
+                    }
+                }
+                $list = $block['FingerPrintList'] ?? $block['FingerPrint'] ?? null;
+                if (is_array($list)) {
+                    if (!isset($list[0]) && isset($list['fingerData'])) {
+                        $list = [$list];
+                    }
+                    foreach ($list as $row) {
+                        if (!is_array($row)) {
+                            continue;
+                        }
+                        foreach (['fingerData', 'FingerData', 'printData'] as $k) {
+                            if (!empty($row[$k]) && is_string($row[$k]) && strlen($row[$k]) > 20) {
+                                return $row[$k];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (preg_match('/<(?:fingerData|FingerData)>([^<]{20,})<\/(?:fingerData|FingerData)>/i', $body, $m)) {
+            return html_entity_decode($m[1], ENT_QUOTES | ENT_XML1, 'UTF-8');
+        }
+        if (preg_match('/"fingerData"\s*:\s*"([^"]{20,})"/', $body, $m)) {
+            return stripcslashes($m[1]);
+        }
+        return null;
     }
 
     /**
@@ -1190,6 +1431,93 @@ class HikvisionIntegration {
             return ['ok' => true, 'message' => 'No previous face (or already cleared).', 'response' => $response];
         } catch (Exception $e) {
             return ['ok' => true, 'message' => 'Face delete skipped: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Delete a person (UserInfo) from this terminal by Employee No.
+     * Also clears face / fingerprints linked to that employee when possible.
+     *
+     * @return array{ok: bool, message: string, response?: mixed}
+     */
+    public function deleteUser(string $employeeNo): array {
+        $employeeNo = trim($employeeNo);
+        if ($employeeNo === '') {
+            return ['ok' => false, 'message' => 'Employee No is required.'];
+        }
+
+        // Best-effort cleanup of biometrics first (ignore failures)
+        try {
+            $this->deleteFace($employeeNo);
+        } catch (Throwable $e) {
+            // ignore
+        }
+        try {
+            $this->deleteFingerPrint($employeeNo, 0);
+        } catch (Throwable $e) {
+            // ignore
+        }
+
+        $payload = [
+            'UserInfoDelCond' => [
+                'EmployeeNoList' => [
+                    ['employeeNo' => $employeeNo],
+                ],
+            ],
+        ];
+        $body = json_encode($payload, JSON_UNESCAPED_SLASHES);
+        $urls = [
+            $this->baseUrl . '/AccessControl/UserInfo/Delete?format=json',
+            $this->baseUrl . '/AccessControl/UserInfoDetail/Delete?format=json',
+        ];
+        $lastMsg = 'Delete failed';
+        $lastResponse = null;
+
+        try {
+            foreach ($urls as $url) {
+                foreach (['PUT', 'POST'] as $method) {
+                    $response = $this->makeRequest($url, $method, $body, 'application/json');
+                    $lastResponse = $response;
+                    if ($this->isHikvisionOk($response)) {
+                        return [
+                            'ok' => true,
+                            'message' => 'Person deleted from device.',
+                            'response' => $response,
+                        ];
+                    }
+                    $sub = is_array($response)
+                        ? (string) ($response['subStatusCode'] ?? ($response['ResponseStatus']['subStatusCode'] ?? ''))
+                        : '';
+                    // Already gone is success for our purpose
+                    if (in_array($sub, [
+                        'employeeNoNotExist',
+                        'deviceUserNotExist',
+                        'notFound',
+                        'InvalidOperation',
+                    ], true)) {
+                        return [
+                            'ok' => true,
+                            'message' => 'Person not on device (already removed).',
+                            'response' => $response,
+                        ];
+                    }
+                    $lastMsg = $this->hikvisionErrorMessage($response, 'Delete failed');
+                }
+            }
+
+            // Verify: if search finds nobody, treat as deleted
+            $check = $this->searchUsersLite(5, $employeeNo);
+            if (!empty($check['ok']) && empty($check['users'])) {
+                return [
+                    'ok' => true,
+                    'message' => 'Person not on device (already removed).',
+                    'response' => $lastResponse,
+                ];
+            }
+
+            return ['ok' => false, 'message' => $lastMsg, 'response' => $lastResponse];
+        } catch (Exception $e) {
+            return ['ok' => false, 'message' => $e->getMessage()];
         }
     }
 

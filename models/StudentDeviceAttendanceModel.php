@@ -70,6 +70,385 @@ class StudentDeviceAttendanceModel extends Model {
 
         $this->ensureFingerIdColumn();
         $this->ensureAttendanceExtraColumns();
+        $this->ensureCredentialSyncTables();
+    }
+
+    /**
+     * Multi-device credential sync queue + attempt logs (additive; does not alter punches).
+     */
+    public function ensureCredentialSyncTables(): void {
+        $this->db->query(
+            "CREATE TABLE IF NOT EXISTS `student_attendance_credential_sync` (
+                `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `employee_no` VARCHAR(50) NOT NULL,
+                `student_id` VARCHAR(50) NOT NULL DEFAULT '',
+                `name` VARCHAR(150) NOT NULL DEFAULT '',
+                `device_host` VARCHAR(64) NOT NULL,
+                `operation` VARCHAR(40) NOT NULL DEFAULT 'credentials',
+                `status` VARCHAR(20) NOT NULL DEFAULT 'pending',
+                `finger_slots` VARCHAR(40) NOT NULL DEFAULT '',
+                `include_face` TINYINT(1) NOT NULL DEFAULT 0,
+                `attempt_count` INT NOT NULL DEFAULT 0,
+                `last_error` VARCHAR(500) NOT NULL DEFAULT '',
+                `last_attempt_at` DATETIME NULL DEFAULT NULL,
+                `synced_at` DATETIME NULL DEFAULT NULL,
+                `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `uq_emp_device_op` (`employee_no`, `device_host`, `operation`),
+                KEY `idx_cred_status` (`status`),
+                KEY `idx_cred_device` (`device_host`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $this->db->query(
+            "CREATE TABLE IF NOT EXISTS `student_attendance_credential_sync_logs` (
+                `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `employee_no` VARCHAR(50) NOT NULL DEFAULT '',
+                `device_host` VARCHAR(64) NOT NULL DEFAULT '',
+                `operation` VARCHAR(40) NOT NULL DEFAULT '',
+                `success` TINYINT(1) NOT NULL DEFAULT 0,
+                `message` VARCHAR(500) NOT NULL DEFAULT '',
+                `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                KEY `idx_cred_log_emp` (`employee_no`),
+                KEY `idx_cred_log_device` (`device_host`),
+                KEY `idx_cred_log_created` (`created_at`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+    }
+
+    /**
+     * Upsert credential sync queue row for one employee → device.
+     *
+     * @param list<int> $fingerSlots
+     */
+    public function upsertCredentialSyncJob(
+        string $employeeNo,
+        string $deviceHost,
+        string $name = '',
+        string $studentId = '',
+        array $fingerSlots = [],
+        bool $includeFace = false,
+        string $status = 'pending'
+    ): void {
+        $this->ensureCredentialSyncTables();
+        $employeeNo = trim($employeeNo);
+        $deviceHost = trim($deviceHost);
+        if ($employeeNo === '' || $deviceHost === '') {
+            return;
+        }
+        $slots = [];
+        foreach ($fingerSlots as $s) {
+            $n = (int) $s;
+            if ($n > 0) {
+                $slots[] = $n;
+            }
+        }
+        $slots = array_values(array_unique($slots));
+        sort($slots);
+        $slotStr = implode(',', $slots);
+        $includeFaceInt = $includeFace ? 1 : 0;
+        $status = in_array($status, ['pending', 'syncing', 'success', 'failed'], true) ? $status : 'pending';
+
+        $stmt = $this->db->prepare(
+            "INSERT INTO `student_attendance_credential_sync`
+                (`employee_no`, `student_id`, `name`, `device_host`, `operation`, `status`,
+                 `finger_slots`, `include_face`, `attempt_count`, `last_error`)
+             VALUES (?, ?, ?, ?, 'credentials', ?, ?, ?, 0, '')
+             ON DUPLICATE KEY UPDATE
+                `student_id` = VALUES(`student_id`),
+                `name` = VALUES(`name`),
+                `status` = VALUES(`status`),
+                `finger_slots` = VALUES(`finger_slots`),
+                `include_face` = VALUES(`include_face`),
+                `last_error` = IF(VALUES(`status`) = 'pending', '', `last_error`),
+                `updated_at` = CURRENT_TIMESTAMP"
+        );
+        if (!$stmt) {
+            return;
+        }
+        $stmt->bind_param(
+            'ssssssi',
+            $employeeNo,
+            $studentId,
+            $name,
+            $deviceHost,
+            $status,
+            $slotStr,
+            $includeFaceInt
+        );
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    /**
+     * @param list<string> $statuses
+     * @return list<array<string,mixed>>
+     */
+    public function listCredentialSyncJobs(array $statuses = [], int $limit = 200): array {
+        $this->ensureCredentialSyncTables();
+        $limit = max(1, min(1000, $limit));
+        $sql = 'SELECT * FROM `student_attendance_credential_sync`';
+        $types = '';
+        $params = [];
+        if ($statuses !== []) {
+            $ph = implode(',', array_fill(0, count($statuses), '?'));
+            $sql .= " WHERE `status` IN ({$ph})";
+            $types = str_repeat('s', count($statuses));
+            $params = array_values($statuses);
+        }
+        $sql .= " ORDER BY FIELD(`status`,'syncing','pending','failed','success'), `updated_at` DESC LIMIT {$limit}";
+        if ($types === '') {
+            $res = $this->db->query($sql);
+        } else {
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                return [];
+            }
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $res = $stmt->get_result();
+        }
+        $rows = [];
+        if ($res) {
+            while ($r = $res->fetch_assoc()) {
+                $rows[] = $r;
+            }
+        }
+        return $rows;
+    }
+
+    public function updateCredentialSyncJob(
+        int $id,
+        string $status,
+        string $lastError = '',
+        bool $bumpAttempt = true,
+        bool $setSyncedAt = false
+    ): void {
+        $this->ensureCredentialSyncTables();
+        $status = in_array($status, ['pending', 'syncing', 'success', 'failed'], true) ? $status : 'failed';
+        $lastError = mb_substr($lastError, 0, 500);
+        if ($bumpAttempt) {
+            $sql = "UPDATE `student_attendance_credential_sync`
+                    SET `status` = ?, `last_error` = ?, `attempt_count` = `attempt_count` + 1,
+                        `last_attempt_at` = NOW()"
+                . ($setSyncedAt ? ', `synced_at` = NOW()' : '')
+                . ' WHERE `id` = ?';
+        } else {
+            $sql = "UPDATE `student_attendance_credential_sync`
+                    SET `status` = ?, `last_error` = ?, `last_attempt_at` = NOW()"
+                . ($setSyncedAt ? ', `synced_at` = NOW()' : '')
+                . ' WHERE `id` = ?';
+        }
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return;
+        }
+        $stmt->bind_param('ssi', $status, $lastError, $id);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    public function requeueFailedCredentialJobs(): int {
+        $this->ensureCredentialSyncTables();
+        $ok = $this->db->query(
+            "UPDATE `student_attendance_credential_sync`
+             SET `status` = 'pending', `last_error` = ''
+             WHERE `status` = 'failed'"
+        );
+        return $ok ? (int) $this->db->affected_rows : 0;
+    }
+
+    /**
+     * Remove credential sync queue rows for an employee (optionally limited to hosts).
+     *
+     * @param list<string> $hosts Empty = all hosts for this employee
+     */
+    public function deleteCredentialJobsForEmployee(string $employeeNo, array $hosts = []): int {
+        $this->ensureCredentialSyncTables();
+        $employeeNo = trim($employeeNo);
+        if ($employeeNo === '') {
+            return 0;
+        }
+        $hosts = array_values(array_filter(array_map(
+            static fn ($h): string => trim((string) $h),
+            $hosts
+        ), static fn (string $h): bool => $h !== ''));
+
+        if ($hosts === []) {
+            $stmt = $this->db->prepare(
+                'DELETE FROM `student_attendance_credential_sync` WHERE `employee_no` = ?'
+            );
+            if (!$stmt) {
+                return 0;
+            }
+            $stmt->bind_param('s', $employeeNo);
+            $stmt->execute();
+            $n = (int) $stmt->affected_rows;
+            $stmt->close();
+            return $n;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($hosts), '?'));
+        $types = 's' . str_repeat('s', count($hosts));
+        $params = array_merge([$employeeNo], $hosts);
+        $stmt = $this->db->prepare(
+            "DELETE FROM `student_attendance_credential_sync`
+             WHERE `employee_no` = ? AND `device_host` IN ({$placeholders})"
+        );
+        if (!$stmt) {
+            return 0;
+        }
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $n = (int) $stmt->affected_rows;
+        $stmt->close();
+        return $n;
+    }
+
+    /**
+     * Remove cached machine user row(s) after device delete.
+     *
+     * @param list<string> $hosts Empty = all machines for this employee
+     */
+    public function deleteMachineUserRows(string $employeeNo, array $hosts = []): int {
+        $this->ensureTable();
+        $employeeNo = trim($employeeNo);
+        if ($employeeNo === '') {
+            return 0;
+        }
+        $hosts = array_values(array_filter(array_map(
+            static fn ($h): string => trim((string) $h),
+            $hosts
+        ), static fn (string $h): bool => $h !== ''));
+
+        if ($hosts === []) {
+            $stmt = $this->db->prepare(
+                'DELETE FROM `student_attendance_machine_users` WHERE `employee_no` = ?'
+            );
+            if (!$stmt) {
+                return 0;
+            }
+            $stmt->bind_param('s', $employeeNo);
+            $stmt->execute();
+            $n = (int) $stmt->affected_rows;
+            $stmt->close();
+            return $n;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($hosts), '?'));
+        $types = 's' . str_repeat('s', count($hosts));
+        $params = array_merge([$employeeNo], $hosts);
+        $stmt = $this->db->prepare(
+            "DELETE FROM `student_attendance_machine_users`
+             WHERE `employee_no` = ? AND `machine_id` IN ({$placeholders})"
+        );
+        if (!$stmt) {
+            return 0;
+        }
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $n = (int) $stmt->affected_rows;
+        $stmt->close();
+        return $n;
+    }
+
+    public function logCredentialSyncAttempt(
+        string $employeeNo,
+        string $deviceHost,
+        string $operation,
+        bool $success,
+        string $message
+    ): void {
+        $this->ensureCredentialSyncTables();
+        $stmt = $this->db->prepare(
+            'INSERT INTO `student_attendance_credential_sync_logs`
+                (`employee_no`, `device_host`, `operation`, `success`, `message`)
+             VALUES (?, ?, ?, ?, ?)'
+        );
+        if (!$stmt) {
+            return;
+        }
+        $successInt = $success ? 1 : 0;
+        $message = mb_substr($message, 0, 500);
+        $stmt->bind_param('sssis', $employeeNo, $deviceHost, $operation, $successInt, $message);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public function listCredentialSyncLogs(int $limit = 100, string $employeeNo = ''): array {
+        $this->ensureCredentialSyncTables();
+        $limit = max(1, min(500, $limit));
+        $employeeNo = trim($employeeNo);
+        if ($employeeNo !== '') {
+            $stmt = $this->db->prepare(
+                "SELECT * FROM `student_attendance_credential_sync_logs`
+                 WHERE `employee_no` = ?
+                 ORDER BY `id` DESC LIMIT {$limit}"
+            );
+            if (!$stmt) {
+                return [];
+            }
+            $stmt->bind_param('s', $employeeNo);
+            $stmt->execute();
+            $res = $stmt->get_result();
+        } else {
+            $res = $this->db->query(
+                "SELECT * FROM `student_attendance_credential_sync_logs`
+                 ORDER BY `id` DESC LIMIT {$limit}"
+            );
+        }
+        $rows = [];
+        if ($res) {
+            while ($r = $res->fetch_assoc()) {
+                $rows[] = $r;
+            }
+        }
+        return $rows;
+    }
+
+    /**
+     * Per-device sync aggregates for dashboard.
+     *
+     * @return array<string, array{pending:int,syncing:int,success:int,failed:int,last_sync:?string}>
+     */
+    public function credentialSyncStatsByDevice(): array {
+        $this->ensureCredentialSyncTables();
+        $res = $this->db->query(
+            "SELECT `device_host`, `status`, COUNT(*) AS `cnt`, MAX(`synced_at`) AS `last_sync`
+             FROM `student_attendance_credential_sync`
+             GROUP BY `device_host`, `status`"
+        );
+        $out = [];
+        if ($res) {
+            while ($r = $res->fetch_assoc()) {
+                $host = (string) ($r['device_host'] ?? '');
+                if ($host === '') {
+                    continue;
+                }
+                if (!isset($out[$host])) {
+                    $out[$host] = [
+                        'pending' => 0,
+                        'syncing' => 0,
+                        'success' => 0,
+                        'failed' => 0,
+                        'last_sync' => null,
+                    ];
+                }
+                $st = (string) ($r['status'] ?? '');
+                if (isset($out[$host][$st])) {
+                    $out[$host][$st] = (int) ($r['cnt'] ?? 0);
+                }
+                $ls = $r['last_sync'] ?? null;
+                if ($ls && ($out[$host]['last_sync'] === null || $ls > $out[$host]['last_sync'])) {
+                    $out[$host]['last_sync'] = (string) $ls;
+                }
+            }
+        }
+        return $out;
     }
 
     /** Add finger/face counts on machine users cache. */
@@ -636,7 +1015,119 @@ class StudentDeviceAttendanceModel extends Model {
         }
         unset($r);
 
-        return $rows;
+        // One card per Employee No (same person on MAIN + readers must not create 4 cards)
+        return $this->dedupeEnrollCardsByEmployeeNo($rows);
+    }
+
+    /**
+     * Collapse machine_users rows that share employee_no across devices into one enroll card.
+     * Prefers MAIN host; merges max finger/face flags.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return list<array<string,mixed>>
+     */
+    private function dedupeEnrollCardsByEmployeeNo(array $rows): array {
+        if ($rows === []) {
+            return [];
+        }
+
+        $mainHost = '';
+        try {
+            $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
+            $mainHost = trim((string) ($cfg['host'] ?? ''));
+        } catch (Throwable $e) {
+            $mainHost = '';
+        }
+
+        $byKey = [];
+        foreach ($rows as $r) {
+            $eno = trim((string) ($r['employee_no'] ?? ''));
+            if ($eno === '') {
+                continue;
+            }
+            $key = strtoupper($eno);
+            $host = trim((string) ($r['machine_id'] ?? ''));
+            $isMain = ($mainHost !== '' && $host === $mainHost);
+
+            if (!isset($byKey[$key])) {
+                $byKey[$key] = $r;
+                $byKey[$key]['_is_main'] = $isMain ? 1 : 0;
+                continue;
+            }
+
+            $cur = &$byKey[$key];
+            // Prefer MAIN row as base identity / machine_id for enroll actions
+            if ($isMain && empty($cur['_is_main'])) {
+                $mergedSlots = array_values(array_unique(array_merge(
+                    is_array($cur['finger_slots'] ?? null) ? $cur['finger_slots'] : [],
+                    is_array($r['finger_slots'] ?? null) ? $r['finger_slots'] : []
+                )));
+                sort($mergedSlots);
+                $name = (string) ($cur['student_name'] ?? '');
+                $sid = (string) ($cur['student_id'] ?? '');
+                $photo = (string) ($cur['student_profile_img'] ?? '');
+                $cur = $r;
+                $cur['_is_main'] = 1;
+                if ($sid !== '' && trim((string) ($cur['student_id'] ?? '')) === '') {
+                    $cur['student_id'] = $sid;
+                    $cur['student_name'] = $name !== '' ? $name : ($cur['student_name'] ?? '');
+                    $cur['student_profile_img'] = $photo !== '' ? $photo : ($cur['student_profile_img'] ?? '');
+                }
+                $cur['finger_slots'] = $mergedSlots;
+            } else {
+                // Keep current base; merge biometric flags / student link
+                if (trim((string) ($cur['student_id'] ?? '')) === '' && trim((string) ($r['student_id'] ?? '')) !== '') {
+                    foreach ([
+                        'student_id', 'student_name', 'student_status', 'student_phone',
+                        'student_email', 'student_gender', 'student_profile_img',
+                        'department_id', 'department_name', 'course_id', 'course_name',
+                        'academic_year', 'course_mode',
+                    ] as $field) {
+                        if (array_key_exists($field, $r)) {
+                            $cur[$field] = $r[$field];
+                        }
+                    }
+                }
+                $slotsA = is_array($cur['finger_slots'] ?? null) ? $cur['finger_slots'] : [];
+                $slotsB = is_array($r['finger_slots'] ?? null) ? $r['finger_slots'] : [];
+                $mergedSlots = array_values(array_unique(array_merge($slotsA, $slotsB)));
+                sort($mergedSlots);
+                $cur['finger_slots'] = $mergedSlots;
+            }
+
+            $cur['finger_count'] = max((int) ($cur['finger_count'] ?? 0), (int) ($r['finger_count'] ?? 0), count($cur['finger_slots'] ?? []));
+            $cur['face_count'] = max((int) ($cur['face_count'] ?? 0), (int) ($r['face_count'] ?? 0));
+            $cur['has_finger_01'] = !empty($cur['has_finger_01']) || !empty($r['has_finger_01']) || in_array(1, $cur['finger_slots'] ?? [], true);
+            $cur['has_finger_02'] = !empty($cur['has_finger_02']) || !empty($r['has_finger_02']) || in_array(2, $cur['finger_slots'] ?? [], true);
+            $cur['has_face'] = !empty($cur['has_face']) || !empty($r['has_face']) || ((int) ($cur['face_count'] ?? 0) > 0);
+            $cur['on_machine'] = !empty($cur['on_machine']) || !empty($r['on_machine']);
+            // Prefer showing MAIN host when known
+            if ($isMain || (trim((string) ($cur['machine_id'] ?? '')) === '' && $host !== '')) {
+                $cur['machine_id'] = $isMain ? $host : (trim((string) ($cur['machine_id'] ?? '')) !== '' ? $cur['machine_id'] : $host);
+            }
+            unset($cur);
+        }
+
+        $out = [];
+        foreach ($byKey as $row) {
+            unset($row['_is_main']);
+            // Enroll UI always targets MAIN — pin machine_id to main when configured
+            if ($mainHost !== '') {
+                $row['machine_id'] = $mainHost;
+                $row['on_machine'] = !empty($row['on_machine']);
+            }
+            $slots = is_array($row['finger_slots'] ?? null) ? $row['finger_slots'] : [];
+            $row['has_finger_01'] = in_array(1, $slots, true);
+            $row['has_finger_02'] = in_array(2, $slots, true);
+            $row['has_face'] = ((int) ($row['face_count'] ?? 0) > 0) || !empty($row['has_face']);
+            $out[] = $row;
+        }
+
+        usort($out, static function (array $a, array $b): int {
+            return strcmp((string) ($a['employee_no'] ?? ''), (string) ($b['employee_no'] ?? ''));
+        });
+
+        return $out;
     }
 
     /**
@@ -856,6 +1347,147 @@ class StudentDeviceAttendanceModel extends Model {
             }
         }
         return $rows;
+    }
+
+    /**
+     * User counts per machine_id for dashboard.
+     *
+     * @return array<string, array{users:int,last_synced:?string}>
+     */
+    public function machineUserStatsByHost(): array {
+        $this->ensureTable();
+        $out = [];
+        $res = $this->db->query(
+            "SELECT `machine_id`,
+                    COUNT(*) AS `users`,
+                    MAX(`synced_at`) AS `last_synced`
+             FROM `student_attendance_machine_users`
+             WHERE TRIM(`machine_id`) <> ''
+             GROUP BY `machine_id`"
+        );
+        if ($res) {
+            while ($r = $res->fetch_assoc()) {
+                $host = (string) ($r['machine_id'] ?? '');
+                if ($host === '') {
+                    continue;
+                }
+                $out[$host] = [
+                    'users' => (int) ($r['users'] ?? 0),
+                    'last_synced' => $r['last_synced'] !== null ? (string) $r['last_synced'] : null,
+                ];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Person presence matrix across configured machines (from student_attendance_machine_users cache).
+     *
+     * @param list<string> $hosts Device IPs / machine_ids in column order
+     * @return list<array{
+     *   employee_no:string,
+     *   name:string,
+     *   present_count:int,
+     *   missing_count:int,
+     *   missing_hosts:list<string>,
+     *   devices: array<string, array{present:bool,finger_count:int,face_count:int,synced_at:?string}>
+     * }>
+     */
+    public function personPresenceByHosts(array $hosts, int $limit = 2000): array {
+        $this->ensureTable();
+        $hosts = array_values(array_unique(array_filter(array_map(
+            static fn ($h): string => trim((string) $h),
+            $hosts
+        ), static fn (string $h): bool => $h !== '')));
+        if ($hosts === []) {
+            return [];
+        }
+
+        $limit = max(200, min(20000, $limit));
+        // Row cap: each person may appear once per host
+        $rowCap = min(50000, $limit * max(1, count($hosts)));
+        $byEmp = [];
+
+        // Pull all machine_users for these hosts
+        $placeholders = implode(',', array_fill(0, count($hosts), '?'));
+        $types = str_repeat('s', count($hosts));
+        $stmt = $this->db->prepare(
+            "SELECT `employee_no`, `name`, `machine_id`, `finger_count`, `face_count`, `synced_at`
+             FROM `student_attendance_machine_users`
+             WHERE `machine_id` IN ({$placeholders})
+               AND TRIM(`employee_no`) <> ''
+             ORDER BY `employee_no` ASC
+             LIMIT {$rowCap}"
+        );
+        if ($stmt) {
+            $stmt->bind_param($types, ...$hosts);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) {
+                $eno = trim((string) ($r['employee_no'] ?? ''));
+                $mid = trim((string) ($r['machine_id'] ?? ''));
+                if ($eno === '' || $mid === '') {
+                    continue;
+                }
+                if (!isset($byEmp[$eno])) {
+                    $byEmp[$eno] = [
+                        'employee_no' => $eno,
+                        'name' => (string) ($r['name'] ?? ''),
+                        'devices' => [],
+                    ];
+                }
+                if ($byEmp[$eno]['name'] === '' && trim((string) ($r['name'] ?? '')) !== '') {
+                    $byEmp[$eno]['name'] = (string) $r['name'];
+                }
+                $byEmp[$eno]['devices'][$mid] = [
+                    'present' => true,
+                    'finger_count' => (int) ($r['finger_count'] ?? 0),
+                    'face_count' => (int) ($r['face_count'] ?? 0),
+                    'synced_at' => $r['synced_at'] !== null ? (string) $r['synced_at'] : null,
+                ];
+            }
+            $stmt->close();
+        }
+
+        $out = [];
+        foreach ($byEmp as $eno => $row) {
+            $devices = [];
+            $present = 0;
+            $missingHosts = [];
+            foreach ($hosts as $h) {
+                if (!empty($row['devices'][$h]['present'])) {
+                    $devices[$h] = $row['devices'][$h];
+                    $present++;
+                } else {
+                    $devices[$h] = [
+                        'present' => false,
+                        'finger_count' => 0,
+                        'face_count' => 0,
+                        'synced_at' => null,
+                    ];
+                    $missingHosts[] = $h;
+                }
+            }
+            $out[] = [
+                'employee_no' => $eno,
+                'name' => (string) ($row['name'] ?? ''),
+                'present_count' => $present,
+                'missing_count' => count($missingHosts),
+                'missing_hosts' => $missingHosts,
+                'devices' => $devices,
+            ];
+        }
+
+        // Incomplete first (missing on some readers), then employee_no
+        usort($out, static function (array $a, array $b): int {
+            $mc = ((int) $b['missing_count']) <=> ((int) $a['missing_count']);
+            if ($mc !== 0) {
+                return $mc;
+            }
+            return strcmp((string) $a['employee_no'], (string) $b['employee_no']);
+        });
+
+        return $out;
     }
 
     public function isStaffPersonId(string $personId): bool {

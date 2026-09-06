@@ -15,6 +15,7 @@ $items = [
     ['key' => 'month', 'href' => $urls['month'] ?? '#', 'icon' => 'fa-calendar-alt', 'label' => 'Month report', 'manage_only' => false],
     ['key' => 'holidays', 'href' => $urls['holidays'] ?? '#', 'icon' => 'fa-umbrella-beach', 'label' => 'Holidays / leave', 'manage_only' => true],
     ['key' => 'users', 'href' => $urls['users'] ?? '#', 'icon' => 'fa-users', 'label' => 'Users', 'manage_only' => true],
+    ['key' => 'devices', 'href' => $urls['devices'] ?? '#', 'icon' => 'fa-network-wired', 'label' => 'Device sync', 'manage_only' => true],
     ['key' => 'fingerprint-import', 'href' => $urls['fingerprint_import'] ?? '#', 'icon' => 'fa-file-excel', 'label' => 'Excel Export', 'manage_only' => false],
     ['key' => 'logs', 'href' => $urls['logs'] ?? '#', 'icon' => 'fa-history', 'label' => 'Sync logs', 'manage_only' => true],
 ];

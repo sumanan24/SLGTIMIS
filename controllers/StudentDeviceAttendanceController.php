@@ -90,9 +90,48 @@ class StudentDeviceAttendanceController extends Controller {
             'fingerprint_import' => $root . '/fingerprint-import',
             'export_fingerprint_import' => $root . '/export/fingerprint-import',
             'test' => $root . '/machine/test',
+            'refresh_users' => $root . '/machine/refresh-users',
             'logs' => $root . '/logs',
+            'devices' => $root . '/devices',
             'warning' => $root . '/warning-letter',
         ];
+    }
+
+    private function credentialSyncService(): StudentDeviceCredentialSyncService {
+        require_once BASE_PATH . '/core/StudentDeviceCredentialSyncService.php';
+        return new StudentDeviceCredentialSyncService($this->syncService()->attendanceModel());
+    }
+
+    /**
+     * After MAIN enroll: queue + push credentials to reader terminals.
+     *
+     * @param list<int> $fingerSlots
+     */
+    private function fanOutCredentialsToReaders(
+        string $employeeNo,
+        string $name,
+        string $studentId,
+        array $fingerSlots = [],
+        bool $includeFace = false
+    ): string {
+        try {
+            require_once BASE_PATH . '/core/HikvisionIntegration.php';
+            if (!HikvisionIntegration::isCurlAvailable()) {
+                return ' · Readers: skipped (PHP cURL missing)';
+            }
+            $r = $this->credentialSyncService()->queueAndSyncEmployee(
+                $employeeNo,
+                $name,
+                $studentId,
+                $fingerSlots,
+                $includeFace,
+                true
+            );
+            return ' · Readers: ' . ($r['message'] ?? 'queued');
+        } catch (Throwable $e) {
+            error_log('[StudentDevice fanOut] ' . $e->getMessage());
+            return ' · Readers: sync error — ' . $e->getMessage();
+        }
     }
 
     private function filtersFromRequest(): array {
@@ -139,6 +178,49 @@ class StudentDeviceAttendanceController extends Controller {
         $att = $svc->attendanceModel();
         $recent = $att->searchDailyGrouped([], 1, 8);
 
+        $deviceCards = [];
+        $userStats = $att->machineUserStatsByHost();
+        try {
+            require_once BASE_PATH . '/core/HikvisionIntegration.php';
+            // Use last Test / Refresh result only — do not probe all devices on every page load
+            $cached = $_SESSION['student_att_device_status'] ?? null;
+            $probes = (is_array($cached) && !empty($cached['devices'])) ? $cached['devices'] : [];
+            $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
+            $byHost = [];
+            foreach ($probes as $p) {
+                $h = (string) ($p['host'] ?? '');
+                if ($h !== '') {
+                    $byHost[$h] = $p;
+                }
+            }
+            foreach (($cfg['devices'] ?? []) as $d) {
+                $host = (string) ($d['host'] ?? '');
+                if ($host === '') {
+                    continue;
+                }
+                $p = $byHost[$host] ?? null;
+                $st = $userStats[$host] ?? ['users' => 0, 'last_synced' => null];
+                $online = null;
+                $message = 'Click Test all or Get users';
+                if (is_array($p)) {
+                    $online = !empty($p['online']);
+                    $message = (string) ($p['message'] ?? ($online ? 'OK' : 'Offline'));
+                }
+                $deviceCards[] = [
+                    'host' => $host,
+                    'role' => (string) ($d['role'] ?? ''),
+                    'label' => (string) ($d['label'] ?? $host),
+                    'online' => $online,
+                    'message' => $message,
+                    'model' => (string) ($p['model'] ?? ''),
+                    'users' => (int) ($st['users'] ?? 0),
+                    'last_synced' => $st['last_synced'] ?? null,
+                ];
+            }
+        } catch (Throwable $e) {
+            error_log('[StudentDevice index devices] ' . $e->getMessage());
+        }
+
         return $this->view('attendance/student_device/index', [
             'title' => 'Student Fingerprint Attendance',
             'page' => 'student-device-attendance',
@@ -152,6 +234,8 @@ class StudentDeviceAttendanceController extends Controller {
             'machineHost' => $this->machineHost(),
             'syncSummary' => $_SESSION['student_att_sync_summary'] ?? null,
             'connectionStatus' => $_SESSION['student_att_connection'] ?? null,
+            'deviceCards' => $deviceCards,
+            'refreshUsersSummary' => $_SESSION['student_att_refresh_users'] ?? null,
         ]);
     }
 
@@ -841,6 +925,494 @@ class StudentDeviceAttendanceController extends Controller {
     }
 
     /**
+     * Hikvision multi-device credential synchronization dashboard.
+     */
+    public function devices() {
+        if (!$this->requireAccess()) {
+            return;
+        }
+
+        require_once BASE_PATH . '/core/HikvisionIntegration.php';
+        $cred = $this->credentialSyncService();
+        $model = $cred->attendanceModel();
+        $tabDefault = 'overview';
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $action = trim((string) $this->post('action', ''));
+            $employeeNo = trim((string) $this->post('employee_no', ''));
+            $deviceHost = trim((string) $this->post('device_host', ''));
+            $returnTab = trim((string) $this->post('return_tab', $tabDefault));
+            if (!in_array($returnTab, ['overview', 'presence', 'tools', 'queue', 'logs'], true)) {
+                $returnTab = $tabDefault;
+            }
+
+            $go = static function (string $tab, array $q = []) use ($returnTab): void {
+                $tab = $tab !== '' ? $tab : $returnTab;
+                $q = array_merge(['tab' => $tab], $q);
+                $qs = http_build_query(array_filter($q, static fn ($v) => $v !== null && $v !== ''));
+                header('Location: ' . rtrim(APP_URL, '/') . '/attendance/student-device/devices' . ($qs !== '' ? '?' . $qs : ''));
+                exit;
+            };
+
+            try {
+                if (!HikvisionIntegration::isCurlAvailable()) {
+                    $_SESSION['flash_error'] = 'PHP cURL is not installed on this server. Install php-curl before device sync.';
+                    $go($returnTab);
+                    return;
+                }
+
+                if ($action === 'test_all' || $action === 'test_one') {
+                    $statuses = $cred->probeDeviceStatuses();
+                    $_SESSION['student_att_device_status'] = [
+                        'devices' => $statuses,
+                        'tested_at' => date('Y-m-d H:i:s'),
+                    ];
+                    $lines = [];
+                    $online = 0;
+                    foreach ($statuses as $s) {
+                        if ($action === 'test_one' && $deviceHost !== '' && $s['host'] !== $deviceHost) {
+                            continue;
+                        }
+                        if (!empty($s['online'])) {
+                            $online++;
+                        }
+                        $lines[] = ($s['host'] ?? '') . ': ' . (!empty($s['online']) ? 'ONLINE' : 'OFFLINE');
+                    }
+                    $_SESSION['flash_success'] = ($action === 'test_all'
+                        ? "Online {$online}/" . count($statuses) . ' — '
+                        : '') . implode(' · ', $lines);
+                    $go('overview');
+                    return;
+                }
+
+                if ($action === 'sync_user') {
+                    if ($employeeNo === '') {
+                        $_SESSION['flash_error'] = 'Employee No is required.';
+                        $go('tools');
+                        return;
+                    }
+                    $st = $model->findActiveStudentByEmployeeNo($employeeNo);
+                    $name = $employeeNo;
+                    $sid = '';
+                    if ($st) {
+                        $ini = trim((string) ($st['student_ininame'] ?? ''));
+                        $full = trim((string) ($st['student_fullname'] ?? ''));
+                        $name = $ini !== '' ? $ini : ($full !== '' ? $full : $employeeNo);
+                        $sid = (string) ($st['student_id'] ?? '');
+                    }
+                    $r = $cred->queueAndSyncEmployee($employeeNo, $name, $sid, [], true, true);
+                    $_SESSION['flash_success'] = $r['message'] ?? 'Sync queued.';
+                    $go($returnTab === 'presence' ? 'presence' : 'queue', [
+                        'pf' => (string) $this->post('pf', ''),
+                        'q' => (string) $this->post('q', ''),
+                    ]);
+                    return;
+                }
+
+                if ($action === 'sync_all') {
+                    @set_time_limit(90);
+                    $r = $cred->queueAndSyncAllUsers(false, 500);
+                    $proc = $cred->processPendingJobs(10, '', 40);
+                    $_SESSION['flash_success'] = ($r['message'] ?? 'Queued.')
+                        . ' ' . ($proc['message'] ?? '');
+                    $go('queue');
+                    return;
+                }
+
+                if ($action === 'process_pending') {
+                    @set_time_limit(90);
+                    $r = $cred->processPendingJobs(15, '', 50);
+                    $_SESSION['flash_success'] = $r['message'] ?? 'Processed pending jobs.';
+                    $go('queue');
+                    return;
+                }
+
+                if ($action === 'retry_failed') {
+                    @set_time_limit(90);
+                    $n = $model->requeueFailedCredentialJobs();
+                    $r = $cred->processPendingJobs(15, '', 50);
+                    $_SESSION['flash_success'] = "Requeued {$n} failed job(s). " . ($r['message'] ?? '');
+                    $go('queue');
+                    return;
+                }
+
+                if ($action === 'refresh_presence') {
+                    @set_time_limit(100);
+                    $result = $cred->refreshUserDirectoriesFromAllDevices(75);
+                    if (!empty($result['ok'])) {
+                        $_SESSION['flash_success'] = $result['message'] ?? 'Person list refreshed.';
+                    } else {
+                        $_SESSION['flash_error'] = $result['message'] ?? 'Could not refresh person list.';
+                    }
+                    if ($returnTab === 'tools') {
+                        $go('tools');
+                    } else {
+                        $go('presence', ['pf' => 'missing']);
+                    }
+                    return;
+                }
+
+                if ($action === 'delete_user_readers' || $action === 'delete_user_one') {
+                    @set_time_limit(90);
+                    if ($employeeNo === '' || !preg_match('/^[A-Za-z0-9_\\-\\/]{2,40}$/', $employeeNo)) {
+                        $_SESSION['flash_error'] = 'Valid Employee No is required.';
+                        $go('tools');
+                        return;
+                    }
+                    $includeMain = (string) $this->post('include_main', '') === '1';
+                    $onlyHost = $action === 'delete_user_one' ? $deviceHost : '';
+                    if ($action === 'delete_user_one' && $onlyHost === '') {
+                        $_SESSION['flash_error'] = 'Select a reader to delete from.';
+                        $go('tools');
+                        return;
+                    }
+                    $mainHost = (string) ($cred->mainDevice()['host'] ?? '');
+                    if ($onlyHost !== '' && $onlyHost === $mainHost && !$includeMain) {
+                        $_SESSION['flash_error'] = 'To delete from MAIN, check “Also delete from MAIN”.';
+                        $go('tools');
+                        return;
+                    }
+                    $r = $cred->deletePersonFromDevices($employeeNo, $includeMain, $onlyHost);
+                    if (!empty($r['ok'])) {
+                        $_SESSION['flash_success'] = $r['message'] ?? 'Deleted.';
+                    } else {
+                        $_SESSION['flash_error'] = $r['message'] ?? 'Delete failed.';
+                    }
+                    $go('tools', [
+                        'tq' => (string) $this->post('tq', ''),
+                        'tpage' => (string) $this->post('tpage', ''),
+                    ]);
+                    return;
+                }
+
+                if ($action === 'delete_users_selected') {
+                    @set_time_limit(180);
+                    $rawList = $_POST['employee_nos'] ?? [];
+                    if (!is_array($rawList)) {
+                        $rawList = [];
+                    }
+                    $selected = [];
+                    foreach ($rawList as $eno) {
+                        $eno = trim((string) $eno);
+                        if ($eno !== '' && preg_match('/^[A-Za-z0-9_\\-\\/]{2,40}$/', $eno)) {
+                            $selected[$eno] = $eno;
+                        }
+                    }
+                    $selected = array_values($selected);
+                    if ($selected === []) {
+                        $_SESSION['flash_error'] = 'Select at least one person to delete.';
+                        $go('tools');
+                        return;
+                    }
+                    $includeMain = (string) $this->post('include_main', '') === '1';
+                    $onlyHost = trim((string) $this->post('device_host', ''));
+                    $okN = 0;
+                    $failN = 0;
+                    $msgs = [];
+                    foreach ($selected as $eno) {
+                        $r = $cred->deletePersonFromDevices($eno, $includeMain, $onlyHost);
+                        if (!empty($r['ok'])) {
+                            $okN++;
+                        } else {
+                            $failN++;
+                            $msgs[] = $eno . ': ' . ($r['message'] ?? 'failed');
+                        }
+                    }
+                    $summary = "Deleted {$okN}/" . count($selected) . ' selected person(s) from '
+                        . ($onlyHost !== '' ? $onlyHost : ($includeMain ? 'MAIN + readers' : 'all readers')) . '.';
+                    if ($failN > 0) {
+                        $_SESSION['flash_error'] = $summary . ' ' . implode(' · ', array_slice($msgs, 0, 5));
+                    } else {
+                        $_SESSION['flash_success'] = $summary;
+                    }
+                    $go('tools', [
+                        'tq' => (string) $this->post('tq', ''),
+                        'tpage' => (string) $this->post('tpage', ''),
+                    ]);
+                    return;
+                }
+
+                $_SESSION['flash_error'] = 'Unknown action.';
+            } catch (Throwable $e) {
+                error_log('[StudentDevice devices] ' . $e->getMessage());
+                $_SESSION['flash_error'] = $e->getMessage();
+            }
+            $go($returnTab);
+            return;
+        }
+
+        $tab = strtolower(trim((string) $this->get('tab', $tabDefault)));
+        if (!in_array($tab, ['overview', 'presence', 'tools', 'queue', 'logs'], true)) {
+            $tab = $tabDefault;
+        }
+
+        $presenceFilter = strtolower(trim((string) $this->get('pf', 'missing')));
+        if (!in_array($presenceFilter, ['all', 'missing', 'complete'], true)) {
+            $presenceFilter = 'missing';
+        }
+        $presenceQ = trim((string) $this->get('q', ''));
+        $presencePage = max(1, (int) $this->get('page', 1));
+        $presencePerPage = 20;
+
+        $queueStatus = strtolower(trim((string) $this->get('qs', 'all')));
+        if (!in_array($queueStatus, ['all', 'pending', 'syncing', 'failed', 'success'], true)) {
+            $queueStatus = 'all';
+        }
+
+        $logsPage = max(1, (int) $this->get('lpage', 1));
+        $logsPerPage = 25;
+
+        $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
+        $cfgDevices = is_array($cfg['devices'] ?? null) ? $cfg['devices'] : [];
+        $hostsOrdered = [];
+        $deviceMeta = [];
+        foreach ($cfgDevices as $d) {
+            if (!is_array($d)) {
+                continue;
+            }
+            $host = trim((string) ($d['host'] ?? ''));
+            if ($host === '') {
+                continue;
+            }
+            $hostsOrdered[] = $host;
+            $deviceMeta[$host] = [
+                'label' => (string) ($d['label'] ?? $host),
+                'role' => (string) ($d['role'] ?? ''),
+            ];
+        }
+
+        $forceProbe = (string) $this->get('probe', '') === '1';
+        $cached = $_SESSION['student_att_device_status'] ?? null;
+        $cacheFresh = is_array($cached) && !empty($cached['devices']) && !empty($cached['tested_at'])
+            && (time() - strtotime((string) $cached['tested_at'])) < 120;
+        $shouldProbe = HikvisionIntegration::isCurlAvailable()
+            && ($forceProbe || ($tab === 'overview' && !$cacheFresh));
+
+        if ($shouldProbe) {
+            $deviceStatuses = $cred->probeDeviceStatuses();
+            $_SESSION['student_att_device_status'] = [
+                'devices' => $deviceStatuses,
+                'tested_at' => date('Y-m-d H:i:s'),
+            ];
+            $cached = $_SESSION['student_att_device_status'];
+        } elseif (is_array($cached) && !empty($cached['devices'])) {
+            $deviceStatuses = $cached['devices'];
+        } else {
+            $deviceStatuses = [];
+            foreach ($cfgDevices as $d) {
+                if (!is_array($d)) {
+                    continue;
+                }
+                $deviceStatuses[] = [
+                    'host' => (string) ($d['host'] ?? ''),
+                    'role' => (string) ($d['role'] ?? ''),
+                    'label' => (string) ($d['label'] ?? ''),
+                    'online' => null,
+                    'message' => 'Not tested',
+                ];
+            }
+        }
+
+        $stats = $model->credentialSyncStatsByDevice();
+        $userStats = $model->machineUserStatsByHost();
+        $rows = [];
+        $onlineCount = 0;
+        $pendingTotal = 0;
+        $failedTotal = 0;
+        foreach ($deviceStatuses as $ds) {
+            $host = (string) ($ds['host'] ?? '');
+            $st = $stats[$host] ?? [
+                'pending' => 0,
+                'syncing' => 0,
+                'success' => 0,
+                'failed' => 0,
+                'last_sync' => null,
+            ];
+            $us = $userStats[$host] ?? ['users' => 0, 'last_synced' => null];
+            $rows[] = array_merge($ds, $st, [
+                'users_on_device' => (int) ($us['users'] ?? 0),
+                'users_last_synced' => $us['last_synced'] ?? null,
+            ]);
+            if (!empty($ds['online'])) {
+                $onlineCount++;
+            }
+            $pendingTotal += (int) ($st['pending'] ?? 0) + (int) ($st['syncing'] ?? 0);
+            $failedTotal += (int) ($st['failed'] ?? 0);
+            if ($host !== '' && !isset($deviceMeta[$host])) {
+                $hostsOrdered[] = $host;
+                $deviceMeta[$host] = [
+                    'label' => (string) ($ds['label'] ?? $host),
+                    'role' => (string) ($ds['role'] ?? ''),
+                ];
+            }
+        }
+        $hostsOrdered = array_values(array_unique($hostsOrdered));
+
+        $allPresence = $hostsOrdered !== []
+            ? $model->personPresenceByHosts($hostsOrdered, 3000)
+            : [];
+        $presenceSummary = ['total' => count($allPresence), 'missing' => 0, 'complete' => 0];
+        foreach ($allPresence as $pr) {
+            if ((int) ($pr['missing_count'] ?? 0) > 0) {
+                $presenceSummary['missing']++;
+            } else {
+                $presenceSummary['complete']++;
+            }
+        }
+
+        $filteredPresence = $allPresence;
+        if ($presenceFilter === 'missing') {
+            $filteredPresence = array_values(array_filter(
+                $allPresence,
+                static fn (array $r): bool => (int) ($r['missing_count'] ?? 0) > 0
+            ));
+        } elseif ($presenceFilter === 'complete') {
+            $filteredPresence = array_values(array_filter(
+                $allPresence,
+                static fn (array $r): bool => (int) ($r['missing_count'] ?? 0) === 0
+            ));
+        }
+        if ($presenceQ !== '') {
+            $qLower = mb_strtolower($presenceQ);
+            $filteredPresence = array_values(array_filter(
+                $filteredPresence,
+                static function (array $r) use ($qLower): bool {
+                    return str_contains(mb_strtolower((string) ($r['employee_no'] ?? '')), $qLower)
+                        || str_contains(mb_strtolower((string) ($r['name'] ?? '')), $qLower);
+                }
+            ));
+        }
+        $presenceTotal = count($filteredPresence);
+        $presencePages = max(1, (int) ceil($presenceTotal / $presencePerPage));
+        if ($presencePage > $presencePages) {
+            $presencePage = $presencePages;
+        }
+        $presenceRows = array_slice(
+            $filteredPresence,
+            ($presencePage - 1) * $presencePerPage,
+            $presencePerPage
+        );
+
+        // Tools tab: synced persons across 4 machines (select → delete)
+        $toolsQ = trim((string) $this->get('tq', ''));
+        $toolsPage = max(1, (int) $this->get('tpage', 1));
+        $toolsPerPage = 25;
+        $toolsScope = strtolower(trim((string) $this->get('ts', 'synced')));
+        if (!in_array($toolsScope, ['synced', 'readers', 'all'], true)) {
+            $toolsScope = 'synced';
+        }
+        $toolsFiltered = $allPresence;
+        if ($toolsScope === 'synced') {
+            // Present on at least one machine
+            $toolsFiltered = array_values(array_filter(
+                $allPresence,
+                static fn (array $r): bool => (int) ($r['present_count'] ?? 0) > 0
+            ));
+        } elseif ($toolsScope === 'readers') {
+            // Present on at least one reader (not only MAIN)
+            $readerHosts = [];
+            foreach ($deviceMeta as $h => $meta) {
+                if (($meta['role'] ?? '') === 'reader') {
+                    $readerHosts[] = $h;
+                }
+            }
+            $toolsFiltered = array_values(array_filter(
+                $allPresence,
+                static function (array $r) use ($readerHosts): bool {
+                    foreach ($readerHosts as $rh) {
+                        if (!empty($r['devices'][$rh]['present'])) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            ));
+        }
+        if ($toolsQ !== '') {
+            $tqLower = mb_strtolower($toolsQ);
+            $toolsFiltered = array_values(array_filter(
+                $toolsFiltered,
+                static function (array $r) use ($tqLower): bool {
+                    return str_contains(mb_strtolower((string) ($r['employee_no'] ?? '')), $tqLower)
+                        || str_contains(mb_strtolower((string) ($r['name'] ?? '')), $tqLower);
+                }
+            ));
+        }
+        // Prefer people on more machines first (already synced)
+        usort($toolsFiltered, static function (array $a, array $b): int {
+            $c = ((int) ($b['present_count'] ?? 0)) <=> ((int) ($a['present_count'] ?? 0));
+            if ($c !== 0) {
+                return $c;
+            }
+            return strcmp((string) ($a['employee_no'] ?? ''), (string) ($b['employee_no'] ?? ''));
+        });
+        $toolsTotal = count($toolsFiltered);
+        $toolsPages = max(1, (int) ceil($toolsTotal / $toolsPerPage));
+        if ($toolsPage > $toolsPages) {
+            $toolsPage = $toolsPages;
+        }
+        $toolsRows = array_slice(
+            $toolsFiltered,
+            ($toolsPage - 1) * $toolsPerPage,
+            $toolsPerPage
+        );
+
+        $statusList = $queueStatus === 'all' ? [] : [$queueStatus];
+        $jobs = $model->listCredentialSyncJobs($statusList, 1000);
+        $queueTotal = count($jobs);
+
+        $allLogs = $model->listCredentialSyncLogs(500);
+        $logsTotal = count($allLogs);
+        $logsPages = max(1, (int) ceil($logsTotal / $logsPerPage));
+        if ($logsPage > $logsPages) {
+            $logsPage = $logsPages;
+        }
+        $logs = array_slice($allLogs, ($logsPage - 1) * $logsPerPage, $logsPerPage);
+
+        return $this->view('attendance/student_device/devices', [
+            'title' => 'Hikvision device sync',
+            'page' => 'student-device-attendance-devices',
+            'urls' => $this->urls(),
+            'canManageDevice' => true,
+            'deviceTab' => $tab,
+            'deviceRows' => $rows,
+            'jobs' => $jobs,
+            'logs' => $logs,
+            'curlMissing' => !HikvisionIntegration::isCurlAvailable(),
+            'mainHost' => (string) ($cred->mainDevice()['host'] ?? ''),
+            'presenceRows' => $presenceRows,
+            'presenceHosts' => $hostsOrdered,
+            'presenceDeviceMeta' => $deviceMeta,
+            'presenceFilter' => $presenceFilter,
+            'presenceSummary' => $presenceSummary,
+            'presenceQ' => $presenceQ,
+            'presencePage' => $presencePage,
+            'presencePages' => $presencePages,
+            'presenceTotal' => $presenceTotal,
+            'presencePerPage' => $presencePerPage,
+            'toolsRows' => $toolsRows,
+            'toolsQ' => $toolsQ,
+            'toolsPage' => $toolsPage,
+            'toolsPages' => $toolsPages,
+            'toolsTotal' => $toolsTotal,
+            'toolsScope' => $toolsScope,
+            'queueStatus' => $queueStatus,
+            'queueTotal' => $queueTotal,
+            'logsPage' => $logsPage,
+            'logsPages' => $logsPages,
+            'logsTotal' => $logsTotal,
+            'kpi' => [
+                'devices' => count($rows),
+                'online' => $onlineCount,
+                'missing' => (int) $presenceSummary['missing'],
+                'pending' => $pendingTotal,
+                'failed' => $failedTotal,
+            ],
+            'testedAt' => is_array($cached) ? (string) ($cached['tested_at'] ?? '') : '',
+        ]);
+    }
+
+    /**
      * Stream enrolled face JPEG from the fingerprint terminal (read machine photo).
      */
     public function facePhoto() {
@@ -1250,7 +1822,8 @@ class StudentDeviceAttendanceController extends Controller {
                 );
                 if ($action === 'add_user') {
                     $_SESSION['flash_success'] = ($created['message'] ?? 'User added.')
-                        . ' · ' . $synced['message'];
+                        . ' · ' . $synced['message']
+                        . $this->fanOutCredentialsToReaders($employeeNo, $name, $studentId, [], false);
                     $this->redirect($this->usersRedirectUrl($search, $employeeNo, $filters));
                     return;
                 }
@@ -1284,6 +1857,13 @@ class StudentDeviceAttendanceController extends Controller {
                 );
                 $text = implode(' ', $messages) . ' · ' . $synced['message'];
                 if ($okAll) {
+                    $text .= $this->fanOutCredentialsToReaders(
+                        $employeeNo,
+                        $name,
+                        $studentId,
+                        $synced['slots'] ?? $slots,
+                        !empty($synced['has_face'])
+                    );
                     $_SESSION['flash_success'] = $text;
                 } else {
                     $_SESSION['flash_error'] = $text;
@@ -1433,6 +2013,13 @@ class StudentDeviceAttendanceController extends Controller {
                 }
                 $text = ($enroll['message'] ?? '') . ' · ' . $synced['message'];
                 if (!empty($enroll['ok'])) {
+                    $text .= $this->fanOutCredentialsToReaders(
+                        $employeeNo,
+                        $name,
+                        $studentId,
+                        $synced['slots'] ?? [],
+                        true
+                    );
                     $_SESSION['flash_success'] = $text;
                 } else {
                     $_SESSION['flash_error'] = $text;
@@ -1784,16 +2371,39 @@ class StudentDeviceAttendanceController extends Controller {
             $end = $today->setTime(23, 59, 59);
         }
 
+        @set_time_limit(200);
         $svc = $this->syncService();
+        // Prefer Sync today / short ranges — full history across 4 machines can hit PHP limits
+        $budget = ($mode === 'today') ? 120 : (($mode === 'range') ? 160 : 180);
         $summary = $svc->syncRange(
             $start,
             $end,
             (int) $_SESSION['user_id'],
-            (string) ($_SESSION['user_name'] ?? '')
+            (string) ($_SESSION['user_name'] ?? ''),
+            $budget
         );
         $_SESSION['student_att_sync_summary'] = $summary;
+
+        // Cache per-device online from sync result for dashboard cards
+        if (!empty($summary['devices']) && is_array($summary['devices'])) {
+            $probes = [];
+            foreach ($summary['devices'] as $d) {
+                $probes[] = [
+                    'host' => $d['host'] ?? '',
+                    'role' => $d['role'] ?? '',
+                    'label' => $d['label'] ?? '',
+                    'online' => !empty($d['ok']),
+                    'message' => $d['message'] ?? '',
+                ];
+            }
+            $_SESSION['student_att_device_status'] = [
+                'devices' => $probes,
+                'tested_at' => date('Y-m-d H:i:s'),
+            ];
+        }
+
         if ($summary['ok']) {
-            $_SESSION['flash_success'] = 'Synchronization Completed';
+            $_SESSION['flash_success'] = $summary['message'] ?: 'Synchronization Completed';
         } else {
             $_SESSION['flash_error'] = $summary['message'] ?: 'Synchronization failed.';
         }
@@ -1804,19 +2414,82 @@ class StudentDeviceAttendanceController extends Controller {
         if (!$this->requireAccess()) {
             return;
         }
-        $svc = $this->syncService();
-        $result = $svc->machine()->testConnection();
-        $_SESSION['student_att_connection'] = [
-            'host' => $svc->machine()->getHost(),
-            'ok' => !empty($result['ok']),
-            'message' => (string) ($result['message'] ?? ''),
+        @set_time_limit(90);
+        require_once BASE_PATH . '/core/HikvisionIntegration.php';
+        $cred = $this->credentialSyncService();
+        $probes = $cred->probeDeviceStatuses();
+        $_SESSION['student_att_device_status'] = [
+            'devices' => $probes,
             'tested_at' => date('Y-m-d H:i:s'),
-            'device_info' => $result['device_info'] ?? null,
         ];
-        if (!empty($result['ok'])) {
-            $_SESSION['flash_success'] = 'Machine ' . $svc->machine()->getHost() . ': CONNECTED';
+
+        $online = 0;
+        $lines = [];
+        foreach ($probes as $p) {
+            if (!empty($p['online'])) {
+                $online++;
+            }
+            $lines[] = ($p['host'] ?? '') . ': ' . (!empty($p['online']) ? 'ONLINE' : 'OFFLINE');
+        }
+
+        $main = $cred->mainDevice();
+        $mainHost = (string) ($main['host'] ?? '');
+        $mainOk = false;
+        foreach ($probes as $p) {
+            if ((string) ($p['host'] ?? '') === $mainHost) {
+                $mainOk = !empty($p['online']);
+                $_SESSION['student_att_connection'] = [
+                    'host' => $mainHost,
+                    'ok' => $mainOk,
+                    'message' => (string) ($p['message'] ?? ''),
+                    'tested_at' => date('Y-m-d H:i:s'),
+                    'device_info' => null,
+                ];
+                break;
+            }
+        }
+
+        if ($online > 0) {
+            $_SESSION['flash_success'] = "Devices online: {$online}/" . count($probes) . ' — ' . implode(' · ', $lines);
         } else {
-            $_SESSION['flash_error'] = $result['message'] ?? 'DISCONNECTED';
+            $_SESSION['flash_error'] = 'All devices offline — ' . implode(' · ', $lines);
+        }
+        $this->redirect('attendance/student-device');
+    }
+
+    /**
+     * Pull student/user directories from MAIN + 3 readers into the central DB cache.
+     */
+    public function refreshUsersFromMachines() {
+        if (!$this->requireAccess()) {
+            return;
+        }
+        @set_time_limit(100);
+        require_once BASE_PATH . '/core/HikvisionIntegration.php';
+        $cred = $this->credentialSyncService();
+        $result = $cred->refreshUserDirectoriesFromAllDevices(75);
+        $_SESSION['student_att_refresh_users'] = $result;
+        // Also refresh probe cache from result online flags
+        $probes = [];
+        foreach ($result['devices'] ?? [] as $d) {
+            $probes[] = [
+                'host' => $d['host'] ?? '',
+                'role' => $d['role'] ?? '',
+                'label' => $d['label'] ?? '',
+                'online' => !empty($d['online']),
+                'message' => $d['message'] ?? '',
+            ];
+        }
+        if ($probes !== []) {
+            $_SESSION['student_att_device_status'] = [
+                'devices' => $probes,
+                'tested_at' => date('Y-m-d H:i:s'),
+            ];
+        }
+        if (!empty($result['ok'])) {
+            $_SESSION['flash_success'] = $result['message'] ?? 'User directories refreshed.';
+        } else {
+            $_SESSION['flash_error'] = $result['message'] ?? 'Could not refresh user directories.';
         }
         $this->redirect('attendance/student-device');
     }

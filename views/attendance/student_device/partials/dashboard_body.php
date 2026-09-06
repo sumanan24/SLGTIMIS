@@ -23,6 +23,7 @@ $connLabel = $connOk === true ? 'CONNECTED' : ($connOk === false ? 'DISCONNECTED
     <div class="alert alert-info mb-3">
         <div class="fw-semibold mb-2"><?php echo $e($syncSummary['message'] ?? 'Synchronization Completed'); ?></div>
         <div class="row g-2 small">
+            <div class="col-6 col-md-3">Machines: <strong><?php echo (int) ($syncSummary['devices_online'] ?? 0); ?>/<?php echo (int) ($syncSummary['devices_total'] ?? 0); ?></strong></div>
             <div class="col-6 col-md-3">Retrieved: <strong><?php echo (int) ($syncSummary['records_retrieved'] ?? 0); ?></strong></div>
             <div class="col-6 col-md-3">Users synced: <strong><?php echo (int) ($syncSummary['machine_users'] ?? 0); ?></strong></div>
             <div class="col-6 col-md-3">Finger IDs: <strong><?php echo (int) ($syncSummary['finger_ids_linked'] ?? 0); ?></strong></div>
@@ -32,8 +33,99 @@ $connLabel = $connOk === true ? 'CONNECTED' : ($connOk === false ? 'DISCONNECTED
             <div class="col-6 col-md-3">Unmatched: <strong><?php echo (int) ($syncSummary['unmatched'] ?? 0); ?></strong></div>
             <div class="col-6 col-md-3">Duplicates: <strong><?php echo (int) ($syncSummary['duplicates'] ?? 0); ?></strong></div>
         </div>
+        <?php if (!empty($syncSummary['devices']) && is_array($syncSummary['devices'])): ?>
+            <ul class="mb-0 mt-2 small">
+                <?php foreach ($syncSummary['devices'] as $sd): ?>
+                    <li>
+                        <code><?php echo $e($sd['host'] ?? ''); ?></code>
+                        (<?php echo $e($sd['role'] ?? ''); ?>) —
+                        <?php echo !empty($sd['ok']) ? 'OK' : 'FAIL'; ?> —
+                        events <?php echo (int) ($sd['records_retrieved'] ?? 0); ?>,
+                        saved <?php echo (int) ($sd['saved'] ?? 0); ?>,
+                        fingers <?php echo (int) ($sd['finger_ids_linked'] ?? 0); ?>
+                        <?php if (!empty($sd['message'])): ?>
+                            — <?php echo $e($sd['message']); ?>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
     </div>
     <?php unset($_SESSION['student_att_sync_summary']); ?>
+<?php endif; ?>
+
+<?php if (!empty($refreshUsersSummary) && is_array($refreshUsersSummary)): ?>
+    <div class="alert alert-<?php echo !empty($refreshUsersSummary['ok']) ? 'success' : 'warning'; ?> mb-3">
+        <div class="fw-semibold mb-2"><?php echo $e($refreshUsersSummary['message'] ?? 'User directory refresh'); ?></div>
+        <?php if (!empty($refreshUsersSummary['devices']) && is_array($refreshUsersSummary['devices'])): ?>
+            <ul class="mb-0 small">
+                <?php foreach ($refreshUsersSummary['devices'] as $d): ?>
+                    <li>
+                        <code><?php echo $e($d['host'] ?? ''); ?></code>
+                        (<?php echo $e($d['role'] ?? ''); ?>) —
+                        <?php echo !empty($d['online']) ? 'ONLINE' : 'OFFLINE'; ?> —
+                        <?php echo $e($d['message'] ?? ''); ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+    </div>
+    <?php unset($_SESSION['student_att_refresh_users']); ?>
+<?php endif; ?>
+
+<?php
+$deviceCards = $deviceCards ?? [];
+?>
+<?php if ($deviceCards !== []): ?>
+<div class="card sd-card mb-3">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span class="fw-semibold">Hikvision machines (MAIN + readers)</span>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-sm btn-outline-primary" href="<?php echo $e($urls['test'] ?? '#'); ?>">
+                <i class="fas fa-plug me-1"></i>Test all
+            </a>
+            <form method="post" action="<?php echo $e($urls['refresh_users'] ?? '#'); ?>" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-primary"
+                        onclick="return confirm('Pull student/user lists from MAIN and all readers into the database?');">
+                    <i class="fas fa-users me-1"></i>Get users from all machines
+                </button>
+            </form>
+            <a class="btn btn-sm btn-outline-secondary" href="<?php echo $e($urls['devices'] ?? '#'); ?>">Device sync</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <?php foreach ($deviceCards as $dc): ?>
+                <?php
+                $online = $dc['online'] ?? null;
+                $pillClass = $online === true ? 'is-on' : ($online === false ? 'is-off' : 'is-unknown');
+                $pillLabel = $online === true ? 'ONLINE' : ($online === false ? 'OFFLINE' : 'UNKNOWN');
+                ?>
+                <div class="col-12 col-md-6 col-xl-3">
+                    <div class="sd-device-mini <?php echo $online === true ? 'is-online' : ($online === false ? 'is-offline' : ''); ?>">
+                        <div class="sd-device-mini-top">
+                            <div>
+                                <div class="sd-device-mini-label"><?php echo $e($dc['label'] ?? ''); ?></div>
+                                <code class="sd-device-mini-ip"><?php echo $e($dc['host'] ?? ''); ?></code>
+                            </div>
+                            <span class="sd-status-pill <?php echo $e($pillClass); ?>"><?php echo $e($pillLabel); ?></span>
+                        </div>
+                        <div class="sd-device-mini-meta">
+                            <span><?php echo $e(strtoupper((string) ($dc['role'] ?? ''))); ?></span>
+                            <span><strong><?php echo (int) ($dc['users'] ?? 0); ?></strong> users</span>
+                        </div>
+                        <?php if (!empty($dc['last_synced'])): ?>
+                            <div class="sd-device-mini-sync">Users synced: <?php echo $e($dc['last_synced']); ?></div>
+                        <?php endif; ?>
+                        <?php if (!empty($dc['message'])): ?>
+                            <div class="sd-device-mini-msg"><?php echo $e($dc['message']); ?></div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 
 <div class="row g-3 mb-3">
@@ -57,7 +149,7 @@ $connLabel = $connOk === true ? 'CONNECTED' : ($connOk === false ? 'DISCONNECTED
     </div>
     <div class="col-6 col-xl-3">
         <div class="sd-stat">
-            <div class="sd-label">Machine</div>
+            <div class="sd-label">Main machine</div>
             <div class="sd-value" style="font-size:1.05rem;"><?php echo $e($machineHost); ?></div>
             <div class="sd-meta">
                 <span class="sd-status-pill <?php echo $e($connClass); ?>"><?php echo $e($connLabel); ?></span>
@@ -65,16 +157,19 @@ $connLabel = $connOk === true ? 'CONNECTED' : ($connOk === false ? 'DISCONNECTED
                     · <?php echo $e($connectionStatus['tested_at']); ?>
                 <?php endif; ?>
             </div>
-            <div class="sd-meta">Last sync: <?php echo $e($lastSync['ended_at'] ?? 'Never'); ?></div>
+            <div class="sd-meta">Last punch sync: <?php echo $e($lastSync['ended_at'] ?? 'Never'); ?></div>
         </div>
     </div>
 </div>
 
 <div class="card sd-card mb-3">
     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <span class="fw-semibold">Synchronize from device</span>
+        <div>
+            <span class="fw-semibold">Synchronize punches from all 4 machines</span>
+            <div class="small text-muted">Collects finger attendance (AcsEvent) from MAIN + readers, updates finger IDs, saves In/Out.</div>
+        </div>
         <a class="btn btn-sm btn-outline-primary" href="<?php echo $e($urls['test']); ?>">
-            <i class="fas fa-plug me-1"></i>Test connection
+            <i class="fas fa-plug me-1"></i>Test all machines
         </a>
     </div>
     <div class="card-body">
@@ -83,16 +178,16 @@ $connLabel = $connOk === true ? 'CONNECTED' : ($connOk === false ? 'DISCONNECTED
                 <form method="post" action="<?php echo $e($urls['sync']); ?>">
                     <input type="hidden" name="sync_mode" value="today">
                     <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-calendar-day me-1"></i>Sync today
+                        <i class="fas fa-calendar-day me-1"></i>Sync today (all)
                     </button>
                 </form>
             </div>
             <div class="col-sm-6 col-lg-3">
                 <form method="post" action="<?php echo $e($urls['sync']); ?>"
-                      onsubmit="return confirm('Pull full history from the machine. Continue?');">
+                      onsubmit="return confirm('Pull full history from MAIN + all readers. This may take several minutes. Continue?');">
                     <input type="hidden" name="sync_mode" value="full">
                     <button type="submit" class="btn btn-dark w-100">
-                        <i class="fas fa-database me-1"></i>Sync full history
+                        <i class="fas fa-database me-1"></i>Sync full history (all)
                     </button>
                 </form>
             </div>
@@ -108,7 +203,7 @@ $connLabel = $connOk === true ? 'CONNECTED' : ($connOk === false ? 'DISCONNECTED
                         <input type="date" name="date_to" class="form-control" required value="<?php echo $e(date('Y-m-d')); ?>">
                     </div>
                     <div class="col-12 col-md-4">
-                        <button type="submit" class="btn btn-outline-primary w-100">Sync range</button>
+                        <button type="submit" class="btn btn-outline-primary w-100">Sync range (all)</button>
                     </div>
                 </form>
             </div>

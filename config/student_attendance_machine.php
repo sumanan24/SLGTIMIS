@@ -1,9 +1,10 @@
 <?php
 /**
- * Student fingerprint attendance machine (Hikvision DS-K1T343).
+ * Student fingerprint attendance machines (Hikvision ISAPI Digest).
  *
- * Deployable defaults (same pattern as config/hikvision.php / staff_attendance/config.php).
- * Optional overrides (prefer for secrets on shared hosts):
+ * MAIN enrolls biometrics once; readers receive credentials via ISAPI sync.
+ *
+ * Overrides (prefer secrets here on shared hosts):
  *   - .env  STUDENT_HIKVISION_*
  *   - config/student_attendance_machine.local.php  (gitignored)
  */
@@ -21,18 +22,19 @@ if (is_file($local)) {
     }
 }
 
-// Defaults match campus student terminal — override via .env / local.php when needed.
 $defaults = [
     'host' => '172.16.0.26',
     'username' => 'admin',
-    'password' => 'TCI@itgls0206',
+    'password' => '',
     'ssl' => false,
     'port' => 0,
     'timeout' => 60,
     'timezone' => 'Asia/Colombo',
+    // Comma-separated reader IPs (synced after enroll on main)
+    'reader_hosts' => ['172.16.0.29', '172.16.0.28', '172.16.0.27'],
 ];
 
-$host = EnvLoader::get('STUDENT_HIKVISION_IP', $localCfg['host'] ?? $defaults['host']);
+$host = trim((string) EnvLoader::get('STUDENT_HIKVISION_IP', $localCfg['host'] ?? $defaults['host']));
 $user = EnvLoader::get('STUDENT_HIKVISION_USER', $localCfg['username'] ?? $defaults['username']);
 $pass = EnvLoader::get('STUDENT_HIKVISION_PASS', $localCfg['password'] ?? $defaults['password']);
 $https = EnvLoader::get(
@@ -52,23 +54,78 @@ $tz = EnvLoader::get(
     $localCfg['timezone'] ?? $defaults['timezone']
 );
 
-$password = (string) $pass;
-$hostStr = trim((string) $host);
+$readerHostsRaw = EnvLoader::get(
+    'STUDENT_HIKVISION_READER_IPS',
+    isset($localCfg['reader_hosts'])
+        ? (is_array($localCfg['reader_hosts'])
+            ? implode(',', $localCfg['reader_hosts'])
+            : (string) $localCfg['reader_hosts'])
+        : implode(',', $defaults['reader_hosts'])
+);
 
-return [
-    'host' => $hostStr,
+$parseHosts = static function (string $raw): array {
+    $out = [];
+    foreach (preg_split('/[\s,;]+/', trim($raw)) ?: [] as $ip) {
+        $ip = trim((string) $ip);
+        if ($ip === '' || !filter_var($ip, FILTER_VALIDATE_IP)) {
+            continue;
+        }
+        $out[$ip] = $ip;
+    }
+    return array_values($out);
+};
+
+$readerHosts = $parseHosts((string) $readerHostsRaw);
+// Never list main as a reader
+$readerHosts = array_values(array_filter(
+    $readerHosts,
+    static fn (string $ip): bool => $ip !== $host
+));
+
+$ssl = in_array(strtolower((string) $https), ['1', 'true', 'yes'], true);
+$portVal = $port > 0 ? $port : 0;
+$timeoutVal = $timeout > 0 ? $timeout : 60;
+$password = (string) $pass;
+
+$deviceCommon = [
     'username' => (string) $user,
     'password' => $password,
-    'ssl' => in_array(strtolower((string) $https), ['1', 'true', 'yes'], true),
-    'port' => $port > 0 ? $port : 0,
-    'timeout' => $timeout > 0 ? $timeout : 60,
+    'ssl' => $ssl,
+    'port' => $portVal,
+    'timeout' => $timeoutVal,
+];
+
+$devices = [];
+if ($host !== '') {
+    $devices[] = array_merge($deviceCommon, [
+        'host' => $host,
+        'role' => 'main',
+        'label' => 'Main (enrollment)',
+    ]);
+}
+foreach ($readerHosts as $i => $rip) {
+    $devices[] = array_merge($deviceCommon, [
+        'host' => $rip,
+        'role' => 'reader',
+        'label' => 'Reader ' . ($i + 1),
+    ]);
+}
+
+return [
+    'host' => $host,
+    'username' => (string) $user,
+    'password' => $password,
+    'ssl' => $ssl,
+    'port' => $portVal,
+    'timeout' => $timeoutVal,
     'timezone' => (string) $tz,
     'acs_major' => 5,
-    // DS-K1T343: 0 auth, 38 face auth, 75 face+pic — include employeeNoString
     'acs_minors' => [0, 38, 75],
     'max_results_per_page' => 2000,
     'max_pages' => 5000,
-    // Safe diagnostics for UI (no secrets)
-    'configured' => ($hostStr !== '' && $password !== ''),
+    'reader_hosts' => $readerHosts,
+    /** @var list<array{host:string,role:string,label:string,username:string,password:string,ssl:bool,port:int,timeout:int}> */
+    'devices' => $devices,
+    'configured' => ($host !== '' && $password !== ''),
     'env_file_present' => EnvLoader::envFileExists(),
 ];
