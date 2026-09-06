@@ -49,7 +49,7 @@ if (($endPage - $startPage) < ($window * 2)) {
 }
 
 $studentDeviceSection = 'events';
-$pageTitle = 'Attendance events';
+$pageTitle = 'Attendance';
 $pageSubtitle = 'One row per student per day — In (first), Out (last), Others (middle punches)';
 $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
 ?>
@@ -268,7 +268,7 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
             <?php if ($totalPages > 1): ?>
                 <div class="card-footer sd-pager">
                     <div class="small text-muted">Page <?php echo (int) $pageNum; ?> of <?php echo (int) $totalPages; ?></div>
-                    <nav aria-label="Events pagination">
+                    <nav aria-label="Attendance pagination">
                         <ul class="pagination pagination-sm mb-0 flex-wrap justify-content-end">
                             <li class="page-item <?php echo $pageNum <= 1 ? 'disabled' : ''; ?>">
                                 <a class="page-link" href="<?php echo $pageNum <= 1 ? '#' : $pageHref($pageNum - 1); ?>">Prev</a>

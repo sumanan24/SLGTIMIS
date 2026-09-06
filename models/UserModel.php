@@ -279,6 +279,13 @@ class UserModel extends Model {
     }
 
     /**
+     * Student Information Excel export (fingerprint-import): ADM / system admin only (not SAO).
+     */
+    public function canAccessStudentFingerprintImport($userId): bool {
+        return $this->isAdminOrADM($userId);
+    }
+
+    /**
      * Monthly SAO attendance dashboard (view): SAO, ADM, HOD, DIR, DPA, REG.
      */
     public function canViewStudentAttendanceSaoDashboard($userId): bool {

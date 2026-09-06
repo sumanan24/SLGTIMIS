@@ -14,6 +14,25 @@ class StudentDeviceAttendanceController extends Controller {
     }
 
     /**
+     * Student Information Excel export: ADM / system admin only (not SAO).
+     */
+    private function requireFingerprintImportAccess(): bool {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        if (!$userModel->canAccessStudentFingerprintImport((int) $_SESSION['user_id'])) {
+            http_response_code(403);
+            echo 'Access denied. Student Excel Export is available for ADM only.';
+            exit;
+        }
+        $this->autoPurgeStaleCaches();
+        return true;
+    }
+
+    /**
      * Dashboard / month / warning letter view access.
      *
      * @return array{user_id:int,role:string,can_manage:bool,department_scope:?string}|null
@@ -58,6 +77,9 @@ class StudentDeviceAttendanceController extends Controller {
                 exit;
             }
         }
+
+        // Auto-clear stale face/session cache files on every student-device visit
+        $this->autoPurgeStaleCaches();
 
         return [
             'user_id' => $userId,
@@ -215,15 +237,38 @@ class StudentDeviceAttendanceController extends Controller {
         return $deleted;
     }
 
-    /** Throttled auto-purge of stale face cache (once per 10 minutes per session). */
+    /**
+     * Throttled auto-purge: face JPEGs + expired device probe session cache.
+     * Runs at most once every 2 minutes per session (safe for every page hit).
+     */
     private function autoPurgeStaleCaches(): void {
+        $now = time();
         $last = (int) ($_SESSION['student_att_cache_purged_at'] ?? 0);
-        if ($last > 0 && (time() - $last) < 600) {
+        if ($last > 0 && ($now - $last) < 120) {
             return;
         }
-        $_SESSION['student_att_cache_purged_at'] = time();
+        $_SESSION['student_att_cache_purged_at'] = $now;
+
         // Face JPEGs are short-lived; drop anything older than 5 minutes
         $this->purgeMachineFaceCacheFiles(300);
+
+        // Drop device probe session cache after 10 minutes
+        $cached = $_SESSION['student_att_device_status'] ?? null;
+        if (is_array($cached)) {
+            $testedAt = 0;
+            $raw = trim((string) ($cached['tested_at'] ?? ''));
+            if ($raw !== '') {
+                $testedAt = (int) strtotime($raw);
+            }
+            if ($testedAt <= 0 || ($now - $testedAt) >= 600) {
+                unset(
+                    $_SESSION['student_att_device_status'],
+                    $_SESSION['student_att_connection']
+                );
+            }
+        }
+
+        clearstatcache(true);
     }
 
     /** Clear session + face files + OPcache for machine config (after password save). */
@@ -401,7 +446,7 @@ class StudentDeviceAttendanceController extends Controller {
                     $reason = (string) ($p['reason'] ?? '');
                     $message = (string) ($p['message'] ?? ($online ? 'OK' : 'Offline'));
                 } else {
-                    $message = 'Password OK — click Test all (LAN check, no Internet)';
+                    $message = '';
                     $status = '';
                 }
                 $deviceCards[] = [
@@ -689,7 +734,7 @@ class StudentDeviceAttendanceController extends Controller {
         $result = $att->searchDailyGrouped($filters, $page, 50);
 
         return $this->view('attendance/student_device/events', [
-            'title' => 'Attendance events',
+            'title' => 'Attendance',
             'page' => 'student-device-attendance-events',
             'urls' => $this->urls(),
             'filters' => $filters,
@@ -2382,18 +2427,14 @@ class StudentDeviceAttendanceController extends Controller {
     }
 
     /**
-     * Student Information Excel export — filter UI (RBAC: HOD scoped; SAO/ADM/DIR/DPA/REG all depts).
+     * Student Information Excel export — ADM / system admin only (not SAO).
      */
     public function fingerprintImport() {
-        $ctx = $this->requireDashboardAccess();
-        if ($ctx === null) {
+        if (!$this->requireFingerprintImportAccess()) {
             return;
         }
 
         $departmentId = trim((string) $this->get('department_id', ''));
-        if ($ctx['department_scope'] !== null) {
-            $departmentId = $ctx['department_scope'];
-        }
         $courseId = trim((string) $this->get('course_id', ''));
         $academicYear = trim((string) $this->get('academic_year', ''));
         $groupId = trim((string) $this->get('group_id', ''));
@@ -2414,26 +2455,14 @@ class StudentDeviceAttendanceController extends Controller {
         $studentModel = $this->model('StudentModel');
         $groupModel = $this->model('GroupModel');
 
-        $allDepartments = $departmentModel->getAll();
-        if ($ctx['department_scope'] !== null) {
-            $departments = array_values(array_filter(
-                $allDepartments,
-                static function (array $d) use ($ctx): bool {
-                    return (string) ($d['department_id'] ?? '') === $ctx['department_scope'];
-                }
-            ));
-        } else {
-            $departments = $allDepartments;
-        }
-
+        $departments = $departmentModel->getAll();
         $academicYears = $studentModel->getAcademicYears();
         $courses = [];
         if ($departmentId !== '') {
             $courses = $courseModel->getCoursesWithDepartment(['department_id' => $departmentId]);
         }
-        $groupDept = $departmentId !== '' ? $departmentId : $ctx['department_scope'];
         $groups = $groupModel->getAllWithDetails(
-            $groupDept !== null && $groupDept !== '' ? $groupDept : null,
+            $departmentId !== '' ? $departmentId : null,
             $courseId !== '' ? $courseId : null
         );
 
@@ -2446,16 +2475,6 @@ class StudentDeviceAttendanceController extends Controller {
                 $groupId,
                 $courseMode
             );
-            // Extra server-side HOD guard (never leak other depts).
-            if ($ctx['department_scope'] !== null) {
-                $scope = $ctx['department_scope'];
-                $students = array_values(array_filter(
-                    $students,
-                    static function (array $row) use ($scope): bool {
-                        return (string) ($row['department_id'] ?? '') === $scope;
-                    }
-                ));
-            }
         }
 
         $exportQuery = http_build_query(array_filter([
@@ -2472,9 +2491,10 @@ class StudentDeviceAttendanceController extends Controller {
             'title' => 'Student Information Excel Export',
             'page' => 'student-device-attendance-fingerprint-import',
             'urls' => $this->urls(),
-            'canManageDevice' => $ctx['can_manage'],
-            'isHodScoped' => $ctx['department_scope'] !== null,
-            'userRole' => $ctx['role'],
+            'canManageDevice' => true,
+            'canFingerprintImport' => true,
+            'isHodScoped' => false,
+            'userRole' => 'ADM',
             'departments' => $departments,
             'courses' => $courses,
             'academicYears' => $academicYears,
@@ -2492,18 +2512,14 @@ class StudentDeviceAttendanceController extends Controller {
     }
 
     /**
-     * Download Student Information .xlsx (RBAC enforced; read-only; does not modify student data).
+     * Download Student Information .xlsx — ADM / system admin only.
      */
     public function exportFingerprintImport() {
-        $ctx = $this->requireDashboardAccess();
-        if ($ctx === null) {
+        if (!$this->requireFingerprintImportAccess()) {
             return;
         }
 
         $departmentId = trim((string) $this->get('department_id', ''));
-        if ($ctx['department_scope'] !== null) {
-            $departmentId = $ctx['department_scope'];
-        }
         $courseId = trim((string) $this->get('course_id', ''));
         $academicYear = trim((string) $this->get('academic_year', ''));
         $groupId = trim((string) $this->get('group_id', ''));
@@ -2520,15 +2536,6 @@ class StudentDeviceAttendanceController extends Controller {
             $groupId,
             $courseMode
         );
-        if ($ctx['department_scope'] !== null) {
-            $scope = $ctx['department_scope'];
-            $students = array_values(array_filter(
-                $students,
-                static function (array $row) use ($scope): bool {
-                    return (string) ($row['department_id'] ?? '') === $scope;
-                }
-            ));
-        }
 
         if ($students === []) {
             $_SESSION['flash_error'] = 'No authorized students found for the selected filters.';

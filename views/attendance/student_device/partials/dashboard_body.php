@@ -40,7 +40,7 @@ $connLabel = $connOk === true ? 'CONNECTED' : ($connOk === false ? 'DISCONNECTED
                         <code><?php echo $e($sd['host'] ?? ''); ?></code>
                         (<?php echo $e($sd['role'] ?? ''); ?>) —
                         <?php echo !empty($sd['ok']) ? 'OK' : 'FAIL'; ?> —
-                        events <?php echo (int) ($sd['records_retrieved'] ?? 0); ?>,
+                        records <?php echo (int) ($sd['records_retrieved'] ?? 0); ?>,
                         saved <?php echo (int) ($sd['saved'] ?? 0); ?>,
                         fingers <?php echo (int) ($sd['finger_ids_linked'] ?? 0); ?>
                         <?php if (!empty($sd['message'])): ?>
@@ -76,14 +76,6 @@ $connLabel = $connOk === true ? 'CONNECTED' : ($connOk === false ? 'DISCONNECTED
 <?php
 $deviceCards = $deviceCards ?? [];
 ?>
-<?php if (!empty($deviceCards)): ?>
-<div class="alert alert-light border mb-3 py-2 small">
-    LAN mode: Hikvision devices use private IPs only (no Internet check).
-    SIS on LAN: <code><?php echo $e($sisPublicHost ?? 'sis.slgti.ac.lk'); ?></code>
-    → <a href="<?php echo $e($sisLanUrl ?? 'http://172.16.1.245'); ?>"><?php echo $e($sisLanIp ?? '172.16.1.245'); ?></a>
-    (set hosts/DNS or open the IP URL if Internet DNS is down).
-</div>
-<?php endif; ?>
 
 <?php if ($deviceCards !== []): ?>
 <div class="card sd-card mb-3">
@@ -139,22 +131,23 @@ $deviceCards = $deviceCards ?? [];
                             <span><?php echo $e(strtoupper((string) ($dc['role'] ?? ''))); ?></span>
                             <span><strong><?php echo (int) ($dc['users'] ?? 0); ?></strong> users</span>
                         </div>
-                        <?php if (!empty($dc['last_synced'])): ?>
-                            <div class="sd-device-mini-sync">Users synced: <?php echo $e($dc['last_synced']); ?></div>
-                        <?php endif; ?>
                         <?php if (!empty($dc['reason']) && $pillLabel !== 'ONLINE'): ?>
                             <div class="sd-device-mini-msg"><strong><?php echo $e($dc['reason']); ?></strong></div>
                         <?php endif; ?>
                         <?php if (!empty($dc['message'])): ?>
                             <?php
                             $msg = (string) $dc['message'];
-                            if (stripos($msg, 'locked') !== false) {
+                            if (stripos($msg, 'Password OK') !== false || stripos($msg, 'LAN check') !== false) {
+                                $msg = '';
+                            } elseif (stripos($msg, 'locked') !== false) {
                                 $msg = 'Admin locked — wait ~15–20 min or reboot this terminal, then Test once.';
                             } elseif (strlen($msg) > 120) {
                                 $msg = substr($msg, 0, 117) . '…';
                             }
                             ?>
+                            <?php if ($msg !== ''): ?>
                             <div class="sd-device-mini-msg"><?php echo $e($msg); ?></div>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -193,7 +186,6 @@ $deviceCards = $deviceCards ?? [];
                     · <?php echo $e($connectionStatus['tested_at']); ?>
                 <?php endif; ?>
             </div>
-            <div class="sd-meta">Last punch sync: <?php echo $e($lastSync['ended_at'] ?? 'Never'); ?></div>
         </div>
     </div>
 </div>
@@ -257,7 +249,7 @@ $deviceCards = $deviceCards ?? [];
                 <span><i class="dot other"></i>Others</span>
             </div>
         </div>
-        <a class="btn btn-sm btn-outline-secondary" href="<?php echo $e($urls['events']); ?>">View all events</a>
+        <a class="btn btn-sm btn-outline-secondary" href="<?php echo $e($urls['events']); ?>">View all attendance</a>
     </div>
     <div class="table-responsive">
         <table class="table table-hover sd-events-table mb-0">
@@ -273,7 +265,7 @@ $deviceCards = $deviceCards ?? [];
             </thead>
             <tbody>
             <?php if (empty($recentRows)): ?>
-                <tr><td colspan="6" class="text-center text-muted py-4">No attendance yet. Run a sync to pull events.</td></tr>
+                <tr><td colspan="6" class="text-center text-muted py-4">No attendance yet. Run a sync to pull records.</td></tr>
             <?php else: ?>
                 <?php foreach ($recentRows as $row): ?>
                     <tr>

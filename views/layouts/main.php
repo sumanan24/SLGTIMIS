@@ -123,9 +123,11 @@
                             }
                             $canStudentFingerprintAttendance = false;
                             $canStudentAttendanceSaoDashboard = false;
+                            $canStudentFingerprintImport = false;
                             if (isset($_SESSION['user_id'], $userModel) && is_object($userModel)) {
                                 $canStudentFingerprintAttendance = $userModel->canManageStudentFingerprintAttendance((int) $_SESSION['user_id']);
                                 $canStudentAttendanceSaoDashboard = $userModel->canViewStudentAttendanceSaoDashboard((int) $_SESSION['user_id']);
+                                $canStudentFingerprintImport = $userModel->canAccessStudentFingerprintImport((int) $_SESSION['user_id']);
                             }
                             $devicePages = ['devices'];
                             $busSeasonPages = ['bus-season-requests-sao', 'bus-season-payments'];
@@ -520,12 +522,14 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                             <span><?php echo !empty($canStudentFingerprintAttendance) ? 'Student Fingerprint' : 'SAO Attendance'; ?></span>
                                         </a>
                                     </li>
+                                    <?php if (!empty($canStudentFingerprintImport)): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/attendance/student-device/fingerprint-import" class="<?php echo (isset($page) && $page === 'student-device-attendance-fingerprint-import') ? 'active' : ''; ?>">
                                             <i class="fas fa-file-excel"></i>
                                             <span>Student Excel Export</span>
                                         </a>
                                     </li>
+                                    <?php endif; ?>
                                     <?php endif; ?>
                                 </ul>
                             </li>
