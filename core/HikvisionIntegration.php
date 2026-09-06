@@ -374,13 +374,13 @@ class HikvisionIntegration {
 
         if ($lockStatus === 'lock' || $unlockTime > 0) {
             $mins = max(1, (int) ceil($unlockTime / 60));
-            return 'HTTP 401 — device admin account is temporarily locked after failed logins'
-                . ($unlockTime > 0 ? (" (wait ~{$mins} min / {$unlockTime}s, or reboot the terminal)") : '')
-                . '. Then retry Test on Biometric machines. URL: ' . $url;
+            return 'Admin locked after failed logins'
+                . ($unlockTime > 0 ? (" — wait ~{$mins} min (or reboot this terminal), then Test once") : '')
+                . '. Do not keep clicking Test.';
         }
 
-        return 'HTTP 401 Unauthorized at ' . $url
-            . ' (user=' . $this->username . '). Digest login failed — use the same password as Device sync (HTTP port 80).';
+        return 'HTTP 401 Unauthorized (user=' . $this->username . '). '
+            . 'Wrong password — set STUDENT_HIKVISION_PASS to the device web login password.';
     }
 
     /**

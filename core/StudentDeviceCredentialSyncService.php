@@ -72,6 +72,7 @@ class StudentDeviceCredentialSyncService {
      */
     public function probeDeviceStatuses(): array {
         $out = [];
+        $skipRestReason = '';
         foreach ($this->devices() as $device) {
             $host = (string) ($device['host'] ?? '');
             $row = [
@@ -80,6 +81,7 @@ class StudentDeviceCredentialSyncService {
                 'label' => (string) ($device['label'] ?? $host),
                 'online' => false,
                 'message' => '',
+                'locked' => false,
             ];
             if ($host === '') {
                 $row['message'] = 'Missing host';
@@ -91,8 +93,21 @@ class StudentDeviceCredentialSyncService {
                 $out[] = $row;
                 continue;
             }
+            // Same admin password on all devices — stop after lock/wrong-password to avoid more lockouts
+            if ($skipRestReason !== '') {
+                $row['message'] = $skipRestReason;
+                $row['locked'] = stripos($skipRestReason, 'locked') !== false;
+                $out[] = $row;
+                continue;
+            }
             try {
                 $hik = $this->hikvisionFor($device);
+                if (!$hik->hasPasswordConfigured()) {
+                    $row['message'] = 'Password empty — set STUDENT_HIKVISION_PASS';
+                    $skipRestReason = 'Skipped — set password first (same admin on all machines).';
+                    $out[] = $row;
+                    continue;
+                }
                 $test = $hik->testConnection();
                 $row['online'] = !empty($test['success']);
                 $row['message'] = (string) ($test['message'] ?? ($row['online'] ? 'OK' : 'Failed'));
@@ -102,8 +117,22 @@ class StudentDeviceCredentialSyncService {
                         ?? $test['device_info']['deviceType']
                         ?? '');
                 }
+                $msgLower = strtolower($row['message']);
+                if (!$row['online'] && (str_contains($msgLower, 'temporarily locked') || str_contains($msgLower, 'lockstatus'))) {
+                    $row['locked'] = true;
+                    $skipRestReason = 'Skipped — admin locked on another device (same password). Wait ~15–20 min or reboot each terminal, then Test once.';
+                } elseif (!$row['online'] && str_contains($msgLower, '401')) {
+                    $skipRestReason = 'Skipped — login failed (check STUDENT_HIKVISION_PASS). Do not keep clicking Test.';
+                }
             } catch (Throwable $e) {
                 $row['message'] = $e->getMessage();
+                $msgLower = strtolower($row['message']);
+                if (str_contains($msgLower, 'temporarily locked')) {
+                    $row['locked'] = true;
+                    $skipRestReason = 'Skipped — admin locked on another device. Wait or reboot terminals, then Test once.';
+                } elseif (str_contains($msgLower, '401')) {
+                    $skipRestReason = 'Skipped — login failed (check password). Do not keep clicking Test.';
+                }
             }
             $out[] = $row;
         }

@@ -118,7 +118,15 @@ $deviceCards = $deviceCards ?? [];
                             <div class="sd-device-mini-sync">Users synced: <?php echo $e($dc['last_synced']); ?></div>
                         <?php endif; ?>
                         <?php if (!empty($dc['message'])): ?>
-                            <div class="sd-device-mini-msg"><?php echo $e($dc['message']); ?></div>
+                            <?php
+                            $msg = (string) $dc['message'];
+                            if (stripos($msg, 'locked') !== false) {
+                                $msg = 'Admin locked — wait ~15–20 min or reboot this terminal, then Test once.';
+                            } elseif (strlen($msg) > 120) {
+                                $msg = substr($msg, 0, 117) . '…';
+                            }
+                            ?>
+                            <div class="sd-device-mini-msg"><?php echo $e($msg); ?></div>
                         <?php endif; ?>
                     </div>
                 </div>

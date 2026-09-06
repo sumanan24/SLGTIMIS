@@ -2441,10 +2441,14 @@ class StudentDeviceAttendanceController extends Controller {
         ];
 
         $online = 0;
+        $locked = 0;
         $lines = [];
         foreach ($probes as $p) {
             if (!empty($p['online'])) {
                 $online++;
+            }
+            if (!empty($p['locked']) || stripos((string) ($p['message'] ?? ''), 'locked') !== false) {
+                $locked++;
             }
             $lines[] = ($p['host'] ?? '') . ': ' . (!empty($p['online']) ? 'ONLINE' : 'OFFLINE');
         }
@@ -2468,6 +2472,10 @@ class StudentDeviceAttendanceController extends Controller {
 
         if ($online > 0) {
             $_SESSION['flash_success'] = "Devices online: {$online}/" . count($probes) . ' — ' . implode(' · ', $lines);
+        } elseif ($locked > 0) {
+            $_SESSION['flash_error'] = 'Admin account locked on the terminals after failed logins. '
+                . 'Wait ~15–20 minutes OR reboot MAIN + readers, confirm password in device web UI, '
+                . 'then click Test all once. Do not keep testing while locked.';
         } else {
             $_SESSION['flash_error'] = 'All devices offline — ' . implode(' · ', $lines);
         }
