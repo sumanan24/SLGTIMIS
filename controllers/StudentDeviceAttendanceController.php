@@ -1929,47 +1929,18 @@ class StudentDeviceAttendanceController extends Controller {
         if ($raw === '') {
             return null;
         }
-        if (strncmp($raw, "\xFF\xD8\xFF", 3) === 0) {
-            return strlen($raw) > 250000 ? $this->compressJpegBytes($raw, 180000) : $raw;
-        }
-        if (!function_exists('imagecreatefromstring') || !function_exists('imagejpeg')) {
-            return null;
-        }
-        $img = @imagecreatefromstring($raw);
-        if ($img === false) {
-            return null;
-        }
-        ob_start();
-        imagejpeg($img, null, 82);
-        imagedestroy($img);
-        $jpeg = (string) ob_get_clean();
-        if ($jpeg === '' || strncmp($jpeg, "\xFF\xD8\xFF", 3) !== 0) {
-            return null;
-        }
-        return strlen($jpeg) > 250000 ? $this->compressJpegBytes($jpeg, 180000) : $jpeg;
+        // Resize + compress under ~180 KB (no device call)
+        require_once BASE_PATH . '/core/HikvisionIntegration.php';
+        $prep = new HikvisionIntegration(['host' => '127.0.0.1', 'username' => 'admin', 'password' => 'x']);
+        $out = $prep->prepareFaceJpegBytes($raw, 180000);
+        return is_string($out) && $out !== '' ? $out : null;
     }
 
     private function compressJpegBytes(string $jpeg, int $maxBytes): string {
-        if (!function_exists('imagecreatefromstring') || !function_exists('imagejpeg')) {
-            return $jpeg;
-        }
-        $img = @imagecreatefromstring($jpeg);
-        if ($img === false) {
-            return $jpeg;
-        }
-        $quality = 75;
-        $out = $jpeg;
-        while ($quality >= 40) {
-            ob_start();
-            imagejpeg($img, null, $quality);
-            $out = (string) ob_get_clean();
-            if (strlen($out) <= $maxBytes) {
-                break;
-            }
-            $quality -= 10;
-        }
-        imagedestroy($img);
-        return $out !== '' ? $out : $jpeg;
+        require_once BASE_PATH . '/core/HikvisionIntegration.php';
+        $prep = new HikvisionIntegration(['host' => '127.0.0.1', 'username' => 'admin', 'password' => 'x']);
+        $out = $prep->prepareFaceJpegBytes($jpeg, $maxBytes);
+        return is_string($out) && $out !== '' ? $out : $jpeg;
     }
 
     /**

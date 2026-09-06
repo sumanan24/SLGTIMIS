@@ -2520,6 +2520,7 @@ class HikvisionIntegration {
 
     /**
      * Upload face JPEG to person FPID via FaceDataRecord multipart (no empty faceURL).
+     * Automatically compresses/resizes oversized profile photos (target &lt; 180 KB).
      *
      * @return array{ok: bool, message: string, response?: mixed}
      */
@@ -2528,15 +2529,118 @@ class HikvisionIntegration {
         if ($employeeNo === '') {
             return ['ok' => false, 'message' => 'Employee No is required.'];
         }
-        if ($jpegBytes === '' || strncmp($jpegBytes, "\xFF\xD8\xFF", 3) !== 0) {
-            return ['ok' => false, 'message' => 'A valid JPEG face photo is required (max ~200 KB recommended).'];
+
+        $prepared = $this->prepareFaceJpegBytes($jpegBytes, 180000);
+        if ($prepared === null || $prepared === '') {
+            return ['ok' => false, 'message' => 'A valid face photo is required (JPEG/PNG). Could not prepare image.'];
         }
-        if (strlen($jpegBytes) > 250000) {
-            return ['ok' => false, 'message' => 'Face photo is too large. Use a JPEG under 200 KB.'];
+        if (strlen($prepared) > 200000) {
+            return [
+                'ok' => false,
+                'message' => 'Face photo is still too large after auto-compress ('
+                    . round(strlen($prepared) / 1024) . ' KB). Use a clearer close-up portrait under 200 KB.',
+            ];
         }
 
         $fdid = $this->resolveFaceLibraryId();
-        return $this->uploadFaceImage($employeeNo, $jpegBytes, $fdid);
+        $uploaded = $this->uploadFaceImage($employeeNo, $prepared, $fdid);
+        if (!empty($uploaded['ok']) && strlen($jpegBytes) > strlen($prepared) + 1024) {
+            $uploaded['message'] = ($uploaded['message'] ?? 'Face enrolled.')
+                . ' (auto-compressed to ' . round(strlen($prepared) / 1024) . ' KB)';
+        }
+        return $uploaded;
+    }
+
+    /**
+     * Normalize any GD-readable image to a JPEG under $maxBytes (resize + quality).
+     */
+    public function prepareFaceJpegBytes(string $imageBytes, int $maxBytes = 180000): ?string {
+        if ($imageBytes === '') {
+            return null;
+        }
+        $maxBytes = max(40000, min(200000, $maxBytes));
+
+        // Already small JPEG — keep as-is
+        if (strncmp($imageBytes, "\xFF\xD8\xFF", 3) === 0 && strlen($imageBytes) <= $maxBytes) {
+            return $imageBytes;
+        }
+
+        if (!function_exists('imagecreatefromstring') || !function_exists('imagejpeg')) {
+            // No GD — return original JPEG only if within limit
+            if (strncmp($imageBytes, "\xFF\xD8\xFF", 3) === 0 && strlen($imageBytes) <= $maxBytes) {
+                return $imageBytes;
+            }
+            return null;
+        }
+
+        $img = @imagecreatefromstring($imageBytes);
+        if ($img === false) {
+            return null;
+        }
+
+        $w = imagesx($img);
+        $h = imagesy($img);
+        if ($w < 1 || $h < 1) {
+            imagedestroy($img);
+            return null;
+        }
+
+        // Face terminals work best with moderate resolution; shrink long edge stepwise
+        $maxEdges = [640, 480, 360, 280];
+        $best = null;
+
+        foreach ($maxEdges as $maxEdge) {
+            $scale = 1.0;
+            if (max($w, $h) > $maxEdge) {
+                $scale = $maxEdge / max($w, $h);
+            }
+            $nw = max(1, (int) round($w * $scale));
+            $nh = max(1, (int) round($h * $scale));
+
+            if ($scale < 1.0) {
+                $resized = imagecreatetruecolor($nw, $nh);
+                if ($resized === false) {
+                    continue;
+                }
+                imagecopyresampled($resized, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+                $work = $resized;
+            } else {
+                $work = $img;
+            }
+
+            foreach ([85, 75, 65, 55, 45, 35] as $quality) {
+                ob_start();
+                imagejpeg($work, null, $quality);
+                $out = (string) ob_get_clean();
+                if ($out !== '' && strncmp($out, "\xFF\xD8\xFF", 3) === 0) {
+                    if ($best === null || strlen($out) < strlen($best)) {
+                        $best = $out;
+                    }
+                    if (strlen($out) <= $maxBytes) {
+                        if ($work !== $img) {
+                            imagedestroy($work);
+                        }
+                        imagedestroy($img);
+                        return $out;
+                    }
+                }
+            }
+
+            if ($work !== $img) {
+                imagedestroy($work);
+            }
+            // Already at/under source size — further shrink edges only if still too big
+            if ($scale >= 1.0 && $best !== null && strlen($best) <= $maxBytes) {
+                break;
+            }
+        }
+
+        imagedestroy($img);
+        if ($best !== null && strlen($best) <= $maxBytes) {
+            return $best;
+        }
+        // Return smallest attempt even if slightly over — caller may still reject
+        return $best;
     }
 
     /**
