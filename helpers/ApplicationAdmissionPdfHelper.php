@@ -117,7 +117,22 @@ class ApplicationAdmissionPdfHelper {
             . 'table.adm-att th{background:#f2f2f2;font-size:6.5pt;font-weight:700;text-transform:uppercase;text-align:center;}'
             . 'table.adm-att td{font-weight:600;}'
             . '.adm-asig{height:9mm;}'
-            . '.adm-note{font-size:7.5pt;font-weight:700;text-align:center;border-top:1pt solid #666;padding-top:1.3mm;margin-top:0.4mm;}';
+            . '.adm-note{font-size:7.5pt;font-weight:700;text-align:center;border-top:1pt solid #666;padding-top:1.3mm;margin-top:0.4mm;}'
+            . '.iv-body{margin:0;padding:0;}'
+            . '.iv-body-title{text-align:center;font-size:11pt;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;margin:1.5mm 0 3mm 0;}'
+            . '.iv-body-dear{font-weight:700;font-size:9.5pt;margin:0 0 2mm 0;}'
+            . '.iv-body-p{font-size:8.5pt;line-height:1.4;margin:0 0 2.2mm 0;text-align:justify;}'
+            . 'table.iv-body-details{width:100%;border-collapse:collapse;margin:1mm 0 2.5mm 0;}'
+            . 'table.iv-body-details th,table.iv-body-details td{border:none;padding:1mm 0;vertical-align:top;font-size:9pt;text-align:left;}'
+            . 'table.iv-body-details th{width:30%;font-weight:700;}'
+            . '.iv-body-h{font-size:9pt;font-weight:700;margin:2.5mm 0 1.2mm 0;}'
+            . '.iv-body-ul{margin:0 0 2mm 4mm;padding:0;font-size:8.5pt;line-height:1.4;}'
+            . '.iv-body-ul li{margin:0 0 1mm 0;}'
+            . '.iv-body-sign{margin-top:4mm;font-size:9pt;}'
+            . '.iv-body-sign-img{height:8mm;width:auto;max-width:32mm;display:block;margin:0.5mm 0 0.3mm 0;}'
+            . '.iv-body-sign-name{font-weight:700;margin:1.5mm 0 0 0;}'
+            . '.iv-body-sign-role{font-weight:700;margin:0;}'
+            . '.iv-body-sign-org{margin:0;font-size:8pt;}';
     }
 
     /**
@@ -128,12 +143,12 @@ class ApplicationAdmissionPdfHelper {
     public static function defaultExamInstructions(bool $isInterview = false): array {
         if ($isInterview) {
             return [
-                'Report to the interview venue at least 30 minutes before the scheduled time.',
-                'Bring this admission card and the original NIC for verification.',
-                'Dress appropriately and follow the interview panel instructions.',
-                'Mobile phones, smart watches, and unauthorised materials are prohibited.',
-                'Follow all instructions given by the interview panel.',
-                'Malpractice or false information may lead to disqualification.',
+                'Arrive at least 15 minutes before the scheduled interview time.',
+                'Bring original NIC, Birth Certificate, and relevant educational/NVQ certificates for verification.',
+                'Male applicants: white shirt, black jeans/trousers and formal shoes.',
+                'Female applicants: white blouse, black skirt/formal black jeans or trousers and formal shoes. Muslim female applicants may wear a black Abaya with a black or white Hijab.',
+                'Maintain a neat, clean and professional appearance.',
+                'Being called for an interview does not guarantee admission. Final selection follows applicable admission criteria.',
             ];
         }
 
@@ -148,7 +163,8 @@ class ApplicationAdmissionPdfHelper {
     }
 
     public static function wrapPdfDocument(string $bodyHtml): string {
-        $css = '@page{margin:12mm;}body{font-family:Helvetica,Arial,DejaVu Sans,sans-serif;font-size:10pt;color:#0f172a;}'
+        $css = '@page{margin:14mm;}'
+            . 'body{font-family:DejaVu Sans,Helvetica,Arial,sans-serif;font-size:10pt;color:#0f172a;}'
             . 'table.grid{width:100%;border-collapse:collapse;margin:8px 0;}table.grid th,table.grid td{border:1px solid #cbd5e1;padding:5px 7px;text-align:left;}'
             . 'table.grid th{background:#f1f5f9;font-size:9px;text-transform:uppercase;}'
             . 'table.grid td.sig{height:22px;}'

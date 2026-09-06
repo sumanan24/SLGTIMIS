@@ -35,7 +35,7 @@ class GroupModel extends Model {
     /**
      * Get all groups with course and department info
      */
-    public function getAllWithDetails($departmentId = null) {
+    public function getAllWithDetails($departmentId = null, $courseId = null) {
         $sql = "SELECT g.*, c.course_name, c.department_id, d.department_name,
                 COUNT(gs.id) as student_count
                 FROM `{$this->table}` g
@@ -50,6 +50,11 @@ class GroupModel extends Model {
         if ($departmentId) {
             $sql .= " AND c.department_id = ?";
             $params[] = $departmentId;
+            $types .= 's';
+        }
+        if ($courseId) {
+            $sql .= " AND g.course_id = ?";
+            $params[] = $courseId;
             $types .= 's';
         }
         

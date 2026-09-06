@@ -74,7 +74,7 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
 </style>
 <div class="container-fluid px-3 px-md-4 admission-form-page-wrap">
     <h1 class="page-title h4 mb-1"><?php echo $isEdit ? 'Edit' : 'Create'; ?> <?php echo $e($typeLabel); ?></h1>
-    <p class="text-muted small mb-3"><?php if ($showCourseFields): ?>Set NVQ level, language, course, and schedule details. Level 04 lists use the selected language; Level 05 is English medium and includes all applicants.<?php else: ?>Set NVQ level, language, and schedule details for this exam centre. Level 05 is English medium for all applicants. Assign department and course later when you edit the schedule.<?php endif; ?></p>
+    <p class="text-muted small mb-3"><?php if ($isInterview): ?>Choose NVQ level, department, and course. Only students marked <strong>Selected</strong> on the entrance exam for that course can be added.<?php elseif ($showCourseFields): ?>Set NVQ level, language, course, and schedule details. Level 04 lists use the selected language; Level 05 is English medium and includes all applicants.<?php else: ?>Set NVQ level, language, and schedule details for this exam centre. Level 05 is English medium for all applicants. Assign department and course later when you edit the schedule.<?php endif; ?></p>
 
     <?php if (!empty($_SESSION['error'])): ?>
         <div class="alert alert-danger"><?php echo $e($_SESSION['error']); unset($_SESSION['error']); ?></div>
@@ -82,21 +82,27 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
 
     <?php if (!$isInterview): ?>
     <div class="alert alert-info py-2 small mb-3">
-        <strong>Exam and interview pathway.</strong> Candidates sit this entrance exam first. Mark results as <strong>Selected</strong> or <strong>Not selected</strong>. Only selected candidates may be added to a later <strong>interview</strong> schedule set to “Exam and interview” for the same course.
+        <strong>Entrance exam.</strong> After results, mark candidates as <strong>Selected</strong> or <strong>Not selected</strong>. Interview schedules (department / course) list only Selected candidates.
+    </div>
+    <?php else: ?>
+    <div class="alert alert-info py-2 small mb-3">
+        Interview schedules are <strong>department and course</strong> based. Language and exam centre are not required. Applicants must already be marked <strong>Selected</strong> on an entrance exam.
     </div>
     <?php endif; ?>
 
     <form method="post" action="<?php echo APP_URL . '/' . ltrim($formAction ?? 'application-admission/store', '/'); ?>" class="admission-form-card" id="admission-schedule-form">
         <div class="card-body">
             <input type="hidden" name="schedule_type" value="<?php echo $e($type); ?>">
-            <?php if (!$isInterview): ?>
+            <?php if ($isInterview): ?>
+            <input type="hidden" name="admission_pathway" value="<?php echo $e($pathExam); ?>">
+            <?php else: ?>
             <input type="hidden" name="admission_pathway" value="<?php echo $e($pathExam); ?>">
             <?php endif; ?>
 
             <div class="admission-form-section">
-                <div class="admission-form-section-title"><?php echo $showCourseFields ? 'Course scope' : 'Exam scope'; ?></div>
+                <div class="admission-form-section-title"><?php echo $isInterview ? 'Department &amp; course' : ($showCourseFields ? 'Course scope' : 'Exam scope'); ?></div>
                 <div class="row g-3">
-                    <div class="col-md-6">
+                    <div class="<?php echo $isInterview ? 'col-md-12' : 'col-md-6'; ?>">
                         <label class="form-label" for="application_level">NVQ level <span class="text-danger">*</span></label>
                         <select name="application_level" id="application_level" class="form-select" required>
                             <option value="">Select…</option>
@@ -104,6 +110,7 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
                             <option value="05" <?php echo $selectedLevel === '05' ? 'selected' : ''; ?>>Level 05</option>
                         </select>
                     </div>
+                    <?php if (!$isInterview): ?>
                     <div class="col-md-6" id="student-language-wrap">
                         <label class="form-label" for="student_language">Language <span class="text-danger" id="student-language-req">*</span></label>
                         <select name="student_language" id="student_language" class="form-select" required>
@@ -115,6 +122,7 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
                         <div class="form-text" id="student-language-help">Only approved applicants with this language appear in counts and on the schedule.</div>
                         <div class="form-text d-none" id="student-language-help-l05">Level 05 entrance exams are English medium. All approved applicants are included (Tamil, Sinhala, and English).</div>
                     </div>
+                    <?php endif; ?>
                 </div>
                 <?php if ($showCourseFields): ?>
                 <div class="row g-3 mt-0">
@@ -130,43 +138,19 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
                             <option value="">— Select department first —</option>
                         </select>
                         <div class="form-text"><?php echo $isInterview
-                            ? '1st course preference must match; counts reflect the language above.'
+                            ? 'Required. Only entrance exam Selected students for this course appear on the applicants list.'
                             : 'Optional for this venue. When set, only matching 1st preferences are listed. Applicants already assigned to an entrance exam are excluded.'; ?></div>
                     </div>
                 </div>
                 <?php endif; ?>
             </div>
 
-            <?php if ($isInterview): ?>
-            <div class="admission-form-section mb-3" id="pathway-field-wrap">
-                <label class="form-label d-block">Admission pathway <span class="text-danger">*</span></label>
-                <div id="pathway-count-banner" class="alert alert-light border small py-2 mb-2 d-none"></div>
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="radio" name="admission_pathway" id="pathway_exam" value="<?php echo $e($pathExam); ?>"
-                        <?php echo $selectedPathway === $pathExam ? 'checked' : ''; ?> required>
-                    <label class="form-check-label" for="pathway_exam">
-                        <strong>Exam and interview</strong>
-                        <span class="d-block small text-muted">Students face the entrance exam first; only <em>Selected</em> candidates can be scheduled for this interview.</span>
-                    </label>
-                </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="admission_pathway" id="pathway_interview_only" value="<?php echo $e($pathInterviewOnly); ?>"
-                        <?php echo $selectedPathway === $pathInterviewOnly ? 'checked' : ''; ?>>
-                    <label class="form-check-label" for="pathway_interview_only">
-                        <strong>Interview only</strong>
-                        <span class="d-block small text-muted">Skip the entrance exam; approved applicants for this course can be interviewed directly.</span>
-                    </label>
-                </div>
-                <div class="form-text mt-2">Default suggestion uses approved application count: more than <?php echo (int) $pathwayMax; ?> → exam and interview; <?php echo (int) $pathwayMax; ?> or fewer → interview only. You can change this.</div>
-            </div>
-            <?php endif; ?>
-
             <div class="admission-form-section">
                 <div class="admission-form-section-title">Schedule details</div>
                 <div class="mb-3">
                     <label class="form-label" for="schedule_title">Title <span class="text-danger">*</span></label>
                     <input type="text" name="title" id="schedule_title" class="form-control" required maxlength="200"
-                           value="<?php echo $e($s['title'] ?? ''); ?>" placeholder="e.g. 2026 — Motor Mechanic entrance exam">
+                           value="<?php echo $e($s['title'] ?? ''); ?>" placeholder="<?php echo $isInterview ? 'e.g. 2026 — Motor Mechanic interview' : 'e.g. 2026 — Motor Mechanic entrance exam'; ?>">
                 </div>
                 <div class="row g-3 mb-3">
                     <div class="col-sm-4">
@@ -182,10 +166,14 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
                         <input type="time" name="end_time" class="form-control" value="<?php echo $e(substr((string) ($s['end_time'] ?? ''), 0, 5)); ?>">
                     </div>
                 </div>
+                <?php if (!$isInterview): ?>
                 <div class="mb-3">
-                    <label class="form-label">Venue <span class="text-danger">*</span></label>
+                    <label class="form-label">Venue / Centre <span class="text-danger">*</span></label>
                     <input type="text" name="venue" class="form-control" required maxlength="255" value="<?php echo $e($s['venue'] ?? ''); ?>">
                 </div>
+                <?php else: ?>
+                <input type="hidden" name="venue" value="<?php echo $e($s['venue'] ?? ''); ?>">
+                <?php endif; ?>
                 <div class="mb-0">
                     <label class="form-label">Instructions (shown on PDF / public page)</label>
                     <textarea name="instructions" class="form-control" rows="4"><?php echo $e($s['instructions'] ?? ''); ?></textarea>
@@ -193,7 +181,7 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
             </div>
             <div class="admission-form-actions">
                 <button type="submit" class="btn btn-primary">Save</button>
-                <a href="<?php echo APP_URL; ?>/application-admission" class="btn btn-outline-secondary">Cancel</a>
+                <a href="<?php echo $isInterview ? (APP_URL . '/application-admission/interviews') : (APP_URL . '/application-admission'); ?>" class="btn btn-outline-secondary">Cancel</a>
             </div>
         </div>
     </form>
@@ -201,6 +189,7 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
 <script>
 (function () {
     var showCourseFields = <?php echo $showCourseFields ? 'true' : 'false'; ?>;
+    var isInterview = <?php echo $isInterview ? 'true' : 'false'; ?>;
     var levelEl = document.getElementById('application_level');
     var langEl = document.getElementById('student_language');
     var scheduleForm = document.getElementById('admission-schedule-form');
@@ -210,7 +199,7 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
     }
 
     function syncLanguageForLevel() {
-        if (!langEl) {
+        if (!langEl || isInterview) {
             return;
         }
         var helpL04 = document.getElementById('student-language-help');
@@ -247,7 +236,7 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
     if (levelEl) {
         levelEl.addEventListener('change', syncLanguageForLevel);
     }
-    if (scheduleForm && langEl) {
+    if (scheduleForm && langEl && !isInterview) {
         scheduleForm.addEventListener('submit', function () {
             if (isLevel05()) {
                 langEl.disabled = false;
@@ -264,73 +253,27 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
     var departmentsByLevel = <?php echo json_encode($departmentsByLevel, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     var selectedCourseId = <?php echo json_encode($selectedCourseId); ?>;
     var selectedDepartmentId = <?php echo json_encode($selectedDepartmentId); ?>;
-    var isInterview = <?php echo $isInterview ? 'true' : 'false'; ?>;
-    var pathwayMax = <?php echo (int) $pathwayMax; ?>;
-    var pathExam = <?php echo json_encode($pathExam); ?>;
-    var pathInterviewOnly = <?php echo json_encode($pathInterviewOnly); ?>;
-    var userPickedPathway = <?php echo $isEdit ? 'true' : 'false'; ?>;
     var deptEl = document.getElementById('filter_department_id');
     var courseEl = document.getElementById('course_id');
     var titleEl = document.getElementById('schedule_title');
-    var pathwayBanner = document.getElementById('pathway-count-banner');
-    var pathwayExamEl = document.getElementById('pathway_exam');
-    var pathwayInterviewEl = document.getElementById('pathway_interview_only');
 
-    function defaultPathwayForCount(count) {
-        return count > pathwayMax ? pathExam : pathInterviewOnly;
-    }
-
-    function approvedCountForCourse(course) {
-        if (!course) {
-            return 0;
+    function courseCountLabel(course) {
+        if (isInterview) {
+            var sel = parseInt(course.selected_entrance_count, 10) || 0;
+            return (course.course_name || course.course_id) + ' (' + sel + ' selected)';
         }
-        // Level 05: count every language (English medium exam for all).
+        var cnt = 0;
         if (isLevel05()) {
-            if (course.approved_application_count != null) {
-                return parseInt(course.approved_application_count, 10) || 0;
+            cnt = parseInt(course.approved_application_count, 10) || 0;
+        } else {
+            var lang = langEl ? langEl.value : '';
+            if (lang && course.approved_counts_by_language && course.approved_counts_by_language[lang] != null) {
+                cnt = parseInt(course.approved_counts_by_language[lang], 10) || 0;
+            } else {
+                cnt = parseInt(course.approved_application_count, 10) || 0;
             }
         }
-        var lang = langEl ? langEl.value : '';
-        if (lang && course.approved_counts_by_language && course.approved_counts_by_language[lang] != null) {
-            return parseInt(course.approved_counts_by_language[lang], 10) || 0;
-        }
-        if (course.approved_application_count != null) {
-            return parseInt(course.approved_application_count, 10) || 0;
-        }
-        return 0;
-    }
-
-    function updatePathwayFromCourse() {
-        if (!isInterview || !courseEl.value) {
-            if (pathwayBanner) {
-                pathwayBanner.classList.add('d-none');
-            }
-            return;
-        }
-        var level = levelEl.value;
-        var list = coursesByLevel[level] || [];
-        var course = list.find(function (c) { return String(c.course_id) === String(courseEl.value); });
-        var count = approvedCountForCourse(course);
-        if (pathwayBanner) {
-            pathwayBanner.classList.remove('d-none');
-            var suggested = defaultPathwayForCount(count);
-            var suggestedLabel = suggested === pathExam ? 'Exam and interview' : 'Interview only';
-            pathwayBanner.innerHTML = isLevel05()
-                ? '<strong>' + count + '</strong> approved application(s) for this course and Level 05 (all languages, English medium). Suggested pathway: <strong>' + suggestedLabel + '</strong>.'
-                : '<strong>' + count + '</strong> approved application(s) for this course, language, and level. Suggested pathway: <strong>' + suggestedLabel + '</strong>.';
-        }
-        if (!userPickedPathway && pathwayExamEl && pathwayInterviewEl) {
-            var pick = defaultPathwayForCount(count);
-            pathwayExamEl.checked = pick === pathExam;
-            pathwayInterviewEl.checked = pick === pathInterviewOnly;
-        }
-    }
-
-    if (pathwayExamEl) {
-        pathwayExamEl.addEventListener('change', function () { if (pathwayExamEl.checked) { userPickedPathway = true; } });
-    }
-    if (pathwayInterviewEl) {
-        pathwayInterviewEl.addEventListener('change', function () { if (pathwayInterviewEl.checked) { userPickedPathway = true; } });
+        return (course.course_name || course.course_id) + ' (' + cnt + ' approved)';
     }
 
     function rebuildDepartments() {
@@ -411,8 +354,7 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
         list.forEach(function (c) {
             var opt = document.createElement('option');
             opt.value = c.course_id;
-            var cnt = approvedCountForCourse(c);
-            opt.textContent = (c.course_name || c.course_id) + ' (' + cnt + ' approved)';
+            opt.textContent = courseCountLabel(c);
             courseEl.appendChild(opt);
         });
         if (list.length === 0) {
@@ -423,31 +365,26 @@ $selectedStudentLanguage = (string) ($selectedStudentLanguage ?? '');
         if (pick) {
             courseEl.value = pick;
         }
-        updatePathwayFromCourse();
     }
 
-    if (langEl) {
+    if (langEl && !isInterview) {
         langEl.addEventListener('change', function () {
-            userPickedPathway = false;
             rebuildCourses();
         });
     }
     levelEl.addEventListener('change', function () {
         selectedCourseId = '';
         selectedDepartmentId = '';
-        userPickedPathway = false;
         rebuildDepartments();
     });
     deptEl.addEventListener('change', function () {
         selectedCourseId = '';
-        userPickedPathway = false;
         rebuildCourses();
     });
     courseEl.addEventListener('change', function () {
-        userPickedPathway = false;
-        updatePathwayFromCourse();
         if (!titleEl.value.trim() && courseEl.selectedIndex > 0) {
-            var label = courseEl.options[courseEl.selectedIndex].textContent.replace(/\s*\(\d+ approved\)\s*$/, '');
+            var label = courseEl.options[courseEl.selectedIndex].textContent
+                .replace(/\s*\(\d+ (approved|selected)\)\s*$/, '');
             titleEl.placeholder = label + (isInterview ? ' — interview' : ' — entrance examination');
         }
     });

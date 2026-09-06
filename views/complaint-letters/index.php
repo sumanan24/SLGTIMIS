@@ -20,7 +20,7 @@ $listQuery = static function (array $extra = []) use ($f): string {
 <div class="container-fluid px-3 px-md-4 py-3">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
-            <h1 class="h4 mb-1">Student Complaint Letters</h1>
+            <h1 class="h4 mb-1">Student Letters</h1>
             <p class="text-muted small mb-0">Generate formal complaint letters to parents/guardians.</p>
         </div>
         <div class="d-flex flex-wrap gap-1">

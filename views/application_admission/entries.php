@@ -63,18 +63,20 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 ?>
 <style>
 .admission-entries-page-wrap {
-    max-width: 1400px;
-    margin: 0 auto;
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    padding-bottom: 1.5rem;
 }
 
 .admission-entries-header {
-    margin-bottom: 1.25rem;
+    margin-bottom: 1rem;
 }
 
 .admission-entries-header .page-title {
     font-size: 1.25rem;
     font-weight: 600;
-    margin-bottom: 0.35rem;
+    margin-bottom: 0;
 }
 
 .admission-entries-meta {
@@ -165,44 +167,40 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 
 .admission-entries-table,
 .admission-picker-table {
-    table-layout: fixed;
+    table-layout: auto;
     width: 100%;
     margin-bottom: 0;
     border-collapse: separate;
     border-spacing: 0;
 }
 
-.admission-entries-table {
-    min-width: 74rem;
-}
-
-.admission-entries-table col.col-no { width: 3rem; }
-.admission-entries-table col.col-name { width: 12rem; }
-.admission-entries-table col.col-nic { width: 8rem; }
-.admission-entries-table col.col-province { width: 7.5rem; }
-.admission-entries-table col.col-status { width: 5.75rem; }
-.admission-entries-table col.col-dept { width: 4.5rem; }
-.admission-entries-table col.col-course { width: 11rem; }
-.admission-entries-table col.col-roll { width: 14rem; }
-.admission-entries-table col.col-card { width: 4rem; }
-.admission-entries-table col.col-whatsapp { width: 9.5rem; }
-.admission-entries-table col.col-sent { width: 4.25rem; }
-
+.admission-entries-table,
 .admission-entries-table-readonly {
-    min-width: 68rem;
+    min-width: 100%;
 }
 
-.admission-entries-table-readonly col.col-no { width: 3rem; }
-.admission-entries-table-readonly col.col-name { width: 13rem; }
-.admission-entries-table-readonly col.col-nic { width: 8rem; }
-.admission-entries-table-readonly col.col-province { width: 7.5rem; }
-.admission-entries-table-readonly col.col-status { width: 5.75rem; }
-.admission-entries-table-readonly col.col-dept { width: 4.5rem; }
-.admission-entries-table-readonly col.col-course { width: 12rem; }
-.admission-entries-table-readonly col.col-roll { width: 14rem; }
-.admission-entries-table-readonly col.col-card { width: 4rem; }
-.admission-entries-table-readonly col.col-whatsapp { width: 9.5rem; }
-.admission-entries-table-readonly col.col-sent { width: 4rem; }
+.admission-entries-table col.col-no,
+.admission-entries-table-readonly col.col-no,
+.admission-picker-table col.col-no { width: 3rem; }
+.admission-entries-table col.col-pick,
+.admission-picker-table col.col-pick { width: 2.75rem; }
+.admission-entries-table col.col-nic,
+.admission-entries-table-readonly col.col-nic,
+.admission-picker-table col.col-nic { width: 8.5rem; }
+.admission-entries-table col.col-status,
+.admission-entries-table-readonly col.col-status,
+.admission-picker-table col.col-status { width: 5.75rem; }
+.admission-entries-table col.col-dept,
+.admission-entries-table-readonly col.col-dept,
+.admission-picker-table col.col-dept { width: 4.25rem; }
+.admission-entries-table col.col-roll,
+.admission-entries-table-readonly col.col-roll { width: 15rem; }
+.admission-entries-table col.col-card,
+.admission-entries-table-readonly col.col-card { width: 3.5rem; }
+.admission-entries-table col.col-whatsapp,
+.admission-entries-table-readonly col.col-whatsapp { width: 8.5rem; }
+.admission-entries-table col.col-sent,
+.admission-entries-table-readonly col.col-sent { width: 3.75rem; }
 
 .admission-barcode-toolbar {
     display: flex;
@@ -235,17 +233,8 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 }
 
 .admission-picker-table {
-    min-width: 56rem;
+    min-width: 100%;
 }
-
-.admission-picker-table col.col-pick { width: 2.75rem; }
-.admission-picker-table col.col-no { width: 3rem; }
-.admission-picker-table col.col-name { width: 14rem; }
-.admission-picker-table col.col-nic { width: 8rem; }
-.admission-picker-table col.col-province { width: 8rem; }
-.admission-picker-table col.col-status { width: 5.75rem; }
-.admission-picker-table col.col-dept { width: 4.5rem; }
-.admission-picker-table col.col-course { width: auto; }
 
 .admission-entries-table .col-dept,
 .admission-entries-table-readonly .col-dept,
@@ -290,7 +279,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 
 .admission-text-filter {
     display: grid;
-    grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 14rem) auto;
+    grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 14rem);
     gap: 0.75rem 1rem;
     align-items: end;
 }
@@ -312,15 +301,6 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 .admission-text-filter .form-control {
     font-size: 0.875rem;
     height: 2rem;
-}
-
-.admission-text-filter .filter-hint {
-    font-size: 0.75rem;
-    color: #6c757d;
-    margin: 0;
-    padding-bottom: 0.35rem;
-    align-self: end;
-    white-space: nowrap;
 }
 
 .admission-text-hidden {
@@ -378,11 +358,6 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 @media (max-width: 767.98px) {
     .admission-text-filter {
         grid-template-columns: 1fr;
-    }
-
-    .admission-text-filter .filter-hint {
-        white-space: normal;
-        padding-bottom: 0;
     }
 }
 
@@ -454,9 +429,10 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 
 .admission-entries-table .col-name,
 .admission-picker-table .col-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    word-break: break-word;
+    min-width: 10rem;
+    max-width: 18rem;
 }
 
 .admission-entries-table .col-nic,
@@ -469,9 +445,9 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 
 .admission-entries-table .col-province,
 .admission-picker-table .col-province {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
+    min-width: 6.5rem;
 }
 
 .admission-entries-table .col-status,
@@ -484,9 +460,10 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 .admission-entries-table .col-course,
 .admission-picker-table .col-course {
     font-size: 0.8125rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    word-break: break-word;
+    min-width: 12rem;
+    max-width: 22rem;
 }
 
 .admission-entries-summary code {
@@ -533,8 +510,6 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
     letter-spacing: 0.02em;
     line-height: 1.35;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     padding: 0.15rem 0;
     color: #212529;
 }
@@ -578,13 +553,6 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
     margin-top: 0.25rem;
 }
 
-.admission-entries-toolbar .toolbar-hint {
-    flex: 1 1 200px;
-    font-size: 0.8125rem;
-    color: #6c757d;
-    margin: 0;
-}
-
 .admission-entries-secondary {
     display: flex;
     flex-wrap: wrap;
@@ -613,7 +581,6 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
     <div class="admission-entries-header d-flex flex-wrap justify-content-between align-items-start gap-3">
         <div>
             <h1 class="page-title"><?php echo $e($sch['title'] ?? 'Schedule'); ?></h1>
-            <p class="text-muted small mb-0">Manage applicants on this <?php echo $isInterview ? 'interview' : 'entrance exam'; ?> schedule.</p>
             <div class="admission-entries-meta">
                 <span class="meta-chip">NVQ <?php echo $e($sch['application_level'] ?? ''); ?></span>
                 <?php if (!empty($sch['course_name'])): ?>
@@ -635,14 +602,14 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
             </div>
         </div>
         <div class="admission-entries-actions d-flex flex-wrap gap-2">
-            <a href="<?php echo APP_URL; ?>/application-admission" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i> Back</a>
+            <a href="<?php echo $isInterview ? (APP_URL . '/application-admission/interviews') : (APP_URL . '/application-admission'); ?>" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i> Back</a>
             <?php if (!empty($canManage)): ?>
             <a href="<?php echo APP_URL; ?>/application-admission/edit?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit me-1"></i> Edit schedule</a>
             <?php endif; ?>
             <a href="<?php echo APP_URL; ?>/application-admission/pdf-schedule?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>" class="btn btn-sm btn-outline-dark"><i class="fas fa-file-pdf me-1"></i> Schedule PDF</a>
             <?php if ($entryCount > 0): ?>
-            <a href="<?php echo $e($attendanceSheetUrl); ?>" class="btn btn-sm btn-outline-dark" target="_blank" rel="noopener" title="Download printable attendance sheet in roll number order"><i class="fas fa-clipboard-list me-1"></i> Attendance sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
-            <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" title="Download postal admission cards (name &amp; address on top)"><i class="fas fa-id-card me-1"></i> Admission cards<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
+            <a href="<?php echo $e($attendanceSheetUrl); ?>" class="btn btn-sm btn-outline-dark" target="_blank" rel="noopener" title="Download printable attendance sheet"><i class="fas fa-clipboard-list me-1"></i> Attendance sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
+            <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" title="<?php echo $isInterview ? 'Download interview invitation letters' : 'Download postal admission cards (name &amp; address on top)'; ?>"><i class="fas fa-id-card me-1"></i> <?php echo $isInterview ? 'Invitation letters' : 'Admission cards'; ?><?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <?php endif; ?>
             <?php if ($isInterview): ?>
             <a href="<?php echo APP_URL; ?>/application-admission/selection?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>" class="btn btn-sm btn-outline-info"><i class="fas fa-list-check me-1"></i> Selection</a>
@@ -676,7 +643,9 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
         <?php if ($canManage && $provinceFilterActive && $pickerUnfilteredCount !== $pickerCount): ?>
         <span class="text-muted"><?php echo (int) $pickerCount; ?> to add (of <?php echo (int) $pickerUnfilteredCount; ?> eligible)</span>
         <?php endif; ?>
-        <span class="text-muted">Roll format: <code><?php echo $e($rollFormatSample); ?></code> <span class="text-muted">(serial continues within department; restarts when department changes)</span></span>
+        <?php if (!$isInterview): ?>
+        <span class="text-muted">Roll format: <code><?php echo $e($rollFormatSample); ?></code></span>
+        <?php endif; ?>
     </div>
 
     <?php if ($pickerCount > 0 || $entryCount > 0 || $provinceOptions !== []): ?>
@@ -691,14 +660,12 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                 <label for="admission_filter_nic">Filter by NIC</label>
                 <input type="search" class="form-control form-control-sm" id="admission_filter_nic" placeholder="Type NIC…" autocomplete="off">
             </div>
-            <p class="filter-hint">Filters the lists below as you type.</p>
         </div>
         <?php endif; ?>
 
         <?php if ($provinceOptions !== []): ?>
         <div class="admission-province-filter">
             <label class="filter-title" for="province_filter_all">Filter by province</label>
-            <div class="form-text">Tick one or more provinces to load only those students. Sorted by department, course, then province.</div>
             <div class="admission-province-checkboxes" id="admission-province-checkboxes">
                 <div class="form-check">
                     <input class="form-check-input province-filter-cb" type="checkbox" id="province_filter_all" value="" <?php echo !$provinceFilterActive ? 'checked' : ''; ?>>
@@ -725,30 +692,19 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 
         <?php if (!$isInterview && empty($sch['course_name']) && !empty($canManage)): ?>
         <div class="alert alert-info py-2 small mb-3">
-            <strong>Level-only load.</strong> Showing approved/rejected applicants for NVQ <?php echo $e($sch['application_level'] ?? ''); ?><?php
-                if (trim((string) ($sch['application_level'] ?? '')) === '05') {
-                    echo ' · English medium (all applicant languages)';
-                } else {
-                    $schLang = trim((string) ($sch['student_language'] ?? ''));
-                    echo $schLang !== '' ? ' · ' . $e($schLang) : '';
-                }
-            ?>. Course is optional — <a href="<?php echo APP_URL; ?>/application-admission/edit?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>">Edit schedule</a> to filter by one course. Applicants already assigned to an entrance exam are not listed.
+            Level-only list (NVQ <?php echo $e($sch['application_level'] ?? ''); ?>).
+            <a href="<?php echo APP_URL; ?>/application-admission/edit?id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>">Edit schedule</a> to filter by course.
         </div>
         <?php endif; ?>
 
         <?php if (!empty($pickerHint)): ?>
-        <div class="alert alert-light border small py-2 mb-3"><?php echo $pickerHint; ?></div>
-        <?php endif; ?>
-        <?php if (!empty($picker_entrance_fallback) && !empty($picker)): ?>
-        <div class="alert alert-warning py-2 small mb-3">
-            <strong>No entrance exam yet.</strong> Showing all approved and rejected applicants for this course because no entrance examination schedule exists. Create an entrance exam and mark <em>Selected</em> candidates when you want this interview list to follow exam results.
-        </div>
+        <div class="alert alert-light border small py-2 mb-3"><?php echo $e(is_string($pickerHint) ? $pickerHint : ''); ?></div>
         <?php endif; ?>
 
         <?php if (!empty($picker)): ?>
         <div class="admission-picker-card">
             <div class="card-header">
-                <span>Add applicants (approved or rejected)</span>
+                <span><?php echo $isInterview ? 'Add Selected entrance candidates' : 'Add applicants (approved or rejected)'; ?></span>
                 <label class="small"><input type="checkbox" id="picker-select-all" class="form-check-input"> Select all</label>
             </div>
             <div class="admission-picker-scroll">
@@ -795,6 +751,10 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
         <p class="text-muted small mb-3"><?php
             if ($provinceFilterActive) {
                 echo 'No eligible applicants to add for ' . (count($filterProvinces) === 1 ? 'province ' : 'provinces ') . $e($provinceFilterLabel) . '.';
+            } elseif ($isInterview && empty($has_entrance_schedule)) {
+                echo 'No entrance exam found for this level yet. Create an entrance exam and mark Selected candidates first.';
+            } elseif ($isInterview && (int) ($entrance_selected_count ?? 0) === 0) {
+                echo 'No Selected candidates for this course yet. Mark results on the entrance exam selection page.';
             } elseif (!empty($has_entrance_schedule) && (int) ($entrance_selected_count ?? 0) === 0) {
                 echo 'No eligible applicants yet. Open the entrance exam for this course, mark candidates as Selected, then return here.';
             } elseif (!empty($pickerHint)) {
@@ -805,7 +765,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
         ?></p>
         <?php endif; ?>
 
-        <?php if ($entryCount > 0): ?>
+        <?php if ($entryCount > 0 && !$isInterview): ?>
         <div class="admission-barcode-toolbar" id="admission-barcode-toolbar">
             <label for="zebra-printer-select">Printer</label>
             <select id="zebra-printer-select" class="form-select form-select-sm" title="Select Zebra printer">
@@ -821,7 +781,6 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
             </select>
             <button type="button" class="btn btn-dark btn-sm" id="btn-print-all-roll-numbers" title="Preview then print all student roll-number stickers to selected Zebra printer"><i class="fas fa-eye me-1"></i> Preview &amp; Print Roll Numbers</button>
             <button type="button" class="btn btn-outline-dark btn-sm" id="btn-download-stickers-pdf" title="Download roll-number stickers as PDF (2-up landscape)"><i class="fas fa-file-pdf me-1"></i> Stickers PDF</button>
-            <span class="text-muted small">Select printer · preview · PDF download · 2 stickers parallel · 4″ × 1″ strip</span>
         </div>
         <?php endif; ?>
 
@@ -829,7 +788,8 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
             <table class="table admission-entries-table mb-0">
                 <colgroup>
                     <col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-dept"><col class="col-course">
-                    <col class="col-roll"><col class="col-card"><col class="col-whatsapp"><col class="col-sent">
+                    <?php if (!$isInterview): ?><col class="col-roll"><?php endif; ?>
+                    <col class="col-card"><col class="col-whatsapp"><col class="col-sent">
                 </colgroup>
                 <thead>
                     <tr>
@@ -840,7 +800,9 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                         <th class="col-status">Status</th>
                         <th class="col-dept">Dept</th>
                         <th class="col-course">Course</th>
+                        <?php if (!$isInterview): ?>
                         <th class="col-roll">Roll / Index</th>
+                        <?php endif; ?>
                         <th class="col-card"><span class="visually-hidden">Card</span></th>
                         <th class="col-whatsapp">WhatsApp</th>
                         <th class="col-sent">Sent</th>
@@ -848,13 +810,13 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                 </thead>
                 <tbody>
                 <?php if (empty($entries)): ?>
-                    <tr><td colspan="11" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
+                    <tr><td colspan="<?php echo $isInterview ? 10 : 11; ?>" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
                 <?php else: ?>
                     <?php $i = 0; foreach ($entries as $row): $i++;
                         $entryId = (int) ($row['entry_id'] ?? 0);
                         $rollSeq = (int) ($courseWiseRollSeq[$entryId] ?? 1);
-                        $rollDisplay = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $rollSeq);
-                        $rollPrefix = ApplicationAdmissionScheduleModel::rollNumberPrefixForEntry($sch, $row);
+                        $rollDisplay = $isInterview ? '' : ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $rollSeq);
+                        $rollPrefix = $isInterview ? '' : ApplicationAdmissionScheduleModel::rollNumberPrefixForEntry($sch, $row);
                         $deptKey = ApplicationAdmissionScheduleModel::departmentCodeFromEntry($row);
                         $courseName = ApplicationAdmissionScheduleModel::courseNameFromEntry($row);
                         $waSent = !empty($row['whatsapp_sent']);
@@ -871,7 +833,9 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                         ?><span class="admission-status-badge <?php echo $e($rowStatusClass); ?>"><?php echo $e($applicationStatusLabel($row)); ?></span></td>
                         <td class="col-dept" title="<?php echo $e($deptKey); ?>"><?php echo $e($deptKey !== 'GEN' ? $deptKey : '—'); ?></td>
                         <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($courseName); ?></td>
+                        <?php if (!$isInterview): ?>
                         <td class="col-roll"><input type="text" class="form-control form-control-sm roll-index-input" name="entries[<?php echo (int) $row['entry_id']; ?>][roll_number]" value="<?php echo $e($rollDisplay); ?>" data-seq="<?php echo $rollSeq; ?>" data-roll-prefix="<?php echo $e($rollPrefix); ?>" data-dept-key="<?php echo $e($deptKey); ?>"></td>
+                        <?php endif; ?>
                         <td class="col-card">
                             <a href="<?php echo $e($admissionCardUrl((int) ($row['entry_id'] ?? 0))); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" title="Download postal admission card"><i class="fas fa-id-card" aria-hidden="true"></i><span class="visually-hidden"> Card</span></a>
                         </td>
@@ -914,12 +878,13 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 
         <div class="admission-entries-toolbar">
             <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save me-1"></i> Save applicants</button>
+            <?php if (!$isInterview): ?>
             <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-renumber-rolls"><i class="fas fa-sort-numeric-down me-1"></i> Renumber</button>
-            <?php if ($entryCount > 0): ?>
-            <a href="<?php echo $e($attendanceSheetUrl); ?>" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener" title="Download printable attendance sheet in roll number order"><i class="fas fa-clipboard-list me-1"></i> Download attendance sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
-            <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener"><i class="fas fa-id-card me-1"></i> Download admission cards<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <?php endif; ?>
-            <p class="toolbar-hint mb-0"><i class="fab fa-whatsapp text-success"></i> Use <strong>WhatsApp</strong> for links, <strong>Attendance sheet</strong> for hall signing, <strong>Admission cards</strong> for postal mail, or <strong>Preview &amp; Print Roll Numbers</strong> for Zebra stickers.</p>
+            <?php if ($entryCount > 0): ?>
+            <a href="<?php echo $e($attendanceSheetUrl); ?>" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener" title="Download printable attendance sheet"><i class="fas fa-clipboard-list me-1"></i> Attendance sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
+            <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener"><i class="fas fa-id-card me-1"></i> <?php echo $isInterview ? 'Invitation letters' : 'Admission cards'; ?><?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
+            <?php endif; ?>
         </div>
     </form>
 
@@ -943,7 +908,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 
     <?php else: ?>
 
-    <?php if ($entryCount > 0): ?>
+    <?php if ($entryCount > 0 && !$isInterview): ?>
     <div class="admission-barcode-toolbar" id="admission-barcode-toolbar">
         <label for="zebra-printer-select">Printer</label>
         <select id="zebra-printer-select" class="form-select form-select-sm" title="Select Zebra printer">
@@ -959,7 +924,6 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
         </select>
         <button type="button" class="btn btn-dark btn-sm" id="btn-print-all-roll-numbers" title="Preview then print all student roll-number stickers to selected Zebra printer"><i class="fas fa-eye me-1"></i> Preview &amp; Print Roll Numbers</button>
         <button type="button" class="btn btn-outline-dark btn-sm" id="btn-download-stickers-pdf" title="Download roll-number stickers as PDF (2-up landscape)"><i class="fas fa-file-pdf me-1"></i> Stickers PDF</button>
-        <span class="text-muted small">Select printer · preview · PDF download · 2 stickers parallel · 4″ × 1″ strip</span>
     </div>
     <?php endif; ?>
 
@@ -967,7 +931,8 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
         <table class="table admission-entries-table admission-entries-table-readonly mb-0">
             <colgroup>
                 <col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-dept"><col class="col-course">
-                <col class="col-roll"><col class="col-card"><col class="col-whatsapp"><col class="col-sent">
+                <?php if (!$isInterview): ?><col class="col-roll"><?php endif; ?>
+                <col class="col-card"><col class="col-whatsapp"><col class="col-sent">
             </colgroup>
             <thead>
                 <tr>
@@ -978,7 +943,9 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                     <th class="col-status">Status</th>
                     <th class="col-dept">Dept</th>
                     <th class="col-course">Course</th>
+                    <?php if (!$isInterview): ?>
                     <th class="col-roll">Roll / Index</th>
+                    <?php endif; ?>
                     <th class="col-card"><span class="visually-hidden">Card</span></th>
                     <th class="col-whatsapp">WhatsApp</th>
                     <th class="col-sent">Sent</th>
@@ -986,12 +953,12 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
             </thead>
             <tbody>
             <?php if (empty($entries)): ?>
-                <tr><td colspan="11" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
+                <tr><td colspan="<?php echo $isInterview ? 10 : 11; ?>" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
             <?php else: ?>
                 <?php $i = 0; foreach ($entries as $row): $i++;
                     $entryId = (int) ($row['entry_id'] ?? 0);
                     $rollSeq = (int) ($courseWiseRollSeq[$entryId] ?? 1);
-                    $rollOut = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $rollSeq);
+                    $rollOut = $isInterview ? '' : ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($sch, $row, $rollSeq);
                     $deptKey = ApplicationAdmissionScheduleModel::departmentCodeFromEntry($row);
                     $courseName = ApplicationAdmissionScheduleModel::courseNameFromEntry($row);
                     $waRow = $waByEntry[(int) ($row['entry_id'] ?? 0)] ?? null;
@@ -1012,7 +979,9 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                     ?><span class="admission-status-badge <?php echo $e($rowStatusClass); ?>"><?php echo $e($applicationStatusLabel($row)); ?></span></td>
                     <td class="col-dept" title="<?php echo $e($deptKey); ?>"><?php echo $e($deptKey !== 'GEN' ? $deptKey : '—'); ?></td>
                     <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($courseName); ?></td>
+                    <?php if (!$isInterview): ?>
                     <td class="col-roll"><span class="roll-index-readout"><?php echo $e($rollOut); ?></span></td>
+                    <?php endif; ?>
                     <td class="col-card">
                         <a href="<?php echo $e($admissionCardUrl((int) ($row['entry_id'] ?? 0))); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" title="Download postal admission card"><i class="fas fa-id-card" aria-hidden="true"></i></a>
                     </td>
@@ -1259,7 +1228,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 })();
 </script>
 <?php endif; ?>
-<?php if ($entryCount > 0): ?>
+<?php if ($entryCount > 0 && !$isInterview): ?>
 <script src="<?php echo htmlspecialchars(rtrim(APP_URL, '/') . '/assets/js/zebra-browser-print-client.js', ENT_QUOTES, 'UTF-8'); ?>"></script>
 <script src="<?php echo htmlspecialchars(rtrim(APP_URL, '/') . '/assets/js/student-barcode-sticker.js', ENT_QUOTES, 'UTF-8'); ?>"></script>
 <?php endif; ?>

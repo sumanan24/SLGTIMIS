@@ -102,12 +102,15 @@ return [
     'attendance/student-device/month' => 'StudentDeviceAttendanceController@month',
     'attendance/student-device/holidays' => 'StudentDeviceAttendanceController@holidays',
     'attendance/student-device/users' => 'StudentDeviceAttendanceController@users',
+    'attendance/student-device/users/face-photo' => 'StudentDeviceAttendanceController@facePhoto',
+    'attendance/student-device/fingerprint-import' => 'StudentDeviceAttendanceController@fingerprintImport',
     'attendance/student-device/sync' => 'StudentDeviceAttendanceController@sync',
     'attendance/student-device/search' => 'StudentDeviceAttendanceController@search',
     'attendance/student-device/filter' => 'StudentDeviceAttendanceController@filter',
     'attendance/student-device/export/excel' => 'StudentDeviceAttendanceController@exportExcel',
     'attendance/student-device/export/csv' => 'StudentDeviceAttendanceController@exportCsv',
     'attendance/student-device/export/month-excel' => 'StudentDeviceAttendanceController@exportMonthExcel',
+    'attendance/student-device/export/fingerprint-import' => 'StudentDeviceAttendanceController@exportFingerprintImport',
     'attendance/student-device/machine/test' => 'StudentDeviceAttendanceController@connectionTest',
     'attendance/student-device/logs' => 'StudentDeviceAttendanceController@logs',
     'attendance/sync-hikvision' => 'AttendanceController@syncHikvision',
@@ -252,6 +255,7 @@ return [
 
     // Application entrance exam / interview schedules (SAO, REG, ADM; DIR view)
     'application-admission' => 'ApplicationAdmissionController@index',
+    'application-admission/interviews' => 'ApplicationAdmissionController@interviews',
     'application-admission/create' => 'ApplicationAdmissionController@create',
     'application-admission/edit' => 'ApplicationAdmissionController@edit',
     'application-admission/store' => 'ApplicationAdmissionController@store',

@@ -435,9 +435,13 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
-     * Level 05 schedules sit English medium and include every applicant language.
+     * Level 05 entrance exams (and all interview schedules) include every applicant language.
      */
     public static function scheduleIgnoresApplicantLanguage(array $schedule): bool {
+        if (($schedule['schedule_type'] ?? '') === self::TYPE_INTERVIEW) {
+            return true;
+        }
+
         return trim((string) ($schedule['application_level'] ?? '')) === '05';
     }
 
@@ -840,17 +844,33 @@ class ApplicationAdmissionScheduleModel extends Model {
             return $rows;
         }
         require_once BASE_PATH . '/models/CourseModel.php';
+        require_once BASE_PATH . '/models/DepartmentModel.php';
         $courseModel = new CourseModel();
+        $deptModel = new DepartmentModel();
+        $deptCache = [];
         foreach ($rows as &$row) {
             $cid = trim((string) ($row['course_id'] ?? ''));
             if ($cid === '') {
                 $row['course_name'] = '';
                 $row['department_id'] = '';
+                $row['department_name'] = '';
                 continue;
             }
             $course = $courseModel->find($cid);
             $row['course_name'] = $course ? trim((string) ($course['course_name'] ?? '')) : $cid;
-            $row['department_id'] = $course ? trim((string) ($course['department_id'] ?? '')) : '';
+            $deptId = $course ? trim((string) ($course['department_id'] ?? '')) : '';
+            $row['department_id'] = $deptId;
+            if ($deptId === '') {
+                $row['department_name'] = '';
+                continue;
+            }
+            if (!isset($deptCache[$deptId])) {
+                $dept = $deptModel->find($deptId);
+                $deptCache[$deptId] = $dept
+                    ? trim((string) ($dept['department_name'] ?? $deptId))
+                    : $deptId;
+            }
+            $row['department_name'] = $deptCache[$deptId];
         }
         unset($row);
         return $rows;
@@ -890,6 +910,9 @@ class ApplicationAdmissionScheduleModel extends Model {
         if (array_key_exists('course_id', $data) && trim((string) $data['course_id']) === '') {
             unset($data['course_id']);
         }
+        if (array_key_exists('student_language', $data) && ($data['student_language'] === null || trim((string) $data['student_language']) === '')) {
+            unset($data['student_language']);
+        }
         $id = $this->create($data, $error);
         return $id === false ? null : (int) $id;
     }
@@ -904,6 +927,11 @@ class ApplicationAdmissionScheduleModel extends Model {
             $conn = $this->db->getConnection();
             $conn->query("UPDATE `{$this->table}` SET `course_id` = NULL WHERE `schedule_id` = " . (int) $id . ' LIMIT 1');
             unset($data['course_id']);
+        }
+        if (array_key_exists('student_language', $data) && ($data['student_language'] === null || trim((string) $data['student_language']) === '')) {
+            $conn = $this->db->getConnection();
+            $conn->query("UPDATE `{$this->table}` SET `student_language` = NULL WHERE `schedule_id` = " . (int) $id . ' LIMIT 1');
+            unset($data['student_language']);
         }
         if ($data === []) {
             return true;
@@ -1057,7 +1085,9 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
-     * Application IDs marked selected on an entrance exam for this course & NVQ level.
+     * Application IDs marked Selected on an entrance exam for this NVQ level & course.
+     * Includes: entrance schedules for that course, and level-wide entrance schedules
+     * (no course) where the applicant's 1st preference matches this course.
      *
      * @return list<int>
      */
@@ -1067,47 +1097,70 @@ class ApplicationAdmissionScheduleModel extends Model {
         if ($courseId === '' || !in_array($level, ['04', '05'], true)) {
             return [];
         }
-        $sql = 'SELECT DISTINCT e.`application_id` '
+        $sql = 'SELECT DISTINCT e.`application_id`, sa.`course_priority_1`, '
+            . 'TRIM(IFNULL(s.`course_id`, \'\')) AS `schedule_course_id` '
             . 'FROM `application_admission_schedule_entry` e '
             . 'INNER JOIN `application_admission_schedule` s ON s.`schedule_id` = e.`schedule_id` '
-            . 'WHERE s.`schedule_type` = ? AND s.`application_level` = ? AND s.`course_id` = ? '
+            . 'INNER JOIN `student_applications` sa ON sa.`application_id` = e.`application_id` '
+            . 'WHERE s.`schedule_type` = ? AND s.`application_level` = ? '
             . 'AND e.`selection_status` = ? '
+            . 'AND (TRIM(IFNULL(s.`course_id`, \'\')) = ? OR TRIM(IFNULL(s.`course_id`, \'\')) = \'\') '
             . 'ORDER BY e.`application_id` ASC';
         $rows = $this->fetchAllPrepared($sql, 'ssss', [
             self::TYPE_ENTRANCE,
             $level,
-            $courseId,
             self::SELECTION_SELECTED,
+            $courseId,
         ]);
+        require_once BASE_PATH . '/models/CourseModel.php';
+        require_once BASE_PATH . '/models/StudentApplicationModel.php';
+        $course = (new CourseModel())->find($courseId);
+        $appModel = new StudentApplicationModel();
         $ids = [];
         foreach ($rows as $row) {
             $id = (int) ($row['application_id'] ?? 0);
-            if ($id > 0) {
-                $ids[] = $id;
+            if ($id <= 0) {
+                continue;
+            }
+            $schedCourse = trim((string) ($row['schedule_course_id'] ?? ''));
+            if ($schedCourse === $courseId) {
+                $ids[$id] = $id;
+                continue;
+            }
+            if ($schedCourse === '' && self::applicationMatchesCourse($row, $courseId, $course, $appModel)) {
+                $ids[$id] = $id;
             }
         }
 
-        return $ids;
+        return array_values($ids);
     }
 
     /**
-     * Whether an entrance exam schedule exists for this NVQ level and course.
+     * Whether an entrance exam schedule exists for this NVQ level (course-specific or level-wide).
      */
     public function hasEntranceScheduleForCourse(string $level, string $courseId): bool {
         $this->ensureTables();
         $courseId = trim($courseId);
-        if ($courseId === '' || !in_array($level, ['04', '05'], true)) {
+        if (!in_array($level, ['04', '05'], true)) {
             return false;
         }
-        $sql = 'SELECT 1 FROM `application_admission_schedule` '
-            . 'WHERE `schedule_type` = ? AND `application_level` = ? AND `course_id` = ? LIMIT 1';
-        $rows = $this->fetchAllPrepared($sql, 'sss', [self::TYPE_ENTRANCE, $level, $courseId]);
+        if ($courseId !== '') {
+            $sql = 'SELECT 1 FROM `application_admission_schedule` '
+                . 'WHERE `schedule_type` = ? AND `application_level` = ? '
+                . 'AND (TRIM(IFNULL(`course_id`, \'\')) = ? OR TRIM(IFNULL(`course_id`, \'\')) = \'\') '
+                . 'LIMIT 1';
+            $rows = $this->fetchAllPrepared($sql, 'sss', [self::TYPE_ENTRANCE, $level, $courseId]);
+        } else {
+            $sql = 'SELECT 1 FROM `application_admission_schedule` '
+                . 'WHERE `schedule_type` = ? AND `application_level` = ? LIMIT 1';
+            $rows = $this->fetchAllPrepared($sql, 'ss', [self::TYPE_ENTRANCE, $level]);
+        }
 
         return $rows !== [];
     }
 
     /**
-     * Filter interview picker to entrance-qualified applicants when the course requires an exam.
+     * Interview picker: only applicants marked Selected on an entrance exam for this course.
      *
      * @param list<array<string, mixed>> $rows
      * @return list<array<string, mixed>>
@@ -1123,22 +1176,14 @@ class ApplicationAdmissionScheduleModel extends Model {
             return $rows;
         }
         $courseId = trim($courseId);
-        $pathway = self::normalizePathway($admissionPathway, self::PATHWAY_EXAM_AND_INTERVIEW);
-        if ($pathway === self::PATHWAY_INTERVIEW_ONLY) {
-            return $rows;
-        }
         $allowed = array_flip($this->getPassedEntranceApplicationIds($level, $courseId));
-        if ($allowed !== []) {
-            return array_values(array_filter($rows, function (array $row) use ($allowed): bool {
-                return isset($allowed[(int) ($row['application_id'] ?? 0)]);
-            }));
-        }
-        // No selected entrance candidates yet — if no entrance exam was created, allow picking approved applicants.
-        if (!$this->hasEntranceScheduleForCourse($level, $courseId)) {
-            return $rows;
+        if ($allowed === []) {
+            return [];
         }
 
-        return [];
+        return array_values(array_filter($rows, function (array $row) use ($allowed): bool {
+            return isset($allowed[(int) ($row['application_id'] ?? 0)]);
+        }));
     }
 
     /**

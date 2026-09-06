@@ -1016,13 +1016,14 @@ body.logged-in {
     overflow-x: hidden;
 }
 
-/* ADM role: primary sidebar order (Dashboard → Instructor Diary) */
+/* ADM role: primary sidebar order (Dashboard first; unknown items after known ones) */
 .sidebar-menu-adm {
     display: flex;
     flex-direction: column;
     min-width: 0;
 }
 
+.sidebar-menu-adm > li { order: 50; }
 .sidebar-menu-adm > li[data-nav="dashboard"] { order: 1; }
 .sidebar-menu-adm > li[data-nav="devices"] { order: 2; }
 .sidebar-menu-adm > li[data-nav="management"] { order: 3; }
@@ -1181,8 +1182,27 @@ body.logged-in {
     box-sizing: border-box;
 }
 
-.menu-item-has-children.active .submenu {
+.menu-item-has-children.active > .submenu {
     display: block;
+}
+
+.submenu .menu-item-has-children > a.menu-toggle {
+    padding-left: 2rem;
+}
+
+.submenu .submenu {
+    margin-left: 1rem;
+    margin-right: 0.25rem;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.submenu .submenu li a {
+    padding-left: 1.5rem;
+    font-size: 0.8125rem;
+}
+
+.submenu .submenu li a:hover {
+    padding-left: 1.75rem;
 }
 
 .submenu li {

@@ -81,11 +81,14 @@ class StudentDeviceAttendanceController extends Controller {
             'month' => $root . '/month',
             'holidays' => $root . '/holidays',
             'users' => $root . '/users',
+            'face_photo' => $root . '/users/face-photo',
             'sync' => $root . '/sync',
             'search' => $root . '/events',
             'export_excel' => $root . '/export/excel',
             'export_csv' => $root . '/export/csv',
             'export_month_excel' => $root . '/export/month-excel',
+            'fingerprint_import' => $root . '/fingerprint-import',
+            'export_fingerprint_import' => $root . '/export/fingerprint-import',
             'test' => $root . '/machine/test',
             'logs' => $root . '/logs',
             'warning' => $root . '/warning-letter',
@@ -171,6 +174,8 @@ class StudentDeviceAttendanceController extends Controller {
         if ($ctx['department_scope'] !== null) {
             $departmentId = $ctx['department_scope'];
         }
+        $courseId = trim((string) $this->get('course_id', ''));
+        $academicYear = trim((string) $this->get('academic_year', ''));
         $groupId = trim((string) $this->get('group_id', ''));
         $studentId = trim((string) $this->get('student_id', ''));
         $statusFilter = trim((string) $this->get('status', 'flagged'));
@@ -179,10 +184,14 @@ class StudentDeviceAttendanceController extends Controller {
         }
         $run = (string) $this->get('run', '') === '1'
             || $departmentId !== ''
+            || $courseId !== ''
+            || $academicYear !== ''
             || $groupId !== ''
             || $studentId !== '';
 
         $departmentModel = $this->model('DepartmentModel');
+        $courseModel = $this->model('CourseModel');
+        $studentModel = $this->model('StudentModel');
         $groupModel = $this->model('GroupModel');
         $allDepartments = $departmentModel->getAll();
         if ($ctx['department_scope'] !== null) {
@@ -196,12 +205,29 @@ class StudentDeviceAttendanceController extends Controller {
             $departments = $allDepartments;
         }
 
-        $groups = $departmentId !== ''
-            ? $groupModel->getAllWithDetails($departmentId)
-            : ($ctx['department_scope'] === null ? $groupModel->getAllWithDetails() : $groupModel->getAllWithDetails($ctx['department_scope']));
+        $academicYears = $studentModel->getAcademicYears();
+        $courses = [];
+        if ($departmentId !== '') {
+            $courses = $courseModel->getCoursesWithDepartment(['department_id' => $departmentId]);
+        }
+
+        $groupDept = $departmentId !== '' ? $departmentId : $ctx['department_scope'];
+        $groups = $groupModel->getAllWithDetails(
+            $groupDept !== null && $groupDept !== '' ? $groupDept : null,
+            $courseId !== '' ? $courseId : null
+        );
 
         if ($run) {
-            $dashboard = $att->buildSaoDashboard($reportMonth, $departmentId, $groupId, $studentId, $statusFilter, 3);
+            $dashboard = $att->buildSaoDashboard(
+                $reportMonth,
+                $departmentId,
+                $courseId,
+                $academicYear,
+                $groupId,
+                $studentId,
+                $statusFilter,
+                3
+            );
         } else {
             $dashboard = [
                 'flagged' => [],
@@ -230,8 +256,14 @@ class StudentDeviceAttendanceController extends Controller {
         }
 
         $studentsForFilter = [];
-        if ($run && ($departmentId !== '' || $groupId !== '')) {
-            $studentsForFilter = $att->listActiveStudentsForReport($departmentId, '', '', $groupId, '');
+        if ($run && ($departmentId !== '' || $courseId !== '' || $academicYear !== '' || $groupId !== '')) {
+            $studentsForFilter = $att->listActiveStudentsForReport(
+                $departmentId,
+                $courseId,
+                $academicYear,
+                $groupId,
+                ''
+            );
         }
 
         return $this->view('attendance/student_device/sao_dashboard', [
@@ -243,10 +275,14 @@ class StudentDeviceAttendanceController extends Controller {
             'userRole' => $ctx['role'],
             'reportMonth' => $reportMonth,
             'departmentId' => $departmentId,
+            'courseId' => $courseId,
+            'academicYear' => $academicYear,
             'groupId' => $groupId,
             'studentId' => $studentId,
             'statusFilter' => $statusFilter,
             'departments' => $departments,
+            'courses' => $courses,
+            'academicYears' => $academicYears,
             'groups' => $groups,
             'studentsForFilter' => $studentsForFilter,
             'dashboard' => $dashboard,
@@ -728,13 +764,962 @@ class StudentDeviceAttendanceController extends Controller {
         if (!$this->requireAccess()) {
             return;
         }
+
         $svc = $this->syncService();
+        $model = $svc->attendanceModel();
+        $search = trim((string) $this->get('q', $this->post('q', '')));
+        $departmentId = trim((string) $this->get('department_id', $this->post('department_id', '')));
+        $courseId = trim((string) $this->get('course_id', $this->post('course_id', '')));
+        $academicYear = trim((string) $this->get('academic_year', $this->post('academic_year', '')));
+        $courseMode = trim((string) $this->get('course_mode', $this->post('course_mode', '')));
+        if (!in_array(strtolower($courseMode), ['full', 'part', 'full time', 'part time'], true)
+            && !in_array($courseMode, ['Full', 'Part'], true)) {
+            $courseMode = '';
+        }
+        $filters = [
+            'department_id' => $departmentId,
+            'course_id' => $courseId,
+            'academic_year' => $academicYear,
+            'course_mode' => $courseMode,
+        ];
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $this->handleUsersPost($model, $svc, $search, $filters);
+            return;
+        }
+
+        $cards = $model->listMachineUsersForEnroll(
+            $search,
+            300,
+            $departmentId,
+            $courseId,
+            $academicYear,
+            $courseMode
+        );
+        // Live finger details from machine (fixes stale "0 fingers" after successful enroll).
+        $this->enrichCardsWithLiveFingerDetails($cards, $svc, $model, $search);
+
+        require_once BASE_PATH . '/models/StudentModel.php';
+        $studentModel = new StudentModel();
+        foreach ($cards as &$card) {
+            $card['profile_photo_url'] = $studentModel->getProfileImagePath($card) ?: '';
+        }
+        unset($card);
+
+        $departmentModel = $this->model('DepartmentModel');
+        $courseModel = $this->model('CourseModel');
+        $departments = $departmentModel->getAll();
+        $courses = [];
+        if ($departmentId !== '') {
+            $courses = $courseModel->getCoursesWithDepartment(['department_id' => $departmentId]);
+        }
+        $academicYears = $studentModel->getAcademicYears();
+
         return $this->view('attendance/student_device/users', [
-            'title' => 'Machine users',
+            'title' => 'Student machine users',
             'page' => 'student-device-attendance-users',
             'urls' => $this->urls(),
-            'machineUsers' => $svc->attendanceModel()->listMachineUsers(500),
+            'canManageDevice' => true,
+            'search' => $search,
+            'cards' => $cards,
+            'machineHost' => $svc->machine()->getHost(),
+            'departments' => $departments,
+            'courses' => $courses,
+            'academicYears' => $academicYears,
+            'departmentId' => $departmentId,
+            'courseId' => $courseId,
+            'academicYear' => $academicYear,
+            'courseMode' => $courseMode,
         ]);
+    }
+
+    /**
+     * Stream enrolled face JPEG from the fingerprint terminal (read machine photo).
+     */
+    public function facePhoto() {
+        if (!$this->requireAccess()) {
+            return;
+        }
+        $employeeNo = trim((string) $this->get('employee_no', ''));
+        if ($employeeNo === '' || !preg_match('/^[A-Za-z0-9_\\-\\/]{2,40}$/', $employeeNo)) {
+            http_response_code(400);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo 'Invalid employee number.';
+            exit;
+        }
+
+        $cacheFile = $this->machineFaceCachePath($employeeNo);
+        $refresh = (string) $this->get('refresh', '') === '1';
+
+        if (!$refresh && is_file($cacheFile) && (time() - (int) filemtime($cacheFile)) < 300) {
+            header('Content-Type: image/jpeg');
+            header('Cache-Control: private, max-age=120');
+            readfile($cacheFile);
+            exit;
+        }
+
+        try {
+            $hik = $this->studentHikvision();
+            $photo = $hik->getFacePhoto($employeeNo);
+            if (empty($photo['ok']) || empty($photo['jpeg'])) {
+                http_response_code(404);
+                header('Content-Type: text/plain; charset=UTF-8');
+                echo $photo['message'] ?? 'Face photo not found on machine.';
+                exit;
+            }
+            $this->cacheMachineFaceJpeg($employeeNo, $photo['jpeg']);
+            header('Content-Type: image/jpeg');
+            header('Cache-Control: private, max-age=120');
+            echo $photo['jpeg'];
+            exit;
+        } catch (Throwable $e) {
+            error_log('[StudentDevice facePhoto] ' . $e->getMessage());
+            http_response_code(502);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo 'Could not read face photo from machine.';
+            exit;
+        }
+    }
+
+    private function machineFaceCachePath(string $employeeNo): string {
+        $cacheDir = BASE_PATH . '/assets/img/machine_faces';
+        if (!is_dir($cacheDir)) {
+            @mkdir($cacheDir, 0755, true);
+        }
+        $safe = preg_replace('/[^A-Za-z0-9_-]+/', '_', trim($employeeNo)) ?: 'face';
+        return $cacheDir . '/' . $safe . '.jpg';
+    }
+
+    private function cacheMachineFaceJpeg(string $employeeNo, string $jpeg): void {
+        if ($jpeg === '' || strncmp($jpeg, "\xFF\xD8\xFF", 3) !== 0) {
+            return;
+        }
+        @file_put_contents($this->machineFaceCachePath($employeeNo), $jpeg);
+    }
+
+    private function clearMachineFaceCache(string $employeeNo): void {
+        $path = $this->machineFaceCachePath($employeeNo);
+        if (is_file($path)) {
+            @unlink($path);
+        }
+    }
+
+    /**
+     * Immediately pull Finger 01/02 + Face status from the machine and persist to DB.
+     * Retries briefly so device lag after enroll does not leave the UI at 0.
+     *
+     * @param list<int> $expectSlots Optional finger slots that should appear after a successful enroll
+     * @return array{ok: bool, count: int, slots: list<int>, face_count: int, has_face: bool, message: string}
+     */
+    private function syncEmployeeFingerInfoFromMachine(
+        HikvisionIntegration $hik,
+        StudentDeviceAttendanceModel $model,
+        string $machineId,
+        string $employeeNo,
+        string $name = '',
+        array $expectSlots = []
+    ): array {
+        $employeeNo = trim($employeeNo);
+        if ($employeeNo === '') {
+            return [
+                'ok' => false,
+                'count' => 0,
+                'slots' => [],
+                'face_count' => 0,
+                'has_face' => false,
+                'message' => 'Missing employee no',
+            ];
+        }
+
+        $detail = ['ok' => false, 'count' => 0, 'slots' => []];
+        $attempts = 4;
+        for ($i = 0; $i < $attempts; $i++) {
+            if ($i > 0) {
+                usleep(600000);
+            }
+            $detail = $hik->getFingerPrintDetails($employeeNo);
+            if (empty($detail['ok'])) {
+                continue;
+            }
+            $slots = array_values(array_map('intval', $detail['slots'] ?? []));
+            $missing = false;
+            foreach ($expectSlots as $want) {
+                $want = (int) $want;
+                if ($want > 0 && !in_array($want, $slots, true)) {
+                    $missing = true;
+                    break;
+                }
+            }
+            if (!$missing || $expectSlots === []) {
+                break;
+            }
+        }
+
+        $slots = array_values(array_map('intval', $detail['slots'] ?? []));
+        foreach ($expectSlots as $want) {
+            $want = (int) $want;
+            if ($want > 0 && !in_array($want, $slots, true)) {
+                $slots[] = $want;
+            }
+        }
+        $slots = array_values(array_unique(array_filter($slots, static fn ($n) => $n > 0)));
+        sort($slots);
+        $count = max((int) ($detail['count'] ?? 0), count($slots));
+
+        $faceCount = 0;
+        $liveUser = $hik->searchUsers(5, $employeeNo);
+        if (!empty($liveUser['users'][0])) {
+            $faceCount = (int) ($liveUser['users'][0]['face_count'] ?? 0);
+            if ($name === '' || $name === $employeeNo) {
+                $liveName = trim((string) ($liveUser['users'][0]['name'] ?? ''));
+                if ($liveName !== '') {
+                    $name = $liveName;
+                }
+            }
+        }
+
+        $model->upsertMachineUsers([[
+            'employee_no' => $employeeNo,
+            'name' => $name !== '' ? $name : $employeeNo,
+            'user_type' => 'normal',
+            'finger_count' => $count,
+            'face_count' => $faceCount,
+            'finger_slots' => $slots,
+        ]], $machineId !== '' ? $machineId : 'device');
+
+        $slotLabel = $slots === []
+            ? 'no fingers'
+            : ('Finger ' . implode(', Finger ', array_map(
+                static fn ($n) => str_pad((string) $n, 2, '0', STR_PAD_LEFT),
+                $slots
+            )));
+        $faceLabel = $faceCount > 0 ? 'Face enrolled' : 'Face empty';
+
+        return [
+            'ok' => !empty($detail['ok']) || !empty($liveUser['ok']),
+            'count' => $count,
+            'slots' => $slots,
+            'face_count' => $faceCount,
+            'has_face' => $faceCount > 0,
+            'message' => 'Synced · ' . $count . ' finger(s) (' . $slotLabel . ') · ' . $faceLabel,
+        ];
+    }
+
+    /**
+     * Load student profile image as JPEG bytes for FaceDataRecord upload.
+     */
+    private function loadStudentProfileJpegBytes(string $studentId): ?string {
+        $studentId = trim($studentId);
+        if ($studentId === '') {
+            return null;
+        }
+        require_once BASE_PATH . '/models/StudentModel.php';
+        $studentModel = new StudentModel();
+        $student = $studentModel->find($studentId);
+        if (!$student || !is_array($student)) {
+            return null;
+        }
+        $rel = trim((string) ($student['student_profile_img'] ?? $student['file_path'] ?? ''));
+        if ($rel === '') {
+            return null;
+        }
+        $rel = ltrim($rel, '/');
+        if (strpos($rel, 'assets/') === 0) {
+            $rel = substr($rel, 7);
+        }
+        if (strpos($rel, 'img/student_profile/') === 0) {
+            $rel = str_replace('img/student_profile/', 'img/Studnet_profile/', $rel);
+        }
+        if (strpos($rel, 'img/Student_profile/') === 0) {
+            $rel = str_replace('img/Student_profile/', 'img/Studnet_profile/', $rel);
+        }
+        if (strpos($rel, 'img/') !== 0) {
+            $rel = 'img/Studnet_profile/' . basename($rel);
+        }
+        $full = BASE_PATH . '/assets/' . $rel;
+        if (!is_file($full)) {
+            return null;
+        }
+        $raw = (string) file_get_contents($full);
+        if ($raw === '') {
+            return null;
+        }
+        if (strncmp($raw, "\xFF\xD8\xFF", 3) === 0) {
+            return strlen($raw) > 250000 ? $this->compressJpegBytes($raw, 180000) : $raw;
+        }
+        if (!function_exists('imagecreatefromstring') || !function_exists('imagejpeg')) {
+            return null;
+        }
+        $img = @imagecreatefromstring($raw);
+        if ($img === false) {
+            return null;
+        }
+        ob_start();
+        imagejpeg($img, null, 82);
+        imagedestroy($img);
+        $jpeg = (string) ob_get_clean();
+        if ($jpeg === '' || strncmp($jpeg, "\xFF\xD8\xFF", 3) !== 0) {
+            return null;
+        }
+        return strlen($jpeg) > 250000 ? $this->compressJpegBytes($jpeg, 180000) : $jpeg;
+    }
+
+    private function compressJpegBytes(string $jpeg, int $maxBytes): string {
+        if (!function_exists('imagecreatefromstring') || !function_exists('imagejpeg')) {
+            return $jpeg;
+        }
+        $img = @imagecreatefromstring($jpeg);
+        if ($img === false) {
+            return $jpeg;
+        }
+        $quality = 75;
+        $out = $jpeg;
+        while ($quality >= 40) {
+            ob_start();
+            imagejpeg($img, null, $quality);
+            $out = (string) ob_get_clean();
+            if (strlen($out) <= $maxBytes) {
+                break;
+            }
+            $quality -= 10;
+        }
+        imagedestroy($img);
+        return $out !== '' ? $out : $jpeg;
+    }
+
+    /**
+     * Refresh finger_count / Finger 01–02 slots from device for visible cards.
+     *
+     * @param list<array<string,mixed>> $cards
+     */
+    private function enrichCardsWithLiveFingerDetails(
+        array &$cards,
+        StudentDeviceAttendanceSyncService $svc,
+        StudentDeviceAttendanceModel $model,
+        string $search
+    ): void {
+        if ($cards === []) {
+            return;
+        }
+        $limit = ($search !== '' || count($cards) <= 24) ? count($cards) : min(12, count($cards));
+        try {
+            $hik = $this->studentHikvision();
+        } catch (Throwable $e) {
+            return;
+        }
+        $machineId = $svc->machine()->getHost();
+        for ($i = 0; $i < $limit; $i++) {
+            $eno = trim((string) ($cards[$i]['employee_no'] ?? ''));
+            if ($eno === '') {
+                continue;
+            }
+            $name = (string) ($cards[$i]['student_name'] ?? $cards[$i]['machine_name'] ?? $eno);
+            $synced = $this->syncEmployeeFingerInfoFromMachine($hik, $model, $machineId, $eno, $name, []);
+            $slots = $synced['slots'];
+            $cards[$i]['finger_count'] = $synced['count'];
+            $cards[$i]['finger_slots'] = $slots;
+            $cards[$i]['has_finger_01'] = in_array(1, $slots, true);
+            $cards[$i]['has_finger_02'] = in_array(2, $slots, true);
+            $cards[$i]['face_count'] = (int) ($synced['face_count'] ?? 0);
+            $cards[$i]['has_face'] = !empty($synced['has_face']);
+        }
+    }
+
+    private function studentHikvision(): HikvisionIntegration {
+        require_once BASE_PATH . '/core/HikvisionIntegration.php';
+        return HikvisionIntegration::fromStudentAttendanceConfig();
+    }
+
+    /**
+     * POST actions: refresh users, add user on device, enroll finger 1 / 2 / both.
+     */
+    private function handleUsersPost(
+        StudentDeviceAttendanceModel $model,
+        StudentDeviceAttendanceSyncService $svc,
+        string $search,
+        array $filters = []
+    ): void {
+        $action = trim((string) $this->post('action', ''));
+        $employeeNo = trim((string) $this->post('employee_no', ''));
+        $name = trim((string) $this->post('name', ''));
+        $studentId = trim((string) $this->post('student_id', ''));
+        $fingerNo = (int) $this->post('finger_no', 1);
+        $usersUrl = $this->usersRedirectUrl($search, '', $filters);
+
+        try {
+            if ($action === 'refresh') {
+                $hik = $this->studentHikvision();
+                $res = $hik->searchUsers(200);
+                if (!$res['ok']) {
+                    $_SESSION['flash_error'] = $res['message'] ?? 'Could not refresh users from machine.';
+                    $this->redirect($usersUrl);
+                    return;
+                }
+                $machineId = $svc->machine()->getHost();
+                $users = $res['users'] ?? [];
+                // Enrich finger slots for users already in search results (or focused search).
+                foreach ($users as &$u) {
+                    $eno = (string) ($u['employee_no'] ?? '');
+                    if ($eno === '') {
+                        continue;
+                    }
+                    if ($search !== '' && stripos($eno, $search) === false) {
+                        continue;
+                    }
+                    $detail = $hik->getFingerPrintDetails($eno);
+                    if (!empty($detail['ok'])) {
+                        $u['finger_count'] = (int) ($detail['count'] ?? $u['finger_count'] ?? 0);
+                        $u['finger_slots'] = $detail['slots'] ?? [];
+                    }
+                }
+                unset($u);
+                $saved = $model->upsertMachineUsers($users, $machineId);
+                $model->linkFingerIdsFromMachineUsers($machineId);
+                $_SESSION['flash_success'] = 'Refreshed ' . $saved . ' user(s) from machine ' . $machineId . '.';
+                $this->redirect($usersUrl);
+                return;
+            }
+
+            if ($employeeNo === '') {
+                $_SESSION['flash_error'] = 'Employee number (Person ID code) is required.';
+                $this->redirect($usersUrl);
+                return;
+            }
+
+            // Resolve name / student if missing.
+            if ($studentId === '' || $name === '') {
+                $st = $model->findActiveStudentByEmployeeNo($employeeNo);
+                if ($st) {
+                    if ($studentId === '') {
+                        $studentId = (string) ($st['student_id'] ?? '');
+                    }
+                    if ($name === '') {
+                        $ini = trim((string) ($st['student_ininame'] ?? ''));
+                        $full = trim((string) ($st['student_fullname'] ?? ''));
+                        $name = $ini !== '' ? $ini : $full;
+                    }
+                }
+            }
+            if ($name === '') {
+                $name = $employeeNo;
+            }
+
+            $hik = $this->studentHikvision();
+            $machineId = $svc->machine()->getHost();
+
+            if ($action === 'add_user' || $action === 'add_user_and_fingers') {
+                $created = $hik->createUser($employeeNo, $name, 'normal');
+                if (!$created['ok']) {
+                    $_SESSION['flash_error'] = $created['message'] ?? 'Failed to add user on machine.';
+                    $this->redirect($this->usersRedirectUrl($search, $employeeNo, $filters));
+                    return;
+                }
+                if ($studentId !== '') {
+                    $model->setStudentFingerId($studentId, $employeeNo);
+                }
+                $synced = $this->syncEmployeeFingerInfoFromMachine(
+                    $hik,
+                    $model,
+                    $machineId,
+                    $employeeNo,
+                    $name,
+                    []
+                );
+                if ($action === 'add_user') {
+                    $_SESSION['flash_success'] = ($created['message'] ?? 'User added.')
+                        . ' · ' . $synced['message'];
+                    $this->redirect($this->usersRedirectUrl($search, $employeeNo, $filters));
+                    return;
+                }
+            }
+
+            if ($action === 'add_finger' || $action === 'add_user_and_fingers') {
+                $slots = $action === 'add_user_and_fingers'
+                    ? [1, 2]
+                    : [max(1, min(2, $fingerNo > 0 ? $fingerNo : 1))];
+                $messages = [];
+                $okAll = true;
+                foreach ($slots as $slot) {
+                    $enroll = $hik->enrollFingerPrint($employeeNo, $slot);
+                    $messages[] = $enroll['message'] ?? ('Finger 0' . $slot . ($enroll['ok'] ? ' OK' : ' failed'));
+                    if (empty($enroll['ok'])) {
+                        $okAll = false;
+                        break;
+                    }
+                }
+                if ($studentId !== '') {
+                    $model->setStudentFingerId($studentId, $employeeNo);
+                }
+                // Auto-sync machine immediately after enroll
+                $synced = $this->syncEmployeeFingerInfoFromMachine(
+                    $hik,
+                    $model,
+                    $machineId,
+                    $employeeNo,
+                    $name,
+                    $okAll ? $slots : []
+                );
+                $text = implode(' ', $messages) . ' · ' . $synced['message'];
+                if ($okAll) {
+                    $_SESSION['flash_success'] = $text;
+                } else {
+                    $_SESSION['flash_error'] = $text;
+                }
+                $this->redirect($this->usersRedirectUrl($search, $employeeNo, $filters));
+                return;
+            }
+
+            if ($action === 'remove_finger') {
+                $slot = max(0, min(2, $fingerNo));
+                $del = $hik->deleteFingerPrint($employeeNo, $slot);
+                usleep(400000);
+                $synced = $this->syncEmployeeFingerInfoFromMachine(
+                    $hik,
+                    $model,
+                    $machineId,
+                    $employeeNo,
+                    $name,
+                    []
+                );
+                if (!empty($del['ok']) && $slot > 0) {
+                    $fpSlots = array_values(array_filter(
+                        $synced['slots'],
+                        static fn ($n) => (int) $n !== $slot
+                    ));
+                    $model->upsertMachineUsers([[
+                        'employee_no' => $employeeNo,
+                        'name' => $name,
+                        'user_type' => 'normal',
+                        'finger_count' => count($fpSlots),
+                        'face_count' => (int) ($synced['face_count'] ?? 0),
+                        'finger_slots' => $fpSlots,
+                    ]], $machineId);
+                    $synced['count'] = count($fpSlots);
+                    $synced['slots'] = $fpSlots;
+                    $synced['message'] = 'Synced from machine · ' . $synced['count'] . ' finger(s)';
+                } elseif (!empty($del['ok']) && $slot === 0) {
+                    $model->upsertMachineUsers([[
+                        'employee_no' => $employeeNo,
+                        'name' => $name,
+                        'user_type' => 'normal',
+                        'finger_count' => 0,
+                        'face_count' => (int) ($synced['face_count'] ?? 0),
+                        'finger_slots' => [],
+                    ]], $machineId);
+                    $synced['count'] = 0;
+                    $synced['slots'] = [];
+                    $synced['message'] = 'Synced from machine · 0 fingers';
+                }
+                if (!empty($del['ok'])) {
+                    $_SESSION['flash_success'] = ($del['message'] ?? 'Fingerprint removed.')
+                        . ' · ' . $synced['message'];
+                } else {
+                    $_SESSION['flash_error'] = ($del['message'] ?? 'Failed to remove fingerprint.')
+                        . ' · ' . $synced['message'];
+                }
+                $this->redirect($this->usersRedirectUrl($search, $employeeNo, $filters));
+                return;
+            }
+
+            if ($action === 'add_face') {
+                // Prefer MIS profile photo; fallback to on-device terminal enrollment.
+                // If face already exists and this is not a Replace, treat as success (read photo).
+                $enroll = ['ok' => false, 'message' => 'Face enroll failed.'];
+                $forceReplace = (string) $this->post('replace_face', '') === '1';
+                $existing = $hik->getFacePhoto($employeeNo);
+                if (!$forceReplace && !empty($existing['ok']) && !empty($existing['jpeg'])) {
+                    $this->cacheMachineFaceJpeg($employeeNo, $existing['jpeg']);
+                    $enroll = [
+                        'ok' => true,
+                        'message' => 'Face already enrolled on machine (photo read OK).',
+                    ];
+                } else {
+                    if ($forceReplace && !empty($existing['ok'])) {
+                        $hik->deleteFace($employeeNo);
+                        $this->clearMachineFaceCache($employeeNo);
+                        usleep(300000);
+                    }
+                    $jpeg = $this->loadStudentProfileJpegBytes($studentId);
+                    if ($jpeg !== null) {
+                        $enroll = $hik->enrollFaceFromJpeg($employeeNo, $jpeg);
+                        if (!empty($enroll['ok'])) {
+                            $enroll['message'] = ($enroll['message'] ?? 'Face enrolled.') . ' (from student profile photo)';
+                        }
+                    }
+                    if (empty($enroll['ok'])) {
+                        $onDevice = $hik->enrollFaceOnDevice($employeeNo);
+                        if (!empty($onDevice['ok'])) {
+                            $enroll = $onDevice;
+                        } elseif ($jpeg === null) {
+                            $enroll = [
+                                'ok' => false,
+                                'message' => 'No student profile photo found, and on-device face enroll failed: '
+                                    . ($onDevice['message'] ?? 'unknown'),
+                            ];
+                        } else {
+                            $enroll = [
+                                'ok' => false,
+                                'message' => 'Profile photo upload failed ('
+                                    . ($enroll['message'] ?? 'error')
+                                    . '). On-device: ' . ($onDevice['message'] ?? 'failed'),
+                            ];
+                        }
+                    }
+                    if (!empty($enroll['ok'])) {
+                        $fresh = $hik->getFacePhoto($employeeNo);
+                        if (!empty($fresh['ok']) && !empty($fresh['jpeg'])) {
+                            $this->cacheMachineFaceJpeg($employeeNo, $fresh['jpeg']);
+                        }
+                    }
+                }
+                usleep(400000);
+                $synced = $this->syncEmployeeFingerInfoFromMachine(
+                    $hik,
+                    $model,
+                    $machineId,
+                    $employeeNo,
+                    $name,
+                    []
+                );
+                if (empty($enroll['ok']) && !empty($synced['has_face'])) {
+                    $enroll = [
+                        'ok' => true,
+                        'message' => 'Face already on machine (sync confirmed).',
+                    ];
+                    $photo = $hik->getFacePhoto($employeeNo);
+                    if (!empty($photo['ok']) && !empty($photo['jpeg'])) {
+                        $this->cacheMachineFaceJpeg($employeeNo, $photo['jpeg']);
+                    }
+                }
+                if (!empty($enroll['ok']) && empty($synced['has_face'])) {
+                    // Force face flag if enroll succeeded but UserInfo lag
+                    $model->upsertMachineUsers([[
+                        'employee_no' => $employeeNo,
+                        'name' => $name,
+                        'user_type' => 'normal',
+                        'finger_count' => (int) ($synced['count'] ?? 0),
+                        'face_count' => 1,
+                        'finger_slots' => $synced['slots'] ?? [],
+                    ]], $machineId);
+                    $synced['has_face'] = true;
+                    $synced['face_count'] = 1;
+                    $synced['message'] = 'Synced · Face enrolled';
+                }
+                if ($studentId !== '') {
+                    $model->setStudentFingerId($studentId, $employeeNo);
+                }
+                $text = ($enroll['message'] ?? '') . ' · ' . $synced['message'];
+                if (!empty($enroll['ok'])) {
+                    $_SESSION['flash_success'] = $text;
+                } else {
+                    $_SESSION['flash_error'] = $text;
+                }
+                $this->redirect($this->usersRedirectUrl($search, $employeeNo, $filters));
+                return;
+            }
+
+            if ($action === 'remove_face') {
+                $del = $hik->deleteFace($employeeNo);
+                $this->clearMachineFaceCache($employeeNo);
+                usleep(400000);
+                $synced = $this->syncEmployeeFingerInfoFromMachine(
+                    $hik,
+                    $model,
+                    $machineId,
+                    $employeeNo,
+                    $name,
+                    []
+                );
+                if (!empty($del['ok'])) {
+                    $model->upsertMachineUsers([[
+                        'employee_no' => $employeeNo,
+                        'name' => $name,
+                        'user_type' => 'normal',
+                        'finger_count' => (int) ($synced['count'] ?? 0),
+                        'face_count' => 0,
+                        'finger_slots' => $synced['slots'] ?? [],
+                    ]], $machineId);
+                    $_SESSION['flash_success'] = ($del['message'] ?? 'Face removed.') . ' · Synced · Face empty';
+                } else {
+                    $_SESSION['flash_error'] = ($del['message'] ?? 'Failed to remove face.') . ' · ' . $synced['message'];
+                }
+                $this->redirect($this->usersRedirectUrl($search, $employeeNo, $filters));
+                return;
+            }
+
+            $_SESSION['flash_error'] = 'Unknown action.';
+        } catch (Throwable $e) {
+            error_log('[StudentDevice users] ' . $e->getMessage());
+            $_SESSION['flash_error'] = 'Machine action failed: ' . $e->getMessage();
+        }
+        $this->redirect($this->usersRedirectUrl($search, $employeeNo, $filters));
+    }
+
+    /** Keep focus on the same employee after enroll/remove so live finger info is visible. */
+    private function usersRedirectUrl(string $search, string $employeeNo = '', array $filters = []): string {
+        $q = trim($search);
+        if ($q === '' && trim($employeeNo) !== '') {
+            $q = trim($employeeNo);
+        }
+        $params = [];
+        if ($q !== '') {
+            $params['q'] = $q;
+        }
+        foreach (['department_id', 'course_id', 'academic_year', 'course_mode'] as $key) {
+            $val = trim((string) ($filters[$key] ?? ''));
+            if ($val !== '') {
+                $params[$key] = $val;
+            }
+        }
+        $qs = http_build_query($params);
+        return 'attendance/student-device/users' . ($qs !== '' ? ('?' . $qs) : '');
+    }
+
+    /**
+     * Student Information Excel export — filter UI (RBAC: HOD scoped; SAO/ADM/DIR/DPA/REG all depts).
+     */
+    public function fingerprintImport() {
+        $ctx = $this->requireDashboardAccess();
+        if ($ctx === null) {
+            return;
+        }
+
+        $departmentId = trim((string) $this->get('department_id', ''));
+        if ($ctx['department_scope'] !== null) {
+            $departmentId = $ctx['department_scope'];
+        }
+        $courseId = trim((string) $this->get('course_id', ''));
+        $academicYear = trim((string) $this->get('academic_year', ''));
+        $groupId = trim((string) $this->get('group_id', ''));
+        $courseMode = trim((string) $this->get('course_mode', ''));
+        if (!in_array(strtolower($courseMode), ['full', 'part', 'full time', 'part time'], true)
+            && !in_array($courseMode, ['Full', 'Part'], true)) {
+            $courseMode = '';
+        }
+        $run = (string) $this->get('run', '') === '1'
+            || $departmentId !== ''
+            || $courseId !== ''
+            || $academicYear !== ''
+            || $groupId !== ''
+            || $courseMode !== '';
+
+        $departmentModel = $this->model('DepartmentModel');
+        $courseModel = $this->model('CourseModel');
+        $studentModel = $this->model('StudentModel');
+        $groupModel = $this->model('GroupModel');
+
+        $allDepartments = $departmentModel->getAll();
+        if ($ctx['department_scope'] !== null) {
+            $departments = array_values(array_filter(
+                $allDepartments,
+                static function (array $d) use ($ctx): bool {
+                    return (string) ($d['department_id'] ?? '') === $ctx['department_scope'];
+                }
+            ));
+        } else {
+            $departments = $allDepartments;
+        }
+
+        $academicYears = $studentModel->getAcademicYears();
+        $courses = [];
+        if ($departmentId !== '') {
+            $courses = $courseModel->getCoursesWithDepartment(['department_id' => $departmentId]);
+        }
+        $groupDept = $departmentId !== '' ? $departmentId : $ctx['department_scope'];
+        $groups = $groupModel->getAllWithDetails(
+            $groupDept !== null && $groupDept !== '' ? $groupDept : null,
+            $courseId !== '' ? $courseId : null
+        );
+
+        $students = [];
+        if ($run) {
+            $students = $this->syncService()->attendanceModel()->listStudentsForFingerprintImport(
+                $departmentId,
+                $courseId,
+                $academicYear,
+                $groupId,
+                $courseMode
+            );
+            // Extra server-side HOD guard (never leak other depts).
+            if ($ctx['department_scope'] !== null) {
+                $scope = $ctx['department_scope'];
+                $students = array_values(array_filter(
+                    $students,
+                    static function (array $row) use ($scope): bool {
+                        return (string) ($row['department_id'] ?? '') === $scope;
+                    }
+                ));
+            }
+        }
+
+        $exportQuery = http_build_query(array_filter([
+            'academic_year' => $academicYear,
+            'department_id' => $departmentId,
+            'course_id' => $courseId,
+            'group_id' => $groupId,
+            'course_mode' => $courseMode,
+        ], static function ($v): bool {
+            return $v !== '' && $v !== null;
+        }));
+
+        return $this->view('attendance/student_device/fingerprint_import', [
+            'title' => 'Student Information Excel Export',
+            'page' => 'student-device-attendance-fingerprint-import',
+            'urls' => $this->urls(),
+            'canManageDevice' => $ctx['can_manage'],
+            'isHodScoped' => $ctx['department_scope'] !== null,
+            'userRole' => $ctx['role'],
+            'departments' => $departments,
+            'courses' => $courses,
+            'academicYears' => $academicYears,
+            'groups' => $groups,
+            'departmentId' => $departmentId,
+            'courseId' => $courseId,
+            'academicYear' => $academicYear,
+            'groupId' => $groupId,
+            'courseMode' => $courseMode,
+            'students' => $students,
+            'run' => $run,
+            'filterError' => '',
+            'exportUrl' => $this->urls()['export_fingerprint_import'] . ($exportQuery !== '' ? '?' . $exportQuery : ''),
+        ]);
+    }
+
+    /**
+     * Download Student Information .xlsx (RBAC enforced; read-only; does not modify student data).
+     */
+    public function exportFingerprintImport() {
+        $ctx = $this->requireDashboardAccess();
+        if ($ctx === null) {
+            return;
+        }
+
+        $departmentId = trim((string) $this->get('department_id', ''));
+        if ($ctx['department_scope'] !== null) {
+            $departmentId = $ctx['department_scope'];
+        }
+        $courseId = trim((string) $this->get('course_id', ''));
+        $academicYear = trim((string) $this->get('academic_year', ''));
+        $groupId = trim((string) $this->get('group_id', ''));
+        $courseMode = trim((string) $this->get('course_mode', ''));
+        if (!in_array(strtolower($courseMode), ['full', 'part', 'full time', 'part time'], true)
+            && !in_array($courseMode, ['Full', 'Part'], true)) {
+            $courseMode = '';
+        }
+
+        $students = $this->syncService()->attendanceModel()->listStudentsForFingerprintImport(
+            $departmentId,
+            $courseId,
+            $academicYear,
+            $groupId,
+            $courseMode
+        );
+        if ($ctx['department_scope'] !== null) {
+            $scope = $ctx['department_scope'];
+            $students = array_values(array_filter(
+                $students,
+                static function (array $row) use ($scope): bool {
+                    return (string) ($row['department_id'] ?? '') === $scope;
+                }
+            ));
+        }
+
+        if ($students === []) {
+            $_SESSION['flash_error'] = 'No authorized students found for the selected filters.';
+            $q = http_build_query(array_filter([
+                'run' => '1',
+                'academic_year' => $academicYear,
+                'department_id' => $departmentId,
+                'course_id' => $courseId,
+                'group_id' => $groupId,
+                'course_mode' => $courseMode,
+            ]));
+            $this->redirect('attendance/student-device/fingerprint-import?' . $q);
+            return;
+        }
+
+        $headers = [
+            'Person ID',
+            'Organization',
+            'Person Name',
+            'Gender',
+            'Contact',
+            'Email',
+            'Effective Time',
+            'Expiry Time',
+            'Card No.',
+            'Room No.',
+            'Floor No.',
+        ];
+        $rows = [];
+        foreach ($students as $s) {
+            $rows[] = [
+                (string) ($s['person_id'] ?? ''),
+                'SLGTI',
+                (string) ($s['person_name'] ?? ''),
+                (string) ($s['gender_code'] ?? ''),
+                (string) ($s['contact'] ?? ''),
+                (string) ($s['email'] ?? ''),
+                '',
+                '',
+                '',
+                '',
+                '',
+            ];
+        }
+
+        $baseName = 'student_information_export_' . date('Y-m-d_His');
+        require_once BASE_PATH . '/vendor/autoload.php';
+
+        if (!class_exists(\PhpOffice\PhpSpreadsheet\Spreadsheet::class)) {
+            $_SESSION['flash_error'] = 'Excel engine not available. Run composer install.';
+            $this->redirect('attendance/student-device/fingerprint-import');
+            return;
+        }
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Students');
+        $sheet->fromArray($headers, null, 'A1');
+        $sheet->fromArray($rows, null, 'A2');
+
+        $lastRow = count($rows) + 1;
+        $headerStyle = [
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '1F4E79'],
+            ],
+            'alignment' => [
+                'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+                'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
+            ],
+        ];
+        $sheet->getStyle('A1:K1')->applyFromArray($headerStyle);
+        $sheet->getRowDimension(1)->setRowHeight(22);
+        $sheet->freezePane('A2');
+        $sheet->setAutoFilter('A1:K' . $lastRow);
+
+        foreach (range('A', 'K') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+            $sheet->getStyle($col . '1:' . $col . $lastRow)
+                ->getNumberFormat()
+                ->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
+        }
+        $sheet->getStyle('A2:K' . $lastRow)->getAlignment()->setVertical(
+            \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER
+        );
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $baseName . '.xlsx"');
+        header('Cache-Control: max-age=0, no-cache, must-revalidate');
+        header('Pragma: public');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
     }
 
     public function search() {

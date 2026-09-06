@@ -201,7 +201,7 @@ class NavMenuModel extends Model {
             'route_path' => '',
             'icon_class' => 'fas fa-user-graduate',
             'page_key' => '',
-            'page_keys' => ['students', 'student-applications'],
+            'page_keys' => ['students'],
             'sort_order' => 30,
             'is_active' => 1,
         ]);
@@ -209,10 +209,46 @@ class NavMenuModel extends Model {
             $inserted++;
             foreach ([
                 ['Students', 'students', 'fas fa-user-graduate', 'students', 10, []],
-                ['Online applications', 'student-applications', 'fas fa-file-signature', 'student-applications', 20, []],
             ] as [$label, $route, $icon, $pageKey, $sort, $roles]) {
                 if ($this->createItem([
                     'parent_id' => $studentId,
+                    'label' => $label,
+                    'route_path' => $route,
+                    'icon_class' => $icon,
+                    'page_key' => $pageKey,
+                    'sort_order' => $sort,
+                    'is_active' => 1,
+                    'allowed_roles' => $roles,
+                ])) {
+                    $inserted++;
+                }
+            }
+        }
+
+        $applicationsId = $this->createItem([
+            'parent_id' => null,
+            'label' => 'Student Applications',
+            'route_path' => '',
+            'icon_class' => 'fas fa-file-signature',
+            'page_key' => '',
+            'page_keys' => [
+                'student-applications',
+                'application-admission',
+                'application-admission-entrance',
+                'application-admission-interview',
+            ],
+            'sort_order' => 35,
+            'is_active' => 1,
+        ]);
+        if ($applicationsId) {
+            $inserted++;
+            foreach ([
+                ['Online applications', 'student-applications', 'fas fa-file-alt', 'student-applications', 10, []],
+                ['Entrance exams', 'application-admission', 'fas fa-clipboard-list', 'application-admission-entrance', 20, []],
+                ['Interviews', 'application-admission/interviews', 'fas fa-comments', 'application-admission-interview', 30, []],
+            ] as [$label, $route, $icon, $pageKey, $sort, $roles]) {
+                if ($this->createItem([
+                    'parent_id' => $applicationsId,
                     'label' => $label,
                     'route_path' => $route,
                     'icon_class' => $icon,

@@ -284,29 +284,40 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             if ($canViewHostelInfo) {
                                 $studentAffairsPages[] = 'students'; // Ensure students page is in array
                             }
-                            if (!empty($canViewStudentApplications)) {
-                                $studentAffairsPages[] = 'student-applications';
-                            }
-                            if (!empty($canViewApplicationAdmissionSchedules)) {
-                                $studentAffairsPages[] = 'application-admission';
-                            }
                             if (!empty($canViewComplaintLetters)) {
                                 $studentAffairsPages[] = 'complaint-letters';
                             }
                             if ($hasGroupAccess) {
                                 $studentAffairsPages[] = 'groups';
                             }
-                            if (!empty($canProcessBusSeasonMenu)) {
+                            $studentApplicationsPages = [];
+                            if (!empty($canViewStudentApplications)) {
+                                $studentApplicationsPages[] = 'student-applications';
+                            }
+                            if (!empty($canViewApplicationAdmissionSchedules)) {
+                                $studentApplicationsPages[] = 'application-admission';
+                                $studentApplicationsPages[] = 'application-admission-entrance';
+                                $studentApplicationsPages[] = 'application-admission-interview';
+                            }
+                            $showStudentApplicationsMenu = $studentApplicationsPages !== [];
+                            $showStudentBusSeasonMenu = !empty($canProcessBusSeasonMenu);
+                            if ($showStudentApplicationsMenu) {
+                                $studentAffairsPages = array_merge($studentAffairsPages, $studentApplicationsPages);
+                            }
+                            if ($showStudentBusSeasonMenu) {
                                 $studentAffairsPages = array_merge($studentAffairsPages, $busSeasonPages);
                             }
+                            $studentInfoOpen = isset($page) && in_array($page, $studentAffairsPages, true);
+                            $studentAppsOpen = isset($page) && in_array($page, $studentApplicationsPages, true);
+                            $studentBusOpen = isset($page) && in_array($page, $busSeasonPages, true);
                             ?>
-                            <li data-nav="student-info" class="menu-item-has-children <?php echo (isset($page) && in_array($page, $studentAffairsPages)) ? 'active' : ''; ?>">
+                            <li data-nav="student-info" class="menu-item-has-children <?php echo $studentInfoOpen ? 'active' : ''; ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-user-graduate"></i>
                                     <span>Student Info</span>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
-                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, $studentAffairsPages)) ? 'display: block;' : ''; ?>">
+                                <ul class="submenu" style="<?php echo $studentInfoOpen ? 'display: block;' : ''; ?>">
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/students" class="<?php echo (isset($page) && $page === 'students') ? 'active' : ''; ?>">
                                             <i class="fas fa-user-graduate"></i>
@@ -329,43 +340,68 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    <?php if (!empty($canViewStudentApplications)): ?>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/student-applications" class="<?php echo (isset($page) && $page === 'student-applications') ? 'active' : ''; ?>">
-                                            <i class="fas fa-file-signature"></i>
-                                            <span>Online applications</span>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
-                                    <?php if (!empty($canViewApplicationAdmissionSchedules)): ?>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/application-admission" class="<?php echo (isset($page) && $page === 'application-admission') ? 'active' : ''; ?>">
-                                            <i class="fas fa-calendar-check"></i>
-                                            <span>Exam &amp; interview schedules</span>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
                                     <?php if (!empty($canViewComplaintLetters)): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/complaint-letters" class="<?php echo (isset($page) && $page === 'complaint-letters') ? 'active' : ''; ?>">
                                             <i class="fas fa-envelope-open-text"></i>
-                                            <span>Complaint Letters</span>
+                                            <span>Student Letters</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    <?php if (!empty($canProcessBusSeasonMenu)): ?>
-                                    <li class="menu-divider-submenu"></li>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/bus-season-requests/sao-process" class="<?php echo (isset($page) && $page === 'bus-season-requests-sao') ? 'active' : ''; ?>">
-                                            <i class="fas fa-bus"></i>
-                                            <span>Process Bus Season</span>
+                                    <?php if ($showStudentApplicationsMenu): ?>
+                                    <li data-nav="student-applications" class="menu-item-has-children <?php echo $studentAppsOpen ? 'active' : ''; ?>">
+                                        <a href="#" class="menu-toggle">
+                                            <i class="fas fa-file-signature"></i>
+                                            <span>Student Applications</span>
+                                            <i class="fas fa-chevron-down menu-arrow"></i>
                                         </a>
+                                        <ul class="submenu" style="<?php echo $studentAppsOpen ? 'display: block;' : ''; ?>">
+                                            <?php if (!empty($canViewStudentApplications)): ?>
+                                            <li>
+                                                <a href="<?php echo APP_URL; ?>/student-applications" class="<?php echo (isset($page) && $page === 'student-applications') ? 'active' : ''; ?>">
+                                                    <i class="fas fa-file-alt"></i>
+                                                    <span>Online applications</span>
+                                                </a>
+                                            </li>
+                                            <?php endif; ?>
+                                            <?php if (!empty($canViewApplicationAdmissionSchedules)): ?>
+                                            <li>
+                                                <a href="<?php echo APP_URL; ?>/application-admission" class="<?php echo (isset($page) && in_array($page, ['application-admission', 'application-admission-entrance'], true)) ? 'active' : ''; ?>">
+                                                    <i class="fas fa-clipboard-list"></i>
+                                                    <span>Entrance exams</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo APP_URL; ?>/application-admission/interviews" class="<?php echo (isset($page) && $page === 'application-admission-interview') ? 'active' : ''; ?>">
+                                                    <i class="fas fa-comments"></i>
+                                                    <span>Interviews</span>
+                                                </a>
+                                            </li>
+                                            <?php endif; ?>
+                                        </ul>
                                     </li>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/bus-season-requests/payment-collections" class="<?php echo (isset($page) && $page === 'bus-season-payments') ? 'active' : ''; ?>">
-                                            <i class="fas fa-money-bill-wave"></i>
-                                            <span>Payment Collections</span>
+                                    <?php endif; ?>
+                                    <?php if ($showStudentBusSeasonMenu): ?>
+                                    <li data-nav="student-bus-season" class="menu-item-has-children <?php echo $studentBusOpen ? 'active' : ''; ?>">
+                                        <a href="#" class="menu-toggle">
+                                            <i class="fas fa-bus"></i>
+                                            <span>Student Bus Season</span>
+                                            <i class="fas fa-chevron-down menu-arrow"></i>
                                         </a>
+                                        <ul class="submenu" style="<?php echo $studentBusOpen ? 'display: block;' : ''; ?>">
+                                            <li>
+                                                <a href="<?php echo APP_URL; ?>/bus-season-requests/sao-process" class="<?php echo (isset($page) && $page === 'bus-season-requests-sao') ? 'active' : ''; ?>">
+                                                    <i class="fas fa-tasks"></i>
+                                                    <span>Process Bus Season</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo APP_URL; ?>/bus-season-requests/payment-collections" class="<?php echo (isset($page) && $page === 'bus-season-payments') ? 'active' : ''; ?>">
+                                                    <i class="fas fa-money-bill-wave"></i>
+                                                    <span>Payment Collections</span>
+                                                </a>
+                                            </li>
+                                        </ul>
                                     </li>
                                     <?php endif; ?>
                                 </ul>
@@ -430,7 +466,11 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             if (!empty($hasMonthAttendanceSheetAccess)) {
                                 $studentAttendancePages[] = 'attendance-month-sheet';
                             }
-                            $studentDevicePages = ['student-device-attendance', 'student-device-attendance-events', 'student-device-attendance-month', 'student-device-attendance-holidays', 'student-device-attendance-users', 'student-device-attendance-logs', 'student-device-attendance-sao'];
+                            $studentDevicePages = ['student-device-attendance', 'student-device-attendance-events', 'student-device-attendance-month', 'student-device-attendance-holidays', 'student-device-attendance-users', 'student-device-attendance-logs', 'student-device-attendance-sao', 'student-device-attendance-fingerprint-import'];
+                            $canStudentFingerprintMenu = !empty($canStudentFingerprintAttendance) || !empty($canStudentAttendanceSaoDashboard);
+                            if ($canStudentFingerprintMenu) {
+                                $studentAttendancePages = array_merge($studentAttendancePages, $studentDevicePages);
+                            }
                             $hasStudentAttendanceMenu = !empty($studentAttendancePages);
                             ?>
                             <?php if ($hasStudentAttendanceMenu): ?>
@@ -473,16 +513,21 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                         </a>
                                     </li>
                                     <?php endif; ?>
+                                    <?php if ($canStudentFingerprintMenu): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/attendance/student-device<?php echo empty($canStudentFingerprintAttendance) ? '/sao-dashboard' : ''; ?>" class="<?php echo (isset($page) && in_array($page, $studentDevicePages, true) && $page !== 'student-device-attendance-fingerprint-import') ? 'active' : ''; ?>">
+                                            <i class="fas fa-fingerprint"></i>
+                                            <span><?php echo !empty($canStudentFingerprintAttendance) ? 'Student Fingerprint' : 'SAO Attendance'; ?></span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/attendance/student-device/fingerprint-import" class="<?php echo (isset($page) && $page === 'student-device-attendance-fingerprint-import') ? 'active' : ''; ?>">
+                                            <i class="fas fa-file-excel"></i>
+                                            <span>Student Excel Export</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
                                 </ul>
-                            </li>
-                            <?php endif; ?>
-
-                            <?php if (!empty($canStudentFingerprintAttendance) || !empty($canStudentAttendanceSaoDashboard)): ?>
-                            <li data-nav="student-fingerprint" class="<?php echo (isset($page) && in_array($page, $studentDevicePages, true)) ? 'active' : ''; ?>">
-                                <a href="<?php echo APP_URL; ?>/attendance/student-device<?php echo empty($canStudentFingerprintAttendance) ? '/sao-dashboard' : ''; ?>" class="<?php echo (isset($page) && in_array($page, $studentDevicePages, true)) ? 'active' : ''; ?>">
-                                    <i class="fas fa-fingerprint"></i>
-                                    <span><?php echo !empty($canStudentFingerprintAttendance) ? 'Student Fingerprint' : 'SAO Attendance'; ?></span>
-                                </a>
                             </li>
                             <?php endif; ?>
 
@@ -883,24 +928,32 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                     const parent = this.parentElement;
                     const submenu = parent.querySelector('.submenu');
                     
-                    // Close other submenus
-                    document.querySelectorAll('.menu-item-has-children').forEach(function(item) {
-                        if (item !== parent) {
-                            item.classList.remove('active');
-                            const otherSubmenu = item.querySelector('.submenu');
-                            if (otherSubmenu) {
-                                otherSubmenu.style.display = 'none';
+                    // Close sibling menus at the same level only (keep ancestors open for nested menus)
+                    const parentList = parent.parentElement;
+                    if (parentList) {
+                        parentList.querySelectorAll(':scope > .menu-item-has-children').forEach(function(item) {
+                            if (item !== parent) {
+                                item.classList.remove('active');
+                                const otherSubmenu = item.querySelector(':scope > .submenu');
+                                if (otherSubmenu) {
+                                    otherSubmenu.style.display = 'none';
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                     
                     // Toggle current submenu
+                    const directSubmenu = parent.querySelector(':scope > .submenu') || submenu;
                     if (parent.classList.contains('active')) {
                         parent.classList.remove('active');
-                        submenu.style.display = 'none';
+                        if (directSubmenu) {
+                            directSubmenu.style.display = 'none';
+                        }
                     } else {
                         parent.classList.add('active');
-                        submenu.style.display = 'block';
+                        if (directSubmenu) {
+                            directSubmenu.style.display = 'block';
+                        }
                     }
                 });
             });

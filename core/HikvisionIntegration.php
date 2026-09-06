@@ -68,6 +68,24 @@ class HikvisionIntegration {
         ]);
     }
 
+    /** Student fingerprint terminal (config/student_attendance_machine.php + .env). */
+    public static function fromStudentAttendanceConfig(): self {
+        $config = require BASE_PATH . '/config/student_attendance_machine.php';
+        $https = !empty($config['ssl']);
+        $port = (int) ($config['port'] ?? 0);
+        if ($port <= 0) {
+            $port = $https ? 443 : 80;
+        }
+        return new self([
+            'host' => (string) ($config['host'] ?? ''),
+            'port' => $port,
+            'username' => (string) ($config['username'] ?? 'admin'),
+            'password' => (string) ($config['password'] ?? ''),
+            'timeout' => max(15, (int) ($config['timeout'] ?? 60)),
+            'ssl' => $https,
+        ]);
+    }
+
     /** Endpoint base used for requests (for diagnostics). */
     public function getBaseUrl(): string {
         return $this->baseUrl;
@@ -878,10 +896,120 @@ class HikvisionIntegration {
                 }
                 $position += $batch;
             }
+            // UserInfo often omits numOfFP on some firmwares — enrich from FingerPrint/Count + slot probe.
+            if ($employeeNo !== '' && $users !== []) {
+                foreach ($users as &$u) {
+                    if ((string) ($u['employee_no'] ?? '') !== $employeeNo) {
+                        continue;
+                    }
+                    $detail = $this->getFingerPrintDetails($employeeNo);
+                    if (!empty($detail['ok'])) {
+                        $u['finger_count'] = (int) ($detail['count'] ?? $u['finger_count']);
+                        $u['finger_slots'] = $detail['slots'] ?? [];
+                    }
+                }
+                unset($u);
+            }
             return ['ok' => true, 'message' => 'OK', 'users' => $users];
         } catch (Exception $e) {
             return ['ok' => false, 'message' => $e->getMessage(), 'users' => $users];
         }
+    }
+
+    /**
+     * Live fingerprint slots for one employee (Count + Upload probe for IDs 1–2).
+     *
+     * @return array{ok: bool, message: string, count: int, slots: list<int>}
+     */
+    public function getFingerPrintDetails(string $employeeNo): array {
+        $employeeNo = trim($employeeNo);
+        if ($employeeNo === '') {
+            return ['ok' => false, 'message' => 'Employee No required', 'count' => 0, 'slots' => []];
+        }
+
+        $slots = [];
+        $countFromApi = null;
+
+        $countRes = $this->makeRequestDetailed(
+            $this->baseUrl . '/AccessControl/FingerPrint/Count?format=json&employeeNo=' . rawurlencode($employeeNo),
+            'GET',
+            null,
+            'application/json',
+            20
+        );
+        if ($countRes['ok'] && is_array($countRes['decoded'])) {
+            $list = $countRes['decoded']['FingerPrintCountList'] ?? null;
+            if (is_array($list)) {
+                if (!isset($list[0]) && isset($list['numberOfFP'])) {
+                    $list = [$list];
+                }
+                $total = 0;
+                $ids = [];
+                foreach ($list as $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    $total += (int) ($row['numberOfFP'] ?? 0);
+                    $fpIds = $row['fingerPrintIDs'] ?? null;
+                    if (is_array($fpIds)) {
+                        foreach ($fpIds as $id) {
+                            $ids[] = (int) $id;
+                        }
+                    }
+                }
+                $countFromApi = $total;
+                foreach ($ids as $id) {
+                    if ($id >= 1 && $id <= 10 && !in_array($id, $slots, true)) {
+                        $slots[] = $id;
+                    }
+                }
+            }
+        }
+
+        // Probe slots 1 and 2 (UI supports Finger 01 / 02). Skip if Count already gave IDs.
+        if ($slots === []) {
+            foreach ([1, 2] as $fid) {
+                $body = json_encode([
+                    'FingerPrintCond' => [
+                        'searchID' => 'fp' . $fid . time(),
+                        'employeeNo' => $employeeNo,
+                        'cardReaderNo' => 1,
+                        'fingerPrintID' => $fid,
+                    ],
+                ]);
+                $res = $this->makeRequestDetailed(
+                    $this->baseUrl . '/AccessControl/FingerPrintUpload?format=json',
+                    'POST',
+                    $body,
+                    'application/json',
+                    25
+                );
+                if (!$res['ok'] || !is_array($res['decoded'])) {
+                    continue;
+                }
+                $info = $res['decoded']['FingerPrintInfo'] ?? $res['decoded'];
+                $status = strtoupper((string) (is_array($info) ? ($info['status'] ?? '') : ''));
+                if ($status === 'OK' || $status === 'SUCCESS') {
+                    $slots[] = $fid;
+                    continue;
+                }
+                // Some firmwares return list without status OK
+                $list = is_array($info) ? ($info['FingerPrintList'] ?? null) : null;
+                if (is_array($list) && $list !== []) {
+                    $slots[] = $fid;
+                }
+            }
+        }
+
+        sort($slots);
+        $count = $countFromApi !== null ? max($countFromApi, count($slots)) : count($slots);
+
+        return [
+            'ok' => true,
+            'message' => 'OK',
+            'count' => $count,
+            'slots' => array_values($slots),
+        ];
     }
 
     /**
@@ -923,6 +1051,7 @@ class HikvisionIntegration {
 
     /**
      * Delete fingerprint slot(s) for a person on the device.
+     * fingerNo 1–10 deletes that slot; 0 deletes all fingerprints for the employee.
      *
      * @return array{ok: bool, message: string, response?: mixed}
      */
@@ -932,42 +1061,84 @@ class HikvisionIntegration {
             return ['ok' => false, 'message' => 'Employee No is required.'];
         }
 
-        $fpList = [
-            [
-                'employeeNo' => $employeeNo,
-                'enableCardReader' => [1],
-            ],
+        $detail = [
+            'employeeNo' => $employeeNo,
+            'enableCardReader' => [1],
         ];
         if ($fingerNo > 0) {
-            $fpList[0]['fingerPrintID'] = max(1, min(10, $fingerNo));
+            $detail['fingerPrintID'] = [max(1, min(10, $fingerNo))];
         }
 
-        $payload = [
-            'FingerPrintDelete' => [
-                'mode' => 'byEmployeeNo',
-                'EmployeeNoList' => [
-                    ['employeeNo' => $employeeNo],
+        $payloads = [
+            [
+                'FingerPrintDelete' => [
+                    'mode' => 'byEmployeeNo',
+                    'EmployeeNoDetail' => $detail,
                 ],
-                'fingerPrintList' => $fpList,
+            ],
+            // Legacy shape used by some firmwares
+            [
+                'FingerPrintDelete' => [
+                    'mode' => 'byEmployeeNo',
+                    'EmployeeNoList' => [['employeeNo' => $employeeNo]],
+                    'fingerPrintList' => [
+                        array_filter([
+                            'employeeNo' => $employeeNo,
+                            'enableCardReader' => [1],
+                            'fingerPrintID' => $fingerNo > 0 ? max(1, min(10, $fingerNo)) : null,
+                        ], static fn ($v) => $v !== null),
+                    ],
+                ],
             ],
         ];
 
+        $lastMsg = 'Failed to delete fingerprint.';
+        $lastResp = null;
         try {
-            $url = $this->baseUrl . '/AccessControl/FingerPrint/Delete?format=json';
-            $response = $this->makeRequest($url, 'PUT', json_encode($payload), 'application/json');
-            if ($this->isHikvisionOk($response)) {
-                return ['ok' => true, 'message' => 'Old fingerprint removed.', 'response' => $response];
+            foreach ($payloads as $payload) {
+                foreach (['json', 'xml'] as $fmt) {
+                    if ($fmt === 'json') {
+                        $url = $this->baseUrl . '/AccessControl/FingerPrint/Delete?format=json';
+                        $body = json_encode($payload);
+                        $ct = 'application/json';
+                    } else {
+                        $url = $this->baseUrl . '/AccessControl/FingerPrint/Delete';
+                        $fpIdXml = $fingerNo > 0
+                            ? '<fingerPrintID>' . max(1, min(10, $fingerNo)) . '</fingerPrintID>'
+                            : '';
+                        $body = '<?xml version="1.0" encoding="UTF-8"?>'
+                            . '<FingerPrintDelete version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">'
+                            . '<mode>byEmployeeNo</mode>'
+                            . '<EmployeeNoDetail>'
+                            . '<employeeNo>' . htmlspecialchars($employeeNo, ENT_XML1) . '</employeeNo>'
+                            . '<enableCardReader>1</enableCardReader>'
+                            . $fpIdXml
+                            . '</EmployeeNoDetail>'
+                            . '</FingerPrintDelete>';
+                        $ct = 'application/xml; charset="UTF-8"';
+                    }
+                    $res = $this->makeRequestDetailed($url, 'PUT', $body, $ct, 30);
+                    $lastResp = $res['decoded'] ?? $res['body'];
+                    if ($res['ok'] && $this->isHikvisionOk(is_array($res['decoded']) ? $res['decoded'] : ['statusCode' => 1])) {
+                        $slot = $fingerNo > 0 ? ('Finger 0' . $fingerNo) : 'all fingerprints';
+                        return ['ok' => true, 'message' => $slot . ' removed for ' . $employeeNo . '.', 'response' => $lastResp];
+                    }
+                    $lastMsg = $this->hikvisionErrorMessage(
+                        is_array($res['decoded']) ? $res['decoded'] : null,
+                        'HTTP ' . $res['http_code']
+                    );
+                    // Only try first JSON payload variants then XML once
+                    if ($fmt === 'xml') {
+                        break 2;
+                    }
+                }
             }
-            // Not found / empty is fine when replacing
-            $sub = is_array($response)
-                ? (string) ($response['subStatusCode'] ?? ($response['ResponseStatus']['subStatusCode'] ?? ''))
-                : '';
-            if ($sub === '' || stripos($sub, 'not') !== false || stripos((string) $this->hikvisionErrorMessage($response), 'not') !== false) {
-                return ['ok' => true, 'message' => 'No previous fingerprint (or already cleared).', 'response' => $response];
+            // Not found is OK when clearing before re-enroll
+            if (stripos($lastMsg, 'not') !== false || stripos($lastMsg, 'noFP') !== false) {
+                return ['ok' => true, 'message' => 'No previous fingerprint (or already cleared).', 'response' => $lastResp];
             }
-            return ['ok' => false, 'message' => $this->hikvisionErrorMessage($response, 'Failed to delete fingerprint.'), 'response' => $response];
+            return ['ok' => false, 'message' => $lastMsg, 'response' => $lastResp];
         } catch (Exception $e) {
-            // Many firmwares return error when none exist — treat as OK for replace flow
             return ['ok' => true, 'message' => 'Fingerprint delete skipped: ' . $e->getMessage()];
         }
     }
@@ -1022,7 +1193,7 @@ class HikvisionIntegration {
 
     /**
      * Capture fingerprint on the terminal, then assign it to employeeNo.
-     * Person must stand at the device and place a finger when prompted.
+     * Tries JSON + XML payloads (DS-K1T often returns badXmlContent for JSON-only CaptureFingerPrint).
      *
      * @return array{ok: bool, message: string, response?: mixed}
      */
@@ -1032,29 +1203,143 @@ class HikvisionIntegration {
             return ['ok' => false, 'message' => 'Employee No is required.'];
         }
         $fingerNo = max(1, min(10, $fingerNo));
+        $slotLabel = 'Finger 0' . $fingerNo;
+        $errors = [];
 
         try {
-            $captureUrl = $this->baseUrl . '/AccessControl/CaptureFingerPrint?format=json';
-            $captureBody = json_encode([
-                'CaptureFingerPrintCond' => [
-                    'fingerNo' => $fingerNo,
-                ],
-            ]);
-            // Capture waits for the person at the device
-            $captured = $this->makeRequest($captureUrl, 'POST', $captureBody, 'application/json', 60);
-            $fpBlock = is_array($captured) ? ($captured['CaptureFingerPrint'] ?? $captured) : null;
-            $printData = is_array($fpBlock) ? ($fpBlock['fingerData'] ?? $fpBlock['fingerprintData'] ?? null) : null;
+            $captured = $this->captureFingerPrintData($fingerNo, $errors);
+            $printData = $captured['fingerData'] ?? null;
+            $quality = $captured['quality'] ?? null;
+
             if (!is_string($printData) || $printData === '') {
+                // Fallback: open terminal enrollment UI and wait for finger_count to increase
+                $ui = $this->enrollFingerPrintViaTerminalUi($employeeNo, $fingerNo);
+                if (!empty($ui['ok'])) {
+                    return $ui;
+                }
+                $detail = $errors !== [] ? implode('; ', array_slice(array_unique($errors), 0, 3)) : 'no finger data';
                 return [
                     'ok' => false,
-                    'message' => $this->hikvisionErrorMessage($captured, 'Fingerprint capture failed or timed out. Ask the person to place a finger on the device, then try again.'),
-                    'response' => $captured,
+                    'message' => $slotLabel . ' capture failed. Ask the student to place a finger on the scanner, then try again. (' . $detail . ')',
+                    'response' => $captured['raw'] ?? null,
                 ];
             }
 
-            $quality = is_array($fpBlock) ? ($fpBlock['fingerPrintQuality'] ?? null) : null;
-            $downloadUrl = $this->baseUrl . '/AccessControl/FingerPrintDownload?format=json';
-            $downloadBody = json_encode([
+            $saved = $this->downloadFingerPrintToUser($employeeNo, $fingerNo, $printData, $errors);
+            if (!empty($saved['ok'])) {
+                $q = $quality !== null ? ' (quality: ' . $quality . ')' : '';
+                return [
+                    'ok' => true,
+                    'message' => $slotLabel . ' enrolled for ' . $employeeNo . $q . '.',
+                    'response' => $saved['response'] ?? null,
+                ];
+            }
+
+            return [
+                'ok' => false,
+                'message' => $slotLabel . ' captured but save failed: '
+                    . ($saved['message'] ?? ($errors[0] ?? 'unknown')),
+                'response' => $saved['response'] ?? null,
+            ];
+        } catch (Exception $e) {
+            return ['ok' => false, 'message' => $slotLabel . ': ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * @param list<string> $errors
+     * @return array{fingerData:?string, quality:mixed, raw:mixed}
+     */
+    private function captureFingerPrintData(int $fingerNo, array &$errors): array {
+        $attempts = [
+            [
+                'url' => $this->baseUrl . '/AccessControl/CaptureFingerPrint?format=json',
+                'body' => json_encode(['CaptureFingerPrintCond' => ['fingerNo' => $fingerNo]]),
+                'ct' => 'application/json',
+            ],
+            [
+                'url' => $this->baseUrl . '/AccessControl/CaptureFingerPrint',
+                'body' => '<?xml version="1.0" encoding="UTF-8"?>'
+                    . '<CaptureFingerPrintCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">'
+                    . '<fingerNo>' . $fingerNo . '</fingerNo>'
+                    . '</CaptureFingerPrintCond>',
+                'ct' => 'application/xml; charset="UTF-8"',
+            ],
+            [
+                'url' => $this->baseUrl . '/AccessControl/CaptureFingerPrint?format=json',
+                'body' => json_encode(['CaptureFingerPrintCond' => ['fingerNo' => $fingerNo, 'employeeNo' => '']]),
+                'ct' => 'application/json',
+            ],
+        ];
+
+        foreach ($attempts as $i => $att) {
+            $res = $this->makeRequestDetailed($att['url'], 'POST', $att['body'], $att['ct'], 70);
+            $decoded = $res['decoded'];
+            if ($res['http_code'] >= 400) {
+                $errors[] = 'Capture#' . ($i + 1) . ' HTTP ' . $res['http_code'] . ' '
+                    . $this->hikvisionErrorMessage(is_array($decoded) ? $decoded : null, substr($res['body'], 0, 120));
+                continue;
+            }
+            $fpBlock = is_array($decoded) ? ($decoded['CaptureFingerPrint'] ?? $decoded) : null;
+            $printData = is_array($fpBlock)
+                ? ($fpBlock['fingerData'] ?? $fpBlock['fingerprintData'] ?? null)
+                : null;
+            // Some firmwares nest under ResponseStatus-like wrappers or return Progress first
+            if ((!is_string($printData) || $printData === '') && is_string($res['body']) && $res['body'] !== '') {
+                if (preg_match('/<(?:fingerData|fingerprintData)>([^<]+)</i', $res['body'], $m)) {
+                    $printData = html_entity_decode($m[1], ENT_QUOTES | ENT_XML1, 'UTF-8');
+                }
+            }
+            if (is_string($printData) && $printData !== '') {
+                return [
+                    'fingerData' => $printData,
+                    'quality' => is_array($fpBlock) ? ($fpBlock['fingerPrintQuality'] ?? $fpBlock['fingerNo'] ?? null) : null,
+                    'raw' => $decoded ?? $res['body'],
+                ];
+            }
+            // Poll progress endpoint (XML devices)
+            for ($p = 0; $p < 20; $p++) {
+                usleep(500000);
+                $prog = $this->makeRequestDetailed(
+                    $this->baseUrl . '/AccessControl/CaptureFingerPrint/Progress',
+                    'GET',
+                    null,
+                    'application/xml',
+                    15
+                );
+                if ($prog['http_code'] >= 400) {
+                    break;
+                }
+                $block = is_array($prog['decoded'])
+                    ? ($prog['decoded']['CaptureFingerPrint'] ?? $prog['decoded'])
+                    : null;
+                $data = is_array($block) ? ($block['fingerData'] ?? $block['fingerprintData'] ?? null) : null;
+                if ((!is_string($data) || $data === '') && is_string($prog['body'])) {
+                    if (preg_match('/<(?:fingerData|fingerprintData)>([^<]+)</i', $prog['body'], $m2)) {
+                        $data = html_entity_decode($m2[1], ENT_QUOTES | ENT_XML1, 'UTF-8');
+                    }
+                }
+                if (is_string($data) && $data !== '') {
+                    return [
+                        'fingerData' => $data,
+                        'quality' => is_array($block) ? ($block['fingerPrintQuality'] ?? null) : null,
+                        'raw' => $prog['decoded'] ?? $prog['body'],
+                    ];
+                }
+            }
+            $errors[] = 'Capture#' . ($i + 1) . ' returned no fingerData';
+        }
+
+        return ['fingerData' => null, 'quality' => null, 'raw' => null];
+    }
+
+    /**
+     * @param list<string> $errors
+     * @return array{ok: bool, message?: string, response?: mixed}
+     */
+    private function downloadFingerPrintToUser(string $employeeNo, int $fingerNo, string $printData, array &$errors): array {
+        $jsonBodies = [
+            [
                 'FingerPrintCfg' => [
                     'employeeNo' => $employeeNo,
                     'enableCardReader' => [1],
@@ -1062,16 +1347,131 @@ class HikvisionIntegration {
                     'fingerType' => 'normalFP',
                     'fingerData' => $printData,
                 ],
-            ]);
-            $saved = $this->makeRequest($downloadUrl, 'POST', $downloadBody, 'application/json', 30);
-            if ($this->isHikvisionOk($saved)) {
-                $q = $quality !== null ? ' (quality: ' . $quality . ')' : '';
-                return ['ok' => true, 'message' => 'Fingerprint enrolled for ' . $employeeNo . $q . '.', 'response' => $saved];
+            ],
+            [
+                'FingerPrintCfg' => [
+                    'employeeNo' => $employeeNo,
+                    'cardReaderNo' => 1,
+                    'fingerPrintID' => $fingerNo,
+                    'fingerType' => 'normalFP',
+                    'fingerData' => $printData,
+                ],
+            ],
+        ];
+
+        foreach ($jsonBodies as $idx => $payload) {
+            $res = $this->makeRequestDetailed(
+                $this->baseUrl . '/AccessControl/FingerPrintDownload?format=json',
+                'POST',
+                json_encode($payload),
+                'application/json',
+                40
+            );
+            if ($res['ok'] && $this->isHikvisionOk(is_array($res['decoded']) ? $res['decoded'] : ['statusCode' => 1])) {
+                return ['ok' => true, 'response' => $res['decoded']];
             }
-            return ['ok' => false, 'message' => $this->hikvisionErrorMessage($saved, 'Fingerprint captured but save to user failed.'), 'response' => $saved];
-        } catch (Exception $e) {
-            return ['ok' => false, 'message' => $e->getMessage()];
+            $errors[] = 'Download JSON#' . ($idx + 1) . ' HTTP ' . $res['http_code'] . ' '
+                . $this->hikvisionErrorMessage(is_array($res['decoded']) ? $res['decoded'] : null, '');
         }
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'
+            . '<FingerPrintCfg version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">'
+            . '<employeeNo>' . htmlspecialchars($employeeNo, ENT_XML1) . '</employeeNo>'
+            . '<enableCardReader>1</enableCardReader>'
+            . '<fingerPrintID>' . $fingerNo . '</fingerPrintID>'
+            . '<fingerType>normalFP</fingerType>'
+            . '<fingerData>' . htmlspecialchars($printData, ENT_XML1) . '</fingerData>'
+            . '</FingerPrintCfg>';
+        $res = $this->makeRequestDetailed(
+            $this->baseUrl . '/AccessControl/FingerPrintDownload',
+            'POST',
+            $xml,
+            'application/xml; charset="UTF-8"',
+            40
+        );
+        if ($res['ok'] && $this->isHikvisionOk(is_array($res['decoded']) ? $res['decoded'] : ['statusCode' => 1])) {
+            return ['ok' => true, 'response' => $res['decoded']];
+        }
+        $msg = $this->hikvisionErrorMessage(
+            is_array($res['decoded']) ? $res['decoded'] : null,
+            'HTTP ' . $res['http_code']
+        );
+        $errors[] = 'Download XML: ' . $msg;
+        return ['ok' => false, 'message' => $msg, 'response' => $res['decoded'] ?? $res['body']];
+    }
+
+    /**
+     * Ask the terminal to open person credential enrollment, then poll finger_count.
+     *
+     * @return array{ok: bool, message: string, response?: mixed}
+     */
+    private function enrollFingerPrintViaTerminalUi(string $employeeNo, int $fingerNo): array {
+        $baseline = $this->searchUsers(5, $employeeNo);
+        $baseFp = 0;
+        foreach ($baseline['users'] ?? [] as $u) {
+            if ((string) ($u['employee_no'] ?? '') === $employeeNo) {
+                $baseFp = (int) ($u['finger_count'] ?? 0);
+                break;
+            }
+        }
+
+        $setupAttempts = [
+            json_encode([
+                'UserInfoDetail' => [
+                    'mode' => 'employeeNo',
+                    'EmployeeNoList' => [['employeeNo' => $employeeNo]],
+                ],
+            ]),
+            json_encode([
+                'UserInfoDetail' => [
+                    'mode' => 'byEmployeeNo',
+                    'EmployeeNoList' => [['employeeNo' => $employeeNo]],
+                ],
+            ]),
+        ];
+        $setupOk = false;
+        foreach ($setupAttempts as $payload) {
+            $setup = $this->makeRequestDetailed(
+                $this->baseUrl . '/AccessControl/UserInfoDetail/Setup?format=json',
+                'PUT',
+                $payload,
+                'application/json',
+                20
+            );
+            if ($setup['ok'] && $this->isHikvisionOk($setup['decoded'] ?? ['statusCode' => 1])) {
+                $setupOk = true;
+                break;
+            }
+        }
+        if (!$setupOk) {
+            return ['ok' => false, 'message' => 'Could not start terminal fingerprint enrollment UI.'];
+        }
+
+        $deadline = time() + 90;
+        while (time() < $deadline) {
+            sleep(3);
+            $search = $this->searchUsers(5, $employeeNo);
+            foreach ($search['users'] ?? [] as $u) {
+                if ((string) ($u['employee_no'] ?? '') !== $employeeNo) {
+                    continue;
+                }
+                $fc = (int) ($u['finger_count'] ?? 0);
+                if ($fc > $baseFp) {
+                    return [
+                        'ok' => true,
+                        'message' => 'Finger 0' . $fingerNo . ' enrolled on terminal for ' . $employeeNo
+                            . ' (device fingers: ' . $fc . ').',
+                        'response' => $u,
+                    ];
+                }
+            }
+        }
+
+        return [
+            'ok' => false,
+            'message' => 'Terminal enrollment started for ' . $employeeNo
+                . ', but no new fingerprint was detected within 90s. Complete capture on the device screen.',
+        ];
     }
 
     /**
@@ -1113,12 +1513,17 @@ class HikvisionIntegration {
         $body = is_string($response) ? $response : '';
         $decoded = null;
         if ($body !== '') {
-            $json = json_decode($body, true);
-            if (json_last_error() === JSON_ERROR_NONE) {
-                $decoded = $json;
-            } else {
-                $xml = $this->parseXML($body);
-                $decoded = $xml !== [] ? $xml : null;
+            $isBinary = strncmp($body, "\xFF\xD8\xFF", 3) === 0
+                || stripos($respContentType, 'image/') === 0
+                || stripos($respContentType, 'octet-stream') !== false;
+            if (!$isBinary) {
+                $json = json_decode($body, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $decoded = $json;
+                } else {
+                    $xml = $this->parseXML($body);
+                    $decoded = $xml !== [] ? $xml : null;
+                }
             }
         }
 
@@ -1200,6 +1605,127 @@ class HikvisionIntegration {
             }
         }
         return '1';
+    }
+
+    /**
+     * Read enrolled face photo from the terminal (FDSearch → faceURL → JPEG).
+     *
+     * @return array{ok: bool, message: string, jpeg?: string, face_url?: string, fpid?: string}
+     */
+    public function getFacePhoto(string $employeeNo): array {
+        $employeeNo = trim($employeeNo);
+        if ($employeeNo === '') {
+            return ['ok' => false, 'message' => 'Employee No is required.'];
+        }
+
+        $fdids = ['1', '2', '0'];
+        $faceUrl = '';
+        $fpid = $employeeNo;
+        $lastMsg = 'No face record on machine.';
+
+        foreach ($fdids as $fdid) {
+            $body = json_encode([
+                'searchResultPosition' => 0,
+                'maxResults' => 5,
+                'faceLibType' => 'blackFD',
+                'FDID' => $fdid,
+                'FPID' => $employeeNo,
+            ], JSON_UNESCAPED_SLASHES);
+            $res = $this->makeRequestDetailed(
+                $this->baseUrl . '/Intelligent/FDLib/FDSearch?format=json',
+                'POST',
+                $body,
+                'application/json',
+                25
+            );
+            if (!$res['ok'] || !is_array($res['decoded'])) {
+                $lastMsg = $this->hikvisionErrorMessage(
+                    is_array($res['decoded']) ? $res['decoded'] : null,
+                    'FDSearch HTTP ' . $res['http_code']
+                );
+                continue;
+            }
+            $matches = (int) ($res['decoded']['numOfMatches'] ?? 0);
+            $list = $res['decoded']['MatchList'] ?? null;
+            if ($matches < 1 || !is_array($list) || $list === []) {
+                $lastMsg = 'No face photo for ' . $employeeNo . ' on machine.';
+                continue;
+            }
+            if (!isset($list[0]) && isset($list['FPID'])) {
+                $list = [$list];
+            }
+            $row = $list[0] ?? null;
+            if (!is_array($row)) {
+                continue;
+            }
+            $fpid = (string) ($row['FPID'] ?? $employeeNo);
+            $faceUrl = trim((string) ($row['faceURL'] ?? $row['faceUrl'] ?? ''));
+            // Some firmwares embed base64 faceData
+            foreach (['faceData', 'pictureData', 'img', 'facePicture'] as $k) {
+                if (!empty($row[$k]) && is_string($row[$k])) {
+                    $bin = base64_decode($row[$k], true);
+                    if (is_string($bin) && strncmp($bin, "\xFF\xD8\xFF", 3) === 0) {
+                        return [
+                            'ok' => true,
+                            'message' => 'OK',
+                            'jpeg' => $bin,
+                            'face_url' => $faceUrl,
+                            'fpid' => $fpid,
+                        ];
+                    }
+                }
+            }
+            if ($faceUrl !== '') {
+                break;
+            }
+        }
+
+        if ($faceUrl === '') {
+            return ['ok' => false, 'message' => $lastMsg];
+        }
+
+        // Download JPEG from device LOCALS faceURL (Digest auth)
+        $urls = [$faceUrl];
+        if (preg_match('#https?://[^/]+(/.*)$#i', $faceUrl, $m)) {
+            $hostBase = preg_replace('#/ISAPI/?$#', '', $this->baseUrl);
+            $urls[] = rtrim((string) $hostBase, '/') . $m[1];
+        }
+        foreach (array_unique($urls) as $url) {
+            $img = $this->makeRequestDetailed($url, 'GET', null, null, 30);
+            if (!$img['ok']) {
+                continue;
+            }
+            $bytes = $img['body'];
+            if (strncmp($bytes, "\xFF\xD8\xFF", 3) === 0) {
+                return [
+                    'ok' => true,
+                    'message' => 'OK',
+                    'jpeg' => $bytes,
+                    'face_url' => $faceUrl,
+                    'fpid' => $fpid,
+                ];
+            }
+            // Multipart or JSON-wrapped base64
+            if (preg_match('/\xFF\xD8\xFF.{20,}/s', $bytes, $mm)) {
+                $start = strpos($bytes, "\xFF\xD8\xFF");
+                if ($start !== false) {
+                    $jpeg = substr($bytes, $start);
+                    $end = strpos($jpeg, "\xFF\xD9");
+                    if ($end !== false) {
+                        $jpeg = substr($jpeg, 0, $end + 2);
+                    }
+                    return [
+                        'ok' => true,
+                        'message' => 'OK',
+                        'jpeg' => $jpeg,
+                        'face_url' => $faceUrl,
+                        'fpid' => $fpid,
+                    ];
+                }
+            }
+        }
+
+        return ['ok' => false, 'message' => 'Face record found but photo download failed.', 'face_url' => $faceUrl, 'fpid' => $fpid];
     }
 
     /**
@@ -1349,6 +1875,30 @@ class HikvisionIntegration {
         }
 
         $jpeg = null;
+        // Prefer JSON CaptureFaceData on modern terminals (DS-K1T343)
+        $jsonBodies = [
+            json_encode(['CaptureFaceDataCond' => ['captureInfrared' => false]]),
+            json_encode(['CaptureFaceDataCond' => ['dataType' => 'binary', 'captureInfrared' => false]]),
+        ];
+        foreach ($jsonBodies as $jsonBody) {
+            $res = $this->makeRequestDetailed(
+                $this->baseUrl . '/AccessControl/CaptureFaceData?format=json',
+                'POST',
+                $jsonBody,
+                'application/json',
+                45
+            );
+            if ($res['http_code'] >= 400) {
+                $errors[] = 'CaptureFaceData JSON HTTP ' . $res['http_code'];
+                continue;
+            }
+            $jpeg = $this->extractFaceJpeg($res['body'], $res['content_type'], $res['decoded']);
+            if ($jpeg !== null) {
+                break;
+            }
+        }
+
+        if ($jpeg === null) {
         foreach ($xmlBodies as $xmlBody) {
             $res = $this->makeRequestDetailed(
                 $this->baseUrl . '/AccessControl/CaptureFaceData',
@@ -1387,6 +1937,7 @@ class HikvisionIntegration {
                 }
             }
         }
+        } // end if jpeg === null XML fallback
 
         if ($jpeg !== null) {
             // Transient JPEG in memory only — push to machine FaceDataRecord, never save to DB
@@ -1458,8 +2009,8 @@ class HikvisionIntegration {
         $detail = $errors !== [] ? implode('; ', array_slice(array_unique($errors), 0, 4)) : 'unsupported';
         return [
             'ok' => false,
-            'message' => 'On-device face enrollment failed for DS-K1T320MFWX (' . $detail
-                . '). Stand at the terminal while enrolling. Existing face was not removed.',
+            'message' => 'On-device face enrollment failed (' . $detail
+                . '). Stand at the terminal while enrolling, or use a student profile JPEG photo. Existing face was not removed.',
         ];
     }
 

@@ -5,10 +5,14 @@ declare(strict_types=1);
 /** @var bool $isHodScoped */
 /** @var string $reportMonth */
 /** @var string $departmentId */
+/** @var string $courseId */
+/** @var string $academicYear */
 /** @var string $groupId */
 /** @var string $studentId */
 /** @var string $statusFilter */
 /** @var array $departments */
+/** @var array $courses */
+/** @var array $academicYears */
 /** @var array $groups */
 /** @var array $studentsForFilter */
 /** @var array $dashboard */
@@ -23,10 +27,14 @@ $canManageDevice = !empty($canManageDevice);
 $isHodScoped = !empty($isHodScoped);
 $reportMonth = (string) ($reportMonth ?? date('Y-m'));
 $departmentId = (string) ($departmentId ?? '');
+$courseId = (string) ($courseId ?? '');
+$academicYear = (string) ($academicYear ?? '');
 $groupId = (string) ($groupId ?? '');
 $studentId = (string) ($studentId ?? '');
 $statusFilter = (string) ($statusFilter ?? 'flagged');
 $departments = $departments ?? [];
+$courses = $courses ?? [];
+$academicYears = $academicYears ?? [];
 $groups = $groups ?? [];
 $studentsForFilter = $studentsForFilter ?? [];
 $dashboard = $dashboard ?? ['flagged' => [], 'summary' => []];
@@ -82,6 +90,32 @@ ob_start();
                 <?php if ($isHodScoped): ?>
                     <input type="hidden" name="department_id" value="<?php echo $e($departmentId); ?>">
                 <?php endif; ?>
+            </div>
+            <div class="sd-field">
+                <label class="form-label" for="sdCourse">Course</label>
+                <select id="sdCourse" name="course_id" class="form-select" <?php echo $departmentId === '' ? 'disabled' : ''; ?>>
+                    <option value="">All</option>
+                    <?php foreach ($courses as $c): ?>
+                        <option value="<?php echo $e($c['course_id'] ?? ''); ?>"
+                            <?php echo $courseId === ($c['course_id'] ?? '') ? 'selected' : ''; ?>>
+                            <?php echo $e($c['course_name'] ?? $c['course_id'] ?? ''); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <?php if ($departmentId === ''): ?>
+                    <input type="hidden" name="course_id" value="">
+                <?php endif; ?>
+            </div>
+            <div class="sd-field">
+                <label class="form-label" for="sdYear">Academic year</label>
+                <select id="sdYear" name="academic_year" class="form-select">
+                    <option value="">All</option>
+                    <?php foreach ($academicYears as $y): ?>
+                        <option value="<?php echo $e($y); ?>" <?php echo $academicYear === (string) $y ? 'selected' : ''; ?>>
+                            <?php echo $e($y); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <div class="sd-field">
                 <label class="form-label" for="sdGroup">Group</label>
@@ -178,6 +212,7 @@ ob_start();
                             <th>Student ID</th>
                             <th>Name</th>
                             <th>Department</th>
+                            <th>Course</th>
                             <th>Group</th>
                             <th>Leave dates</th>
                             <th class="text-center">Days</th>
@@ -201,6 +236,7 @@ ob_start();
                                 <td class="sd-sao-id"><?php echo $e($row['student_id'] ?? ''); ?></td>
                                 <td class="sd-sao-name"><?php echo $e($row['student_name'] ?? ''); ?></td>
                                 <td><?php echo $e($row['department_name'] ?? '—'); ?></td>
+                                <td><?php echo $e($row['course_name'] ?? '—'); ?></td>
                                 <td><?php echo $e(($row['group_name'] ?? '') !== '' && ($row['group_name'] ?? '') !== '—' ? $row['group_name'] : '—'); ?></td>
                                 <td class="sd-sao-dates"><?php echo $e($row['leave_dates_label'] ?? '—'); ?></td>
                                 <td class="text-center fw-semibold"><?php echo (int) ($row['leave_days'] ?? 0); ?></td>
@@ -240,6 +276,7 @@ ob_start();
                             </div>
                             <div class="sd-sao-mobile-meta">
                                 <?php echo $e($row['department_name'] ?? ''); ?>
+                                · <?php echo $e($row['course_name'] ?? ''); ?>
                                 · <?php echo $e(number_format((float) ($row['attendance_pct'] ?? 0), 1)); ?>%
                             </div>
                             <div class="sd-sao-dates"><?php echo $e($row['leave_dates_label'] ?? ''); ?></div>
@@ -253,15 +290,41 @@ ob_start();
 </section>
 
 <script>
-document.getElementById('sdDept')?.addEventListener('change', function () {
-    var g = document.getElementById('sdGroup');
-    var s = document.getElementById('sdStudent');
-    if (g) g.value = '';
-    if (s) s.value = '';
-    var run = document.querySelector('#sdSaoDashForm input[name="run"]');
-    if (run) run.value = '0';
-    document.getElementById('sdSaoDashForm')?.submit();
-});
+(function () {
+    var form = document.getElementById('sdSaoDashForm');
+    if (!form) return;
+
+    function cascadeReload(clearCourse, clearGroup, clearStudent) {
+        if (clearCourse) {
+            var c = document.getElementById('sdCourse');
+            if (c) c.value = '';
+        }
+        if (clearGroup) {
+            var g = document.getElementById('sdGroup');
+            if (g) g.value = '';
+        }
+        if (clearStudent) {
+            var s = document.getElementById('sdStudent');
+            if (s) s.value = '';
+        }
+        var run = form.querySelector('input[name="run"]');
+        if (run) run.value = '0';
+        form.submit();
+    }
+
+    document.getElementById('sdDept')?.addEventListener('change', function () {
+        cascadeReload(true, true, true);
+    });
+    document.getElementById('sdCourse')?.addEventListener('change', function () {
+        cascadeReload(false, true, true);
+    });
+    document.getElementById('sdYear')?.addEventListener('change', function () {
+        cascadeReload(false, false, true);
+    });
+    document.getElementById('sdGroup')?.addEventListener('change', function () {
+        cascadeReload(false, false, true);
+    });
+})();
 </script>
 <?php
 $contentHtml = ob_get_clean();

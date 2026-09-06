@@ -491,7 +491,7 @@ $GLOBALS['__student_device_styles_loaded'] = true;
 }
 .student-device-page .sd-sao-filters-grid {
     display: grid;
-    grid-template-columns: 148px minmax(140px, 1.2fr) minmax(120px, 1fr) minmax(140px, 1.2fr) 130px 110px;
+    grid-template-columns: 130px minmax(120px, 1fr) minmax(130px, 1.1fr) minmax(110px, 0.9fr) minmax(110px, 0.9fr) minmax(130px, 1.1fr) 120px 100px;
     gap: 0.65rem 0.75rem;
     align-items: end;
 }
@@ -725,6 +725,416 @@ $GLOBALS['__student_device_styles_loaded'] = true;
     color: var(--sd-text);
     font-weight: 700;
 }
+
+/* Student machine users — fingerprint enroll cards */
+.student-device-page .sd-users-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+}
+.student-device-page .sd-users-panel {
+    background: #fff;
+    border: 1px solid var(--sd-border);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.student-device-page .sd-users-search {
+    padding: 1rem 1.25rem;
+}
+.student-device-page .sd-users-search-grid,
+.student-device-page .sd-users-filters-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.75rem 0.85rem;
+    align-items: end;
+}
+.student-device-page .sd-users-search-field {
+    min-width: 0;
+}
+.student-device-page .sd-users-search-btns {
+    min-width: 0;
+}
+.student-device-page .sd-users-btn-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+.student-device-page .sd-users-btn-row .btn {
+    min-height: 38px;
+    flex: 1 1 auto;
+}
+.student-device-page .sd-users-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem 1rem;
+    padding: 0.7rem 1.25rem;
+    border-top: 1px solid var(--sd-border);
+    background: var(--sd-soft);
+}
+.student-device-page .sd-users-toolbar-form {
+    margin: 0;
+    flex: 0 0 auto;
+}
+.student-device-page .sd-users-toolbar-hint {
+    flex: 1 1 200px;
+    font-size: 0.8125rem;
+    color: var(--sd-muted);
+    line-height: 1.4;
+    margin: 0;
+}
+.student-device-page .sd-users-empty {
+    background: #fff;
+    border: 1px dashed var(--sd-border);
+    border-radius: 0.75rem;
+    padding: 2.5rem 1.25rem;
+    text-align: center;
+    color: var(--sd-muted);
+    font-size: 0.9rem;
+}
+
+/* Student cards grid */
+.student-device-page .sd-users-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+    width: 100%;
+    align-items: stretch;
+}
+.student-device-page .sd-stu-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    background: #fff;
+    border: 1px solid var(--sd-border);
+    border-radius: 0.8rem;
+    padding: 1rem;
+    min-width: 0;
+    max-width: 100%;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.student-device-page .sd-stu-card.is-off {
+    border-style: dashed;
+    background: #fcfcfd;
+}
+.student-device-page .sd-stu-photos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+}
+.student-device-page .sd-stu-photo {
+    margin: 0;
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 0.65rem;
+    overflow: hidden;
+    background: #e2e8f0;
+    border: 1px solid var(--sd-border);
+}
+.student-device-page .sd-stu-photo.has-face {
+    border-color: #86efac;
+}
+.student-device-page .sd-stu-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.student-device-page .sd-stu-photo-fallback {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 1.6rem;
+    background: #f1f5f9;
+}
+.student-device-page .sd-stu-photo figcaption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0.2rem 0.35rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: center;
+    color: #fff;
+    background: rgba(15, 23, 42, 0.68);
+}
+.student-device-page .sd-stu-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.student-device-page .sd-stu-name {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--sd-text);
+    line-height: 1.25;
+    word-break: break-word;
+}
+.student-device-page .sd-stu-meta {
+    display: grid;
+    gap: 0.4rem;
+}
+.student-device-page .sd-stu-meta-row {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    gap: 0.4rem;
+    align-items: center;
+}
+.student-device-page .sd-stu-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sd-muted);
+}
+.student-device-page .sd-stu-emp {
+    display: inline-block;
+    width: fit-content;
+    max-width: 100%;
+    background: #eef2ff;
+    color: #3730a3;
+    border-radius: 0.35rem;
+    padding: 0.18rem 0.45rem;
+    font-size: 0.84rem;
+    font-weight: 700;
+    word-break: break-all;
+}
+.student-device-page .sd-stu-sid {
+    font-size: 0.875rem;
+    color: var(--sd-text);
+    word-break: break-word;
+}
+.student-device-page .sd-stu-actions {
+    display: grid;
+    gap: 0.45rem;
+    margin-top: auto;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--sd-border);
+}
+.student-device-page .sd-stu-action {
+    display: grid;
+    grid-template-columns: 5rem minmax(0, 1fr);
+    gap: 0.45rem;
+    align-items: center;
+}
+.student-device-page .sd-stu-action-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--sd-muted);
+    letter-spacing: 0.02em;
+}
+.student-device-page .sd-stu-btns {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+    align-items: center;
+}
+.student-device-page .sd-stu-btns form,
+.student-device-page .sd-stu-action-full {
+    margin: 0;
+}
+.student-device-page .sd-stu-action-full .btn {
+    width: 100%;
+    min-height: 36px;
+}
+.student-device-page .sd-stu-btns .btn {
+    min-height: 34px;
+    min-width: 4.75rem;
+    justify-content: center;
+    flex: 1 1 auto;
+}
+.student-device-page .sd-stu-btns .btn-outline-danger {
+    flex: 0 0 auto;
+    min-width: 34px;
+    width: 34px;
+    padding-left: 0;
+    padding-right: 0;
+}
+.student-device-page .sd-summary-chip-muted {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+@media (max-width: 1100px) {
+    .student-device-page .sd-users-filters-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+@media (max-width: 768px) {
+    .student-device-page .sd-users-search-grid,
+    .student-device-page .sd-users-filters-grid {
+        grid-template-columns: 1fr;
+    }
+    .student-device-page .sd-users-btn-row .btn {
+        flex: 1 1 auto;
+    }
+    .student-device-page .sd-users-cards {
+        grid-template-columns: 1fr;
+    }
+    .student-device-page .sd-stu-meta-row,
+    .student-device-page .sd-stu-action {
+        grid-template-columns: 1fr;
+        gap: 0.25rem;
+    }
+}
+@media (min-width: 1400px) {
+    .student-device-page .sd-users-cards {
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    }
+}
+
+/* Student Information Excel Export */
+.student-device-page .sd-excel-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+.student-device-page .sd-excel-hint {
+    background: #f8fafc;
+    border: 1px solid var(--sd-border);
+    border-radius: 0.65rem;
+    padding: 0.75rem 1rem;
+}
+.student-device-page .sd-excel-hint-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sd-muted);
+    margin-bottom: 0.25rem;
+}
+.student-device-page .sd-excel-hint-text {
+    font-size: 0.875rem;
+    color: var(--sd-text);
+    line-height: 1.45;
+}
+.student-device-page .sd-excel-hint-text code {
+    background: #e2e8f0;
+    border-radius: 0.25rem;
+    padding: 0.05rem 0.35rem;
+    font-size: 0.8125rem;
+}
+.student-device-page .sd-excel-hint-badge {
+    display: inline-block;
+    margin-left: 0.35rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: #e0f2fe;
+    color: #075985;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.student-device-page .sd-excel-filters {
+    background: #fff;
+    border: 1px solid var(--sd-border);
+    border-radius: 0.65rem;
+    padding: 1rem 1.1rem;
+}
+.student-device-page .sd-excel-filters-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.75rem 0.85rem;
+    align-items: end;
+}
+.student-device-page .sd-excel-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.student-device-page .sd-excel-actions-row .btn {
+    flex: 1 1 auto;
+    min-width: 7.5rem;
+    white-space: nowrap;
+}
+.student-device-page .sd-excel-empty {
+    background: #fff;
+    border: 1px dashed var(--sd-border);
+    border-radius: 0.65rem;
+    padding: 2.25rem 1.25rem;
+    text-align: center;
+    color: var(--sd-muted);
+    font-size: 0.9rem;
+}
+.student-device-page .sd-excel-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+    background: #fff;
+    border: 1px solid var(--sd-border);
+    border-radius: 0.65rem;
+    padding: 0.8rem 1.1rem;
+}
+.student-device-page .sd-excel-summary-left {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem 0.65rem;
+    min-width: 0;
+}
+.student-device-page .sd-excel-count {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--sd-text);
+    line-height: 1;
+}
+.student-device-page .sd-excel-count-label {
+    font-size: 0.875rem;
+    color: var(--sd-muted);
+}
+.student-device-page .sd-excel-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: #ecfdf5;
+    color: #065f46;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.student-device-page .sd-excel-table-card {
+    overflow: hidden;
+}
+.student-device-page .sd-excel-table-card .sd-table-wrap {
+    max-height: 62vh;
+}
+.student-device-page .sd-excel-table thead th {
+    white-space: nowrap;
+    vertical-align: middle;
+}
+.student-device-page .sd-excel-table tbody td {
+    vertical-align: middle;
+}
+@media (max-width: 1200px) {
+    .student-device-page .sd-excel-filters-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .student-device-page .sd-excel-actions {
+        grid-column: 1 / -1;
+    }
+}
+@media (max-width: 768px) {
+    .student-device-page .sd-excel-filters-grid {
+        grid-template-columns: 1fr;
+    }
+    .student-device-page .sd-excel-actions-row .btn {
+        width: 100%;
+    }
+}
+
 .student-device-page .sd-month-total {
     color: #0f5132;
     font-weight: 700;

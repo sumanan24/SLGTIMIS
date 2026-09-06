@@ -28,11 +28,11 @@ $fmtTime = static function (?string $t): string {
 $mailName = trim((string) ($mailing['name'] ?? $entry['student_full_name'] ?? ''));
 $mailAddress = trim((string) ($mailing['address'] ?? $entry['student_address'] ?? ''));
 $mailCity = trim((string) ($mailing['city_line'] ?? ''));
-$roll = trim((string) ($entry['roll_number'] ?? ''));
+$isInterview = !empty($isInterview);
+$roll = $isInterview ? '' : trim((string) ($entry['roll_number'] ?? ''));
 $nic = trim((string) ($entry['student_nic'] ?? ''));
 $name = trim((string) ($entry['student_full_name'] ?? ''));
 $nvq = trim((string) ($schedule['application_level'] ?? ''));
-$isInterview = !empty($isInterview);
 
 $instructions = ApplicationAdmissionPdfHelper::defaultExamInstructions($isInterview);
 $scheduleInstructions = trim((string) ($schedule['instructions'] ?? ''));
@@ -41,6 +41,9 @@ if (mb_strlen($scheduleInstructions) > 120) {
 }
 
 $examCentre = trim((string) ($schedule['venue'] ?? ''));
+if ($isInterview && $examCentre === '') {
+    $examCentre = 'Sri Lanka – German Training Institute, Ariviyal Nagar, Kilinochchi';
+}
 $examTitle = trim((string) ($schedule['title'] ?? $cardSubtitle ?? ''));
 $courseLabel = trim((string) ($entry['course_priority_1'] ?? ''));
 if (class_exists('ApplicationAdmissionScheduleModel')) {
@@ -63,20 +66,27 @@ $examYear = (string) ($schedule['schedule_date'] ?? '');
 $examYear = preg_match('/^\d{4}/', $examYear, $ym) ? $ym[0] : date('Y');
 
 $bannerTitle = $isInterview
-    ? 'INTERVIEW ' . $examYear . ' — ADMISSION CARD'
+    ? 'INTERVIEW INVITATION — ' . $examYear . ' INTAKE'
     : 'SELECTION EXAMINATION ' . $examYear . ' — ADMISSION CARD';
 
 $docTitle = $cardTitle ?? ($isInterview
-    ? 'INTERVIEW — ADMISSION CARD'
+    ? 'INTERVIEW INVITATION — ' . $examYear . ' INTAKE'
     : 'SELECTION EXAMINATION — ADMISSION CARD');
 
 $logoSrc = (string) ($logo_src ?? '');
-$refNo = ApplicationAdmissionPdfHelper::admissionCardReference(
-    (int) ($schedule['schedule_id'] ?? 0),
-    $roll,
-    (int) ($entry['entry_id'] ?? 0)
-);
+$refNo = $isInterview
+    ? ('SLGTI/ADM/' . $examYear . '/' . str_pad((string) ((int) ($entry['entry_id'] ?? 0)), 4, '0', STR_PAD_LEFT))
+    : ApplicationAdmissionPdfHelper::admissionCardReference(
+        (int) ($schedule['schedule_id'] ?? 0),
+        $roll,
+        (int) ($entry['entry_id'] ?? 0)
+    );
 $issuedDate = date('d.m.Y');
+$letterDateLong = date('d F Y');
+$interviewDateLong = (static function (?string $d): string {
+    $ts = $d ? strtotime($d) : false;
+    return $ts ? date('d F Y', $ts) : '—';
+})($schedule['schedule_date'] ?? null);
 
 $instrHalf = (int) ceil(count($instructions) / 2);
 $instrLeft = array_slice($instructions, 0, $instrHalf);
@@ -89,6 +99,11 @@ $attendTitle = $examTitle !== '' ? $examTitle : ($courseLabel !== '' ? $courseLa
 $centreNote = $isInterview ? 'interview' : 'examination';
 $dateLabel = $isInterview ? 'INTERVIEW DATE' : 'EXAMINATION DATE';
 $venueLabel = $isInterview ? 'INTERVIEW VENUE' : 'EXAMINATION CENTRE';
+$principalSig = trim((string) ($principal_sig_src ?? ''));
+$principalName = trim((string) ($principal_name ?? 'R. Mathaan'));
+if ($principalName === '') {
+    $principalName = 'R. Mathaan';
+}
 ?>
 <div class="adm-page">
 <table class="adm-sheet" width="100%" cellspacing="0" cellpadding="0">
@@ -125,6 +140,105 @@ $venueLabel = $isInterview ? 'INTERVIEW VENUE' : 'EXAMINATION CENTRE';
     </table>
     <div class="adm-foldhint">Fold with <strong>Post to</strong> on the outside; Post from stays top-left when posted.</div>
     <div class="adm-fold">— Fold here —</div>
+
+    <?php if ($isInterview): ?>
+    <?php /* Interview invitation letter body — postal header above stays unchanged */ ?>
+    <table class="adm-header" width="100%" cellspacing="0" cellpadding="0">
+        <tr>
+            <td class="adm-hmid" width="68%">
+                <div class="adm-institute">Sri Lanka – German Training Institute (SLGTI)</div>
+                <div class="adm-examline">Ariviyal Nagar, Kilinochchi</div>
+            </td>
+            <td class="adm-hmeta" width="32%">
+                <?php if ($logoSrc !== ''): ?>
+                <img class="adm-logo" src="<?php echo $e($logoSrc); ?>" alt="SLGTI" />
+                <?php endif; ?>
+                <div class="adm-meta-l">Ref. No.</div>
+                <div class="adm-meta-v"><?php echo $e($refNo); ?></div>
+                <div class="adm-meta-l adm-meta-gap">Date</div>
+                <div class="adm-meta-v"><?php echo $e($letterDateLong); ?></div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="iv-body">
+        <div class="iv-body-title">Interview Invitation – <?php echo $e($examYear); ?> Intake</div>
+
+        <p class="iv-body-dear">Dear Applicant,</p>
+
+        <p class="iv-body-p">
+            With reference to your application for admission to a course at the
+            <strong>Sri Lanka – German Training Institute (SLGTI)</strong>, we are pleased to inform you
+            that you have been <strong>shortlisted for an interview for the <?php echo $e($examYear); ?> Intake</strong>.
+        </p>
+
+        <p class="iv-body-p">You are kindly requested to attend the interview according to the following details:</p>
+
+        <table class="iv-body-details" width="100%" cellspacing="0" cellpadding="0">
+            <tr>
+                <th>Applicant Name:</th>
+                <td><?php echo $name !== '' ? $e($name) : '—'; ?></td>
+            </tr>
+            <tr>
+                <th>Course/Programme:</th>
+                <td><?php echo $courseLabel !== '' ? $e($courseLabel) : '—'; ?></td>
+            </tr>
+            <tr>
+                <th>Interview Date:</th>
+                <td><?php echo $e($interviewDateLong); ?></td>
+            </tr>
+            <tr>
+                <th>Interview Time:</th>
+                <td><?php echo $e($timeCell); ?></td>
+            </tr>
+            <tr>
+                <th>Venue:</th>
+                <td><?php echo $e($examCentre); ?></td>
+            </tr>
+        </table>
+
+        <div class="iv-body-h">Documents to Bring</div>
+        <p class="iv-body-p">
+            Please bring the <strong>original NIC, Birth Certificate, and relevant educational/NVQ certificates</strong>
+            for verification.
+        </p>
+
+        <div class="iv-body-h">Dress Code</div>
+        <ul class="iv-body-ul">
+            <li><strong>Male Applicants:</strong> White shirt, black jeans/trousers and formal shoes.</li>
+            <li>
+                <strong>Female Applicants:</strong> White blouse, black skirt/formal black jeans or trousers and formal shoes.
+                <strong>Muslim female applicants may wear a black Abaya with a black or white Hijab.</strong>
+            </li>
+        </ul>
+
+        <p class="iv-body-p">
+            Applicants are requested to arrive <strong>15 minutes before the scheduled interview time</strong>
+            and maintain a neat, clean and professional appearance.
+        </p>
+
+        <p class="iv-body-p">
+            Please note that <strong>being called for an interview does not guarantee admission</strong>.
+            Final selection will be made in accordance with the applicable admission criteria and selection process.
+        </p>
+
+        <p class="iv-body-p">We wish you every success in the interview and selection process.</p>
+
+        <div class="iv-body-sign">
+            <div><strong>Regards,</strong></div>
+            <?php if ($principalSig !== ''): ?>
+            <img class="iv-body-sign-img" src="<?php echo $e($principalSig); ?>" alt="<?php echo $e($principalName); ?>" />
+            <?php else: ?>
+            <div>..........................................................</div>
+            <?php endif; ?>
+            <div class="iv-body-sign-name"><?php echo $e($principalName); ?></div>
+            <div class="iv-body-sign-role">Branch Principal</div>
+            <div class="iv-body-sign-org">Sri Lanka – German Training Institute (SLGTI)</div>
+            <div class="iv-body-sign-org">Ariviyal Nagar, Kilinochchi</div>
+        </div>
+    </div>
+
+    <?php else: ?>
 
     <table class="adm-header" width="100%" cellspacing="0" cellpadding="0">
         <tr>
@@ -270,6 +384,8 @@ $venueLabel = $isInterview ? 'INTERVIEW VENUE' : 'EXAMINATION CENTRE';
     </table>
 
     <div class="adm-note">Bring this admission card and your original NIC / Passport / Driving License to the <?php echo $e($centreNote); ?> centre.</div>
+
+    <?php endif; ?>
 
 </td>
 <td class="adm-side" width="20">&nbsp;</td>

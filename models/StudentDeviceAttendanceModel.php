@@ -57,15 +57,34 @@ class StudentDeviceAttendanceModel extends Model {
             `name` VARCHAR(150) NOT NULL DEFAULT '',
             `user_type` VARCHAR(40) NOT NULL DEFAULT 'normal',
             `machine_id` VARCHAR(64) NOT NULL DEFAULT '',
+            `finger_count` INT NOT NULL DEFAULT 0,
+            `face_count` INT NOT NULL DEFAULT 0,
             `synced_at` DATETIME NOT NULL,
             PRIMARY KEY (`id`),
             UNIQUE KEY `uq_machine_emp` (`machine_id`, `employee_no`),
-            KEY `idx_emp_name` (`name`)
+            KEY `idx_emp_name` (`name`),
+            KEY `idx_emp_no` (`employee_no`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
         $this->db->query($sqlM);
+        $this->ensureMachineUserExtraColumns();
 
         $this->ensureFingerIdColumn();
         $this->ensureAttendanceExtraColumns();
+    }
+
+    /** Add finger/face counts on machine users cache. */
+    private function ensureMachineUserExtraColumns(): void {
+        foreach ([
+            'finger_count' => "ALTER TABLE `student_attendance_machine_users` ADD COLUMN `finger_count` INT NOT NULL DEFAULT 0 AFTER `machine_id`",
+            'face_count' => "ALTER TABLE `student_attendance_machine_users` ADD COLUMN `face_count` INT NOT NULL DEFAULT 0 AFTER `finger_count`",
+            'finger_slots' => "ALTER TABLE `student_attendance_machine_users` ADD COLUMN `finger_slots` VARCHAR(40) NOT NULL DEFAULT '' AFTER `face_count`",
+        ] as $col => $alter) {
+            $c = $this->db->query("SHOW COLUMNS FROM `student_attendance_machine_users` LIKE '{$col}'");
+            if ($c && $c->num_rows > 0) {
+                continue;
+            }
+            $this->db->query($alter);
+        }
     }
 
     /** Add student.finger_id once (stores machine employee_no only). */
@@ -324,20 +343,23 @@ class StudentDeviceAttendanceModel extends Model {
     }
 
     /**
-     * @param list<array{employee_no: string, name: string, user_type: string}> $users
+     * @param list<array{employee_no: string, name: string, user_type: string, finger_count?: int, face_count?: int}> $users
      */
     public function upsertMachineUsers(array $users, string $machineId): int {
         $this->ensureTable();
         $saved = 0;
         $now = date('Y-m-d H:i:s');
         $stmt = $this->db->prepare(
-            'INSERT INTO `student_attendance_machine_users`
-                (`employee_no`, `name`, `user_type`, `machine_id`, `synced_at`)
-             VALUES (?, ?, ?, ?, ?)
+            "INSERT INTO `student_attendance_machine_users`
+                (`employee_no`, `name`, `user_type`, `machine_id`, `finger_count`, `face_count`, `finger_slots`, `synced_at`)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 `name`=VALUES(`name`),
                 `user_type`=VALUES(`user_type`),
-                `synced_at`=VALUES(`synced_at`)'
+                `finger_count`=IF(? < 0, `finger_count`, ?),
+                `face_count`=IF(? < 0, `face_count`, ?),
+                `finger_slots`=IF(? = 0, `finger_slots`, VALUES(`finger_slots`)),
+                `synced_at`=VALUES(`synced_at`)"
         );
         if (!$stmt) {
             return 0;
@@ -349,14 +371,475 @@ class StudentDeviceAttendanceModel extends Model {
             }
             $name = (string) ($u['name'] ?? '');
             $type = (string) ($u['user_type'] ?? 'normal');
-            // Normalize device "normal" display as Student for MIS logic (stored as-is from device)
-            $stmt->bind_param('sssss', $eno, $name, $type, $machineId, $now);
+            $fingers = array_key_exists('finger_count', $u) ? (int) $u['finger_count'] : -1;
+            $faces = array_key_exists('face_count', $u) ? (int) $u['face_count'] : -1;
+            $fingersIns = $fingers < 0 ? 0 : $fingers;
+            $facesIns = $faces < 0 ? 0 : $faces;
+            $slots = '';
+            $slotsProvided = 0;
+            if (array_key_exists('finger_slots', $u)) {
+                $slotsProvided = 1;
+                if (is_array($u['finger_slots'])) {
+                    $ids = array_values(array_unique(array_filter(array_map('intval', $u['finger_slots']), static fn ($n) => $n > 0)));
+                    sort($ids);
+                    $slots = implode(',', $ids);
+                } else {
+                    $slots = trim((string) $u['finger_slots']);
+                }
+            }
+            $stmt->bind_param(
+                'ssssiissiiiii',
+                $eno,
+                $name,
+                $type,
+                $machineId,
+                $fingersIns,
+                $facesIns,
+                $slots,
+                $now,
+                $fingers,
+                $fingersIns,
+                $faces,
+                $facesIns,
+                $slotsProvided
+            );
             if ($stmt->execute()) {
                 $saved++;
             }
         }
         $stmt->close();
         return $saved;
+    }
+
+    /**
+     * Search / list machine users with linked student details (card UI).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function listMachineUsersForEnroll(
+        string $search = '',
+        int $limit = 300,
+        string $departmentId = '',
+        string $courseId = '',
+        string $academicYear = '',
+        string $courseMode = ''
+    ): array {
+        $this->ensureTable();
+        // Profile photo column used in SELECT / cards
+        $col = $this->db->query("SHOW COLUMNS FROM `student` LIKE 'student_profile_img'");
+        if (!$col || $col->num_rows === 0) {
+            @$this->db->query(
+                "ALTER TABLE `student` ADD COLUMN `student_profile_img` VARCHAR(255) DEFAULT NULL AFTER `student_status`"
+            );
+        }
+        $limit = max(1, min(500, $limit));
+        $search = trim($search);
+        $departmentId = trim($departmentId);
+        $courseId = trim($courseId);
+        $academicYear = trim($academicYear);
+        $normalizedMode = self::normalizeCourseMode($courseMode);
+        $hasFilters = $departmentId !== '' || $courseId !== '' || $academicYear !== '' || $normalizedMode !== '';
+
+        $sql = "SELECT
+                    mu.`employee_no`,
+                    mu.`name` AS `machine_name`,
+                    mu.`user_type`,
+                    mu.`machine_id`,
+                    mu.`finger_count`,
+                    mu.`face_count`,
+                    mu.`finger_slots`,
+                    mu.`synced_at`,
+                    s.`student_id`,
+                    COALESCE(NULLIF(TRIM(s.`student_ininame`), ''), NULLIF(TRIM(s.`student_fullname`), ''), mu.`name`) AS `student_name`,
+                    s.`student_status`,
+                    s.`student_phone`,
+                    s.`student_email`,
+                    s.`student_gender`,
+                    s.`student_profile_img`,
+                    se.`academic_year`,
+                    se.`course_mode`,
+                    c.`department_id`,
+                    c.`course_id`,
+                    c.`course_name`,
+                    d.`department_name`
+                FROM `student_attendance_machine_users` mu
+                LEFT JOIN `student` s ON s.`finger_id` = mu.`employee_no`
+                LEFT JOIN `student_enroll` se ON se.`student_id` = s.`student_id`
+                    AND UPPER(TRIM(se.`student_enroll_status`)) = 'FOLLOWING'
+                LEFT JOIN `course` c ON c.`course_id` = se.`course_id`
+                LEFT JOIN `department` d ON d.`department_id` = c.`department_id`";
+        $types = '';
+        $params = [];
+        $where = [];
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+            $where[] = '(mu.`employee_no` LIKE ?
+                        OR mu.`name` LIKE ?
+                        OR s.`student_id` LIKE ?
+                        OR s.`student_fullname` LIKE ?
+                        OR s.`student_ininame` LIKE ?)';
+            $types .= 'sssss';
+            array_push($params, $like, $like, $like, $like, $like);
+        }
+        if ($hasFilters) {
+            // Filters require a linked Active Following enrollment.
+            $where[] = 's.`student_id` IS NOT NULL';
+            $where[] = "UPPER(TRIM(s.`student_status`)) = 'ACTIVE'";
+            if ($departmentId !== '') {
+                $where[] = 'c.`department_id` = ?';
+                $types .= 's';
+                $params[] = $departmentId;
+            }
+            if ($courseId !== '') {
+                $where[] = 'se.`course_id` = ?';
+                $types .= 's';
+                $params[] = $courseId;
+            }
+            if ($academicYear !== '') {
+                $where[] = 'se.`academic_year` = ?';
+                $types .= 's';
+                $params[] = $academicYear;
+            }
+            if ($normalizedMode !== '') {
+                $where[] = 'LOWER(TRIM(se.`course_mode`)) = LOWER(TRIM(?))';
+                $types .= 's';
+                $params[] = $normalizedMode;
+            }
+        }
+        if ($where !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= " GROUP BY mu.`employee_no`, mu.`name`, mu.`user_type`, mu.`machine_id`,
+                           mu.`finger_count`, mu.`face_count`, mu.`finger_slots`, mu.`synced_at`,
+                           s.`student_id`, s.`student_ininame`, s.`student_fullname`, s.`student_status`,
+                           s.`student_phone`, s.`student_email`, s.`student_gender`, s.`student_profile_img`,
+                           se.`academic_year`, se.`course_mode`, c.`department_id`, c.`course_id`,
+                           c.`course_name`, d.`department_name`
+                  ORDER BY mu.`employee_no` ASC LIMIT {$limit}";
+
+        $rows = [];
+        if ($types === '') {
+            $res = $this->db->query($sql);
+        } else {
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                return [];
+            }
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $res = $stmt->get_result();
+        }
+        if ($res) {
+            while ($r = $res->fetch_assoc()) {
+                $rows[] = $r;
+            }
+        }
+
+        // Attach Active student by generated employee code when finger_id is not linked yet.
+        foreach ($rows as &$r) {
+            if (trim((string) ($r['student_id'] ?? '')) !== '') {
+                continue;
+            }
+            if ($hasFilters) {
+                // Already constrained to linked students when filters are active.
+                continue;
+            }
+            $eno = trim((string) ($r['employee_no'] ?? ''));
+            if ($eno === '') {
+                continue;
+            }
+            $st = $this->findActiveStudentByEmployeeNo($eno);
+            if (!$st) {
+                continue;
+            }
+            $ini = trim((string) ($st['student_ininame'] ?? ''));
+            $full = trim((string) ($st['student_fullname'] ?? ''));
+            $r['student_id'] = (string) ($st['student_id'] ?? '');
+            $r['student_name'] = $ini !== '' ? $ini : $full;
+            $r['student_status'] = (string) ($st['student_status'] ?? '');
+            $r['student_phone'] = (string) ($st['student_phone'] ?? '');
+            $r['student_email'] = (string) ($st['student_email'] ?? '');
+            $r['student_gender'] = (string) ($st['student_gender'] ?? '');
+            $r['student_profile_img'] = (string) ($st['student_profile_img'] ?? '');
+        }
+        unset($r);
+
+        // Also surface Active students matching search / filters who are not yet on the machine.
+        if ($search !== '' || $hasFilters) {
+            $extra = $this->findActiveStudentsForEnrollCards(
+                $search,
+                $departmentId,
+                $courseId,
+                $academicYear,
+                $normalizedMode,
+                min(120, $limit)
+            );
+            $seen = [];
+            foreach ($rows as $r) {
+                $seen[strtoupper((string) ($r['employee_no'] ?? ''))] = true;
+            }
+            foreach ($extra as $st) {
+                $eno = (string) ($st['employee_no'] ?? '');
+                $key = strtoupper($eno);
+                if ($eno === '' || isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $rows[] = [
+                    'employee_no' => $eno,
+                    'machine_name' => (string) ($st['student_name'] ?? ''),
+                    'user_type' => 'normal',
+                    'machine_id' => '',
+                    'finger_count' => 0,
+                    'face_count' => 0,
+                    'synced_at' => '',
+                    'student_id' => (string) ($st['student_id'] ?? ''),
+                    'student_name' => (string) ($st['student_name'] ?? ''),
+                    'student_status' => (string) ($st['student_status'] ?? ''),
+                    'student_phone' => (string) ($st['student_phone'] ?? ''),
+                    'student_email' => (string) ($st['student_email'] ?? ''),
+                    'student_gender' => (string) ($st['student_gender'] ?? ''),
+                    'student_profile_img' => (string) ($st['student_profile_img'] ?? ''),
+                    'department_id' => (string) ($st['department_id'] ?? ''),
+                    'department_name' => (string) ($st['department_name'] ?? ''),
+                    'course_id' => (string) ($st['course_id'] ?? ''),
+                    'course_name' => (string) ($st['course_name'] ?? ''),
+                    'academic_year' => (string) ($st['academic_year'] ?? ''),
+                    'course_mode' => (string) ($st['course_mode'] ?? ''),
+                    'on_machine' => false,
+                ];
+            }
+        }
+
+        foreach ($rows as &$r) {
+            if (!array_key_exists('on_machine', $r)) {
+                $r['on_machine'] = trim((string) ($r['machine_id'] ?? '')) !== ''
+                    || trim((string) ($r['synced_at'] ?? '')) !== '';
+            }
+            $slotsRaw = trim((string) ($r['finger_slots'] ?? ''));
+            $slots = [];
+            if ($slotsRaw !== '') {
+                foreach (explode(',', $slotsRaw) as $p) {
+                    $n = (int) trim($p);
+                    if ($n > 0) {
+                        $slots[] = $n;
+                    }
+                }
+            }
+            $r['finger_slots'] = $slots;
+            $r['has_finger_01'] = in_array(1, $slots, true);
+            $r['has_finger_02'] = in_array(2, $slots, true);
+            $r['has_face'] = (int) ($r['face_count'] ?? 0) > 0;
+            if ((int) ($r['finger_count'] ?? 0) < count($slots)) {
+                $r['finger_count'] = count($slots);
+            }
+        }
+        unset($r);
+
+        return $rows;
+    }
+
+    /**
+     * Active Following students for Users cards (search + academic filters).
+     *
+     * @return list<array<string,string>>
+     */
+    public function findActiveStudentsForEnrollCards(
+        string $search = '',
+        string $departmentId = '',
+        string $courseId = '',
+        string $academicYear = '',
+        string $courseMode = '',
+        int $limit = 80
+    ): array {
+        $search = trim($search);
+        $departmentId = trim($departmentId);
+        $courseId = trim($courseId);
+        $academicYear = trim($academicYear);
+        $normalizedMode = self::normalizeCourseMode($courseMode);
+        $hasFilters = $departmentId !== '' || $courseId !== '' || $academicYear !== '' || $normalizedMode !== '';
+        if ($search === '' && !$hasFilters) {
+            return [];
+        }
+        $limit = max(1, min(200, $limit));
+
+        $sql = "SELECT s.`student_id`, s.`student_fullname`, s.`student_ininame`, s.`student_status`,
+                       s.`student_phone`, s.`student_email`, s.`student_gender`, s.`finger_id`,
+                       s.`student_profile_img`,
+                       se.`academic_year`, se.`course_mode`, se.`course_id`,
+                       c.`department_id`, c.`course_name`, d.`department_name`
+                FROM `student` s
+                INNER JOIN `student_enroll` se ON se.`student_id` = s.`student_id`
+                INNER JOIN `course` c ON c.`course_id` = se.`course_id`
+                LEFT JOIN `department` d ON d.`department_id` = c.`department_id`
+                WHERE UPPER(TRIM(s.`student_status`)) = 'ACTIVE'
+                  AND UPPER(TRIM(se.`student_enroll_status`)) = 'FOLLOWING'";
+        $types = '';
+        $params = [];
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+            $sql .= ' AND (
+                s.`student_id` LIKE ?
+                OR s.`finger_id` LIKE ?
+                OR s.`student_fullname` LIKE ?
+                OR s.`student_ininame` LIKE ?
+            )';
+            $types .= 'ssss';
+            array_push($params, $like, $like, $like, $like);
+        }
+        if ($departmentId !== '') {
+            $sql .= ' AND c.`department_id` = ?';
+            $types .= 's';
+            $params[] = $departmentId;
+        }
+        if ($courseId !== '') {
+            $sql .= ' AND se.`course_id` = ?';
+            $types .= 's';
+            $params[] = $courseId;
+        }
+        if ($academicYear !== '') {
+            $sql .= ' AND se.`academic_year` = ?';
+            $types .= 's';
+            $params[] = $academicYear;
+        }
+        if ($normalizedMode !== '') {
+            $sql .= ' AND LOWER(TRIM(se.`course_mode`)) = LOWER(TRIM(?))';
+            $types .= 's';
+            $params[] = $normalizedMode;
+        }
+        $sql .= ' GROUP BY s.`student_id`, s.`student_fullname`, s.`student_ininame`, s.`student_status`,
+                           s.`student_phone`, s.`student_email`, s.`student_gender`, s.`finger_id`,
+                           s.`student_profile_img`, se.`academic_year`, se.`course_mode`, se.`course_id`,
+                           c.`department_id`, c.`course_name`, d.`department_name`
+                  ORDER BY d.`department_name` ASC, c.`course_name` ASC, s.`student_id` ASC
+                  LIMIT ' . $limit;
+
+        if ($types === '') {
+            $res = $this->db->query($sql);
+        } else {
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                return [];
+            }
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $res = $stmt->get_result();
+        }
+        $out = [];
+        if (!$res) {
+            return [];
+        }
+        while ($r = $res->fetch_assoc()) {
+            $sid = (string) ($r['student_id'] ?? '');
+            $eno = trim((string) ($r['finger_id'] ?? ''));
+            if ($eno === '') {
+                $eno = (string) (self::generateEmployeeNoFromStudentId($sid)
+                    ?? self::generatePersonIdForStudentExport($sid)
+                    ?? '');
+            }
+            if ($search !== '' && $eno !== '') {
+                $needleOk = stripos($eno, $search) !== false
+                    || stripos($sid, $search) !== false
+                    || stripos((string) ($r['student_fullname'] ?? ''), $search) !== false
+                    || stripos((string) ($r['student_ininame'] ?? ''), $search) !== false;
+                if (!$needleOk) {
+                    continue;
+                }
+            }
+            $ini = trim((string) ($r['student_ininame'] ?? ''));
+            $full = trim((string) ($r['student_fullname'] ?? ''));
+            $out[] = [
+                'student_id' => $sid,
+                'student_name' => $ini !== '' ? $ini : $full,
+                'employee_no' => $eno,
+                'student_status' => (string) ($r['student_status'] ?? ''),
+                'student_phone' => (string) ($r['student_phone'] ?? ''),
+                'student_email' => (string) ($r['student_email'] ?? ''),
+                'student_gender' => (string) ($r['student_gender'] ?? ''),
+                'student_profile_img' => (string) ($r['student_profile_img'] ?? ''),
+                'department_id' => (string) ($r['department_id'] ?? ''),
+                'department_name' => (string) ($r['department_name'] ?? ''),
+                'course_id' => (string) ($r['course_id'] ?? ''),
+                'course_name' => (string) ($r['course_name'] ?? ''),
+                'academic_year' => (string) ($r['academic_year'] ?? ''),
+                'course_mode' => (string) ($r['course_mode'] ?? ''),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Active students whose Person ID / finger code matches search (or student id / name).
+     *
+     * @return list<array{student_id:string,student_name:string,employee_no:string,student_status:string,student_phone:string,student_email:string,student_gender:string}>
+     */
+    public function findActiveStudentsByEmployeeSearch(string $search, int $limit = 40): array {
+        return $this->findActiveStudentsForEnrollCards($search, '', '', '', '', $limit);
+    }
+
+    /** Resolve Active student for an employee/person code. */
+    public function findActiveStudentByEmployeeNo(string $employeeNo): ?array {
+        $employeeNo = trim($employeeNo);
+        if ($employeeNo === '') {
+            return null;
+        }
+        $this->ensureFingerIdColumn();
+        $stmt = $this->db->prepare(
+            'SELECT s.`student_id`, s.`student_fullname`, s.`student_ininame`, s.`student_status`,
+                    s.`student_phone`, s.`student_email`, s.`finger_id`, s.`student_profile_img`
+             FROM `student` s
+             WHERE s.`finger_id` = ?
+             LIMIT 1'
+        );
+        if ($stmt) {
+            $stmt->bind_param('s', $employeeNo);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if ($row) {
+                return $row;
+            }
+        }
+
+        // Match generated employee no from student_id for Active + Following.
+        $sql = "SELECT s.`student_id`, s.`student_fullname`, s.`student_ininame`, s.`student_status`,
+                       s.`student_phone`, s.`student_email`, s.`finger_id`, s.`student_profile_img`
+                FROM `student` s
+                INNER JOIN `student_enroll` se ON se.`student_id` = s.`student_id`
+                WHERE UPPER(TRIM(s.`student_status`)) = 'ACTIVE'
+                  AND UPPER(TRIM(se.`student_enroll_status`)) = 'FOLLOWING'
+                GROUP BY s.`student_id`, s.`student_fullname`, s.`student_ininame`, s.`student_status`,
+                         s.`student_phone`, s.`student_email`, s.`finger_id`, s.`student_profile_img`";
+        $res = $this->db->query($sql);
+        if (!$res) {
+            return null;
+        }
+        while ($r = $res->fetch_assoc()) {
+            $sid = (string) ($r['student_id'] ?? '');
+            $eno = self::generateEmployeeNoFromStudentId($sid)
+                ?? self::generatePersonIdForStudentExport($sid);
+            if ($eno !== null && strcasecmp($eno, $employeeNo) === 0) {
+                return $r;
+            }
+        }
+        return null;
+    }
+
+    public function setStudentFingerId(string $studentId, string $employeeNo): bool {
+        $studentId = trim($studentId);
+        $employeeNo = trim($employeeNo);
+        if ($studentId === '' || $employeeNo === '') {
+            return false;
+        }
+        $this->ensureFingerIdColumn();
+        $stmt = $this->db->prepare('UPDATE `student` SET `finger_id` = ? WHERE `student_id` = ?');
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param('ss', $employeeNo, $studentId);
+        $ok = $stmt->execute();
+        $stmt->close();
+        return $ok;
     }
 
     /** @return list<array<string,mixed>> */
@@ -964,6 +1447,212 @@ class StudentDeviceAttendanceModel extends Model {
             }
         }
         return $rows;
+    }
+
+    /**
+     * Person ID for student information Excel export.
+     * From Student ID only: year last 2 digits (first segment) + last 6 characters of the ID tail.
+     * Example: 2022/MET/4MA010 → 22 + 4MA010 = 224MA010.
+     * Academic year filter is not used for Person ID.
+     */
+    public static function generatePersonIdForStudentExport(string $studentId, string $academicYear = ''): ?string {
+        $studentId = trim($studentId);
+        if ($studentId === '') {
+            return null;
+        }
+        $parts = preg_split('#[/\\\\]+#', $studentId);
+        if (!is_array($parts) || $parts === []) {
+            return null;
+        }
+
+        $yearPart = trim((string) $parts[0]);
+        if (!preg_match('/^\d{4}$/', $yearPart)) {
+            return null;
+        }
+        $yy = substr($yearPart, -2);
+
+        $tail = trim((string) $parts[count($parts) - 1]);
+        if ($tail === '') {
+            return null;
+        }
+        $last6 = mb_strlen($tail, 'UTF-8') >= 6
+            ? mb_substr($tail, -6, null, 'UTF-8')
+            : $tail;
+        $last6 = preg_replace('/\s+/', '', $last6) ?? $last6;
+        if ($last6 === '') {
+            return null;
+        }
+
+        return $yy . $last6;
+    }
+
+    /**
+     * Active/Following students for Student Information Excel export (read-only).
+     *
+     * @return list<array{
+     *   student_id: string,
+     *   person_id: string,
+     *   person_name: string,
+     *   gender_code: string,
+     *   contact: string,
+     *   email: string,
+     *   department_id: string,
+     *   department_name: string,
+     *   course_name: string,
+     *   academic_year: string,
+     *   group_name: string
+     * }>
+     */
+    public function listStudentsForFingerprintImport(
+        string $departmentId = '',
+        string $courseId = '',
+        string $academicYear = '',
+        string $groupId = '',
+        string $courseMode = ''
+    ): array {
+        $gid = $groupId !== '' ? (int) $groupId : 0;
+        $normalizedMode = self::normalizeCourseMode($courseMode);
+        if ($gid > 0) {
+            $groupJoin = "INNER JOIN `group_students` gs ON gs.`student_id` = s.`student_id`
+                    AND gs.`status` = 'active' AND gs.`group_id` = {$gid}
+                INNER JOIN `groups` g ON g.`id` = gs.`group_id`";
+        } else {
+            $groupJoin = "LEFT JOIN (
+                    SELECT `student_id`, MIN(`group_id`) AS `group_id`
+                    FROM `group_students`
+                    WHERE `status` = 'active'
+                    GROUP BY `student_id`
+                ) gsp ON gsp.`student_id` = s.`student_id`
+                LEFT JOIN `groups` g ON g.`id` = gsp.`group_id`";
+        }
+
+        // Active students only: student_status=Active AND enrollment still Following.
+        $sql = "SELECT
+                    s.`student_id`,
+                    s.`student_fullname`,
+                    s.`student_ininame`,
+                    s.`student_gender`,
+                    s.`student_phone`,
+                    s.`student_email`,
+                    s.`student_status`,
+                    se.`student_enroll_status`,
+                    se.`academic_year`,
+                    se.`course_mode`,
+                    c.`department_id`,
+                    d.`department_name`,
+                    c.`course_name`,
+                    COALESCE(g.`name`, '') AS `group_name`
+                FROM `student` s
+                INNER JOIN `student_enroll` se ON se.`student_id` = s.`student_id`
+                INNER JOIN `course` c ON c.`course_id` = se.`course_id`
+                LEFT JOIN `department` d ON d.`department_id` = c.`department_id`
+                {$groupJoin}
+                WHERE UPPER(TRIM(s.`student_status`)) = 'ACTIVE'
+                  AND UPPER(TRIM(se.`student_enroll_status`)) = 'FOLLOWING'";
+        $types = '';
+        $params = [];
+        if ($departmentId !== '') {
+            $sql .= ' AND c.`department_id` = ?';
+            $types .= 's';
+            $params[] = $departmentId;
+        }
+        if ($courseId !== '') {
+            $sql .= ' AND se.`course_id` = ?';
+            $types .= 's';
+            $params[] = $courseId;
+        }
+        if ($academicYear !== '') {
+            $sql .= ' AND se.`academic_year` = ?';
+            $types .= 's';
+            $params[] = $academicYear;
+        }
+        if ($normalizedMode !== '') {
+            $sql .= ' AND LOWER(TRIM(se.`course_mode`)) = LOWER(TRIM(?))';
+            $types .= 's';
+            $params[] = $normalizedMode;
+        }
+        $sql .= ' GROUP BY s.`student_id`, s.`student_fullname`, s.`student_ininame`, s.`student_gender`,
+                           s.`student_phone`, s.`student_email`, s.`student_status`, se.`student_enroll_status`,
+                           se.`academic_year`, se.`course_mode`,
+                           c.`department_id`, d.`department_name`, c.`course_name`, g.`name`
+                  ORDER BY d.`department_name` ASC, c.`course_name` ASC, s.`student_id` ASC';
+
+        $raw = [];
+        if ($types === '') {
+            $res = $this->db->query($sql);
+        } else {
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                return [];
+            }
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $res = $stmt->get_result();
+        }
+        if ($res) {
+            while ($r = $res->fetch_assoc()) {
+                $raw[] = $r;
+            }
+        }
+
+        $out = [];
+        $seenStudent = [];
+        $usedPersonIds = [];
+        foreach ($raw as $r) {
+            // Belt-and-suspenders: never export Inactive / Dropout / Graduated, etc.
+            $stStatus = strtoupper(trim((string) ($r['student_status'] ?? '')));
+            $enStatus = strtoupper(trim((string) ($r['student_enroll_status'] ?? '')));
+            if ($stStatus !== 'ACTIVE' || $enStatus !== 'FOLLOWING') {
+                continue;
+            }
+            $sid = trim((string) ($r['student_id'] ?? ''));
+            if ($sid === '' || isset($seenStudent[$sid])) {
+                continue;
+            }
+            $enrollYear = trim((string) ($r['academic_year'] ?? ''));
+            $personId = self::generatePersonIdForStudentExport($sid);
+            if ($personId === null || $personId === '') {
+                continue;
+            }
+            // Keep Person ID unique within this export set.
+            $basePersonId = $personId;
+            $n = 2;
+            while (isset($usedPersonIds[$personId])) {
+                $personId = $basePersonId . '-' . $n;
+                $n++;
+            }
+            $usedPersonIds[$personId] = true;
+            $seenStudent[$sid] = true;
+
+            $ini = trim((string) ($r['student_ininame'] ?? ''));
+            $full = trim((string) ($r['student_fullname'] ?? ''));
+            $name = $ini !== '' ? $ini : ($full !== '' ? $full : $sid);
+            $gender = strtolower(trim((string) ($r['student_gender'] ?? '')));
+            $genderCode = '';
+            if ($gender === 'male' || $gender === 'm') {
+                $genderCode = '1';
+            } elseif ($gender === 'female' || $gender === 'f') {
+                $genderCode = '2';
+            }
+            $mode = (string) ($r['course_mode'] ?? '');
+            $out[] = [
+                'student_id' => $sid,
+                'person_id' => $personId,
+                'person_name' => mb_strtoupper($name, 'UTF-8'),
+                'gender_code' => $genderCode,
+                'contact' => trim((string) ($r['student_phone'] ?? '')),
+                'email' => trim((string) ($r['student_email'] ?? '')),
+                'department_id' => (string) ($r['department_id'] ?? ''),
+                'department_name' => (string) ($r['department_name'] ?? ''),
+                'course_name' => (string) ($r['course_name'] ?? ''),
+                'academic_year' => $enrollYear,
+                'group_name' => (string) ($r['group_name'] ?? ''),
+                'course_mode' => $mode,
+                'course_mode_label' => self::courseModeLabel($mode),
+            ];
+        }
+
+        return $out;
     }
 
     /**
@@ -1640,6 +2329,8 @@ class StudentDeviceAttendanceModel extends Model {
     public function buildSaoDashboard(
         string $reportMonth,
         string $departmentId = '',
+        string $courseId = '',
+        string $academicYear = '',
         string $groupId = '',
         string $studentId = '',
         string $statusFilter = 'flagged',
@@ -1703,7 +2394,7 @@ class StudentDeviceAttendanceModel extends Model {
             ];
         }
 
-        $students = $this->listActiveStudentsForReport($departmentId, '', '', $groupId, $studentId);
+        $students = $this->listActiveStudentsForReport($departmentId, $courseId, $academicYear, $groupId, $studentId);
         $ids = array_column($students, 'student_id');
         $punchMap = $this->getDailyPunchMapForStudents($ids, $dateFrom, $dateTo);
 
@@ -1870,7 +2561,7 @@ class StudentDeviceAttendanceModel extends Model {
      * @return array<string,mixed>|null
      */
     public function getSaoDashboardStudentRow(string $reportMonth, string $studentId, string $departmentId = ''): ?array {
-        $dash = $this->buildSaoDashboard($reportMonth, $departmentId, '', $studentId, 'all', 3);
+        $dash = $this->buildSaoDashboard($reportMonth, $departmentId, '', '', '', $studentId, 'all', 3);
         foreach ($dash['flagged'] as $row) {
             if ((string) ($row['student_id'] ?? '') === $studentId) {
                 return $row;

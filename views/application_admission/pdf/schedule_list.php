@@ -38,22 +38,22 @@ if ($st !== '') echo ' · ' . $e($st) . ($et !== '' ? ' – ' . $e($et) : '');
 <thead>
 <tr>
 <th style="width:5%;">No</th>
-<th style="width:12%;">Roll / Index</th>
-<th style="width:28%;">Name</th>
+<?php if (!$isInterview): ?><th style="width:12%;">Roll / Index</th><?php endif; ?>
+<th style="width:<?php echo $isInterview ? '34%' : '28%'; ?>;">Name</th>
 <th style="width:14%;">NIC</th>
-<th style="width:22%;">Course (1st preference)</th>
+<th style="width:<?php echo $isInterview ? '28%' : '22%'; ?>;">Course (1st preference)</th>
 <th style="width:10%;"><?php echo $isInterview ? 'Panel' : 'Hall'; ?></th>
 <?php if ($isInterview): ?><th style="width:9%;">Status</th><?php endif; ?>
 </tr>
 </thead>
 <tbody>
 <?php if (empty($entries)): ?>
-<tr><td colspan="<?php echo $isInterview ? 7 : 6; ?>" class="muted">No applicants listed.</td></tr>
+<tr><td colspan="<?php echo $isInterview ? 6 : 6; ?>" class="muted">No applicants listed.</td></tr>
 <?php else: ?>
 <?php $n = 0; foreach ($entries as $row): $n++; ?>
 <tr>
 <td><?php echo $n; ?></td>
-<td><?php echo $e($row['roll_number'] ?? '—'); ?></td>
+<?php if (!$isInterview): ?><td><?php echo $e($row['roll_number'] ?? '—'); ?></td><?php endif; ?>
 <td><?php echo $e($row['student_full_name'] ?? ''); ?></td>
 <td><?php echo $e($row['student_nic'] ?? ''); ?></td>
 <td><?php echo $e($row['course_priority_1'] ?? ''); ?></td>

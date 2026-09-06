@@ -63,21 +63,25 @@ $total = (int) count($entries ?? []);
 <thead>
 <tr>
 <th style="width:5%;text-align:center;">No</th>
+<?php if (!$isInterview): ?>
 <th style="width:14%;text-align:center;">Roll / Index</th>
-<th style="width:30%;text-align:center;">Name</th>
+<?php endif; ?>
+<th style="width:<?php echo $isInterview ? '40%' : '30%'; ?>;text-align:center;">Name</th>
 <th style="width:15%;text-align:center;">NIC</th>
-<th style="width:18%;text-align:center;">Candidate signature</th>
-<th style="width:18%;text-align:center;">Invigilator signature</th>
+<th style="width:<?php echo $isInterview ? '20%' : '18%'; ?>;text-align:center;">Candidate signature</th>
+<th style="width:<?php echo $isInterview ? '20%' : '18%'; ?>;text-align:center;"><?php echo $isInterview ? 'Panel signature' : 'Invigilator signature'; ?></th>
 </tr>
 </thead>
 <tbody>
 <?php if (empty($entries)): ?>
-<tr><td colspan="6" class="muted">No applicants listed.</td></tr>
+<tr><td colspan="<?php echo $isInterview ? 5 : 6; ?>" class="muted">No applicants listed.</td></tr>
 <?php else: ?>
 <?php $n = 0; foreach ($entries as $row): $n++; ?>
 <tr>
 <td style="text-align:center;"><?php echo $n; ?></td>
+<?php if (!$isInterview): ?>
 <td style="text-align:center;"><?php echo $e($row['roll_number'] ?? '—'); ?></td>
+<?php endif; ?>
 <td><?php echo $e(mb_strtoupper(trim((string) ($row['student_full_name'] ?? '')), 'UTF-8')); ?></td>
 <td style="text-align:center;"><?php echo $e($row['student_nic'] ?? ''); ?></td>
 <td class="sig">&nbsp;</td>
