@@ -106,13 +106,15 @@ ob_start();
     </nav>
 
     <?php if ($deviceTab === 'overview'): ?>
-        <div class="alert alert-warning mb-3 small">
-            <strong>Important:</strong> Device Test runs from the <em>SIS web server</em>
-            (<code>sis.slgti.ac.lk</code> / LAN <code>172.16.1.245</code>), not from your PC.
-            Your PC can ping <code>172.16.0.26</code> while SIS still shows OFFLINE if the server has
-            no route/VLAN to <code>172.16.0.0/24</code>. Ask network admin to allow
-            <code>172.16.1.245 → 172.16.0.26–29 TCP/80</code>.
+    <?php
+    require_once BASE_PATH . '/config/hikvision.php';
+    $passOk = function_exists('hikvision_pass_configured') && hikvision_pass_configured();
+    ?>
+    <?php if (!$passOk): ?>
+        <div class="alert alert-danger mb-3 small">
+            <strong>HIKVISION_PASS missing in config/hikvision.php</strong> on this server. Deploy the latest code, then click Test all.
         </div>
+    <?php endif; ?>
 
         <div class="sd-devices-kpi">
             <div class="sd-kpi"><span class="sd-kpi-label">Devices</span><strong><?php echo (int) $kpi['devices']; ?></strong></div>

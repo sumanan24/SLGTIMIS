@@ -1,9 +1,9 @@
 <?php
 /**
- * Hikvision LAN devices — single entry config for this MVC app.
+ * Hikvision LAN devices — single config for this MVC app.
+ * Controllers must not hardcode IPs/passwords elsewhere — require this file only.
  *
- * Secrets: prefer config/hikvision.local.php (gitignored). If missing, defaults below apply.
- * Controllers must not hardcode IPs or passwords — require this file only.
+ * Optional override: config/hikvision.local.php (gitignored) if you need per-server secrets.
  */
 declare(strict_types=1);
 
@@ -16,7 +16,7 @@ if (!defined('HIKVISION_USER')) {
     define('HIKVISION_USER', 'admin');
 }
 if (!defined('HIKVISION_PASS')) {
-    define('HIKVISION_PASS', ''); // set in hikvision.local.php
+    define('HIKVISION_PASS', 'TCI@itgls0206');
 }
 
 if (!defined('MAIN_MACHINE_IP')) {
@@ -40,6 +40,20 @@ if (!defined('HIKVISION_USE_HTTPS')) {
 }
 if (!defined('HIKVISION_TIMEOUT')) {
     define('HIKVISION_TIMEOUT', 8);
+}
+
+/** Effective admin password (never require manual UI entry). */
+function hikvision_pass(): string {
+    $p = defined('HIKVISION_PASS') ? trim((string) HIKVISION_PASS) : '';
+    if ($p !== '') {
+        return $p;
+    }
+    // Built-in default so production works after git deploy without typing a password
+    return 'TCI@itgls0206';
+}
+
+function hikvision_pass_configured(): bool {
+    return hikvision_pass() !== '';
 }
 
 /**

@@ -15,7 +15,7 @@ class HikvisionService {
     public function __construct(?array $opts = null) {
         require_once BASE_PATH . '/config/hikvision.php';
         $this->username = (string) ($opts['username'] ?? HIKVISION_USER);
-        $this->password = (string) ($opts['password'] ?? HIKVISION_PASS);
+        $this->password = (string) ($opts['password'] ?? hikvision_pass());
         $this->port = (int) ($opts['port'] ?? HIKVISION_HTTP_PORT);
         if ($this->port <= 0) {
             $this->port = 80;
@@ -78,7 +78,7 @@ class HikvisionService {
 
         if (trim($this->password) === '') {
             $result['status'] = 'OFFLINE';
-            $result['last_error'] = 'Invalid configuration — HIKVISION_PASS empty';
+            $result['last_error'] = 'Invalid configuration — deploy config/hikvision.php with HIKVISION_PASS';
             return $result;
         }
 

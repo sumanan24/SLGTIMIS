@@ -74,9 +74,14 @@ $statusClass = static function (string $status): string {
     <?php endif; ?>
 
     <div class="alert alert-light border small mb-3">
-        Tests run from the <strong>SIS PHP server</strong>, not your browser PC.
-        If your PC can ping readers but this page shows OFFLINE, fix routing:
-        SIS host → <code>172.16.0.26–29</code> TCP/80.
+        <?php
+        require_once BASE_PATH . '/config/hikvision.php';
+        if (!hikvision_pass_configured()):
+        ?>
+            <strong class="text-danger">HIKVISION_PASS missing in config/hikvision.php</strong> — deploy latest code.
+        <?php else: ?>
+            Password is loaded from <code>config/hikvision.php</code>. Click <strong>Test all</strong> — no manual password entry.
+        <?php endif; ?>
     </div>
 
     <div class="hk-grid">

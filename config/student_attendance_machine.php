@@ -9,7 +9,7 @@ require_once dirname(__DIR__) . '/config/hikvision.php';
 
 $host = MAIN_MACHINE_IP;
 $user = HIKVISION_USER;
-$password = HIKVISION_PASS;
+$password = hikvision_pass();
 $ssl = (bool) HIKVISION_USE_HTTPS;
 $portVal = (int) HIKVISION_HTTP_PORT;
 $timeoutVal = (int) HIKVISION_TIMEOUT;

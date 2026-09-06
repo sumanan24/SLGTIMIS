@@ -99,33 +99,31 @@ class StudentDeviceAttendanceController extends Controller {
     }
 
     /**
-     * Write gitignored config/student_attendance_machine.local.php (production secrets).
+     * Write gitignored config/hikvision.local.php (production secrets).
      *
      * @return array{ok:bool,message:string,path:string}
      */
     private function writeMachineLocalConfig(string $password, string $username = 'admin'): array {
-        $path = BASE_PATH . '/config/student_attendance_machine.local.php';
+        require_once BASE_PATH . '/config/hikvision.php';
+        $path = BASE_PATH . '/config/hikvision.local.php';
         $dir = dirname($path);
-        $existing = [];
-        if (is_file($path)) {
-            $tmp = require $path;
-            if (is_array($tmp)) {
-                $existing = $tmp;
-            }
-        }
-        $data = array_merge([
-            'host' => '172.16.0.26',
-            'username' => 'admin',
-            'password' => '',
-            'ssl' => false,
-            'port' => 0,
-            'timeout' => 60,
-            'reader_hosts' => ['172.16.0.29', '172.16.0.28', '172.16.0.27'],
-            'timezone' => 'Asia/Colombo',
-        ], $existing, [
-            'username' => $username !== '' ? $username : 'admin',
-            'password' => $password,
-        ]);
+        $user = $username !== '' ? $username : 'admin';
+        $passExport = var_export($password, true);
+        $userExport = var_export($user, true);
+        $main = var_export(MAIN_MACHINE_IP, true);
+        $r1 = var_export(READER1_IP, true);
+        $r2 = var_export(READER2_IP, true);
+        $r3 = var_export(READER3_IP, true);
+
+        $php = "<?php\n"
+            . "/** Auto-saved Hikvision LAN credentials (gitignored). Do not commit. */\n"
+            . "declare(strict_types=1);\n\n"
+            . "define('HIKVISION_USER', {$userExport});\n"
+            . "define('HIKVISION_PASS', {$passExport});\n"
+            . "define('MAIN_MACHINE_IP', {$main});\n"
+            . "define('READER1_IP', {$r1});\n"
+            . "define('READER2_IP', {$r2});\n"
+            . "define('READER3_IP', {$r3});\n";
 
         if (!is_dir($dir)) {
             return ['ok' => false, 'message' => 'config/ directory missing on server.', 'path' => $path];
@@ -133,25 +131,39 @@ class StudentDeviceAttendanceController extends Controller {
         if ((is_file($path) && !is_writable($path)) || (!is_file($path) && !is_writable($dir))) {
             return [
                 'ok' => false,
-                'message' => 'Cannot write config/student_attendance_machine.local.php — fix folder permissions or upload the file via FTP.',
+                'message' => 'Cannot write config/hikvision.local.php — fix folder permissions or upload the file via FTP.',
                 'path' => $path,
             ];
         }
 
-        $export = var_export($data, true);
-        $php = "<?php\n/** Auto-saved machine credentials (gitignored). Do not commit. */\ndeclare(strict_types=1);\n\nreturn {$export};\n";
         $written = @file_put_contents($path, $php, LOCK_EX);
         if ($written === false) {
             return [
                 'ok' => false,
-                'message' => 'Failed to write local machine config. Upload via FTP instead.',
+                'message' => 'Failed to write hikvision.local.php. Upload via FTP instead.',
                 'path' => $path,
             ];
         }
 
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($path, true);
+        }
+        // Also keep legacy local.php in sync for older includes
+        $legacy = BASE_PATH . '/config/student_attendance_machine.local.php';
+        @file_put_contents($legacy, "<?php\ndeclare(strict_types=1);\nreturn [\n"
+            . "  'host' => " . $main . ",\n"
+            . "  'username' => " . $userExport . ",\n"
+            . "  'password' => " . $passExport . ",\n"
+            . "  'ssl' => false,\n"
+            . "  'port' => 0,\n"
+            . "  'timeout' => 20,\n"
+            . "  'reader_hosts' => [" . $r1 . ", " . $r2 . ", " . $r3 . "],\n"
+            . "  'timezone' => 'Asia/Colombo',\n"
+            . "];\n", LOCK_EX);
+
         return [
             'ok' => true,
-            'message' => 'Machine password saved on this server.',
+            'message' => 'Hikvision password saved on this server (config/hikvision.local.php).',
             'path' => $path,
         ];
     }
@@ -221,6 +233,8 @@ class StudentDeviceAttendanceController extends Controller {
         unset($_SESSION['student_att_cache_purged_at']);
 
         $paths = [
+            BASE_PATH . '/config/hikvision.php',
+            BASE_PATH . '/config/hikvision.local.php',
             BASE_PATH . '/config/student_attendance_machine.php',
             BASE_PATH . '/config/student_attendance_machine.local.php',
             BASE_PATH . '/controllers/StudentDeviceAttendanceController.php',
@@ -327,21 +341,29 @@ class StudentDeviceAttendanceController extends Controller {
         try {
             require_once BASE_PATH . '/core/HikvisionIntegration.php';
             $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
-            $passwordOk = !empty($cfg['configured']) && trim((string) ($cfg['password'] ?? '')) !== '';
+            require_once BASE_PATH . '/config/hikvision.php';
+            $passwordOk = function_exists('hikvision_pass_configured')
+                ? hikvision_pass_configured()
+                : (!empty($cfg['configured']) && trim((string) ($cfg['password'] ?? '')) !== '');
+            // Always prefer live password helper for device cards
+            if ($passwordOk && trim((string) ($cfg['password'] ?? '')) === '') {
+                $cfg['password'] = hikvision_pass();
+                $cfg['configured'] = true;
+            }
 
-            // Drop stale probe cache that still says "Password empty" after secrets were fixed
+            // Drop stale probe cache that still says password empty after config deploy
             $cached = $_SESSION['student_att_device_status'] ?? null;
             if ($passwordOk && is_array($cached) && !empty($cached['devices'])) {
                 $staleEmpty = false;
                 foreach ($cached['devices'] as $p) {
-                    $m = strtolower((string) ($p['message'] ?? ''));
-                    if (str_contains($m, 'password empty') || str_contains($m, 'set password first')) {
+                    $m = strtolower((string) ($p['message'] ?? $p['reason'] ?? ''));
+                    if (str_contains($m, 'password empty') || str_contains($m, 'hikvision_pass empty') || str_contains($m, 'set password first')) {
                         $staleEmpty = true;
                         break;
                     }
                 }
                 if ($staleEmpty) {
-                    unset($_SESSION['student_att_device_status'], $_SESSION['student_att_lockout_until']);
+                    unset($_SESSION['student_att_device_status'], $_SESSION['student_att_lockout_until'], $_SESSION['student_att_connection']);
                     $cached = null;
                 }
             }
@@ -370,7 +392,7 @@ class StudentDeviceAttendanceController extends Controller {
                 $status = '';
                 $reason = '';
                 if (!$passwordOk) {
-                    $message = 'Password empty on this server — set HIKVISION_PASS / STUDENT_HIKVISION_PASS in .env or Save password on Device page';
+                    $message = 'Deploy config/hikvision.php (password is built-in) then click Test all';
                     $status = 'invalid_config';
                     $reason = 'Invalid configuration';
                 } elseif (is_array($p)) {
@@ -1226,9 +1248,23 @@ class StudentDeviceAttendanceController extends Controller {
                     $msg = ($action === 'test_all'
                         ? "Online {$online}/" . count($cred->devices()) . ' — '
                         : '') . implode(' · ', $lines);
-                    if ($online === 0 && $sisHint !== '') {
+
+                    $configEmpty = false;
+                    $unreachable = false;
+                    foreach ($statuses as $s) {
+                        $reason = strtolower((string) ($s['reason'] ?? $s['message'] ?? ''));
+                        if (str_contains($reason, 'hikvision_pass empty') || str_contains($reason, 'password empty')) {
+                            $configEmpty = true;
+                        }
+                        if (str_contains($reason, 'unreachable') || str_contains($reason, 'timeout') || str_contains($reason, 'port closed')) {
+                            $unreachable = true;
+                        }
+                    }
+                    if ($online === 0 && $configEmpty) {
+                        $msg .= ' · Fix: save password on this SIS server (Device page → Save password, or upload config/hikvision.local.php / set HIKVISION_PASS in .env). Not a VLAN issue.';
+                    } elseif ($online === 0 && $unreachable && $sisHint !== '') {
                         $msg .= ' · Probed from SIS host: ' . $sisHint
-                            . ' — if all show OFFLINE/unreachable, that host has no route to 172.16.0.0/24 (fix VLAN/firewall on the server, not the browser PC).';
+                            . ' — no route from that host to 172.16.0.0/24 (VLAN/firewall).';
                     }
                     $anyAuth = false;
                     foreach ($statuses as $s) {
@@ -2718,9 +2754,9 @@ class StudentDeviceAttendanceController extends Controller {
             return;
         }
         $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
-        if (trim((string) ($cfg['password'] ?? '')) === '') {
-            $_SESSION['flash_error'] = 'Cannot test: machine password is empty on this server. '
-                . 'Use “Save machine password” below (or set STUDENT_HIKVISION_PASS / local.php), then Test once.';
+        require_once BASE_PATH . '/config/hikvision.php';
+        if (!hikvision_pass_configured()) {
+            $_SESSION['flash_error'] = 'Cannot test: HIKVISION_PASS missing in config/hikvision.php. Deploy latest code, then Test once.';
             $this->redirect('attendance/student-device');
             return;
         }
