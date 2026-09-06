@@ -91,10 +91,79 @@ class StudentDeviceAttendanceController extends Controller {
             'export_fingerprint_import' => $root . '/export/fingerprint-import',
             'test' => $root . '/machine/test',
             'refresh_users' => $root . '/machine/refresh-users',
+            'save_credentials' => $root . '/machine/save-credentials',
             'logs' => $root . '/logs',
             'devices' => $root . '/devices',
             'warning' => $root . '/warning-letter',
         ];
+    }
+
+    /**
+     * Write gitignored config/student_attendance_machine.local.php (production secrets).
+     *
+     * @return array{ok:bool,message:string,path:string}
+     */
+    private function writeMachineLocalConfig(string $password, string $username = 'admin'): array {
+        $path = BASE_PATH . '/config/student_attendance_machine.local.php';
+        $dir = dirname($path);
+        $existing = [];
+        if (is_file($path)) {
+            $tmp = require $path;
+            if (is_array($tmp)) {
+                $existing = $tmp;
+            }
+        }
+        $data = array_merge([
+            'host' => '172.16.0.26',
+            'username' => 'admin',
+            'password' => '',
+            'ssl' => false,
+            'port' => 0,
+            'timeout' => 60,
+            'reader_hosts' => ['172.16.0.29', '172.16.0.28', '172.16.0.27'],
+            'timezone' => 'Asia/Colombo',
+        ], $existing, [
+            'username' => $username !== '' ? $username : 'admin',
+            'password' => $password,
+        ]);
+
+        if (!is_dir($dir)) {
+            return ['ok' => false, 'message' => 'config/ directory missing on server.', 'path' => $path];
+        }
+        if ((is_file($path) && !is_writable($path)) || (!is_file($path) && !is_writable($dir))) {
+            return [
+                'ok' => false,
+                'message' => 'Cannot write config/student_attendance_machine.local.php — fix folder permissions or upload the file via FTP.',
+                'path' => $path,
+            ];
+        }
+
+        $export = var_export($data, true);
+        $php = "<?php\n/** Auto-saved machine credentials (gitignored). Do not commit. */\ndeclare(strict_types=1);\n\nreturn {$export};\n";
+        $written = @file_put_contents($path, $php, LOCK_EX);
+        if ($written === false) {
+            return [
+                'ok' => false,
+                'message' => 'Failed to write local machine config. Upload via FTP instead.',
+                'path' => $path,
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'message' => 'Machine password saved on this server.',
+            'path' => $path,
+        ];
+    }
+
+    /** Clear cached probe / connection state after credentials change. */
+    private function clearMachineSessionCache(): void {
+        unset(
+            $_SESSION['student_att_device_status'],
+            $_SESSION['student_att_connection'],
+            $_SESSION['student_att_lockout_until'],
+            $_SESSION['student_att_refresh_users']
+        );
     }
 
     private function credentialSyncService(): StudentDeviceCredentialSyncService {
@@ -180,6 +249,8 @@ class StudentDeviceAttendanceController extends Controller {
 
         $deviceCards = [];
         $userStats = $att->machineUserStatsByHost();
+        $passwordOk = false;
+        $cfg = [];
         try {
             require_once BASE_PATH . '/core/HikvisionIntegration.php';
             $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
@@ -200,6 +271,11 @@ class StudentDeviceAttendanceController extends Controller {
                     unset($_SESSION['student_att_device_status'], $_SESSION['student_att_lockout_until']);
                     $cached = null;
                 }
+            }
+
+            // Don't show stale DISCONNECTED banner when password was never set
+            if (!$passwordOk) {
+                unset($_SESSION['student_att_connection']);
             }
 
             $probes = (is_array($cached) && !empty($cached['devices'])) ? $cached['devices'] : [];
@@ -256,6 +332,8 @@ class StudentDeviceAttendanceController extends Controller {
             'connectionStatus' => $_SESSION['student_att_connection'] ?? null,
             'deviceCards' => $deviceCards,
             'refreshUsersSummary' => $_SESSION['student_att_refresh_users'] ?? null,
+            'passwordConfigured' => $passwordOk,
+            'machineUsername' => (string) ($cfg['username'] ?? 'admin'),
         ]);
     }
 
@@ -2457,6 +2535,13 @@ class StudentDeviceAttendanceController extends Controller {
         if (!$this->requireAccess()) {
             return;
         }
+        $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
+        if (trim((string) ($cfg['password'] ?? '')) === '') {
+            $_SESSION['flash_error'] = 'Cannot test: machine password is empty on this server. '
+                . 'Use “Save machine password” below (or set STUDENT_HIKVISION_PASS / local.php), then Test once.';
+            $this->redirect('attendance/student-device');
+            return;
+        }
         $lockoutUntil = (int) ($_SESSION['student_att_lockout_until'] ?? 0);
         if ($lockoutUntil > time() && (string) $this->get('force', '') !== '1') {
             $_SESSION['flash_error'] = 'Admin lock cooldown active until ' . date('H:i', $lockoutUntil)
@@ -2520,6 +2605,177 @@ class StudentDeviceAttendanceController extends Controller {
     }
 
     /**
+     * Save Hikvision admin password onto this server (writes gitignored local.php).
+     * Required on production because .env / local.php are not in git.
+     */
+    public function saveMachineCredentials() {
+        if (!$this->requireAccess()) {
+            return;
+        }
+        if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
+            $this->redirect('attendance/student-device');
+            return;
+        }
+
+        $username = trim((string) $this->post('machine_username', 'admin'));
+        $password = (string) $this->post('machine_password', '');
+        $passwordConfirm = (string) $this->post('machine_password_confirm', '');
+
+        if ($username === '') {
+            $username = 'admin';
+        }
+        if (trim($password) === '') {
+            $_SESSION['flash_error'] = 'Enter the Hikvision admin password (same as http://172.16.0.26 web login).';
+            $this->redirect('attendance/student-device');
+            return;
+        }
+        if ($password !== $passwordConfirm) {
+            $_SESSION['flash_error'] = 'Password confirmation does not match.';
+            $this->redirect('attendance/student-device');
+            return;
+        }
+
+        $written = $this->writeMachineLocalConfig($password, $username);
+        if (empty($written['ok'])) {
+            $_SESSION['flash_error'] = $written['message'] ?? 'Could not save password on server.';
+            $this->redirect('attendance/student-device');
+            return;
+        }
+
+        $this->clearMachineSessionCache();
+
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($written['path'], true);
+        }
+        clearstatcache(true, $written['path']);
+
+        $autoTest = (string) $this->post('auto_test', '1') === '1';
+        if ($autoTest) {
+            @set_time_limit(90);
+            require_once BASE_PATH . '/core/HikvisionIntegration.php';
+            try {
+                $probes = $this->probeWithPassword($username, $password);
+                $_SESSION['student_att_device_status'] = [
+                    'devices' => $probes,
+                    'tested_at' => date('Y-m-d H:i:s'),
+                ];
+                $this->rememberDeviceLockout($probes);
+                $online = 0;
+                foreach ($probes as $p) {
+                    if (!empty($p['online'])) {
+                        $online++;
+                    }
+                }
+                foreach ($probes as $p) {
+                    if (($p['role'] ?? '') === 'main') {
+                        $_SESSION['student_att_connection'] = [
+                            'host' => (string) ($p['host'] ?? '172.16.0.26'),
+                            'ok' => !empty($p['online']),
+                            'message' => (string) ($p['message'] ?? ''),
+                            'tested_at' => date('Y-m-d H:i:s'),
+                            'device_info' => null,
+                        ];
+                        break;
+                    }
+                }
+                if ($online > 0) {
+                    $_SESSION['flash_success'] = $written['message']
+                        . " Devices online: {$online}/" . count($probes) . '.';
+                } else {
+                    $_SESSION['flash_error'] = $written['message']
+                        . ' Password saved, but devices still offline — check LAN from this server to 172.16.0.26, admin lock, or wrong password.';
+                }
+            } catch (Throwable $e) {
+                $_SESSION['flash_success'] = $written['message'] . ' Saved. Test failed: ' . $e->getMessage();
+            }
+        } else {
+            $_SESSION['flash_success'] = $written['message'] . ' Click Test all once.';
+        }
+
+        $this->redirect('attendance/student-device');
+    }
+
+    /**
+     * Probe MAIN + readers using explicit credentials (avoids PHP require cache after write).
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function probeWithPassword(string $username, string $password): array {
+        require_once BASE_PATH . '/core/HikvisionIntegration.php';
+        $hosts = [
+            ['host' => '172.16.0.26', 'role' => 'main', 'label' => 'Main (enrollment)'],
+            ['host' => '172.16.0.29', 'role' => 'reader', 'label' => 'Reader 1'],
+            ['host' => '172.16.0.28', 'role' => 'reader', 'label' => 'Reader 2'],
+            ['host' => '172.16.0.27', 'role' => 'reader', 'label' => 'Reader 3'],
+        ];
+        // Prefer hosts from written local / config when available
+        $localPath = BASE_PATH . '/config/student_attendance_machine.local.php';
+        if (is_file($localPath)) {
+            $local = include $localPath;
+            if (is_array($local)) {
+                $main = trim((string) ($local['host'] ?? '172.16.0.26'));
+                $readers = $local['reader_hosts'] ?? [];
+                if (!is_array($readers)) {
+                    $readers = [];
+                }
+                $hosts = [['host' => $main, 'role' => 'main', 'label' => 'Main (enrollment)']];
+                $i = 1;
+                foreach ($readers as $rip) {
+                    $rip = trim((string) $rip);
+                    if ($rip === '' || $rip === $main) {
+                        continue;
+                    }
+                    $hosts[] = ['host' => $rip, 'role' => 'reader', 'label' => 'Reader ' . $i];
+                    $i++;
+                }
+            }
+        }
+
+        $out = [];
+        $skipRestReason = '';
+        foreach ($hosts as $device) {
+            $host = (string) ($device['host'] ?? '');
+            $row = [
+                'host' => $host,
+                'role' => (string) ($device['role'] ?? ''),
+                'label' => (string) ($device['label'] ?? $host),
+                'online' => false,
+                'message' => '',
+                'locked' => false,
+            ];
+            if ($skipRestReason !== '') {
+                $row['message'] = $skipRestReason;
+                $out[] = $row;
+                continue;
+            }
+            try {
+                $hik = new HikvisionIntegration([
+                    'host' => $host,
+                    'username' => $username,
+                    'password' => $password,
+                    'ssl' => false,
+                    'port' => 0,
+                    'timeout' => 12,
+                ]);
+                $test = $hik->testConnection();
+                $row['online'] = !empty($test['success']);
+                $row['message'] = (string) ($test['message'] ?? ($row['online'] ? 'OK' : 'Failed'));
+                $msgLower = strtolower($row['message']);
+                if (!$row['online'] && (str_contains($msgLower, 'temporarily locked') || str_contains($msgLower, 'lockstatus'))) {
+                    $row['locked'] = true;
+                    $skipRestReason = 'Skipped — admin locked on another device (same password). Wait ~15–20 min or reboot each terminal, then Test once.';
+                } elseif (!$row['online'] && str_contains($msgLower, '401')) {
+                    $skipRestReason = 'Skipped — login failed (check password). Do not keep clicking Test.';
+                }
+            } catch (Throwable $e) {
+                $row['message'] = $e->getMessage();
+            }
+            $out[] = $row;
+        }
+        return $out;
+    }
+
+    /**
      * Remember device admin lockout so we do not keep probing and extending the lock.
      *
      * @param list<array<string,mixed>> $probes
@@ -2533,20 +2789,15 @@ class StudentDeviceAttendanceController extends Controller {
             }
         }
         if ($locked) {
-            // ~20 minutes cooldown unless already set further out
             $until = time() + 20 * 60;
             $prev = (int) ($_SESSION['student_att_lockout_until'] ?? 0);
             $_SESSION['student_att_lockout_until'] = max($prev, $until);
-        } else {
-            $anyOnline = false;
-            foreach ($probes as $p) {
-                if (!empty($p['online'])) {
-                    $anyOnline = true;
-                    break;
-                }
-            }
-            if ($anyOnline) {
+            return;
+        }
+        foreach ($probes as $p) {
+            if (!empty($p['online'])) {
                 unset($_SESSION['student_att_lockout_until']);
+                return;
             }
         }
     }
@@ -2556,6 +2807,12 @@ class StudentDeviceAttendanceController extends Controller {
      */
     public function refreshUsersFromMachines() {
         if (!$this->requireAccess()) {
+            return;
+        }
+        $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
+        if (trim((string) ($cfg['password'] ?? '')) === '') {
+            $_SESSION['flash_error'] = 'Cannot refresh users: machine password is empty on this server. Save the password first.';
+            $this->redirect('attendance/student-device');
             return;
         }
         @set_time_limit(100);

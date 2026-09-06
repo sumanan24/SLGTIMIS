@@ -19,6 +19,62 @@ $connClass = $connOk === true ? 'is-on' : ($connOk === false ? 'is-off' : 'is-un
 $connLabel = $connOk === true ? 'CONNECTED' : ($connOk === false ? 'DISCONNECTED' : 'NOT TESTED');
 ?>
 
+<?php
+$passwordConfigured = !empty($passwordConfigured);
+$machineUsername = (string) ($machineUsername ?? 'admin');
+?>
+<?php if (!empty($canManageDevice) && !$passwordConfigured): ?>
+    <div class="alert alert-danger mb-3">
+        <div class="fw-semibold mb-1">Machines cannot go online — password missing on this server</div>
+        <p class="small mb-3 mb-md-2">
+            Production does not get secrets from git. Enter the same admin password you use at
+            <code>http://172.16.0.26</code> (MAIN + all readers). It is saved only on this server
+            (<code>config/student_attendance_machine.local.php</code>).
+        </p>
+        <form method="post" action="<?php echo $e($urls['save_credentials'] ?? '#'); ?>" class="row g-2 align-items-end">
+            <input type="hidden" name="auto_test" value="1">
+            <div class="col-md-2">
+                <label class="form-label small mb-1">Username</label>
+                <input type="text" name="machine_username" class="form-control" value="<?php echo $e($machineUsername); ?>" autocomplete="username">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-1">Device admin password</label>
+                <input type="password" name="machine_password" class="form-control" required autocomplete="new-password" placeholder="Hikvision web login">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-1">Confirm password</label>
+                <input type="password" name="machine_password_confirm" class="form-control" required autocomplete="new-password">
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-danger w-100">
+                    <i class="fas fa-key me-1"></i>Save password &amp; test machines
+                </button>
+            </div>
+        </form>
+    </div>
+<?php elseif (!empty($canManageDevice) && $passwordConfigured): ?>
+    <div class="alert alert-light border mb-3 py-2">
+        <form method="post" action="<?php echo $e($urls['save_credentials'] ?? '#'); ?>" class="row g-2 align-items-end">
+            <input type="hidden" name="auto_test" value="1">
+            <div class="col-12">
+                <span class="small text-muted">Update device password on this server (if terminals were reconfigured):</span>
+            </div>
+            <div class="col-md-2">
+                <input type="text" name="machine_username" class="form-control form-control-sm" value="<?php echo $e($machineUsername); ?>" autocomplete="username" aria-label="Username">
+            </div>
+            <div class="col-md-3">
+                <input type="password" name="machine_password" class="form-control form-control-sm" required autocomplete="new-password" placeholder="New device password" aria-label="Password">
+            </div>
+            <div class="col-md-3">
+                <input type="password" name="machine_password_confirm" class="form-control form-control-sm" required autocomplete="new-password" placeholder="Confirm" aria-label="Confirm password">
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-sm btn-outline-secondary w-100">Update password &amp; re-test</button>
+            </div>
+        </form>
+    </div>
+<?php endif; ?>
+
 <?php if (!empty($syncSummary)): ?>
     <div class="alert alert-info mb-3">
         <div class="fw-semibold mb-2"><?php echo $e($syncSummary['message'] ?? 'Synchronization Completed'); ?></div>

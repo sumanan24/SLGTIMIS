@@ -114,6 +114,7 @@ return [
     'attendance/student-device/export/fingerprint-import' => 'StudentDeviceAttendanceController@exportFingerprintImport',
     'attendance/student-device/machine/test' => 'StudentDeviceAttendanceController@connectionTest',
     'attendance/student-device/machine/refresh-users' => 'StudentDeviceAttendanceController@refreshUsersFromMachines',
+    'attendance/student-device/machine/save-credentials' => 'StudentDeviceAttendanceController@saveMachineCredentials',
     'attendance/student-device/logs' => 'StudentDeviceAttendanceController@logs',
     'attendance/sync-hikvision' => 'AttendanceController@syncHikvision',
     'attendance/test-hikvision' => 'AttendanceController@testHikvision',

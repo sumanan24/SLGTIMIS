@@ -49078,3 +49078,175 @@
 [06-Sep-2026 09:26:24 UTC] Database::connect - Connection successful to sisslgti
 [06-Sep-2026 09:26:26 UTC] Database::connect - Connection successful to sisslgti
 [06-Sep-2026 09:26:26 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:31:50 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:31:51 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:31:51 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:31:51 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:31:51 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:31:51 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:31:51 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:31:52 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:31:54 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:31:54 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:31:54 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>unlock</lockStatus>
+<unlockTime>0</unlockTime>
+<retryLoginTime>1</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:31:54 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:31:54 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1799</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:31:55 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:31:55 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1799</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:31:55 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:31:55 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1799</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:31:55 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:31:55 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1799</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:31:55 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:31:55 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1799</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:31:55 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:31:55 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1799</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:31:55 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:31:55 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1798</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:31:56 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:31:56 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1798</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:31:56 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:31:56 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1798</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:31:56 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:31:56 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1798</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:31:56 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:31:56 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1798</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:32:08 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:32:08 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:32:08 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1786</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:32:12 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:32:13 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:32:13 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1781</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:32:13 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:32:13 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1781</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:32:13 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:32:13 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:32:13 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1781</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
