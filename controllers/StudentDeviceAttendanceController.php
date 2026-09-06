@@ -797,7 +797,13 @@ class StudentDeviceAttendanceController extends Controller {
             $courseMode
         );
         // Live finger details from machine (fixes stale "0 fingers" after successful enroll).
-        $this->enrichCardsWithLiveFingerDetails($cards, $svc, $model, $search);
+        $curlMissing = false;
+        require_once BASE_PATH . '/core/HikvisionIntegration.php';
+        if (!HikvisionIntegration::isCurlAvailable()) {
+            $curlMissing = true;
+        } else {
+            $this->enrichCardsWithLiveFingerDetails($cards, $svc, $model, $search);
+        }
 
         require_once BASE_PATH . '/models/StudentModel.php';
         $studentModel = new StudentModel();
@@ -830,6 +836,7 @@ class StudentDeviceAttendanceController extends Controller {
             'courseId' => $courseId,
             'academicYear' => $academicYear,
             'courseMode' => $courseMode,
+            'curlMissing' => $curlMissing,
         ]);
     }
 
@@ -1101,6 +1108,10 @@ class StudentDeviceAttendanceController extends Controller {
         if ($cards === []) {
             return;
         }
+        require_once BASE_PATH . '/core/HikvisionIntegration.php';
+        if (!HikvisionIntegration::isCurlAvailable()) {
+            return;
+        }
         $limit = ($search !== '' || count($cards) <= 24) ? count($cards) : min(12, count($cards));
         try {
             $hik = $this->studentHikvision();
@@ -1114,7 +1125,12 @@ class StudentDeviceAttendanceController extends Controller {
                 continue;
             }
             $name = (string) ($cards[$i]['student_name'] ?? $cards[$i]['machine_name'] ?? $eno);
-            $synced = $this->syncEmployeeFingerInfoFromMachine($hik, $model, $machineId, $eno, $name, []);
+            try {
+                $synced = $this->syncEmployeeFingerInfoFromMachine($hik, $model, $machineId, $eno, $name, []);
+            } catch (Throwable $e) {
+                error_log('[StudentDevice enrich] ' . $e->getMessage());
+                continue;
+            }
             $slots = $synced['slots'];
             $cards[$i]['finger_count'] = $synced['count'];
             $cards[$i]['finger_slots'] = $slots;
@@ -1145,6 +1161,13 @@ class StudentDeviceAttendanceController extends Controller {
         $studentId = trim((string) $this->post('student_id', ''));
         $fingerNo = (int) $this->post('finger_no', 1);
         $usersUrl = $this->usersRedirectUrl($search, '', $filters);
+
+        require_once BASE_PATH . '/core/HikvisionIntegration.php';
+        if (!HikvisionIntegration::isCurlAvailable()) {
+            $_SESSION['flash_error'] = 'PHP cURL is not installed on this server. Install php-curl and restart PHP-FPM/Apache before using machine actions.';
+            $this->redirect($usersUrl);
+            return;
+        }
 
         try {
             if ($action === 'refresh') {

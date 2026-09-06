@@ -356,11 +356,32 @@ class HikvisionIntegration {
     }
 
     /**
+     * Whether PHP cURL is available (required for Hikvision ISAPI).
+     */
+    public static function isCurlAvailable(): bool {
+        return function_exists('curl_init') && function_exists('curl_setopt_array');
+    }
+
+    /**
+     * @throws RuntimeException when php-curl is not installed
+     */
+    private function ensureCurlAvailable(): void {
+        if (self::isCurlAvailable()) {
+            return;
+        }
+        throw new RuntimeException(
+            'PHP cURL extension is not installed (curl_init missing). '
+            . 'On the server install php-curl (e.g. apt install php-curl) and restart PHP-FPM/Apache.'
+        );
+    }
+
+    /**
      * cURL options matching staff_attendance/includes/hikvision_sync_lib.php (working Digest path).
      *
      * @return \CurlHandle|resource
      */
     private function createDigestCurl(string $url, int $timeout) {
+        $this->ensureCurlAvailable();
         $ch = curl_init($url);
         $opts = [
             CURLOPT_RETURNTRANSFER => true,
@@ -1481,7 +1502,18 @@ class HikvisionIntegration {
      */
     private function makeRequestDetailed($url, $method = 'GET', $data = null, $contentType = 'application/json', $timeoutOverride = null): array {
         $timeout = $timeoutOverride !== null ? (int) $timeoutOverride : (int) $this->timeout;
-        $ch = $this->createDigestCurl($url, $timeout);
+        try {
+            $ch = $this->createDigestCurl($url, $timeout);
+        } catch (Throwable $e) {
+            return [
+                'ok' => false,
+                'http_code' => 0,
+                'content_type' => '',
+                'body' => '',
+                'decoded' => null,
+                'error' => $e->getMessage(),
+            ];
+        }
 
         $headers = [];
         $method = strtoupper((string) $method);

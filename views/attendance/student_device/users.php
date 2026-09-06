@@ -69,6 +69,15 @@ $headerActions = ob_get_clean();
 ob_start();
 ?>
 <section class="sd-users-layout">
+    <?php if (!empty($curlMissing)): ?>
+        <div class="alert alert-warning" role="alert">
+            <strong>PHP cURL is not installed on this server.</strong>
+            Machine sync, fingerprint enroll, and Face ID will not work until you install
+            <code>php-curl</code> and restart PHP-FPM/Apache
+            (e.g. <code>sudo apt install php-curl &amp;&amp; sudo systemctl restart php8.2-fpm</code>).
+            The student list below still loads from the database.
+        </div>
+    <?php endif; ?>
     <div class="sd-users-panel">
         <form method="get" action="<?php echo $e($usersAction); ?>" class="sd-users-search" id="sdUsersSearchForm">
             <div class="sd-users-filters-grid">
