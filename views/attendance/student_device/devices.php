@@ -135,8 +135,23 @@ ob_start();
                 <?php foreach ($deviceRows as $row): ?>
                     <?php
                     $online = $row['online'] ?? null;
-                    $pill = $online === true ? 'is-on' : ($online === false ? 'is-off' : 'is-unknown');
-                    $label = $online === true ? 'ONLINE' : ($online === false ? 'OFFLINE' : 'UNKNOWN');
+                    $status = strtolower((string) ($row['status'] ?? ''));
+                    if ($status === 'online' || $online === true) {
+                        $pill = 'is-on';
+                        $label = 'ONLINE';
+                    } elseif ($status === 'auth_error') {
+                        $pill = 'is-auth';
+                        $label = 'AUTH ERROR';
+                    } elseif ($status === 'invalid_config') {
+                        $pill = 'is-unknown';
+                        $label = 'CONFIG';
+                    } elseif ($online === false || $status === 'offline') {
+                        $pill = 'is-off';
+                        $label = 'OFFLINE';
+                    } else {
+                        $pill = 'is-unknown';
+                        $label = 'UNKNOWN';
+                    }
                     ?>
                     <article class="sd-dev-card">
                         <div class="sd-dev-card-top">
@@ -151,13 +166,25 @@ ob_start();
                             <span><?php echo (int) ($row['users_on_device'] ?? 0); ?> users</span>
                             <span><?php echo (int) ($row['pending'] ?? 0) + (int) ($row['syncing'] ?? 0); ?> pending</span>
                         </div>
+                        <?php if (!empty($row['reason']) && $label !== 'ONLINE'): ?>
+                            <p class="sd-dev-card-reason"><strong><?php echo $e($row['reason']); ?></strong>
+                                <?php if (!empty($row['category'])): ?>
+                                    <span class="text-muted"> · <?php echo $e($row['category']); ?></span>
+                                <?php endif; ?>
+                            </p>
+                        <?php endif; ?>
                         <?php if (!empty($row['message'])): ?>
                             <p class="sd-dev-card-msg"><?php echo $e($row['message']); ?></p>
                         <?php endif; ?>
+                        <div class="sd-dev-card-checks small text-muted">
+                            TCP <?php echo !empty($row['tcp_ok']) ? 'OK' : '—'; ?>
+                            · HTTP <?php echo !empty($row['http_ok']) ? 'OK' : '—'; ?>
+                            · Auth <?php echo !empty($row['auth_ok']) ? 'OK' : '—'; ?>
+                        </div>
                         <form method="post" action="<?php echo $e($devicesAction); ?>" class="sd-dev-card-action">
                             <input type="hidden" name="return_tab" value="overview">
                             <input type="hidden" name="device_host" value="<?php echo $e($row['host'] ?? ''); ?>">
-                            <button type="submit" name="action" value="test_one" class="btn btn-outline-primary btn-sm">Test</button>
+                            <button type="submit" name="action" value="test_one" class="btn btn-outline-primary btn-sm">Test connection</button>
                         </form>
                     </article>
                 <?php endforeach; ?>

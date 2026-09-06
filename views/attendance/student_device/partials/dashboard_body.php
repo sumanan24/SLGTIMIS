@@ -132,6 +132,15 @@ $machineUsername = (string) ($machineUsername ?? 'admin');
 <?php
 $deviceCards = $deviceCards ?? [];
 ?>
+<?php if (!empty($deviceCards)): ?>
+<div class="alert alert-light border mb-3 py-2 small">
+    LAN mode: Hikvision devices use private IPs only (no Internet check).
+    SIS on LAN: <code><?php echo $e($sisPublicHost ?? 'sis.slgti.ac.lk'); ?></code>
+    → <a href="<?php echo $e($sisLanUrl ?? 'http://172.16.1.245'); ?>"><?php echo $e($sisLanIp ?? '172.16.1.245'); ?></a>
+    (set hosts/DNS or open the IP URL if Internet DNS is down).
+</div>
+<?php endif; ?>
+
 <?php if ($deviceCards !== []): ?>
 <div class="card sd-card mb-3">
     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -154,8 +163,23 @@ $deviceCards = $deviceCards ?? [];
             <?php foreach ($deviceCards as $dc): ?>
                 <?php
                 $online = $dc['online'] ?? null;
-                $pillClass = $online === true ? 'is-on' : ($online === false ? 'is-off' : 'is-unknown');
-                $pillLabel = $online === true ? 'ONLINE' : ($online === false ? 'OFFLINE' : 'UNKNOWN');
+                $status = strtolower((string) ($dc['status'] ?? ''));
+                if ($status === 'online' || $online === true) {
+                    $pillClass = 'is-on';
+                    $pillLabel = 'ONLINE';
+                } elseif ($status === 'auth_error') {
+                    $pillClass = 'is-auth';
+                    $pillLabel = 'AUTH ERROR';
+                } elseif ($status === 'invalid_config') {
+                    $pillClass = 'is-unknown';
+                    $pillLabel = 'CONFIG';
+                } elseif ($online === false || $status === 'offline') {
+                    $pillClass = 'is-off';
+                    $pillLabel = 'OFFLINE';
+                } else {
+                    $pillClass = 'is-unknown';
+                    $pillLabel = 'UNKNOWN';
+                }
                 ?>
                 <div class="col-12 col-md-6 col-xl-3">
                     <div class="sd-device-mini <?php echo $online === true ? 'is-online' : ($online === false ? 'is-offline' : ''); ?>">
@@ -172,6 +196,9 @@ $deviceCards = $deviceCards ?? [];
                         </div>
                         <?php if (!empty($dc['last_synced'])): ?>
                             <div class="sd-device-mini-sync">Users synced: <?php echo $e($dc['last_synced']); ?></div>
+                        <?php endif; ?>
+                        <?php if (!empty($dc['reason']) && $pillLabel !== 'ONLINE'): ?>
+                            <div class="sd-device-mini-msg"><strong><?php echo $e($dc['reason']); ?></strong></div>
                         <?php endif; ?>
                         <?php if (!empty($dc['message'])): ?>
                             <?php

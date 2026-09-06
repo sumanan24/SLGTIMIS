@@ -28,7 +28,8 @@ class HikvisionIntegration {
         $this->host = trim((string) ($config['host'] ?? '192.168.1.64'));
         $this->port = (int) ($config['port'] ?? 80);
         $this->username = trim((string) ($config['username'] ?? 'admin'));
-        $this->password = (string) ($config['password'] ?? 'admin12345');
+        // Never default to a real password — empty means “not configured”
+        $this->password = (string) ($config['password'] ?? '');
         $this->timeout = (int) ($config['timeout'] ?? 15);
         $this->ssl = !empty($config['ssl']);
         
@@ -390,7 +391,7 @@ class HikvisionIntegration {
     /**
      * Single Digest login check (deviceInfo). Used before capture so we do not hammer CaptureFingerPrint.
      *
-     * @return array{ok:bool,http_code:int,message:string}
+     * @return array{ok:bool,http_code:int,message:string,model?:string}
      */
     public function assertDigestLogin(): array {
         if (!$this->hasPasswordConfigured()) {
@@ -398,6 +399,7 @@ class HikvisionIntegration {
                 'ok' => false,
                 'http_code' => 0,
                 'message' => 'Password empty on this server — save STUDENT_HIKVISION_PASS / local.php first.',
+                'model' => '',
             ];
         }
         $res = $this->makeRequestDetailed(
@@ -408,7 +410,19 @@ class HikvisionIntegration {
             min(12, max(5, (int) $this->timeout))
         );
         if (!empty($res['ok'])) {
-            return ['ok' => true, 'http_code' => (int) $res['http_code'], 'message' => 'OK'];
+            $model = '';
+            if (is_array($res['decoded'])) {
+                $di = $res['decoded']['DeviceInfo'] ?? $res['decoded'];
+                if (is_array($di)) {
+                    $model = (string) ($di['model'] ?? $di['deviceName'] ?? $di['deviceType'] ?? '');
+                }
+            }
+            return [
+                'ok' => true,
+                'http_code' => (int) $res['http_code'],
+                'message' => 'OK',
+                'model' => $model,
+            ];
         }
         $msg = (string) ($res['error'] ?? '');
         if ($msg === '' && (int) $res['http_code'] === 401) {
@@ -417,7 +431,12 @@ class HikvisionIntegration {
         if ($msg === '') {
             $msg = 'Login failed HTTP ' . (int) ($res['http_code'] ?? 0);
         }
-        return ['ok' => false, 'http_code' => (int) ($res['http_code'] ?? 0), 'message' => $msg];
+        return [
+            'ok' => false,
+            'http_code' => (int) ($res['http_code'] ?? 0),
+            'message' => $msg,
+            'model' => '',
+        ];
     }
 
     /**
@@ -480,6 +499,227 @@ class HikvisionIntegration {
 
     public function hasPasswordConfigured(): bool {
         return trim($this->password) !== '';
+    }
+
+    /**
+     * LAN-only device health check (no Internet / external DNS).
+     *
+     * Status:
+     *   online      — TCP + HTTP + Digest auth + deviceInfo OK
+     *   auth_error  — LAN reachable but login failed / locked / HTTP 401/403
+     *   offline     — TCP/HTTP unreachable (timeout, refused, etc.)
+     *   invalid_config — missing host/password/cURL
+     *
+     * @return array{
+     *   status: string,
+     *   online: bool,
+     *   locked: bool,
+     *   tcp_ok: bool,
+     *   http_ok: bool,
+     *   auth_ok: bool,
+     *   http_code: int,
+     *   port: int,
+     *   category: string,
+     *   reason: string,
+     *   message: string,
+     *   model: string,
+     *   checked_at: string
+     * }
+     */
+    public function diagnoseLanConnection(bool $attemptAuth = true): array {
+        $checkedAt = date('Y-m-d H:i:s');
+        $port = $this->port > 0 ? $this->port : ($this->ssl ? 443 : 80);
+        $base = [
+            'status' => 'offline',
+            'online' => false,
+            'locked' => false,
+            'tcp_ok' => false,
+            'http_ok' => false,
+            'auth_ok' => false,
+            'http_code' => 0,
+            'port' => $port,
+            'category' => 'routing',
+            'reason' => 'Device unreachable',
+            'message' => 'Device unreachable',
+            'model' => '',
+            'checked_at' => $checkedAt,
+        ];
+
+        if ($this->host === '' || !filter_var($this->host, FILTER_VALIDATE_IP)) {
+            return array_merge($base, [
+                'status' => 'invalid_config',
+                'category' => 'config',
+                'reason' => 'Invalid configuration',
+                'message' => 'Invalid configuration — device host IP missing or invalid',
+            ]);
+        }
+
+        if (!self::isCurlAvailable()) {
+            return array_merge($base, [
+                'status' => 'invalid_config',
+                'category' => 'config',
+                'reason' => 'Invalid configuration',
+                'message' => 'Invalid configuration — PHP cURL not installed on this server',
+            ]);
+        }
+
+        // 1) TCP connect on Hikvision HTTP(S) port (LAN only)
+        $tcp = $this->probeTcpPort($this->host, $port, 3);
+        if (empty($tcp['ok'])) {
+            $reason = (string) ($tcp['reason'] ?? 'Device unreachable');
+            error_log('[Hikvision LAN] ' . $this->host . ':' . $port . ' TCP fail: ' . $reason);
+            return array_merge($base, [
+                'status' => 'offline',
+                'category' => $reason === 'Timeout' ? 'firewall_port' : 'routing',
+                'reason' => $reason,
+                'message' => 'OFFLINE — ' . $reason . ' (TCP ' . $this->host . ':' . $port . '). Check cable/VLAN/firewall.',
+            ]);
+        }
+        $base['tcp_ok'] = true;
+
+        // 2) HTTP reachability WITHOUT credentials (expect 401 from Hikvision = HTTP stack OK)
+        $http = $this->probeHttpReachable($port, 5);
+        $base['http_code'] = (int) ($http['http_code'] ?? 0);
+        if (empty($http['ok'])) {
+            $reason = (string) ($http['reason'] ?? 'Device unreachable');
+            error_log('[Hikvision LAN] ' . $this->host . ' HTTP fail: ' . $reason);
+            return array_merge($base, [
+                'status' => 'offline',
+                'category' => 'http',
+                'reason' => $reason,
+                'message' => 'OFFLINE — LAN TCP OK but HTTP failed: ' . $reason,
+            ]);
+        }
+        $base['http_ok'] = true;
+
+        if (!$attemptAuth) {
+            return array_merge($base, [
+                'status' => 'auth_error',
+                'category' => 'auth',
+                'reason' => 'Authentication skipped',
+                'message' => 'LAN OK (TCP+HTTP) — auth skipped to avoid admin lockout after earlier failure',
+            ]);
+        }
+
+        if (!$this->hasPasswordConfigured()) {
+            return array_merge($base, [
+                'status' => 'invalid_config',
+                'category' => 'config',
+                'reason' => 'Invalid configuration',
+                'message' => 'LAN OK — password empty on this server (set STUDENT_HIKVISION_PASS / HIKVISION_PASS)',
+            ]);
+        }
+
+        // 3) ONE Digest auth + deviceInfo (never retry here)
+        $auth = $this->assertDigestLogin();
+        $base['http_code'] = (int) ($auth['http_code'] ?? $base['http_code']);
+        if (empty($auth['ok'])) {
+            $msg = (string) ($auth['message'] ?? 'Authentication failed');
+            $locked = stripos($msg, 'locked') !== false;
+            $reason = 'Authentication failed';
+            if ($base['http_code'] === 403 || stripos($msg, '403') !== false) {
+                $reason = 'HTTP 403';
+            } elseif ($base['http_code'] === 401 || stripos($msg, '401') !== false) {
+                $reason = 'HTTP 401';
+            }
+            error_log('[Hikvision LAN] ' . $this->host . ' AUTH fail: ' . $reason . ' — ' . substr($msg, 0, 180));
+            return array_merge($base, [
+                'status' => 'auth_error',
+                'locked' => $locked,
+                'category' => 'auth',
+                'reason' => $reason,
+                'message' => 'AUTH ERROR — ' . $msg,
+            ]);
+        }
+
+        return array_merge($base, [
+            'status' => 'online',
+            'online' => true,
+            'auth_ok' => true,
+            'category' => 'ok',
+            'reason' => 'OK',
+            'message' => 'ONLINE — LAN + Digest auth + deviceInfo OK',
+            'model' => (string) ($auth['model'] ?? ''),
+        ]);
+    }
+
+    /**
+     * @return array{ok:bool,reason:string}
+     */
+    private function probeTcpPort(string $host, int $port, int $timeoutSec = 3): array {
+        $errno = 0;
+        $errstr = '';
+        $fp = @fsockopen($host, $port, $errno, $errstr, max(1, $timeoutSec));
+        if (is_resource($fp) || $fp instanceof \Socket) {
+            fclose($fp);
+            return ['ok' => true, 'reason' => 'OK'];
+        }
+        $err = strtolower(trim($errstr . ' ' . $errno));
+        if (str_contains($err, 'timed out') || str_contains($err, 'timeout') || $errno === 10060) {
+            return ['ok' => false, 'reason' => 'Timeout'];
+        }
+        if (str_contains($err, 'refused') || $errno === 10061 || $errno === 111) {
+            return ['ok' => false, 'reason' => 'Connection refused'];
+        }
+        if ($errstr !== '') {
+            return ['ok' => false, 'reason' => 'Device unreachable (' . trim($errstr) . ')'];
+        }
+        return ['ok' => false, 'reason' => 'Device unreachable'];
+    }
+
+    /**
+     * HTTP GET without Digest — Hikvision normally returns 401 (proves HTTP service is up).
+     *
+     * @return array{ok:bool,http_code:int,reason:string}
+     */
+    private function probeHttpReachable(int $port, int $timeoutSec = 5): array {
+        $protocol = $this->ssl ? 'https' : 'http';
+        $url = $protocol . '://' . $this->host
+            . (($port === 80 && !$this->ssl) || ($port === 443 && $this->ssl) ? '' : ':' . $port)
+            . '/ISAPI/System/deviceInfo';
+        try {
+            $this->ensureCurlAvailable();
+        } catch (Throwable $e) {
+            return ['ok' => false, 'http_code' => 0, 'reason' => 'Invalid configuration'];
+        }
+        $ch = curl_init($url);
+        $opts = [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => $timeoutSec,
+            CURLOPT_TIMEOUT => $timeoutSec,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_HTTPHEADER => ['Expect:'],
+            CURLOPT_NOBODY => false,
+        ];
+        if (defined('CURL_IPRESOLVE_V4')) {
+            $opts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+        }
+        if ($this->ssl) {
+            $opts[CURLOPT_SSL_VERIFYPEER] = false;
+            $opts[CURLOPT_SSL_VERIFYHOST] = 0;
+        }
+        curl_setopt_array($ch, $opts);
+        $body = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = (string) curl_error($ch);
+        curl_close($ch);
+
+        if ($body === false || ($code === 0 && $err !== '')) {
+            $el = strtolower($err);
+            if (str_contains($el, 'timed out') || str_contains($el, 'timeout')) {
+                return ['ok' => false, 'http_code' => 0, 'reason' => 'Timeout'];
+            }
+            if (str_contains($el, 'refused')) {
+                return ['ok' => false, 'http_code' => 0, 'reason' => 'Connection refused'];
+            }
+            return ['ok' => false, 'http_code' => 0, 'reason' => $err !== '' ? $err : 'Device unreachable'];
+        }
+
+        // Any HTTP response from the device means the HTTP service is reachable on LAN
+        if ($code > 0) {
+            return ['ok' => true, 'http_code' => $code, 'reason' => 'OK'];
+        }
+        return ['ok' => false, 'http_code' => 0, 'reason' => 'Device unreachable'];
     }
 
     private function makeRequest($url, $method = 'GET', $data = null, $contentType = 'application/json', $timeoutOverride = null) {

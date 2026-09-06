@@ -66,76 +66,89 @@ class StudentDeviceCredentialSyncService {
     }
 
     /**
-     * Probe ONLINE/OFFLINE for each configured device (no credential changes).
+     * Probe ONLINE / AUTH ERROR / OFFLINE for each configured device (LAN only, no Internet).
+     * Stops Digest auth attempts after the first auth failure to avoid admin lockout.
      *
-     * @return list<array{host:string,role:string,label:string,online:bool,message:string,model?:string}>
+     * @param string|null $onlyHost If set, probe only this host
+     * @return list<array<string,mixed>>
      */
-    public function probeDeviceStatuses(): array {
+    public function probeDeviceStatuses(?string $onlyHost = null): array {
         $out = [];
-        $skipRestReason = '';
+        $skipAuthReason = '';
+        $onlyHost = $onlyHost !== null ? trim($onlyHost) : null;
+
         foreach ($this->devices() as $device) {
             $host = (string) ($device['host'] ?? '');
+            if ($onlyHost !== null && $onlyHost !== '' && $host !== $onlyHost) {
+                continue;
+            }
+
             $row = [
                 'host' => $host,
                 'role' => (string) ($device['role'] ?? ''),
                 'label' => (string) ($device['label'] ?? $host),
                 'online' => false,
+                'status' => 'offline',
                 'message' => '',
+                'reason' => '',
+                'category' => '',
                 'locked' => false,
+                'tcp_ok' => false,
+                'http_ok' => false,
+                'auth_ok' => false,
+                'model' => '',
             ];
+
             if ($host === '') {
-                $row['message'] = 'Missing host';
+                $row['status'] = 'invalid_config';
+                $row['reason'] = 'Invalid configuration';
+                $row['message'] = 'Invalid configuration — missing host';
+                $row['category'] = 'config';
                 $out[] = $row;
                 continue;
             }
-            if (!HikvisionIntegration::isCurlAvailable()) {
-                $row['message'] = 'PHP cURL not installed';
-                $out[] = $row;
-                continue;
-            }
-            // Same admin password on all devices — stop after lock/wrong-password to avoid more lockouts
-            if ($skipRestReason !== '') {
-                $row['message'] = $skipRestReason;
-                $row['locked'] = stripos($skipRestReason, 'locked') !== false;
-                $out[] = $row;
-                continue;
-            }
+
             try {
                 $hik = $this->hikvisionFor($device);
-                if (!$hik->hasPasswordConfigured()) {
-                    $row['message'] = 'Password empty — set STUDENT_HIKVISION_PASS';
-                    $skipRestReason = 'Skipped — set password first (same admin on all machines).';
-                    $out[] = $row;
-                    continue;
+                $attemptAuth = ($skipAuthReason === '');
+                $diag = $hik->diagnoseLanConnection($attemptAuth);
+
+                $row['online'] = !empty($diag['online']);
+                $row['status'] = (string) ($diag['status'] ?? 'offline');
+                $row['message'] = (string) ($diag['message'] ?? '');
+                $row['reason'] = (string) ($diag['reason'] ?? '');
+                $row['category'] = (string) ($diag['category'] ?? '');
+                $row['locked'] = !empty($diag['locked']);
+                $row['tcp_ok'] = !empty($diag['tcp_ok']);
+                $row['http_ok'] = !empty($diag['http_ok']);
+                $row['auth_ok'] = !empty($diag['auth_ok']);
+                $row['model'] = (string) ($diag['model'] ?? '');
+
+                if (!$attemptAuth && $skipAuthReason !== '') {
+                    // Keep LAN facts; clarify auth was skipped
+                    if (!empty($diag['tcp_ok']) && !empty($diag['http_ok'])) {
+                        $row['status'] = 'auth_error';
+                        $row['message'] = 'LAN OK — ' . $skipAuthReason;
+                        $row['reason'] = 'Authentication skipped';
+                        $row['category'] = 'auth';
+                    }
                 }
-                $test = $hik->testConnection();
-                $row['online'] = !empty($test['success']);
-                $row['message'] = (string) ($test['message'] ?? ($row['online'] ? 'OK' : 'Failed'));
-                if (!empty($test['device_info']) && is_array($test['device_info'])) {
-                    $row['model'] = (string) ($test['device_info']['model']
-                        ?? $test['device_info']['deviceName']
-                        ?? $test['device_info']['deviceType']
-                        ?? '');
-                }
-                $msgLower = strtolower($row['message']);
-                if (!$row['online'] && (str_contains($msgLower, 'temporarily locked') || str_contains($msgLower, 'lockstatus'))) {
-                    $row['locked'] = true;
-                    $skipRestReason = 'Skipped — admin locked on another device (same password). Wait ~15–20 min or reboot each terminal, then Test once.';
-                } elseif (!$row['online'] && str_contains($msgLower, '401')) {
-                    $skipRestReason = 'Skipped — login failed (check STUDENT_HIKVISION_PASS). Do not keep clicking Test.';
+
+                if ($row['status'] === 'auth_error' || $row['locked']) {
+                    $skipAuthReason = 'auth failed on ' . $host . ' (same admin password). Do not retry — wait/reboot, confirm browser login, then Test once.';
+                } elseif ($row['status'] === 'invalid_config' && str_contains(strtolower($row['message']), 'password empty')) {
+                    $skipAuthReason = 'set password first (same admin on all machines)';
                 }
             } catch (Throwable $e) {
                 $row['message'] = $e->getMessage();
-                $msgLower = strtolower($row['message']);
-                if (str_contains($msgLower, 'temporarily locked')) {
-                    $row['locked'] = true;
-                    $skipRestReason = 'Skipped — admin locked on another device. Wait or reboot terminals, then Test once.';
-                } elseif (str_contains($msgLower, '401')) {
-                    $skipRestReason = 'Skipped — login failed (check password). Do not keep clicking Test.';
-                }
+                $row['reason'] = 'Device unreachable';
+                $row['category'] = 'routing';
+                error_log('[Hikvision probe] ' . $host . ': ' . $e->getMessage());
             }
+
             $out[] = $row;
         }
+
         return $out;
     }
 

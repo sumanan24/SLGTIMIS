@@ -367,20 +367,32 @@ class StudentDeviceAttendanceController extends Controller {
                 $p = $byHost[$host] ?? null;
                 $st = $userStats[$host] ?? ['users' => 0, 'last_synced' => null];
                 $online = null;
+                $status = '';
+                $reason = '';
                 if (!$passwordOk) {
-                    $message = 'Password empty on this server — set STUDENT_HIKVISION_PASS in .env or upload config/student_attendance_machine.local.php';
+                    $message = 'Password empty on this server — set HIKVISION_PASS / STUDENT_HIKVISION_PASS in .env or Save password on Device page';
+                    $status = 'invalid_config';
+                    $reason = 'Invalid configuration';
                 } elseif (is_array($p)) {
                     $online = !empty($p['online']);
+                    $status = (string) ($p['status'] ?? ($online ? 'online' : 'offline'));
+                    $reason = (string) ($p['reason'] ?? '');
                     $message = (string) ($p['message'] ?? ($online ? 'OK' : 'Offline'));
                 } else {
-                    $message = 'Password OK — click Test all';
+                    $message = 'Password OK — click Test all (LAN check, no Internet)';
+                    $status = '';
                 }
                 $deviceCards[] = [
                     'host' => $host,
                     'role' => (string) ($d['role'] ?? ''),
                     'label' => (string) ($d['label'] ?? $host),
                     'online' => $online,
+                    'status' => $status,
+                    'reason' => $reason,
                     'message' => $message,
+                    'tcp_ok' => !empty($p['tcp_ok']),
+                    'http_ok' => !empty($p['http_ok']),
+                    'auth_ok' => !empty($p['auth_ok']),
                     'model' => (string) ($p['model'] ?? ''),
                     'users' => (int) ($st['users'] ?? 0),
                     'last_synced' => $st['last_synced'] ?? null,
@@ -390,6 +402,7 @@ class StudentDeviceAttendanceController extends Controller {
             error_log('[StudentDevice index devices] ' . $e->getMessage());
         }
 
+        $machineCfg = is_array($cfg) ? $cfg : [];
         return $this->view('attendance/student_device/index', [
             'title' => 'Student Fingerprint Attendance',
             'page' => 'student-device-attendance',
@@ -407,6 +420,9 @@ class StudentDeviceAttendanceController extends Controller {
             'refreshUsersSummary' => $_SESSION['student_att_refresh_users'] ?? null,
             'passwordConfigured' => $passwordOk,
             'machineUsername' => (string) ($cfg['username'] ?? 'admin'),
+            'sisLanIp' => (string) ($machineCfg['sis_lan_ip'] ?? (defined('SIS_LAN_IP') ? SIS_LAN_IP : '172.16.1.245')),
+            'sisPublicHost' => (string) ($machineCfg['sis_public_host'] ?? (defined('SIS_PUBLIC_HOST') ? SIS_PUBLIC_HOST : 'sis.slgti.ac.lk')),
+            'sisLanUrl' => (string) ($machineCfg['sis_lan_url'] ?? (defined('SIS_LAN_URL') ? SIS_LAN_URL : 'http://172.16.1.245')),
         ]);
     }
 
@@ -1152,25 +1168,74 @@ class StudentDeviceAttendanceController extends Controller {
                 }
 
                 if ($action === 'test_all' || $action === 'test_one') {
-                    $statuses = $cred->probeDeviceStatuses();
+                    $lockoutUntil = (int) ($_SESSION['student_att_lockout_until'] ?? 0);
+                    if ($lockoutUntil > time() && (string) $this->post('force', '') !== '1') {
+                        $_SESSION['flash_error'] = 'Admin lock cooldown until ' . date('H:i', $lockoutUntil)
+                            . '. Reboot terminals and confirm browser login first. Do not keep testing.';
+                        $go('overview');
+                        return;
+                    }
+
+                    if ($action === 'test_one' && $deviceHost !== '') {
+                        $statuses = $cred->probeDeviceStatuses($deviceHost);
+                        // Merge into existing cache so other cards keep last known status
+                        $cached = $_SESSION['student_att_device_status']['devices'] ?? [];
+                        $byHost = [];
+                        if (is_array($cached)) {
+                            foreach ($cached as $c) {
+                                $h = (string) ($c['host'] ?? '');
+                                if ($h !== '') {
+                                    $byHost[$h] = $c;
+                                }
+                            }
+                        }
+                        foreach ($statuses as $s) {
+                            $h = (string) ($s['host'] ?? '');
+                            if ($h !== '') {
+                                $byHost[$h] = $s;
+                            }
+                        }
+                        $statuses = array_values($byHost);
+                    } else {
+                        $statuses = $cred->probeDeviceStatuses();
+                    }
+
                     $_SESSION['student_att_device_status'] = [
                         'devices' => $statuses,
                         'tested_at' => date('Y-m-d H:i:s'),
                     ];
+                    $this->rememberDeviceLockout($statuses);
+
                     $lines = [];
                     $online = 0;
                     foreach ($statuses as $s) {
-                        if ($action === 'test_one' && $deviceHost !== '' && $s['host'] !== $deviceHost) {
+                        if ($action === 'test_one' && $deviceHost !== '' && ($s['host'] ?? '') !== $deviceHost) {
                             continue;
                         }
+                        $st = strtoupper((string) ($s['status'] ?? (!empty($s['online']) ? 'online' : 'offline')));
                         if (!empty($s['online'])) {
                             $online++;
                         }
-                        $lines[] = ($s['host'] ?? '') . ': ' . (!empty($s['online']) ? 'ONLINE' : 'OFFLINE');
+                        $lines[] = ($s['host'] ?? '') . ': ' . $st
+                            . (!empty($s['reason']) && $st !== 'ONLINE' ? ' (' . $s['reason'] . ')' : '');
                     }
-                    $_SESSION['flash_success'] = ($action === 'test_all'
-                        ? "Online {$online}/" . count($statuses) . ' — '
+                    $msg = ($action === 'test_all'
+                        ? "Online {$online}/" . count($cred->devices()) . ' — '
                         : '') . implode(' · ', $lines);
+                    $anyAuth = false;
+                    foreach ($statuses as $s) {
+                        if (($s['status'] ?? '') === 'auth_error') {
+                            $anyAuth = true;
+                            break;
+                        }
+                    }
+                    if ($online > 0 && !$anyAuth) {
+                        $_SESSION['flash_success'] = $msg;
+                    } elseif ($online > 0) {
+                        $_SESSION['flash_success'] = $msg;
+                    } else {
+                        $_SESSION['flash_error'] = $msg;
+                    }
                     $go('overview');
                     return;
                 }
@@ -2671,15 +2736,21 @@ class StudentDeviceAttendanceController extends Controller {
 
         $online = 0;
         $locked = 0;
+        $authErr = 0;
         $lines = [];
         foreach ($probes as $p) {
+            $st = strtoupper((string) ($p['status'] ?? (!empty($p['online']) ? 'online' : 'offline')));
             if (!empty($p['online'])) {
                 $online++;
+            }
+            if (($p['status'] ?? '') === 'auth_error') {
+                $authErr++;
             }
             if (!empty($p['locked']) || stripos((string) ($p['message'] ?? ''), 'locked') !== false) {
                 $locked++;
             }
-            $lines[] = ($p['host'] ?? '') . ': ' . (!empty($p['online']) ? 'ONLINE' : 'OFFLINE');
+            $extra = (!empty($p['reason']) && $st !== 'ONLINE') ? ' (' . $p['reason'] . ')' : '';
+            $lines[] = ($p['host'] ?? '') . ': ' . $st . $extra;
         }
 
         $main = $cred->mainDevice();
@@ -2694,6 +2765,8 @@ class StudentDeviceAttendanceController extends Controller {
                     'message' => (string) ($p['message'] ?? ''),
                     'tested_at' => date('Y-m-d H:i:s'),
                     'device_info' => null,
+                    'status' => (string) ($p['status'] ?? ''),
+                    'reason' => (string) ($p['reason'] ?? ''),
                 ];
                 break;
             }
@@ -2702,13 +2775,13 @@ class StudentDeviceAttendanceController extends Controller {
         if ($online > 0) {
             unset($_SESSION['student_att_lockout_until']);
             $_SESSION['flash_success'] = "Devices online: {$online}/" . count($probes) . ' — ' . implode(' · ', $lines);
-        } elseif ($locked > 0) {
+        } elseif ($locked > 0 || $authErr > 0) {
             $until = (int) ($_SESSION['student_att_lockout_until'] ?? (time() + 1200));
-            $_SESSION['flash_error'] = 'Admin locked on the terminals. '
-                . 'Do not Test again until ' . date('H:i', $until)
-                . ' (or reboot MAIN + readers now). Wrong password causes this — confirm login at http://172.16.0.26 first.';
+            $_SESSION['flash_error'] = 'Auth/lock on terminals. '
+                . 'Confirm browser login at http://172.16.0.26 first, then Test once. '
+                . implode(' · ', $lines);
         } else {
-            $_SESSION['flash_error'] = 'All devices offline — ' . implode(' · ', $lines);
+            $_SESSION['flash_error'] = 'Devices not reachable on LAN — ' . implode(' · ', $lines);
         }
         $this->redirect('attendance/student-device');
     }

@@ -156,6 +156,7 @@ $GLOBALS['__student_device_styles_loaded'] = true;
 }
 .student-device-page .sd-status-pill.is-on { background: #d1e7dd; color: #0f5132; }
 .student-device-page .sd-status-pill.is-off { background: #f8d7da; color: #842029; }
+.student-device-page .sd-status-pill.is-auth { background: #fff3cd; color: #664d03; }
 .student-device-page .sd-status-pill.is-unknown { background: #e9ecef; color: #495057; }
 .student-device-page .sd-device-mini {
     border: 1px solid var(--sd-border);
@@ -1095,6 +1096,9 @@ $GLOBALS['__student_device_styles_loaded'] = true;
 }
 .student-device-page .sd-dev-status.is-on { background: #dcfce7; color: #166534; }
 .student-device-page .sd-dev-status.is-off { background: #fee2e2; color: #991b1b; }
+.student-device-page .sd-dev-status.is-auth { background: #fef3c7; color: #92400e; }
+.student-device-page .sd-dev-card-reason { margin: 0.35rem 0 0; font-size: 0.8rem; }
+.student-device-page .sd-dev-card-checks { margin-top: 0.35rem; }
 .student-device-page .sd-sync-pill {
     display: inline-block;
     padding: 0.12rem 0.45rem;

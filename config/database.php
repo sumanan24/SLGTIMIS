@@ -19,31 +19,66 @@ if (!defined('DB_HOST')) {
 // Application Configuration
 if (!defined('APP_NAME')) {
     define('APP_NAME', 'SLGTI SIS');
-    // Detect HTTPS automatically
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
-                (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
-                (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
-                ? 'https://' : 'http://';
-    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 
-    // Web path from document root to project root (not dirname(SCRIPT_NAME) — that breaks under level05application/).
-    $webBase = '';
-    $docRoot = isset($_SERVER['DOCUMENT_ROOT']) ? realpath((string) $_SERVER['DOCUMENT_ROOT']) : false;
-    $projRoot = realpath(BASE_PATH);
-    if ($docRoot !== false && $projRoot !== false) {
-        $docNorm = rtrim(str_replace('\\', '/', $docRoot), '/');
-        $projNorm = str_replace('\\', '/', $projRoot);
-        // PHP 7 compatible (str_starts_with is PHP 8+).
-        if ($docNorm !== '' && strpos($projNorm, $docNorm) === 0) {
-            $webBase = substr($projNorm, strlen($docNorm));
-        }
+    // Load .env early for optional APP_URL_FORCE / SIS_LAN_* (LAN without Internet DNS)
+    if (is_file(BASE_PATH . '/core/EnvLoader.php')) {
+        require_once BASE_PATH . '/core/EnvLoader.php';
+        EnvLoader::load(BASE_PATH . '/.env');
     }
-    $webBase = '/' . ltrim((string) $webBase, '/');
-    if ($webBase === '/') {
+
+    $forceUrl = '';
+    if (class_exists('EnvLoader', false)) {
+        $forceUrl = rtrim(trim((string) (EnvLoader::get('APP_URL_FORCE', '') ?? '')), '/');
+    }
+
+    if ($forceUrl !== '') {
+        define('APP_URL', $forceUrl);
+    } else {
+        // Detect HTTPS automatically
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+                    (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
+                    (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+                    ? 'https://' : 'http://';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+
+        // Web path from document root to project root (not dirname(SCRIPT_NAME) — that breaks under level05application/).
         $webBase = '';
-    }
+        $docRoot = isset($_SERVER['DOCUMENT_ROOT']) ? realpath((string) $_SERVER['DOCUMENT_ROOT']) : false;
+        $projRoot = realpath(BASE_PATH);
+        if ($docRoot !== false && $projRoot !== false) {
+            $docNorm = rtrim(str_replace('\\', '/', $docRoot), '/');
+            $projNorm = str_replace('\\', '/', $projRoot);
+            // PHP 7 compatible (str_starts_with is PHP 8+).
+            if ($docNorm !== '' && strpos($projNorm, $docNorm) === 0) {
+                $webBase = substr($projNorm, strlen($docNorm));
+            }
+        }
+        $webBase = '/' . ltrim((string) $webBase, '/');
+        if ($webBase === '/') {
+            $webBase = '';
+        }
 
-    define('APP_URL', $protocol . $host . $webBase);
+        define('APP_URL', $protocol . $host . $webBase);
+    }
+}
+
+// SIS LAN access when public DNS is unavailable (hosts: sis.slgti.ac.lk → 172.16.1.245)
+if (!defined('SIS_LAN_IP')) {
+    $sisLan = '172.16.1.245';
+    if (class_exists('EnvLoader', false)) {
+        $sisLan = (string) (EnvLoader::get('SIS_LAN_IP', $sisLan) ?? $sisLan);
+    }
+    define('SIS_LAN_IP', $sisLan !== '' ? $sisLan : '172.16.1.245');
+}
+if (!defined('SIS_PUBLIC_HOST')) {
+    $sisHost = 'sis.slgti.ac.lk';
+    if (class_exists('EnvLoader', false)) {
+        $sisHost = (string) (EnvLoader::get('SIS_PUBLIC_HOST', $sisHost) ?? $sisHost);
+    }
+    define('SIS_PUBLIC_HOST', $sisHost !== '' ? $sisHost : 'sis.slgti.ac.lk');
+}
+if (!defined('SIS_LAN_URL')) {
+    define('SIS_LAN_URL', 'http://' . SIS_LAN_IP);
 }
 
 // WhatsApp shortcut for staff on /student-applications (SAO / ADM). Digits only with country code (e.g. 94771234567), no + or spaces. Leave empty to hide the button.
