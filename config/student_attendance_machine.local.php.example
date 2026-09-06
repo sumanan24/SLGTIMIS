@@ -9,7 +9,7 @@ declare(strict_types=1);
 return [
     'host' => '172.16.0.26',
     'username' => 'admin',
-    // Same password as MAIN terminal web login (http://172.16.0.26)
+    // Same password as MAIN + all readers web login
     'password' => 'CHANGE_ME',
     'ssl' => false,
     'port' => 0,
