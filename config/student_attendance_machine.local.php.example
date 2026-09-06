@@ -1,0 +1,19 @@
+<?php
+/**
+ * Server-only secrets for student Hikvision machines (gitignored).
+ * Copy to: config/student_attendance_machine.local.php
+ * Use this on production when you cannot reliably edit .env.
+ */
+declare(strict_types=1);
+
+return [
+    'host' => '172.16.0.26',
+    'username' => 'admin',
+    // Same password as MAIN terminal web login (http://172.16.0.26)
+    'password' => 'CHANGE_ME',
+    'ssl' => false,
+    'port' => 0,
+    'timeout' => 60,
+    'reader_hosts' => ['172.16.0.29', '172.16.0.28', '172.16.0.27'],
+    'timezone' => 'Asia/Colombo',
+];

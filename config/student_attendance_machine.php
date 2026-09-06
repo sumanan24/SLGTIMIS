@@ -35,8 +35,12 @@ $defaults = [
 ];
 
 $host = trim((string) EnvLoader::get('STUDENT_HIKVISION_IP', $localCfg['host'] ?? $defaults['host']));
-$user = EnvLoader::get('STUDENT_HIKVISION_USER', $localCfg['username'] ?? $defaults['username']);
-$pass = EnvLoader::get('STUDENT_HIKVISION_PASS', $localCfg['password'] ?? $defaults['password']);
+$user = trim((string) EnvLoader::get('STUDENT_HIKVISION_USER', $localCfg['username'] ?? $defaults['username']));
+// Prefer non-empty password: .env first, then local.php (gitignored), never commit secrets
+$passEnv = trim((string) (EnvLoader::get('STUDENT_HIKVISION_PASS', '') ?? ''));
+$passLocal = trim((string) ($localCfg['password'] ?? ''));
+$pass = $passEnv !== '' ? $passEnv : $passLocal;
+$passwordSource = $passEnv !== '' ? 'env' : ($passLocal !== '' ? 'local' : 'none');
 $https = EnvLoader::get(
     'STUDENT_HIKVISION_USE_HTTPS',
     isset($localCfg['ssl']) ? (!empty($localCfg['ssl']) ? '1' : '0') : ($defaults['ssl'] ? '1' : '0')
@@ -127,5 +131,7 @@ return [
     /** @var list<array{host:string,role:string,label:string,username:string,password:string,ssl:bool,port:int,timeout:int}> */
     'devices' => $devices,
     'configured' => ($host !== '' && $password !== ''),
+    'password_source' => $passwordSource,
     'env_file_present' => EnvLoader::envFileExists(),
+    'local_file_present' => is_file($local),
 ];

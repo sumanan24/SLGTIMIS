@@ -80,6 +80,15 @@ ob_start();
             The student list below still loads from the database.
         </div>
     <?php endif; ?>
+    <?php if (isset($machineConfigured) && !$machineConfigured): ?>
+        <div class="alert alert-danger" role="alert">
+            <strong>Fingerprint machine password not configured.</strong>
+            <?php echo htmlspecialchars((string) ($machineConfigHint ?? ''), ENT_QUOTES, 'UTF-8'); ?>
+            Use the same password as the MAIN device web login
+            (<code>http://<?php echo htmlspecialchars((string) ($machineHost ?? '172.16.0.26'), ENT_QUOTES, 'UTF-8'); ?></code>).
+            Do not commit secrets to git.
+        </div>
+    <?php endif; ?>
     <div class="sd-users-panel">
         <form method="get" action="<?php echo $e($usersAction); ?>" class="sd-users-search" id="sdUsersSearchForm">
             <div class="sd-users-filters-grid">

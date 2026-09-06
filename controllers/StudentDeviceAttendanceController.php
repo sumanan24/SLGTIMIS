@@ -882,11 +882,26 @@ class StudentDeviceAttendanceController extends Controller {
         );
         // Live finger details from machine (fixes stale "0 fingers" after successful enroll).
         $curlMissing = false;
+        $machineConfigured = true;
+        $machineConfigHint = '';
         require_once BASE_PATH . '/core/HikvisionIntegration.php';
         if (!HikvisionIntegration::isCurlAvailable()) {
             $curlMissing = true;
         } else {
             $this->enrichCardsWithLiveFingerDetails($cards, $svc, $model, $search);
+        }
+        $machineCfg = require BASE_PATH . '/config/student_attendance_machine.php';
+        $machineConfigured = !empty($machineCfg['configured']);
+        if (!$machineConfigured) {
+            $envOk = !empty($machineCfg['env_file_present']);
+            $localOk = !empty($machineCfg['local_file_present']);
+            $machineConfigHint = 'Hikvision password is empty on this server. '
+                . ($envOk
+                    ? 'Edit .env and set STUDENT_HIKVISION_PASS to the MAIN terminal web password. '
+                    : 'Create .env (copy from .env.example) with STUDENT_HIKVISION_PASS. ')
+                . ($localOk
+                    ? 'Or set password in config/student_attendance_machine.local.php. '
+                    : 'Or copy config/student_attendance_machine.local.php.example to config/student_attendance_machine.local.php and set password. ');
         }
 
         require_once BASE_PATH . '/models/StudentModel.php';
@@ -921,6 +936,8 @@ class StudentDeviceAttendanceController extends Controller {
             'academicYear' => $academicYear,
             'courseMode' => $courseMode,
             'curlMissing' => $curlMissing,
+            'machineConfigured' => $machineConfigured,
+            'machineConfigHint' => $machineConfigHint,
         ]);
     }
 
