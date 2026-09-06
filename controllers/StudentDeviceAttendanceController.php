@@ -182,10 +182,27 @@ class StudentDeviceAttendanceController extends Controller {
         $userStats = $att->machineUserStatsByHost();
         try {
             require_once BASE_PATH . '/core/HikvisionIntegration.php';
-            // Use last Test / Refresh result only — do not probe all devices on every page load
-            $cached = $_SESSION['student_att_device_status'] ?? null;
-            $probes = (is_array($cached) && !empty($cached['devices'])) ? $cached['devices'] : [];
             $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
+            $passwordOk = !empty($cfg['configured']) && trim((string) ($cfg['password'] ?? '')) !== '';
+
+            // Drop stale probe cache that still says "Password empty" after secrets were fixed
+            $cached = $_SESSION['student_att_device_status'] ?? null;
+            if ($passwordOk && is_array($cached) && !empty($cached['devices'])) {
+                $staleEmpty = false;
+                foreach ($cached['devices'] as $p) {
+                    $m = strtolower((string) ($p['message'] ?? ''));
+                    if (str_contains($m, 'password empty') || str_contains($m, 'set password first')) {
+                        $staleEmpty = true;
+                        break;
+                    }
+                }
+                if ($staleEmpty) {
+                    unset($_SESSION['student_att_device_status'], $_SESSION['student_att_lockout_until']);
+                    $cached = null;
+                }
+            }
+
+            $probes = (is_array($cached) && !empty($cached['devices'])) ? $cached['devices'] : [];
             $byHost = [];
             foreach ($probes as $p) {
                 $h = (string) ($p['host'] ?? '');
@@ -201,10 +218,13 @@ class StudentDeviceAttendanceController extends Controller {
                 $p = $byHost[$host] ?? null;
                 $st = $userStats[$host] ?? ['users' => 0, 'last_synced' => null];
                 $online = null;
-                $message = 'Click Test all or Get users';
-                if (is_array($p)) {
+                if (!$passwordOk) {
+                    $message = 'Password empty on this server — set STUDENT_HIKVISION_PASS in .env or upload config/student_attendance_machine.local.php';
+                } elseif (is_array($p)) {
                     $online = !empty($p['online']);
                     $message = (string) ($p['message'] ?? ($online ? 'OK' : 'Offline'));
+                } else {
+                    $message = 'Password OK — click Test all';
                 }
                 $deviceCards[] = [
                     'host' => $host,
