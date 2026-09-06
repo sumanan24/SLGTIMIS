@@ -347,6 +347,21 @@ $busSeasonPayments = $busSeasonPayments ?? [];
                         </a>
                     </div>
                     <div class="col-6 col-md-4 col-lg-3">
+                        <a href="<?php echo APP_URL; ?>/student/forms" class="text-decoration-none">
+                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-success border-opacity-25 hover-lift quick-link-card">
+                                <div class="flex-shrink-0">
+                                    <div class="bg-success bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
+                                        <i class="fas fa-file-alt text-success"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="fw-bold text-dark quick-link-text">Forms</div>
+                                    <div class="small text-muted quick-link-subtext">Sample downloads</div>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-4 col-lg-3">
                         <a href="#" class="text-decoration-none" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
                             <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-danger border-opacity-25 hover-lift quick-link-card">
                                 <div class="flex-shrink-0">

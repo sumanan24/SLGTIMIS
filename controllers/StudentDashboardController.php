@@ -144,7 +144,93 @@ class StudentDashboardController extends Controller {
         
         return $this->view('student/dashboard', $data);
     }
-    
+
+    /**
+     * Forms available to logged-in students (PDF filled from student profile).
+     */
+    public function forms() {
+        if (!$this->requireStudentAccess()) {
+            return;
+        }
+
+        $forms = [
+            [
+                'key' => 'student-application',
+                'title' => 'Student Application Form',
+                'description' => 'A4 application PDF filled with your login student details (2 pages).',
+                'icon' => 'fa-file-pdf',
+                'action_label' => 'Download PDF',
+                'url' => rtrim(APP_URL, '/') . '/student/forms/download?form=student-application',
+            ],
+        ];
+
+        return $this->view('student/forms', [
+            'title' => 'Forms',
+            'page' => 'student-forms',
+            'forms' => $forms,
+        ]);
+    }
+
+    /**
+     * Download application form PDF filled from the logged-in student record.
+     */
+    public function downloadForm() {
+        if (!$this->requireStudentAccess()) {
+            return;
+        }
+
+        $form = strtolower(trim((string) $this->get('form', '')));
+        if ($form === 'student-application' || $form === 'application') {
+            $studentId = (string) ($_SESSION['user_name'] ?? '');
+            $studentModel = $this->model('StudentModel');
+            $student = $studentModel->find($studentId);
+            if (!$student) {
+                $_SESSION['error'] = 'Student record not found.';
+                $this->redirect('student/forms');
+                return;
+            }
+
+            $enrollment = null;
+            try {
+                $enrollmentModel = $this->model('StudentEnrollmentModel');
+                $enrollment = $enrollmentModel->getCurrentEnrollment($studentId)
+                    ?: $enrollmentModel->getLatestEnrollment($studentId);
+            } catch (Throwable $e) {
+                $enrollment = null;
+            }
+
+            require_once BASE_PATH . '/helpers/StudentSampleFormsPdfHelper.php';
+            $application = StudentSampleFormsPdfHelper::findApplicationForStudent($student);
+            StudentSampleFormsPdfHelper::streamStudentApplicationBlank(true, $student, $enrollment, $application);
+            return;
+        }
+
+        $_SESSION['error'] = 'Requested form was not found.';
+        $this->redirect('student/forms');
+    }
+
+    /**
+     * @return bool
+     */
+    private function requireStudentAccess(): bool {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        if (!isset($_SESSION['user_table']) || $_SESSION['user_table'] !== 'student') {
+            $_SESSION['error'] = 'Access denied. This section is only available for students.';
+            require_once BASE_PATH . '/models/UserModel.php';
+            $userModel = new UserModel();
+            if ($userModel->isHOD($_SESSION['user_id'])) {
+                $this->redirect('hod/dashboard');
+            } else {
+                $this->redirect('dashboard');
+            }
+            return false;
+        }
+        return true;
+    }
+
     /**
      * Detailed payments page for students
      */

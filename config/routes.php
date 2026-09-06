@@ -25,6 +25,8 @@ return [
     // Student Portal Routes
     'student/dashboard' => 'StudentDashboardController@index',
     'student/payments' => 'StudentDashboardController@payments',
+    'student/forms' => 'StudentDashboardController@forms',
+    'student/forms/download' => 'StudentDashboardController@downloadForm',
     'student/profile' => 'StudentController@showStudentProfile',
     'student/profile/edit' => 'StudentController@editStudentProfile',
     'student/change-password' => 'StudentController@changeStudentPassword',

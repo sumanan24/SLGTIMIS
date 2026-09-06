@@ -65,7 +65,7 @@ class StudentEnrollmentModel extends Model {
      * Get current enrollment (status = Following only)
      */
     public function getCurrentEnrollment($studentId) {
-        $sql = "SELECT se.*, c.course_name, c.department_id, d.department_name
+        $sql = "SELECT se.*, c.course_name, c.course_nvq_level, c.department_id, d.department_name
                 FROM `{$this->table}` se
                 LEFT JOIN `course` c ON se.course_id = c.course_id
                 LEFT JOIN `department` d ON c.department_id = d.department_id
@@ -85,7 +85,7 @@ class StudentEnrollmentModel extends Model {
      * Get latest enrollment (any status - for editing Dropout/Long Absent to re-register)
      */
     public function getLatestEnrollment($studentId) {
-        $sql = "SELECT se.*, c.course_name, c.department_id, d.department_name
+        $sql = "SELECT se.*, c.course_name, c.course_nvq_level, c.department_id, d.department_name
                 FROM `{$this->table}` se
                 LEFT JOIN `course` c ON se.course_id = c.course_id
                 LEFT JOIN `department` d ON c.department_id = d.department_id
