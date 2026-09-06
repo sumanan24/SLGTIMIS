@@ -49250,3 +49250,1159 @@
 <retryLoginTime>0</retryLoginTime>
 </userCheck>
 
+[06-Sep-2026 09:33:45 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:33:45 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:33:45 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1689</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:33:47 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:33:47 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:33:47 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1687</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:11 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:36:14 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:36:14 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:14 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>unlock</lockStatus>
+<unlockTime>0</unlockTime>
+<retryLoginTime>1</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:14 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:14 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1800</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:14 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:14 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1799</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:15 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:15 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1799</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:15 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:15 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1799</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:15 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:15 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1799</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:15 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:15 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1799</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:15 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:15 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1799</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:15 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:15 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1799</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:15 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:15 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1798</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:16 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:16 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1798</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:16 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:16 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1798</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:20 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:36:20 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:20 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1794</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:20 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:20 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1793</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:36:20 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:36:21 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:36:21 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1793</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:40:21 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:40:22 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:40:22 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1552</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:40:23 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:40:23 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:40:23 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1550</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:40:27 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:40:27 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:40:27 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1547</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:40:27 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:40:27 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1547</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:40:27 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:40:27 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:40:27 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1546</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:44:49 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:44:49 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:44:49 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1285</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:44:54 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:44:54 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:44:54 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1279</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:44:54 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:44:55 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:44:55 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1279</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:01 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:01 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:01 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:01 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1273</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:02 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:03 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:03 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:03 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1271</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:03 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:03 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:03 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:03 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1271</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:03 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:03 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:03 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:03 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:03 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1271</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:03 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:03 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:03 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:03 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1270</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:03 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:04 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:04 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:04 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:04 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1270</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:04 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:04 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:04 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:04 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:04 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1270</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:04 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:04 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:04 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:04 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:04 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1269</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:04 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:05 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:05 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:05 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1269</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:05 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:05 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:05 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:05 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:05 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1269</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:05 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:05 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:05 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:05 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:05 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1269</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:05 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:05 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:06 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:06 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1268</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:06 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:06 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:06 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:06 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:06 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1268</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:12 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:13 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:13 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:13 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1261</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:13 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:13 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:13 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:13 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:13 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1261</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:13 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:13 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:13 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:13 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:13 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1260</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:15 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:15 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1259</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:15 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:15 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1259</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:15 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:15 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:15 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1258</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:36 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:36 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:36 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1238</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:36 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:36 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1238</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:36 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:36 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1238</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:36 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:36 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1237</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:37 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:37 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1237</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:37 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:37 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1237</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:37 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:37 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1237</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:37 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:37 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1237</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:37 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:37 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1236</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:38 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:38 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1236</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:38 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:38 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1236</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:38 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/AccessControl/UserInfo/Search?format=json, Method: POST, HTTP Code: 401, Content-Type: application/json
+[06-Sep-2026 09:45:38 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1236</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:45:38 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:43 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:44 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:44 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:44 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:44 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:44 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:44 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:45 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:45 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:45 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:45 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:45 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:46 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:47 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:47 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:47 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:47 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:47 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:48 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:48 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:48 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:48 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:48 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:48 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:45:49 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:46:01 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:46:01 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 401, Content-Type: application/xml
+[06-Sep-2026 09:46:01 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1212</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:46:01 UTC] Hikvision makeRequest - URL: http://172.16.0.29/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:01 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612699)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612699</serialNumber>
+<macAddress>88:de:39:53:98:c2</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:01 UTC] Hikvision makeRequest - URL: http://172.16.0.28/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:01 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612705)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612705</serialNumber>
+<macAddress>88:de:39:53:98:c8</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:01 UTC] Hikvision makeRequest - URL: http://172.16.0.27/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:01 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612702)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612702</serialNumber>
+<macAddress>88:de:39:53:98:c5</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:01 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:46:05 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:46:05 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 401, Content-Type: application/xml
+[06-Sep-2026 09:46:05 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1209</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:46:05 UTC] Hikvision makeRequest - URL: http://172.16.0.29/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:05 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612699)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612699</serialNumber>
+<macAddress>88:de:39:53:98:c2</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:05 UTC] Hikvision makeRequest - URL: http://172.16.0.28/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:05 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612705)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612705</serialNumber>
+<macAddress>88:de:39:53:98:c8</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:05 UTC] Hikvision makeRequest - URL: http://172.16.0.27/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:05 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612702)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612702</serialNumber>
+<macAddress>88:de:39:53:98:c5</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:05 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:46:06 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:46:06 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 401, Content-Type: application/xml
+[06-Sep-2026 09:46:06 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1207</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:46:06 UTC] Hikvision makeRequest - URL: http://172.16.0.29/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:06 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612699)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612699</serialNumber>
+<macAddress>88:de:39:53:98:c2</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:06 UTC] Hikvision makeRequest - URL: http://172.16.0.28/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:06 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612705)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612705</serialNumber>
+<macAddress>88:de:39:53:98:c8</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - URL: http://172.16.0.27/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612702)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612702</serialNumber>
+<macAddress>88:de:39:53:98:c5</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:07 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 401, Content-Type: application/xml
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1207</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - URL: http://172.16.0.29/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612699)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612699</serialNumber>
+<macAddress>88:de:39:53:98:c2</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - URL: http://172.16.0.28/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612705)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612705</serialNumber>
+<macAddress>88:de:39:53:98:c8</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - URL: http://172.16.0.27/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612702)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612702</serialNumber>
+<macAddress>88:de:39:53:98:c5</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:07 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 401, Content-Type: application/xml
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1207</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - URL: http://172.16.0.29/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612699)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612699</serialNumber>
+<macAddress>88:de:39:53:98:c2</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - URL: http://172.16.0.28/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612705)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612705</serialNumber>
+<macAddress>88:de:39:53:98:c8</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - URL: http://172.16.0.27/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612702)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612702</serialNumber>
+<macAddress>88:de:39:53:98:c5</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:07 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:46:07 UTC] Database::connect - Connection successful to sisslgti
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - URL: http://172.16.0.26/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 401, Content-Type: application/xml
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<userCheck version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<statusValue>401</statusValue>
+<statusString>Unauthorized</statusString>
+<isActivated>true</isActivated>
+<lockStatus>lock</lockStatus>
+<unlockTime>1207</unlockTime>
+<retryLoginTime>0</retryLoginTime>
+</userCheck>
+
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - URL: http://172.16.0.29/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612699)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612699</serialNumber>
+<macAddress>88:de:39:53:98:c2</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - URL: http://172.16.0.28/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612705)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612705</serialNumber>
+<macAddress>88:de:39:53:98:c8</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - URL: http://172.16.0.27/ISAPI/System/deviceInfo, Method: GET, HTTP Code: 200, Content-Type: application/xml
+[06-Sep-2026 09:46:07 UTC] Hikvision makeRequest - Raw response (first 1000 chars): <?xml version="1.0" encoding="UTF-8"?>
+<DeviceInfo version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<deviceName>DS-K1T321EFWX-B(GL7612702)</deviceName>
+<deviceID>255</deviceID>
+<model>DS-K1T321EFWX-B</model>
+<serialNumber>DS-K1T321EFWX-B20241227V030920ENGL7612702</serialNumber>
+<macAddress>88:de:39:53:98:c5</macAddress>
+<firmwareVersion>V3.9.20</firmwareVersion>
+<firmwareReleasedDate>build 241227</firmwareReleasedDate>
+<encoderVersion>V1.7.0.723868 build 2024-10-29</encoderVersion>
+<encoderReleasedDate>build 241029</encoderReleasedDate>
+<deviceType>ACS</deviceType>
+<subDeviceType>accessControlTerminal</subDeviceType>
+<telecontrolID>1</telecontrolID>
+<localZoneNum>0</localZoneNum>
+<alarmOutNum>0</alarmOutNum>
+<electroLockNum>1</electroLockNum>
+<RS485Num>1</RS485Num>
+<manufacturer>hikvision</manufacturer>
+<OEMCode>1</OEMCode>
+<bspVersion>V1.6.0.683512 build 2024-11-18</bspVersion>
+<dspVersion>V1.7.0.723868 build 2024-10-29</dspVersion>
+<marketType>1</mark
+[06-Sep-2026 09:46:07 UTC] Database::connect - Connection successful to sisslgti

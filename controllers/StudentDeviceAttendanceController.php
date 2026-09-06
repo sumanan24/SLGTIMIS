@@ -162,8 +162,80 @@ class StudentDeviceAttendanceController extends Controller {
             $_SESSION['student_att_device_status'],
             $_SESSION['student_att_connection'],
             $_SESSION['student_att_lockout_until'],
-            $_SESSION['student_att_refresh_users']
+            $_SESSION['student_att_refresh_users'],
+            $_SESSION['student_att_sync_summary']
         );
+    }
+
+    /**
+     * Auto-remove face JPEG cache files under assets/img/machine_faces.
+     * Pass null to delete all cache files; otherwise delete files older than $maxAgeSeconds.
+     */
+    private function purgeMachineFaceCacheFiles(?int $maxAgeSeconds = 300): int {
+        $dir = BASE_PATH . '/assets/img/machine_faces';
+        if (!is_dir($dir)) {
+            return 0;
+        }
+        $deleted = 0;
+        $now = time();
+        $entries = @scandir($dir);
+        if (!is_array($entries)) {
+            return 0;
+        }
+        foreach ($entries as $name) {
+            if ($name === '.' || $name === '..') {
+                continue;
+            }
+            if (!preg_match('/\.(jpe?g)$/i', $name)) {
+                continue;
+            }
+            $path = $dir . DIRECTORY_SEPARATOR . $name;
+            if (!is_file($path)) {
+                continue;
+            }
+            $age = $now - (int) @filemtime($path);
+            if ($maxAgeSeconds === null || $age >= $maxAgeSeconds) {
+                if (@unlink($path)) {
+                    $deleted++;
+                }
+            }
+        }
+        return $deleted;
+    }
+
+    /** Throttled auto-purge of stale face cache (once per 10 minutes per session). */
+    private function autoPurgeStaleCaches(): void {
+        $last = (int) ($_SESSION['student_att_cache_purged_at'] ?? 0);
+        if ($last > 0 && (time() - $last) < 600) {
+            return;
+        }
+        $_SESSION['student_att_cache_purged_at'] = time();
+        // Face JPEGs are short-lived; drop anything older than 5 minutes
+        $this->purgeMachineFaceCacheFiles(300);
+    }
+
+    /** Clear session + face files + OPcache for machine config (after password save). */
+    private function clearAllMachineCaches(): void {
+        $this->clearMachineSessionCache();
+        $this->purgeMachineFaceCacheFiles(null);
+        unset($_SESSION['student_att_cache_purged_at']);
+
+        $paths = [
+            BASE_PATH . '/config/student_attendance_machine.php',
+            BASE_PATH . '/config/student_attendance_machine.local.php',
+            BASE_PATH . '/controllers/StudentDeviceAttendanceController.php',
+        ];
+        if (function_exists('opcache_invalidate')) {
+            foreach ($paths as $p) {
+                if (is_file($p)) {
+                    @opcache_invalidate($p, true);
+                }
+            }
+        }
+        if (function_exists('opcache_reset')) {
+            @opcache_reset();
+        }
+        clearstatcache(true);
     }
 
     private function credentialSyncService(): StudentDeviceCredentialSyncService {
@@ -251,6 +323,7 @@ class StudentDeviceAttendanceController extends Controller {
         $userStats = $att->machineUserStatsByHost();
         $passwordOk = false;
         $cfg = [];
+        $this->autoPurgeStaleCaches();
         try {
             require_once BASE_PATH . '/core/HikvisionIntegration.php';
             $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
@@ -1036,6 +1109,7 @@ class StudentDeviceAttendanceController extends Controller {
             'curlMissing' => $curlMissing,
             'machineConfigured' => $machineConfigured,
             'machineConfigHint' => $machineConfigHint,
+            'adminLockoutUntil' => (int) ($_SESSION['student_att_lockout_until'] ?? 0),
         ]);
     }
 
@@ -1047,6 +1121,7 @@ class StudentDeviceAttendanceController extends Controller {
             return;
         }
 
+        $this->autoPurgeStaleCaches();
         require_once BASE_PATH . '/core/HikvisionIntegration.php';
         $cred = $this->credentialSyncService();
         $model = $cred->attendanceModel();
@@ -1550,6 +1625,7 @@ class StudentDeviceAttendanceController extends Controller {
 
         $cacheFile = $this->machineFaceCachePath($employeeNo);
         $refresh = (string) $this->get('refresh', '') === '1';
+        $this->autoPurgeStaleCaches();
 
         if (!$refresh && is_file($cacheFile) && (time() - (int) filemtime($cacheFile)) < 300) {
             header('Content-Type: image/jpeg');
@@ -1862,6 +1938,34 @@ class StudentDeviceAttendanceController extends Controller {
             return;
         }
 
+        if ($action === 'clear_admin_lock') {
+            unset($_SESSION['student_att_lockout_until'], $_SESSION['student_att_device_status']);
+            $hik = $this->studentHikvision();
+            $login = $hik->assertDigestLogin();
+            if (!empty($login['ok'])) {
+                unset($_SESSION['student_att_lockout_until']);
+                $_SESSION['flash_success'] = 'MAIN login OK after reboot. You can enroll fingerprints now — place finger on scanner, then click Finger 01 once.';
+            } else {
+                $_SESSION['student_att_lockout_until'] = time() + 20 * 60;
+                $_SESSION['flash_error'] = 'Still cannot login to MAIN. '
+                    . ($login['message'] ?? '')
+                    . ' Open http://172.16.0.26 in a browser and confirm admin password, then use Device → Save password.';
+            }
+            $this->redirect($usersUrl);
+            return;
+        }
+
+        $lockoutUntil = (int) ($_SESSION['student_att_lockout_until'] ?? 0);
+        if (
+            $lockoutUntil > time()
+            && in_array($action, ['add_finger', 'add_user_and_fingers', 'add_face', 'add_user'], true)
+        ) {
+            $_SESSION['flash_error'] = 'Admin lock cooldown until ' . date('H:i', $lockoutUntil)
+                . '. Reboot MAIN, login at http://172.16.0.26 in browser, then click “Terminal rebooted — clear lock & test” below. Do not click Finger again yet.';
+            $this->redirect($usersUrl);
+            return;
+        }
+
         try {
             if ($action === 'refresh') {
                 $hik = $this->studentHikvision();
@@ -1985,8 +2089,13 @@ class StudentDeviceAttendanceController extends Controller {
                         $synced['slots'] ?? $slots,
                         !empty($synced['has_face'])
                     );
+                    unset($_SESSION['student_att_lockout_until']);
                     $_SESSION['flash_success'] = $text;
                 } else {
+                    $joined = strtolower($text);
+                    if (str_contains($joined, 'locked') || str_contains($joined, '401')) {
+                        $_SESSION['student_att_lockout_until'] = time() + 20 * 60;
+                    }
                     $_SESSION['flash_error'] = $text;
                 }
                 $this->redirect($this->usersRedirectUrl($search, $employeeNo, $filters));
@@ -2642,11 +2751,7 @@ class StudentDeviceAttendanceController extends Controller {
             return;
         }
 
-        $this->clearMachineSessionCache();
-
-        if (function_exists('opcache_invalidate')) {
-            @opcache_invalidate($written['path'], true);
-        }
+        $this->clearAllMachineCaches();
         clearstatcache(true, $written['path']);
 
         $autoTest = (string) $this->post('auto_test', '1') === '1';

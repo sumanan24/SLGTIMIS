@@ -89,6 +89,36 @@ ob_start();
             Do not commit secrets to git.
         </div>
     <?php endif; ?>
+    <?php
+    $adminLockoutUntil = (int) ($adminLockoutUntil ?? 0);
+    $hostEsc = htmlspecialchars((string) ($machineHost ?? '172.16.0.26'), ENT_QUOTES, 'UTF-8');
+    ?>
+    <?php if ($adminLockoutUntil > time()): ?>
+        <div class="alert alert-warning" role="alert">
+            <strong>MAIN admin lock / failed login cooldown</strong>
+            until <?php echo htmlspecialchars(date('H:i', $adminLockoutUntil), ENT_QUOTES, 'UTF-8'); ?>.
+            Reboot alone is not enough if the password on this server is wrong — each Finger click re-locks the terminal.
+            <ol class="mb-2 mt-2 small">
+                <li>Open <code>http://<?php echo $hostEsc; ?></code> and login as <code>admin</code> with the device password.</li>
+                <li>If browser login works, save that exact password on the Device page.</li>
+                <li>Then click the button below (one login test only).</li>
+            </ol>
+            <form method="post" action="<?php echo $e($postBase); ?>" class="d-inline">
+                <input type="hidden" name="action" value="clear_admin_lock">
+                <button type="submit" class="btn btn-sm btn-warning">Terminal rebooted — clear lock &amp; test login</button>
+            </form>
+        </div>
+    <?php else: ?>
+        <div class="alert alert-light border py-2 mb-3" role="status">
+            <form method="post" action="<?php echo $e($postBase); ?>" class="d-inline">
+                <input type="hidden" name="action" value="clear_admin_lock">
+                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                    Test MAIN login (after reboot)
+                </button>
+            </form>
+            <span class="small text-muted ms-2">Use this once after reboot — do not spam Finger 01 while locked.</span>
+        </div>
+    <?php endif; ?>
     <div class="sd-users-panel">
         <form method="get" action="<?php echo $e($usersAction); ?>" class="sd-users-search" id="sdUsersSearchForm">
             <div class="sd-users-filters-grid">
