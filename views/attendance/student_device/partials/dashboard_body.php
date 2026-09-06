@@ -156,6 +156,7 @@ $deviceCards = $deviceCards ?? [];
                 </button>
             </form>
             <a class="btn btn-sm btn-outline-secondary" href="<?php echo $e($urls['devices'] ?? '#'); ?>">Device sync</a>
+            <a class="btn btn-sm btn-outline-dark" href="<?php echo $e(rtrim(APP_URL, '/') . '/hikvision'); ?>">Hikvision LAN test</a>
         </div>
     </div>
     <div class="card-body">

@@ -66,87 +66,60 @@ class StudentDeviceCredentialSyncService {
     }
 
     /**
-     * Probe ONLINE / AUTH ERROR / OFFLINE for each configured device (LAN only, no Internet).
-     * Stops Digest auth attempts after the first auth failure to avoid admin lockout.
+     * Probe ONLINE / AUTH ERROR / OFFLINE via new HikvisionService (LAN only).
      *
-     * @param string|null $onlyHost If set, probe only this host
+     * @param string|null $onlyHost If set, probe only this host IP
      * @return list<array<string,mixed>>
      */
     public function probeDeviceStatuses(?string $onlyHost = null): array {
-        $out = [];
-        $skipAuthReason = '';
+        require_once BASE_PATH . '/services/HikvisionService.php';
+        require_once BASE_PATH . '/config/hikvision.php';
+
+        $svc = new HikvisionService();
         $onlyHost = $onlyHost !== null ? trim($onlyHost) : null;
+        $out = [];
+        $stopAuth = false;
 
-        foreach ($this->devices() as $device) {
-            $host = (string) ($device['host'] ?? '');
-            if ($onlyHost !== null && $onlyHost !== '' && $host !== $onlyHost) {
+        foreach ($svc->devices() as $device) {
+            $ip = (string) ($device['ip'] ?? '');
+            if ($onlyHost !== null && $onlyHost !== '' && $ip !== $onlyHost) {
                 continue;
             }
 
-            $row = [
-                'host' => $host,
-                'role' => (string) ($device['role'] ?? ''),
-                'label' => (string) ($device['label'] ?? $host),
-                'online' => false,
-                'status' => 'offline',
-                'message' => '',
-                'reason' => '',
-                'category' => '',
-                'locked' => false,
-                'tcp_ok' => false,
-                'http_ok' => false,
-                'auth_ok' => false,
-                'model' => '',
+            if ($stopAuth && ($onlyHost === null || $onlyHost === '')) {
+                $row = $svc->testReachabilityOnly($device);
+                $row['status'] = 'AUTH ERROR';
+                $row['last_error'] = 'Authentication skipped — previous device failed login (avoid lockout)';
+            } else {
+                $row = $svc->testDevice($device);
+                if (($row['status'] ?? '') === 'AUTH ERROR') {
+                    $stopAuth = true;
+                }
+            }
+
+            $status = strtoupper((string) ($row['status'] ?? 'OFFLINE'));
+            $legacy = 'offline';
+            if ($status === 'ONLINE') {
+                $legacy = 'online';
+            } elseif ($status === 'AUTH ERROR') {
+                $legacy = 'auth_error';
+            }
+
+            $out[] = [
+                'host' => $ip,
+                'role' => (string) ($row['role'] ?? ''),
+                'label' => (string) ($row['label'] ?? ''),
+                'online' => $status === 'ONLINE',
+                'status' => $legacy,
+                'message' => (string) (($row['last_error'] ?? '') !== '' ? $row['last_error'] : $status),
+                'reason' => (string) ($row['last_error'] ?? $status),
+                'locked' => stripos((string) ($row['last_error'] ?? ''), 'lock') !== false,
+                'tcp_ok' => !empty($row['tcp_ok']),
+                'http_ok' => !empty($row['http_ok']),
+                'auth_ok' => !empty($row['auth_ok']),
+                'model' => (string) ($row['device_name'] ?? ''),
+                'sis_server' => (string) ($_SERVER['SERVER_ADDR'] ?? gethostname() ?: 'sis'),
             ];
-
-            if ($host === '') {
-                $row['status'] = 'invalid_config';
-                $row['reason'] = 'Invalid configuration';
-                $row['message'] = 'Invalid configuration — missing host';
-                $row['category'] = 'config';
-                $out[] = $row;
-                continue;
-            }
-
-            try {
-                $hik = $this->hikvisionFor($device);
-                $attemptAuth = ($skipAuthReason === '');
-                $diag = $hik->diagnoseLanConnection($attemptAuth);
-
-                $row['online'] = !empty($diag['online']);
-                $row['status'] = (string) ($diag['status'] ?? 'offline');
-                $row['message'] = (string) ($diag['message'] ?? '');
-                $row['reason'] = (string) ($diag['reason'] ?? '');
-                $row['category'] = (string) ($diag['category'] ?? '');
-                $row['locked'] = !empty($diag['locked']);
-                $row['tcp_ok'] = !empty($diag['tcp_ok']);
-                $row['http_ok'] = !empty($diag['http_ok']);
-                $row['auth_ok'] = !empty($diag['auth_ok']);
-                $row['model'] = (string) ($diag['model'] ?? '');
-
-                if (!$attemptAuth && $skipAuthReason !== '') {
-                    // Keep LAN facts; clarify auth was skipped
-                    if (!empty($diag['tcp_ok']) && !empty($diag['http_ok'])) {
-                        $row['status'] = 'auth_error';
-                        $row['message'] = 'LAN OK — ' . $skipAuthReason;
-                        $row['reason'] = 'Authentication skipped';
-                        $row['category'] = 'auth';
-                    }
-                }
-
-                if ($row['status'] === 'auth_error' || $row['locked']) {
-                    $skipAuthReason = 'auth failed on ' . $host . ' (same admin password). Do not retry — wait/reboot, confirm browser login, then Test once.';
-                } elseif ($row['status'] === 'invalid_config' && str_contains(strtolower($row['message']), 'password empty')) {
-                    $skipAuthReason = 'set password first (same admin on all machines)';
-                }
-            } catch (Throwable $e) {
-                $row['message'] = $e->getMessage();
-                $row['reason'] = 'Device unreachable';
-                $row['category'] = 'routing';
-                error_log('[Hikvision probe] ' . $host . ': ' . $e->getMessage());
-            }
-
-            $out[] = $row;
         }
 
         return $out;

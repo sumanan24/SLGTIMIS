@@ -116,6 +116,12 @@ return [
     'attendance/student-device/machine/refresh-users' => 'StudentDeviceAttendanceController@refreshUsersFromMachines',
     'attendance/student-device/machine/save-credentials' => 'StudentDeviceAttendanceController@saveMachineCredentials',
     'attendance/student-device/logs' => 'StudentDeviceAttendanceController@logs',
+
+    // New Hikvision LAN module (connection / status)
+    'hikvision' => 'HikvisionController@dashboard',
+    'hikvision/test/all' => 'HikvisionController@testAll',
+    'hikvision/test/{key}' => 'HikvisionController@testOne',
+
     'attendance/sync-hikvision' => 'AttendanceController@syncHikvision',
     'attendance/test-hikvision' => 'AttendanceController@testHikvision',
     'attendance/hikvision-report' => 'AttendanceController@getHikvisionReport',

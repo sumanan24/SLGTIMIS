@@ -1,0 +1,12 @@
+<?php
+/**
+ * Example — copy to hikvision.local.php on the server (gitignored).
+ */
+declare(strict_types=1);
+
+define('HIKVISION_USER', 'admin');
+define('HIKVISION_PASS', 'CHANGE_ME');
+define('MAIN_MACHINE_IP', '172.16.0.26');
+define('READER1_IP', '172.16.0.29');
+define('READER2_IP', '172.16.0.28');
+define('READER3_IP', '172.16.0.27');
