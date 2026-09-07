@@ -141,16 +141,15 @@ $formatSubmitted = static function (?string $createdAt) use ($esc): array {
 
 $listBase = $appBase . '/student-applications';
 $appendChoiceQuery = static function (array $q, array $choices): array {
-    unset($q['prio'], $q['dept'], $q['course']);
+    unset($q['prio'], $q['dept'], $q['course'], $q['dept1'], $q['dept2'], $q['dept3']);
     foreach ([1, 2, 3] as $n) {
+        unset($q['dept' . $n]);
         $slot = is_array($choices[$n] ?? null) ? $choices[$n] : [];
-        $dept = trim((string) ($slot['dept_id'] ?? ''));
         $course = trim((string) ($slot['course_id'] ?? ''));
-        if ($dept !== '') {
-            $q['dept' . $n] = $dept;
-        }
         if ($course !== '') {
             $q['course' . $n] = $course;
+        } else {
+            unset($q['course' . $n]);
         }
     }
 
@@ -186,12 +185,29 @@ $makeListQuery = static function (?string $level, string $tab, int $pn, int $pa,
 
     return $appendChoiceQuery($q, $useChoices);
 };
-$withChoiceSlot = static function (array $choices, int $n, ?string $deptId, ?string $courseId): array {
+$withChoiceCourse = static function (array $choices, int $n, ?string $courseId): array {
     $out = $choices;
+    foreach ([1, 2, 3] as $i) {
+        if (!isset($out[$i]) || !is_array($out[$i])) {
+            $out[$i] = ['dept_id' => null, 'course_id' => null];
+        }
+    }
+    $cid = ($courseId !== null && trim($courseId) !== '') ? trim($courseId) : null;
     $out[$n] = [
-        'dept_id' => ($deptId !== null && trim($deptId) !== '') ? trim($deptId) : null,
-        'course_id' => ($courseId !== null && trim($courseId) !== '') ? trim($courseId) : null,
+        'dept_id' => null,
+        'course_id' => $cid,
     ];
+    // Same course cannot be used on more than one choice filter.
+    if ($cid !== null) {
+        foreach ([1, 2, 3] as $i) {
+            if ($i === $n) {
+                continue;
+            }
+            if (($out[$i]['course_id'] ?? null) === $cid) {
+                $out[$i] = ['dept_id' => null, 'course_id' => null];
+            }
+        }
+    }
 
     return $out;
 };
@@ -279,18 +295,18 @@ if ($filter_level !== null) {
 }
 foreach ([1, 2, 3] as $n) {
     $slot = $filter_choice_filters[$n] ?? [];
-    $hasDept = ($slot['dept_id'] ?? null) !== null;
-    $hasCourse = ($slot['course_id'] ?? null) !== null;
-    if ($hasDept || $hasCourse) {
-        $bits = [];
-        if ($hasDept) {
-            $bits[] = 'dept';
-        }
-        if ($hasCourse) {
-            $bits[] = 'course';
-        }
-        $ctxParts[] = ($prioLabels[$n] ?? ('Choice ' . $n)) . ' (' . implode('/', $bits) . ')';
+    $cid = trim((string) ($slot['course_id'] ?? ''));
+    if ($cid === '') {
+        continue;
     }
+    $cname = $cid;
+    foreach (($filter_courses_by_choice[$n] ?? $filter_courses) as $fc) {
+        if ((string) ($fc['course_id'] ?? '') === $cid) {
+            $cname = trim((string) ($fc['course_name'] ?? $cid));
+            break;
+        }
+    }
+    $ctxParts[] = ($prioLabels[$n] ?? ('Choice ' . $n)) . ': ' . $esc($cname);
 }
 if ($filter_language !== null && $filter_language !== '') {
     $ctxParts[] = $esc($filter_language);
@@ -299,7 +315,7 @@ if ($ctxParts !== []) {
     $filterContextSuffix = ' · ' . implode(' · ', $ctxParts);
 }
 ?>
-<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=24">
+<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=27">
 <div class="sa-admin-page sa-student-apps-index container-fluid py-3 px-lg-4<?php echo $active_view === 'dashboard' ? ' sa-page-dashboard' : ''; ?>">
     <header class="sa-apps-page-header mb-4 pb-2 border-bottom<?php echo $active_view === 'dashboard' ? ' sa-apps-page-header--dash' : ''; ?>">
         <h1 class="h4 mb-0 fw-semibold text-dark"><i class="fas fa-file-alt me-2 text-primary" aria-hidden="true"></i>Online applications</h1>
@@ -334,43 +350,70 @@ if ($ctxParts !== []) {
                             <option value="<?php echo $buildListUrl('05', $active_tab, 1, 1, 1); ?>"<?php echo $filter_level === '05' ? ' selected' : ''; ?>>Level 05</option>
                         </select>
                     </div>
-                    <?php foreach ([1 => '1st choice', 2 => '2nd choice', 3 => '3rd choice'] as $choiceN => $choiceLbl): ?>
                     <?php
-                    $slotDept = $filter_choice_filters[$choiceN]['dept_id'] ?? null;
-                    $slotCourse = $filter_choice_filters[$choiceN]['course_id'] ?? null;
-                    $slotCourses = $filter_courses_by_choice[$choiceN] ?? [];
+                    $filterCoursesList = $filter_courses;
+                    if ($filterCoursesList === [] && isset($filter_courses_by_choice[1]) && is_array($filter_courses_by_choice[1])) {
+                        $filterCoursesList = $filter_courses_by_choice[1];
+                    }
+                    // Map course_id → lowercase name for cross-slot exclusion.
+                    $courseNameById = [];
+                    foreach ($filterCoursesList as $fcMap) {
+                        $mid = trim((string) ($fcMap['course_id'] ?? ''));
+                        $mname = preg_replace('/\s+/u', ' ', trim((string) ($fcMap['course_name'] ?? '')));
+                        if ($mid !== '' && $mname !== '') {
+                            $courseNameById[$mid] = function_exists('mb_strtolower') ? mb_strtolower($mname, 'UTF-8') : strtolower($mname);
+                        }
+                    }
+                    foreach ([1 => '1st choice course', 2 => '2nd choice course', 3 => '3rd choice course'] as $choiceN => $choiceLbl):
+                        $slotCourse = isset($filter_choice_filters[$choiceN]['course_id'])
+                            ? trim((string) $filter_choice_filters[$choiceN]['course_id'])
+                            : '';
+                        if ($slotCourse === '') {
+                            $slotCourse = null;
+                        }
+                        // Exclude courses already picked on the other choice filters (by id and by name).
+                        $excludeCourseIds = [];
+                        $excludeCourseNames = [];
+                        foreach ([1, 2, 3] as $otherN) {
+                            if ($otherN === $choiceN) {
+                                continue;
+                            }
+                            $otherCid = trim((string) ($filter_choice_filters[$otherN]['course_id'] ?? ''));
+                            if ($otherCid === '') {
+                                continue;
+                            }
+                            $excludeCourseIds[$otherCid] = true;
+                            if (isset($courseNameById[$otherCid])) {
+                                $excludeCourseNames[$courseNameById[$otherCid]] = true;
+                            }
+                        }
                     ?>
-                    <div class="d-flex flex-wrap align-items-end gap-2 sa-apps-choice-filter" role="group" aria-label="<?php echo $esc($choiceLbl); ?> filters">
-                        <div class="d-flex flex-column gap-1 sa-apps-filter-field">
-                            <label for="saDeptSelect<?php echo (int) $choiceN; ?>" class="form-label small text-secondary text-uppercase mb-0 fw-semibold"><?php echo $esc($choiceLbl); ?> · Dept</label>
-                            <select id="saDeptSelect<?php echo (int) $choiceN; ?>" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="<?php echo $esc($choiceLbl); ?> department">
-                                <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $withChoiceSlot($filter_choice_filters, $choiceN, null, null))); ?>"<?php echo $slotDept === null ? ' selected' : ''; ?>>All departments</option>
-                                <?php foreach ($filter_departments as $fd): ?>
-                                <?php
-                                $did = (string) ($fd['department_id'] ?? '');
-                                if ($did === '') {
-                                    continue;
-                                }
-                                ?>
-                                <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $withChoiceSlot($filter_choice_filters, $choiceN, $did, null))); ?>"<?php echo $slotDept === $did ? ' selected' : ''; ?>><?php echo $esc((string) ($fd['department_name'] ?? '')); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="d-flex flex-column gap-1 sa-apps-filter-field">
-                            <label for="saCourseSelect<?php echo (int) $choiceN; ?>" class="form-label small text-secondary text-uppercase mb-0 fw-semibold"><?php echo $esc($choiceLbl); ?> · Course</label>
-                            <select id="saCourseSelect<?php echo (int) $choiceN; ?>" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="<?php echo $esc($choiceLbl); ?> course">
-                                <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $withChoiceSlot($filter_choice_filters, $choiceN, $slotDept, null))); ?>"<?php echo $slotCourse === null ? ' selected' : ''; ?>>All courses</option>
-                                <?php foreach ($slotCourses as $fc): ?>
-                                <?php
-                                $cid = (string) ($fc['course_id'] ?? '');
-                                if ($cid === '') {
-                                    continue;
-                                }
-                                ?>
-                                <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $withChoiceSlot($filter_choice_filters, $choiceN, $slotDept, $cid))); ?>"<?php echo $slotCourse === $cid ? ' selected' : ''; ?>><?php echo $esc((string) ($fc['course_name'] ?? '')); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
+                    <div class="d-flex flex-column gap-1 sa-apps-filter-field sa-apps-choice-filter" role="group" aria-label="<?php echo $esc($choiceLbl); ?>">
+                        <?php if ($choiceN === 1): ?>
+                        <span class="visually-hidden">1st choice course filter. That course is then removed from the 2nd and 3rd choice lists.</span>
+                        <?php endif; ?>
+                        <label for="saCourseSelect<?php echo (int) $choiceN; ?>" class="form-label small text-secondary text-uppercase mb-0 fw-semibold"><?php echo $esc($choiceLbl); ?></label>
+                        <select id="saCourseSelect<?php echo (int) $choiceN; ?>" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="<?php echo $esc($choiceLbl); ?>">
+                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $withChoiceCourse($filter_choice_filters, $choiceN, null))); ?>"<?php echo $slotCourse === null ? ' selected' : ''; ?>>All courses</option>
+                            <?php foreach ($filterCoursesList as $fc): ?>
+                            <?php
+                            $cid = trim((string) ($fc['course_id'] ?? ''));
+                            $cname = preg_replace('/\s+/u', ' ', trim((string) ($fc['course_name'] ?? '')));
+                            if ($cid === '' || $cname === '') {
+                                continue;
+                            }
+                            $cnameKey = function_exists('mb_strtolower') ? mb_strtolower($cname, 'UTF-8') : strtolower($cname);
+                            $isCurrent = ($slotCourse !== null && $slotCourse === $cid);
+                            if (!$isCurrent && (isset($excludeCourseIds[$cid]) || isset($excludeCourseNames[$cnameKey]))) {
+                                continue; // e.g. 1st=4AT → hide Automobile Technician from 2nd/3rd lists
+                            }
+                            ?>
+                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $withChoiceCourse($filter_choice_filters, $choiceN, $cid))); ?>"<?php echo $isCurrent ? ' selected' : ''; ?>><?php echo $esc($cname); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php if ($choiceN > 1 && $excludeCourseIds !== []): ?>
+                        <span class="form-text small text-muted">Other courses only (not the 1st choice)</span>
+                        <?php endif; ?>
                     </div>
                     <?php endforeach; ?>
                     <div class="d-flex flex-column gap-1 sa-apps-filter-field">
@@ -587,11 +630,7 @@ if ($ctxParts !== []) {
                  data-sa-pr="<?php echo (int) $page_rejected; ?>"
                  <?php if ($filter_level !== null): ?>data-sa-level="<?php echo $esc($filter_level); ?>"<?php endif; ?>
                  <?php foreach ([1, 2, 3] as $n): ?>
-                 <?php
-                 $mountDept = $filter_choice_filters[$n]['dept_id'] ?? null;
-                 $mountCourse = $filter_choice_filters[$n]['course_id'] ?? null;
-                 ?>
-                 <?php if ($mountDept !== null && $mountDept !== ''): ?>data-sa-dept<?php echo (int) $n; ?>="<?php echo $esc($mountDept); ?>"<?php endif; ?>
+                 <?php $mountCourse = $filter_choice_filters[$n]['course_id'] ?? null; ?>
                  <?php if ($mountCourse !== null && $mountCourse !== ''): ?>data-sa-course<?php echo (int) $n; ?>="<?php echo $esc($mountCourse); ?>"<?php endif; ?>
                  <?php endforeach; ?>
                  <?php if ($filter_language !== null && $filter_language !== ''): ?>data-sa-lang="<?php echo $esc($filter_language); ?>"<?php endif; ?>>
@@ -633,8 +672,6 @@ if ($ctxParts !== []) {
         var lev = mount.getAttribute('data-sa-level');
         if (lev) p.set('level', lev);
         [1, 2, 3].forEach(function (n) {
-          var dept = mount.getAttribute('data-sa-dept' + n);
-          if (dept) p.set('dept' + n, dept);
           var course = mount.getAttribute('data-sa-course' + n);
           if (course) p.set('course' + n, course);
         });

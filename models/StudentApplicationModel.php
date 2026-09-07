@@ -355,6 +355,22 @@ class StudentApplicationModel extends Model {
         if ($data === []) {
             return true;
         }
+
+        $c1 = array_key_exists('course_priority_1', $data)
+            ? (string) ($data['course_priority_1'] ?? '')
+            : (string) ($existing['course_priority_1'] ?? '');
+        $c2 = array_key_exists('course_priority_2', $data)
+            ? (string) ($data['course_priority_2'] ?? '')
+            : (string) ($existing['course_priority_2'] ?? '');
+        $c3 = array_key_exists('course_priority_3', $data)
+            ? (string) ($data['course_priority_3'] ?? '')
+            : (string) ($existing['course_priority_3'] ?? '');
+        $dupErr = self::coursePreferenceUniquenessError($c1, $c2, $c3);
+        if ($dupErr !== null) {
+            $errorMessage = $dupErr;
+            return false;
+        }
+
         $sqlErr = null;
         $ok = $this->update((string) $applicationId, $data, $sqlErr);
         if (!$ok) {
@@ -571,9 +587,11 @@ class StudentApplicationModel extends Model {
         $fp = 'course_priority_' . $priority;
         $conn = $this->db->getConnection();
         $sepEsc = $conn->real_escape_string(self::legacyCourseIdNameSeparator());
+        // Match stored preference as course name, legacy "id — name", or bare course_id.
         $join = ' INNER JOIN `course` sa_fc ON ('
             . self::sqlTrimUtf8mb4('sa_fc', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ' OR '
-            . self::sqlLegacyCourseRowConcatLiteral('sa_fc', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ')';
+            . self::sqlLegacyCourseRowConcatLiteral('sa_fc', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ' OR '
+            . self::sqlTrimUtf8mb4('sa_fc', 'course_id') . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ')';
         $whereSuffix = '';
         $suffixTypes = '';
         $suffixParams = [];
@@ -618,7 +636,8 @@ class StudentApplicationModel extends Model {
     }
 
     /**
-     * AND together independent 1st / 2nd / 3rd choice dept+course filters (EXISTS, no JOIN clash).
+     * AND together independent 1st / 2nd / 3rd choice filters (EXISTS per slot — empty slots ignored).
+     * Example: dept1+course1 AND dept2 → matches both preference columns.
      *
      * @param array<int, array{dept_id?:?string, course_id?:?string}> $choiceFilters
      * @return array{active: bool, join: string, whereSuffix: string, suffixTypes: string, suffixParams: list<string>}
@@ -811,7 +830,8 @@ class StudentApplicationModel extends Model {
         $conn = $this->db->getConnection();
         $sepEsc = $conn->real_escape_string(self::legacyCourseIdNameSeparator());
         $inner = '(' . self::sqlTrimUtf8mb4('sa_fc', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ' OR '
-            . self::sqlLegacyCourseRowConcatLiteral('sa_fc', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ')';
+            . self::sqlLegacyCourseRowConcatLiteral('sa_fc', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ' OR '
+            . self::sqlTrimUtf8mb4('sa_fc', 'course_id') . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ')';
         $sql = ' AND EXISTS (SELECT 1 FROM `course` sa_fc WHERE ' . $inner . $parts['whereSuffix'] . ')';
         return ['sql' => $sql, 'types' => $parts['suffixTypes'], 'params' => $parts['suffixParams']];
     }
@@ -1432,7 +1452,7 @@ class StudentApplicationModel extends Model {
     /**
      * Course title for display when there is no `course` row match (legacy concatenated value).
      */
-    private static function displayCourseNameFromStoredPreference(string $stored): string {
+    public static function displayCourseNameFromStoredPreference(string $stored): string {
         $stored = trim($stored);
         if ($stored === '') {
             return '';
@@ -1446,6 +1466,57 @@ class StudentApplicationModel extends Model {
             return trim(substr($stored, $pos + strlen(' — ')));
         }
         return $stored;
+    }
+
+    /**
+     * Case-insensitive key for comparing course preference values (name, legacy "id — name", or bare id).
+     */
+    public static function normalizeCoursePreferenceCompareKey(string $stored): string {
+        $name = self::displayCourseNameFromStoredPreference($stored);
+        $name = preg_replace('/\s+/u', ' ', trim($name));
+        if ($name === '') {
+            return '';
+        }
+        if (function_exists('mb_strtolower')) {
+            return mb_strtolower($name, 'UTF-8');
+        }
+
+        return strtolower($name);
+    }
+
+    /**
+     * All three course preferences must be unique when filled.
+     * Empty 2nd/3rd choices are allowed.
+     *
+     * @return string|null Human-readable error, or null when valid
+     */
+    public static function coursePreferenceUniquenessError(?string $course1, ?string $course2, ?string $course3): ?string {
+        $raw = [
+            1 => trim((string) ($course1 ?? '')),
+            2 => trim((string) ($course2 ?? '')),
+            3 => trim((string) ($course3 ?? '')),
+        ];
+        $ord = [1 => '1st', 2 => '2nd', 3 => '3rd'];
+        $seen = [];
+        foreach ($raw as $n => $stored) {
+            if ($stored === '') {
+                continue;
+            }
+            $key = self::normalizeCoursePreferenceCompareKey($stored);
+            if ($key === '') {
+                continue;
+            }
+            if (isset($seen[$key])) {
+                $firstN = $seen[$key];
+                $label = self::displayCourseNameFromStoredPreference($stored);
+
+                return $label . ' is already selected as your ' . $ord[$firstN]
+                    . ' choice. Please select a different course for your ' . $ord[$n] . ' choice.';
+            }
+            $seen[$key] = $n;
+        }
+
+        return null;
     }
 
     /**

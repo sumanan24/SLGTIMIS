@@ -687,6 +687,7 @@ class StudentApplicationController extends Controller {
      * @return list<string>
      */
     private function validateApplication(string $level, ?array $existingDocPaths = null): array {
+        require_once BASE_PATH . '/models/StudentApplicationModel.php';
         $t = function (string $key): string {
             return trim((string) $this->post($key, ''));
         };
@@ -737,6 +738,15 @@ class StudentApplicationController extends Controller {
             if ($d === '' && $c !== '') {
                 return ['For choice ' . $i . ': pick a department or clear the course.'];
             }
+        }
+
+        $dupCourseErr = StudentApplicationModel::coursePreferenceUniquenessError(
+            $t('course_priority_1'),
+            $t('course_priority_2'),
+            $t('course_priority_3')
+        );
+        if ($dupCourseErr !== null) {
+            return [$dupCourseErr];
         }
 
         $courseModel = $this->model('CourseModel');
@@ -1825,8 +1835,9 @@ class StudentApplicationController extends Controller {
     /**
      * NVQ level + per-choice department/course filters for staff applications list (shared by admin index + AJAX table).
      *
-     * Query params: dept1/course1, dept2/course2, dept3/course3 (AND when multiple set).
-     * Legacy: dept/course + prio=1|2|3 maps into that single choice slot.
+     * Query params: course1, course2, course3 (course IDs) — each filled slot is ANDed.
+     * Optional legacy dept1/dept2/dept3 still accepted. Empty slots are ignored.
+     * Legacy dept/course + prio maps into that single slot.
      *
      * @return array{
      *   level: ?string,
@@ -1861,10 +1872,9 @@ class StudentApplicationController extends Controller {
                 $crow = $courseModel->find($courseRaw);
                 if (!empty($crow['course_id'])) {
                     $filterCourseId = (string) $crow['course_id'];
+                    // If a department was also requested, course must belong to it.
                     if ($filterDeptId !== null && (string) ($crow['department_id'] ?? '') !== $filterDeptId) {
                         $filterCourseId = null;
-                    } elseif ($filterDeptId === null && !empty($crow['department_id'])) {
-                        $filterDeptId = (string) $crow['department_id'];
                     }
                 }
             }
@@ -1898,7 +1908,17 @@ class StudentApplicationController extends Controller {
         }
 
         $activeChoices = [];
+        $seenCourseIds = [];
         foreach ([1, 2, 3] as $n) {
+            $cid = trim((string) ($choiceFilters[$n]['course_id'] ?? ''));
+            if ($cid !== '') {
+                if (isset($seenCourseIds[$cid])) {
+                    // Same course on two choice filters — keep the earlier slot only.
+                    $choiceFilters[$n] = ['dept_id' => null, 'course_id' => null];
+                } else {
+                    $seenCourseIds[$cid] = $n;
+                }
+            }
             if (($choiceFilters[$n]['dept_id'] ?? null) !== null || ($choiceFilters[$n]['course_id'] ?? null) !== null) {
                 $activeChoices[] = $n;
             }
@@ -1919,23 +1939,22 @@ class StudentApplicationController extends Controller {
     }
 
     /**
-     * Append dept1/course1…dept3/course3 (and omit legacy prio/dept/course) onto a query array.
+     * Append course1…course3 onto a query array (course-name filters; dept params omitted from new URLs).
      *
      * @param array<string, string> $q
      * @param array<int, array{dept_id?:?string, course_id?:?string}> $choiceFilters
      * @return array<string, string>
      */
     private function studentApplicationsAppendChoiceFilterQuery(array $q, array $choiceFilters): array {
-        unset($q['prio'], $q['dept'], $q['course']);
+        unset($q['prio'], $q['dept'], $q['course'], $q['dept1'], $q['dept2'], $q['dept3']);
         foreach ([1, 2, 3] as $n) {
+            unset($q['dept' . $n]);
             $slot = is_array($choiceFilters[$n] ?? null) ? $choiceFilters[$n] : [];
-            $dept = trim((string) ($slot['dept_id'] ?? ''));
             $course = trim((string) ($slot['course_id'] ?? ''));
-            if ($dept !== '') {
-                $q['dept' . $n] = $dept;
-            }
             if ($course !== '') {
                 $q['course' . $n] = $course;
+            } else {
+                unset($q['course' . $n]);
             }
         }
 
@@ -2113,20 +2132,16 @@ class StudentApplicationController extends Controller {
         if ($filterLevel !== null) {
             $ctxParts[] = 'NVQ Level ' . $esc($filterLevel);
         }
+        $courseModelForCtx = $this->model('CourseModel');
         foreach ([1, 2, 3] as $n) {
             $slot = $choiceFilters[$n] ?? [];
-            $hasDept = ($slot['dept_id'] ?? null) !== null;
-            $hasCourse = ($slot['course_id'] ?? null) !== null;
-            if ($hasDept || $hasCourse) {
-                $bits = [];
-                if ($hasDept) {
-                    $bits[] = 'dept';
-                }
-                if ($hasCourse) {
-                    $bits[] = 'course';
-                }
-                $ctxParts[] = ($prioLabels[$n] ?? ('Choice ' . $n)) . ' (' . implode('/', $bits) . ')';
+            $cid = trim((string) ($slot['course_id'] ?? ''));
+            if ($cid === '') {
+                continue;
             }
+            $crow = $courseModelForCtx->find($cid);
+            $cname = trim((string) ($crow['course_name'] ?? $cid));
+            $ctxParts[] = ($prioLabels[$n] ?? ('Choice ' . $n)) . ': ' . $esc($cname);
         }
         if ($filterLanguage !== null && $filterLanguage !== '') {
             $ctxParts[] = $esc($filterLanguage);
@@ -2257,14 +2272,15 @@ class StudentApplicationController extends Controller {
 
         $courseModel = $this->model('CourseModel');
         $nvqForCourses = $filterLevel === '04' ? '4' : ($filterLevel === '05' ? '5' : null);
-        $filterCoursesByChoice = [];
-        foreach ([1, 2, 3] as $n) {
-            $slotDept = $choiceFilters[$n]['dept_id'] ?? null;
-            $filterCoursesByChoice[$n] = $courseModel->getCoursesWithDepartment([
-                'department_id' => $slotDept,
-                'nvq_level' => $nvqForCourses,
-            ]);
-        }
+        $filterCoursesAll = $courseModel->getCoursesWithDepartment([
+            'nvq_level' => $nvqForCourses,
+        ]);
+        // Same catalogue for all three choice filters (course name only — no department filter).
+        $filterCoursesByChoice = [
+            1 => $filterCoursesAll,
+            2 => $filterCoursesAll,
+            3 => $filterCoursesAll,
+        ];
 
         return $this->view('student_application/admin_index', [
             'title' => 'Online applications',
@@ -2277,8 +2293,8 @@ class StudentApplicationController extends Controller {
             'filter_active_choices' => $activeChoices,
             'filter_language' => $filterLanguage,
             'ajax_table_url' => rtrim(APP_URL, '/') . '/student-applications/ajax-table',
-            'filter_departments' => $this->model('DepartmentModel')->getAll(),
-            'filter_courses' => $filterCoursesByChoice[1] ?? [],
+            'filter_departments' => [],
+            'filter_courses' => $filterCoursesAll,
             'filter_courses_by_choice' => $filterCoursesByChoice,
             'active_view' => $activeView,
             'active_tab' => $activeTab,
@@ -3162,25 +3178,16 @@ class StudentApplicationController extends Controller {
         if ($filterLevel !== null) {
             $summaryParts[] = 'NVQ Level ' . $filterLevel;
         }
-        $deptModel = $this->model('DepartmentModel');
         $courseModel = $this->model('CourseModel');
         foreach ([1, 2, 3] as $n) {
             $slot = $choiceFilters[$n] ?? [];
-            $slotDept = $slot['dept_id'] ?? null;
             $slotCourse = $slot['course_id'] ?? null;
-            if ($slotDept === null && $slotCourse === null) {
+            if ($slotCourse === null || $slotCourse === '') {
                 continue;
             }
-            $bits = [$prioLabels[$n] ?? ('Choice ' . $n)];
-            if ($slotDept !== null) {
-                $drow = $deptModel->find($slotDept);
-                $bits[] = 'Dept: ' . trim((string) ($drow['department_name'] ?? $slotDept));
-            }
-            if ($slotCourse !== null) {
-                $crow = $courseModel->find($slotCourse);
-                $bits[] = 'Course: ' . trim((string) ($crow['course_name'] ?? $slotCourse));
-            }
-            $summaryParts[] = implode(' · ', $bits);
+            $crow = $courseModel->find($slotCourse);
+            $cname = trim((string) ($crow['course_name'] ?? $slotCourse));
+            $summaryParts[] = ($prioLabels[$n] ?? ('Choice ' . $n)) . ': ' . $cname;
         }
         if ($filterLanguage !== null && $filterLanguage !== '') {
             $summaryParts[] = $filterLanguage;

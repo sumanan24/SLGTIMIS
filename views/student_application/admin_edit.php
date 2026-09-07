@@ -209,6 +209,14 @@ window.APP_FORM_OLD = <?php echo json_encode($jsOld, JSON_HEX_TAG | JSON_HEX_AMP
 <?php require __DIR__ . '/_course_preferences_scripts.php'; ?>
 <script>
 (function () {
+  var form = document.querySelector('form');
+  if (form) {
+    form.addEventListener('submit', function (ev) {
+      if (typeof window.appCoursePrefsValidateUnique === 'function' && !window.appCoursePrefsValidateUnique()) {
+        ev.preventDefault();
+      }
+    });
+  }
   var lev = document.getElementById('f_application_level');
   if (!lev || typeof window.initAppCoursePreferenceSelects !== 'function') return;
   lev.addEventListener('change', function () {

@@ -83,3 +83,14 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
 </script>
 <?php require __DIR__ . '/_address_province_scripts.php'; ?>
 <?php require __DIR__ . '/_course_preferences_scripts.php'; ?>
+<script>
+(function () {
+  var form = document.getElementById('studentApplicationForm') || document.querySelector('form.app-form') || document.querySelector('form');
+  if (!form) return;
+  form.addEventListener('submit', function (ev) {
+    if (typeof window.appCoursePrefsValidateUnique === 'function' && !window.appCoursePrefsValidateUnique()) {
+      ev.preventDefault();
+    }
+  });
+})();
+</script>

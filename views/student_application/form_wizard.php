@@ -1077,6 +1077,9 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
         if (partial) { showAlert('For each optional choice, pick both department and course, or leave both empty.'); return false; }
       }
       if (!okD || !okC) { showAlert('Choose a department and a course for your first preference.'); return false; }
+      if (typeof window.appCoursePrefsValidateUnique === 'function' && !window.appCoursePrefsValidateUnique()) {
+        return false;
+      }
       return true;
     }
     if (step === 7) {
@@ -1479,6 +1482,11 @@ window.SL_DISTRICT_POSTAL = <?php echo json_encode($sl_district_postal_codes, JS
     form.addEventListener('submit', function (ev) {
       if (reviewOnlyMode) {
         ev.preventDefault();
+        return;
+      }
+      if (typeof window.appCoursePrefsValidateUnique === 'function' && !window.appCoursePrefsValidateUnique()) {
+        ev.preventDefault();
+        showStep(6);
       }
     });
   }
