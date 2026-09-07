@@ -43,6 +43,9 @@ ob_start();
 // Define base path FIRST (before any other includes)
 define('BASE_PATH', __DIR__);
 
+// PHP 7.4 compatibility (str_contains / str_starts_with / str_ends_with are PHP 8+)
+require_once BASE_PATH . '/core/Php74Polyfill.php';
+
 // Start session with security settings
 ini_set('session.cookie_httponly', 1);
 ini_set('session.use_only_cookies', 1);
