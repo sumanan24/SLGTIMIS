@@ -105,6 +105,7 @@ class StudentDeviceAttendanceController extends Controller {
             'users' => $root . '/users',
             'face_photo' => $root . '/users/face-photo',
             'sync' => $root . '/sync',
+            'quick_sync_chunk' => $root . '/sync/quick-chunk',
             'search' => $root . '/events',
             'export_excel' => $root . '/export/excel',
             'export_csv' => $root . '/export/csv',
@@ -733,6 +734,10 @@ class StudentDeviceAttendanceController extends Controller {
         $page = max(1, (int) $this->get('page', 1));
         $result = $att->searchDailyGrouped($filters, $page, 50);
 
+        $lastQuick = (int) ($_SESSION['student_att_last_quick_sync'] ?? 0);
+        $autoSync = (string) $this->get('nosync', '') !== '1'
+            && ((time() - $lastQuick) >= 90 || (string) $this->get('force_sync', '') === '1');
+
         return $this->view('attendance/student_device/events', [
             'title' => 'Attendance',
             'page' => 'student-device-attendance-events',
@@ -742,7 +747,86 @@ class StudentDeviceAttendanceController extends Controller {
             'total' => $result['total'],
             'pageNum' => $page,
             'perPage' => 50,
+            'autoQuickSync' => $autoSync,
+            'quickSyncUrl' => $this->urls()['quick_sync_chunk'],
         ]);
+    }
+
+    /**
+     * JSON: sync today's punches from one machine (chunk = device index).
+     * Call chunk=0, then 1, 2… until done=true.
+     */
+    public function quickSyncChunk() {
+        if (!$this->requireAccess()) {
+            return;
+        }
+        header('Content-Type: application/json; charset=UTF-8');
+        header('Cache-Control: no-store');
+
+        $chunk = (int) ($this->get('chunk', $this->post('chunk', 0)));
+        $chunk = max(0, min(20, $chunk));
+
+        @set_time_limit(55);
+        try {
+            $svc = $this->syncService();
+            $row = $svc->syncTodayChunk($chunk, 35);
+
+            // Accumulate run totals in session
+            if ($chunk === 0) {
+                $_SESSION['student_att_quick_run'] = [
+                    'started_at' => date('Y-m-d H:i:s'),
+                    'saved' => 0,
+                    'retrieved' => 0,
+                    'online' => 0,
+                    'devices' => [],
+                ];
+            }
+            $run = $_SESSION['student_att_quick_run'] ?? [
+                'started_at' => date('Y-m-d H:i:s'),
+                'saved' => 0,
+                'retrieved' => 0,
+                'online' => 0,
+                'devices' => [],
+            ];
+            if (empty($row['skipped'])) {
+                $run['saved'] += (int) ($row['saved'] ?? 0);
+                $run['retrieved'] += (int) ($row['records_retrieved'] ?? 0);
+                if (!empty($row['ok'])) {
+                    $run['online']++;
+                }
+                $run['devices'][] = [
+                    'host' => $row['host'] ?? '',
+                    'label' => $row['label'] ?? '',
+                    'ok' => !empty($row['ok']),
+                    'saved' => (int) ($row['saved'] ?? 0),
+                    'message' => $row['message'] ?? '',
+                ];
+            }
+            $_SESSION['student_att_quick_run'] = $run;
+
+            if (!empty($row['done'])) {
+                $_SESSION['student_att_last_quick_sync'] = time();
+                $row['run'] = $run;
+                $row['summary'] = sprintf(
+                    'Quick sync done — %d/%d machine(s) OK, retrieved %d, saved %d',
+                    (int) $run['online'],
+                    (int) ($row['total'] ?? 0),
+                    (int) $run['retrieved'],
+                    (int) $run['saved']
+                );
+            }
+
+            echo json_encode(['success' => true] + $row);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'ok' => false,
+                'done' => true,
+                'message' => $e->getMessage(),
+            ]);
+        }
+        exit;
     }
 
     /** Student month matrix report (device punches → 1 / 0 / H + allowance) */
@@ -2582,56 +2666,8 @@ class StudentDeviceAttendanceController extends Controller {
         }
 
         $baseName = 'student_information_export_' . date('Y-m-d_His');
-        require_once BASE_PATH . '/vendor/autoload.php';
-
-        if (!class_exists(\PhpOffice\PhpSpreadsheet\Spreadsheet::class)) {
-            $_SESSION['flash_error'] = 'Excel engine not available. Run composer install.';
-            $this->redirect('attendance/student-device/fingerprint-import');
-            return;
-        }
-
-        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Students');
-        $sheet->fromArray($headers, null, 'A1');
-        $sheet->fromArray($rows, null, 'A2');
-
-        $lastRow = count($rows) + 1;
-        $headerStyle = [
-            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
-            'fill' => [
-                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                'startColor' => ['rgb' => '1F4E79'],
-            ],
-            'alignment' => [
-                'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
-                'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
-            ],
-        ];
-        $sheet->getStyle('A1:K1')->applyFromArray($headerStyle);
-        $sheet->getRowDimension(1)->setRowHeight(22);
-        $sheet->freezePane('A2');
-        $sheet->setAutoFilter('A1:K' . $lastRow);
-
-        foreach (range('A', 'K') as $col) {
-            $sheet->getColumnDimension($col)->setAutoSize(true);
-            $sheet->getStyle($col . '1:' . $col . $lastRow)
-                ->getNumberFormat()
-                ->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
-        }
-        $sheet->getStyle('A2:K' . $lastRow)->getAlignment()->setVertical(
-            \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER
-        );
-
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment; filename="' . $baseName . '.xlsx"');
-        header('Cache-Control: max-age=0, no-cache, must-revalidate');
-        header('Pragma: public');
-        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-        $writer->save('php://output');
+        require_once BASE_PATH . '/helpers/SimpleTableXlsx.php';
+        SimpleTableXlsx::stream($baseName . '.xlsx', $headers, $rows, 'Students');
         exit;
     }
 
@@ -3048,38 +3084,27 @@ class StudentDeviceAttendanceController extends Controller {
         if (!$this->requireAccess()) {
             return;
         }
-        require_once BASE_PATH . '/vendor/autoload.php';
         $svc = $this->syncService();
         $filters = $this->filtersFromRequest();
-        $rows = $svc->attendanceModel()->exportDailyGrouped($filters);
+        $rowsRaw = $svc->attendanceModel()->exportDailyGrouped($filters);
 
-        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->fromArray(
-            ['Student ID', 'Employee No', 'Student Name', 'Date', 'In', 'Out', 'Others', 'Machine ID'],
-            null,
-            'A1'
-        );
-        $r = 2;
-        foreach ($rows as $row) {
-            $sheet->fromArray([
-                $row['student_id'] ?? '',
-                $row['employee_no'] ?? '',
-                $row['student_name'] ?? '',
-                $row['attendance_date'] ?? '',
-                $row['time_in'] ?? '',
-                $row['time_out'] ?? '',
-                $row['time_others'] ?? '',
-                $row['machine_id'] ?? '',
-            ], null, 'A' . $r);
-            $r++;
+        $headers = ['Student ID', 'Employee No', 'Student Name', 'Date', 'In', 'Out', 'Others', 'Machine ID'];
+        $rows = [];
+        foreach ($rowsRaw as $row) {
+            $rows[] = [
+                (string) ($row['student_id'] ?? ''),
+                (string) ($row['employee_no'] ?? ''),
+                (string) ($row['student_name'] ?? ''),
+                (string) ($row['attendance_date'] ?? ''),
+                (string) ($row['time_in'] ?? ''),
+                (string) ($row['time_out'] ?? ''),
+                (string) ($row['time_others'] ?? ''),
+                (string) ($row['machine_id'] ?? ''),
+            ];
         }
-        $filename = 'student_attendance_' . date('Y-m-d') . '.xlsx';
-        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Cache-Control: max-age=0');
-        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-        $writer->save('php://output');
+
+        require_once BASE_PATH . '/helpers/SimpleTableXlsx.php';
+        SimpleTableXlsx::stream('student_attendance_' . date('Y-m-d') . '.xlsx', $headers, $rows, 'Attendance');
         exit;
     }
 

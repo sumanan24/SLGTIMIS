@@ -316,6 +316,105 @@ class StudentDeviceAttendanceSyncService {
     }
 
     /**
+     * Quick sync: one device per HTTP request (today only). Use chunk 0..N-1.
+     *
+     * @return array{
+     *   ok:bool,done:bool,chunk:int,next_chunk:int,total:int,
+     *   host:string,label:string,role:string,
+     *   records_retrieved:int,saved:int,duplicates:int,finger_ids_linked:int,
+     *   message:string,skipped?:bool
+     * }
+     */
+    public function syncTodayChunk(int $chunkIndex, int $deviceTimeoutSec = 35): array {
+        $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
+        $tzName = !empty($cfg['timezone']) ? (string) $cfg['timezone'] : 'Asia/Colombo';
+        $tz = new DateTimeZone($tzName);
+        $today = new DateTimeImmutable('now', $tz);
+        $startImm = $today->setTime(0, 0, 0);
+        $endImm = $today->setTime(23, 59, 59);
+
+        $devices = $this->configuredDevices($cfg);
+        if ($devices === []) {
+            $devices = [[
+                'host' => $this->machine->getHost(),
+                'role' => 'main',
+                'label' => 'Main',
+                'username' => (string) ($cfg['username'] ?? 'admin'),
+                'password' => (string) ($cfg['password'] ?? ''),
+                'ssl' => !empty($cfg['ssl']),
+                'port' => (int) ($cfg['port'] ?? 0),
+                'timeout' => (int) ($cfg['timeout'] ?? 60),
+            ]];
+        }
+
+        $total = count($devices);
+        if ($total === 0) {
+            return [
+                'ok' => false,
+                'done' => true,
+                'chunk' => 0,
+                'next_chunk' => 0,
+                'total' => 0,
+                'host' => '',
+                'label' => '',
+                'role' => '',
+                'records_retrieved' => 0,
+                'saved' => 0,
+                'duplicates' => 0,
+                'finger_ids_linked' => 0,
+                'message' => 'No devices configured',
+                'skipped' => true,
+            ];
+        }
+
+        if ($chunkIndex < 0 || $chunkIndex >= $total) {
+            return [
+                'ok' => true,
+                'done' => true,
+                'chunk' => $chunkIndex,
+                'next_chunk' => $total,
+                'total' => $total,
+                'host' => '',
+                'label' => '',
+                'role' => '',
+                'records_retrieved' => 0,
+                'saved' => 0,
+                'duplicates' => 0,
+                'finger_ids_linked' => 0,
+                'message' => 'All chunks complete',
+                'skipped' => true,
+            ];
+        }
+
+        $device = $devices[$chunkIndex];
+        $part = $this->syncOneDevice(
+            $device,
+            $cfg,
+            $startImm,
+            $endImm,
+            max(20, min(50, $deviceTimeoutSec))
+        );
+
+        $next = $chunkIndex + 1;
+        return [
+            'ok' => !empty($part['ok']),
+            'done' => $next >= $total,
+            'chunk' => $chunkIndex,
+            'next_chunk' => $next,
+            'total' => $total,
+            'host' => (string) ($part['host'] ?? ''),
+            'label' => (string) ($part['label'] ?? ''),
+            'role' => (string) ($part['role'] ?? ''),
+            'records_retrieved' => (int) ($part['records_retrieved'] ?? 0),
+            'saved' => (int) ($part['saved'] ?? 0),
+            'duplicates' => (int) ($part['duplicates'] ?? 0),
+            'finger_ids_linked' => (int) ($part['finger_ids_linked'] ?? 0),
+            'message' => (string) ($part['message'] ?? ''),
+            'skipped' => false,
+        ];
+    }
+
+    /**
      * @param array<string,mixed> $cfg
      * @return list<array<string,mixed>>
      */

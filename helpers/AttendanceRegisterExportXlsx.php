@@ -24,7 +24,8 @@ class AttendanceRegisterExportXlsx {
 
         $root = dirname(__DIR__);
         $autoload = $root . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
-        $canPhps = is_readable($autoload) && class_exists('ZipArchive', false);
+        // PhpSpreadsheet 2.x requires PHP 8+; loading it on PHP 7.4 fatals on union types.
+        $canPhps = PHP_VERSION_ID >= 80000 && is_readable($autoload) && class_exists('ZipArchive', false);
 
         if ($canPhps) {
             require_once $autoload;
