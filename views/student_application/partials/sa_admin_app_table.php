@@ -29,16 +29,27 @@ function sa_admin_student_applications_render_table(
     int $filterCoursePriority = 1,
     bool $can_update_rejection_reason = false,
     string $update_reason_action = '',
-    string $rejection_reason_return_path = 'student-applications?tab=rejected'
+    string $rejection_reason_return_path = 'student-applications?tab=rejected',
+    array $filterActiveChoices = []
 ): void {
     $filterCoursePriority = in_array($filterCoursePriority, [1, 2, 3], true) ? $filterCoursePriority : 1;
+    $activeSet = [];
+    foreach ($filterActiveChoices as $n) {
+        $n = (int) $n;
+        if (in_array($n, [1, 2, 3], true)) {
+            $activeSet[$n] = true;
+        }
+    }
+    if ($activeSet === []) {
+        $activeSet[$filterCoursePriority] = true;
+    }
     $isRejectedTab = ($statusLabel === 'rejected');
     $colCount = $isRejectedTab ? 14 : 13;
-    $choiceThClass = static function (int $n) use ($filterCoursePriority): string {
-        return $n === $filterCoursePriority ? ' sa-apps-col-choice sa-apps-col-choice--active' : ' sa-apps-col-choice';
+    $choiceThClass = static function (int $n) use ($activeSet): string {
+        return isset($activeSet[$n]) ? ' sa-apps-col-choice sa-apps-col-choice--active' : ' sa-apps-col-choice';
     };
-    $choiceTdClass = static function (int $n) use ($filterCoursePriority): string {
-        return $n === $filterCoursePriority ? ' sa-apps-col-choice sa-apps-col-choice--active' : ' sa-apps-col-choice text-muted';
+    $choiceTdClass = static function (int $n) use ($activeSet): string {
+        return isset($activeSet[$n]) ? ' sa-apps-col-choice sa-apps-col-choice--active' : ' sa-apps-col-choice text-muted';
     };
     ?>
     <div class="table-responsive sa-apps-table-responsive">

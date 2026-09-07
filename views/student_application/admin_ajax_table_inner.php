@@ -16,10 +16,12 @@ if (!function_exists('sa_admin_student_applications_pagination')) {
 $can_update_rejection_reason = (bool) ($can_update_rejection_reason ?? false);
 $update_reason_action = isset($update_reason_action) ? (string) $update_reason_action : '';
 $rejection_reason_return_path = isset($rejection_reason_return_path) ? (string) $rejection_reason_return_path : 'student-applications?tab=rejected';
+$filter_active_choices = isset($filter_active_choices) && is_array($filter_active_choices) ? $filter_active_choices : [];
 $tableExtraArgs = [
     $can_update_rejection_reason,
     $update_reason_action,
     $rejection_reason_return_path,
+    $filter_active_choices,
 ];
 ?>
 <div class="sa-apps-table-mount-inner">

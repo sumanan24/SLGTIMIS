@@ -1823,44 +1823,129 @@ class StudentApplicationController extends Controller {
     }
 
     /**
-     * NVQ level + department + course filters for staff applications list (shared by admin index + AJAX table).
+     * NVQ level + per-choice department/course filters for staff applications list (shared by admin index + AJAX table).
      *
-     * @return array{level: ?string, dept_id: ?string, course_id: ?string, priority: int, language: ?string}
+     * Query params: dept1/course1, dept2/course2, dept3/course3 (AND when multiple set).
+     * Legacy: dept/course + prio=1|2|3 maps into that single choice slot.
+     *
+     * @return array{
+     *   level: ?string,
+     *   language: ?string,
+     *   choice_filters: array<int, array{dept_id: ?string, course_id: ?string}>,
+     *   dept_id: ?string,
+     *   course_id: ?string,
+     *   priority: int,
+     *   active_choices: list<int>
+     * }
      */
     private function studentApplicationsAdminListFilters(): array {
         $levelRaw = trim((string) $this->get('level', ''));
         $filterLevel = in_array($levelRaw, ['04', '05'], true) ? $levelRaw : null;
-        $deptRaw = trim((string) $this->get('dept', ''));
-        $courseRaw = trim((string) $this->get('course', ''));
-        $prioRaw = (int) $this->get('prio', '1');
-        $filterPriority = in_array($prioRaw, [1, 2, 3], true) ? $prioRaw : 1;
         require_once BASE_PATH . '/models/StudentApplicationModel.php';
         $filterLanguage = StudentApplicationModel::normalizedStaffLanguageFilter($this->get('lang', ''));
-        $filterDeptId = null;
-        $filterCourseId = null;
-        if ($deptRaw !== '') {
-            $deptModel = $this->model('DepartmentModel');
-            $drow = $deptModel->find($deptRaw);
-            if (!empty($drow['department_id'])) {
-                $filterDeptId = (string) $drow['department_id'];
-            }
-        }
-        if ($courseRaw !== '') {
-            $courseModel = $this->model('CourseModel');
-            $crow = $courseModel->find($courseRaw);
-            if (!empty($crow['course_id'])) {
-                $filterCourseId = (string) $crow['course_id'];
-                if ($filterDeptId !== null && (string) ($crow['department_id'] ?? '') !== $filterDeptId) {
-                    $filterCourseId = null;
+
+        $resolveSlot = function (?string $deptRaw, ?string $courseRaw): array {
+            $filterDeptId = null;
+            $filterCourseId = null;
+            $deptRaw = trim((string) ($deptRaw ?? ''));
+            $courseRaw = trim((string) ($courseRaw ?? ''));
+            if ($deptRaw !== '') {
+                $deptModel = $this->model('DepartmentModel');
+                $drow = $deptModel->find($deptRaw);
+                if (!empty($drow['department_id'])) {
+                    $filterDeptId = (string) $drow['department_id'];
                 }
+            }
+            if ($courseRaw !== '') {
+                $courseModel = $this->model('CourseModel');
+                $crow = $courseModel->find($courseRaw);
+                if (!empty($crow['course_id'])) {
+                    $filterCourseId = (string) $crow['course_id'];
+                    if ($filterDeptId !== null && (string) ($crow['department_id'] ?? '') !== $filterDeptId) {
+                        $filterCourseId = null;
+                    } elseif ($filterDeptId === null && !empty($crow['department_id'])) {
+                        $filterDeptId = (string) $crow['department_id'];
+                    }
+                }
+            }
+
+            return ['dept_id' => $filterDeptId, 'course_id' => $filterCourseId];
+        };
+
+        $choiceFilters = [
+            1 => ['dept_id' => null, 'course_id' => null],
+            2 => ['dept_id' => null, 'course_id' => null],
+            3 => ['dept_id' => null, 'course_id' => null],
+        ];
+        $hasMultiParams = false;
+        foreach ([1, 2, 3] as $n) {
+            $dRaw = trim((string) $this->get('dept' . $n, ''));
+            $cRaw = trim((string) $this->get('course' . $n, ''));
+            if ($dRaw !== '' || $cRaw !== '') {
+                $hasMultiParams = true;
+            }
+            $choiceFilters[$n] = $resolveSlot($dRaw, $cRaw);
+        }
+
+        if (!$hasMultiParams) {
+            $legacyDept = trim((string) $this->get('dept', ''));
+            $legacyCourse = trim((string) $this->get('course', ''));
+            $prioRaw = (int) $this->get('prio', '1');
+            $legacyPrio = in_array($prioRaw, [1, 2, 3], true) ? $prioRaw : 1;
+            if ($legacyDept !== '' || $legacyCourse !== '') {
+                $choiceFilters[$legacyPrio] = $resolveSlot($legacyDept, $legacyCourse);
             }
         }
 
-        return ['level' => $filterLevel, 'dept_id' => $filterDeptId, 'course_id' => $filterCourseId, 'priority' => $filterPriority, 'language' => $filterLanguage];
+        $activeChoices = [];
+        foreach ([1, 2, 3] as $n) {
+            if (($choiceFilters[$n]['dept_id'] ?? null) !== null || ($choiceFilters[$n]['course_id'] ?? null) !== null) {
+                $activeChoices[] = $n;
+            }
+        }
+        $primaryPriority = $activeChoices[0] ?? 1;
+        $primaryDept = $choiceFilters[$primaryPriority]['dept_id'] ?? null;
+        $primaryCourse = $choiceFilters[$primaryPriority]['course_id'] ?? null;
+
+        return [
+            'level' => $filterLevel,
+            'language' => $filterLanguage,
+            'choice_filters' => $choiceFilters,
+            'dept_id' => $primaryDept,
+            'course_id' => $primaryCourse,
+            'priority' => $primaryPriority,
+            'active_choices' => $activeChoices,
+        ];
+    }
+
+    /**
+     * Append dept1/course1…dept3/course3 (and omit legacy prio/dept/course) onto a query array.
+     *
+     * @param array<string, string> $q
+     * @param array<int, array{dept_id?:?string, course_id?:?string}> $choiceFilters
+     * @return array<string, string>
+     */
+    private function studentApplicationsAppendChoiceFilterQuery(array $q, array $choiceFilters): array {
+        unset($q['prio'], $q['dept'], $q['course']);
+        foreach ([1, 2, 3] as $n) {
+            $slot = is_array($choiceFilters[$n] ?? null) ? $choiceFilters[$n] : [];
+            $dept = trim((string) ($slot['dept_id'] ?? ''));
+            $course = trim((string) ($slot['course_id'] ?? ''));
+            if ($dept !== '') {
+                $q['dept' . $n] = $dept;
+            }
+            if ($course !== '') {
+                $q['course' . $n] = $course;
+            }
+        }
+
+        return $q;
     }
 
     /**
      * Relative URL for redirect back to the staff applications list (preserves tab filters).
+     *
+     * @param array<int, array{dept_id?:?string, course_id?:?string}>|null $choiceFilters
      */
     private function studentApplicationsAdminListReturnPath(
         string $tab,
@@ -1871,15 +1956,14 @@ class StudentApplicationController extends Controller {
         int $pageNew = 1,
         int $pageApproved = 1,
         int $pageRejected = 1,
-        ?string $filterLanguage = null
+        ?string $filterLanguage = null,
+        ?array $choiceFilters = null
     ): string {
         $tab = in_array($tab, ['approved', 'rejected'], true) ? $tab : 'new';
         $q = ['tab' => $tab];
         if ($filterLevel === '04' || $filterLevel === '05') {
             $q['level'] = $filterLevel;
         }
-        $filterPriority = in_array($filterPriority, [1, 2, 3], true) ? $filterPriority : 1;
-        $q['prio'] = (string) $filterPriority;
         if ($tab === 'new' && $pageNew > 1) {
             $q['pn'] = $pageNew;
         }
@@ -1889,15 +1973,22 @@ class StudentApplicationController extends Controller {
         if ($tab === 'rejected' && $pageRejected > 1) {
             $q['pr'] = $pageRejected;
         }
-        if ($filterDeptId !== null && $filterDeptId !== '') {
-            $q['dept'] = $filterDeptId;
-        }
-        if ($filterCourseId !== null && $filterCourseId !== '') {
-            $q['course'] = $filterCourseId;
-        }
         if ($filterLanguage !== null && $filterLanguage !== '') {
             $q['lang'] = $filterLanguage;
         }
+        if (is_array($choiceFilters)) {
+            $q = $this->studentApplicationsAppendChoiceFilterQuery($q, $choiceFilters);
+        } else {
+            $filterPriority = in_array($filterPriority, [1, 2, 3], true) ? $filterPriority : 1;
+            $slot = [
+                $filterPriority => [
+                    'dept_id' => $filterDeptId,
+                    'course_id' => $filterCourseId,
+                ],
+            ];
+            $q = $this->studentApplicationsAppendChoiceFilterQuery($q, $slot);
+        }
+
         return 'student-applications?' . http_build_query($q);
     }
 
@@ -1927,6 +2018,8 @@ class StudentApplicationController extends Controller {
         $filterCourseId = $filters['course_id'];
         $filterPriority = $filters['priority'];
         $filterLanguage = $filters['language'];
+        $choiceFilters = $filters['choice_filters'];
+        $activeChoices = $filters['active_choices'];
         $nicRaw = trim((string) $this->get('nic', ''));
 
         $tabRaw = strtolower(trim((string) $this->get('tab', '')));
@@ -1936,9 +2029,9 @@ class StudentApplicationController extends Controller {
         $excludeNicDrafts = $this->staffStudentAppsExcludeNicDrafts($userModel, $uid);
         $perPage = 20;
 
-        $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage);
-        $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage);
-        $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage);
+        $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters);
+        $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters);
+        $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters);
         $maxPageNew = max(1, (int) ceil($countNew / $perPage));
         $maxPageApproved = max(1, (int) ceil($countApproved / $perPage));
         $maxPageRejected = max(1, (int) ceil($countRejected / $perPage));
@@ -1948,13 +2041,13 @@ class StudentApplicationController extends Controller {
         $pageRejected = max(1, min((int) $this->get('pr', 1), $maxPageRejected));
 
         $applicationsNew = $activeTab === 'new'
-            ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage)
+            ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters)
             : [];
         $applicationsApproved = $activeTab === 'approved'
-            ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage)
+            ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters)
             : [];
         $applicationsRejected = $activeTab === 'rejected'
-            ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage)
+            ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters)
             : [];
 
         if (defined('BASE_PATH') && is_file(BASE_PATH . '/models/StudentModel.php')) {
@@ -1983,15 +2076,15 @@ class StudentApplicationController extends Controller {
         };
         $listBase = $appBase . '/student-applications';
         $activeView = 'table';
-        $makeListQuery = static function (?string $level, string $tab, int $pn, int $pa, int $pr, ?string $deptId, ?string $courseId, ?string $viewOverride = null, ?int $prio = null, ?string $language = null) use ($activeView, $filterPriority, $filterLanguage): array {
+        $appendChoice = function (array $q) use ($choiceFilters): array {
+            return $this->studentApplicationsAppendChoiceFilterQuery($q, $choiceFilters);
+        };
+        $makeListQuery = static function (?string $level, string $tab, int $pn, int $pa, int $pr, ?string $viewOverride = null, ?string $language = null) use ($activeView, $filterLanguage, $appendChoice): array {
             $tab = in_array($tab, ['approved', 'rejected'], true) ? $tab : 'new';
             $q = ['tab' => $tab];
             if ($level === '04' || $level === '05') {
                 $q['level'] = $level;
             }
-            $prioVal = $prio ?? $filterPriority;
-            $prioVal = in_array((int) $prioVal, [1, 2, 3], true) ? (int) $prioVal : 1;
-            $q['prio'] = (string) $prioVal;
             if ($tab === 'new' && $pn > 1) {
                 $q['pn'] = $pn;
             }
@@ -2001,12 +2094,6 @@ class StudentApplicationController extends Controller {
             if ($tab === 'rejected' && $pr > 1) {
                 $q['pr'] = $pr;
             }
-            if ($deptId !== null && $deptId !== '') {
-                $q['dept'] = $deptId;
-            }
-            if ($courseId !== null && $courseId !== '') {
-                $q['course'] = $courseId;
-            }
             $langVal = $language ?? $filterLanguage;
             if ($langVal !== null && $langVal !== '') {
                 $q['lang'] = $langVal;
@@ -2015,29 +2102,31 @@ class StudentApplicationController extends Controller {
             if ($effView === 'dashboard') {
                 $q['view'] = 'dashboard';
             }
-            return $q;
+            return $appendChoice($q);
         };
-        $buildListUrl = static function (?string $level, string $tab, int $pn = 1, int $pa = 1, int $pr = 1) use ($listBase, $esc, $makeListQuery, $filterDeptId, $filterCourseId, $filterPriority, $filterLanguage): string {
-            return $esc($listBase . '?' . http_build_query($makeListQuery($level, $tab, $pn, $pa, $pr, $filterDeptId, $filterCourseId, null, $filterPriority, $filterLanguage)));
+        $buildListUrl = static function (?string $level, string $tab, int $pn = 1, int $pa = 1, int $pr = 1) use ($listBase, $esc, $makeListQuery): string {
+            return $esc($listBase . '?' . http_build_query($makeListQuery($level, $tab, $pn, $pa, $pr)));
         };
 
+        $prioLabels = [1 => '1st choice', 2 => '2nd choice', 3 => '3rd choice'];
         $ctxParts = [];
         if ($filterLevel !== null) {
             $ctxParts[] = 'NVQ Level ' . $esc($filterLevel);
         }
-        if ($filterPriority !== 1) {
-            $prioLabels = [1 => '1st choice', 2 => '2nd choice', 3 => '3rd choice'];
-            $ctxParts[] = $prioLabels[$filterPriority] ?? 'Course choice';
-        }
-        if ($filterPriority !== 1) {
-            $prioLabels = [1 => '1st choice', 2 => '2nd choice', 3 => '3rd choice'];
-            $ctxParts[] = $prioLabels[$filterPriority] ?? 'Course choice';
-        }
-        if ($filterDeptId !== null) {
-            $ctxParts[] = 'Department';
-        }
-        if ($filterCourseId !== null) {
-            $ctxParts[] = 'Course';
+        foreach ([1, 2, 3] as $n) {
+            $slot = $choiceFilters[$n] ?? [];
+            $hasDept = ($slot['dept_id'] ?? null) !== null;
+            $hasCourse = ($slot['course_id'] ?? null) !== null;
+            if ($hasDept || $hasCourse) {
+                $bits = [];
+                if ($hasDept) {
+                    $bits[] = 'dept';
+                }
+                if ($hasCourse) {
+                    $bits[] = 'course';
+                }
+                $ctxParts[] = ($prioLabels[$n] ?? ('Choice ' . $n)) . ' (' . implode('/', $bits) . ')';
+            }
         }
         if ($filterLanguage !== null && $filterLanguage !== '') {
             $ctxParts[] = $esc($filterLanguage);
@@ -2058,7 +2147,8 @@ class StudentApplicationController extends Controller {
             $pageNew,
             $pageApproved,
             $pageRejected,
-            $filterLanguage
+            $filterLanguage,
+            $choiceFilters
         );
         $applications_new = $applicationsNew;
         $applications_approved = $applicationsApproved;
@@ -2075,6 +2165,7 @@ class StudentApplicationController extends Controller {
         $active_tab = $activeTab;
         $filter_level = $filterLevel;
         $filter_course_priority = $filterPriority;
+        $filter_active_choices = $activeChoices;
         $per_page = $perPage;
         ob_start();
         require BASE_PATH . '/views/student_application/admin_ajax_table_inner.php';
@@ -2118,6 +2209,8 @@ class StudentApplicationController extends Controller {
         $filterCourseId = $filters['course_id'];
         $filterPriority = $filters['priority'];
         $filterLanguage = $filters['language'];
+        $choiceFilters = $filters['choice_filters'];
+        $activeChoices = $filters['active_choices'];
         $tabRaw = strtolower(trim((string) $this->get('tab', '')));
         $activeTab = in_array($tabRaw, ['approved', 'rejected'], true) ? $tabRaw : 'new';
 
@@ -2125,12 +2218,12 @@ class StudentApplicationController extends Controller {
         $activeView = $viewRaw === 'dashboard' ? 'dashboard' : 'table';
 
         $perPage = 20;
-        $dashboardStats = $model->getDashboardStats($filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage);
+        $dashboardStats = $model->getDashboardStats($filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage, $choiceFilters);
 
         if ($activeView === 'table') {
-            $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage);
-            $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage);
-            $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage);
+            $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage, $choiceFilters);
+            $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage, $choiceFilters);
+            $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage, $choiceFilters);
             $maxPageNew = max(1, (int) ceil($countNew / $perPage));
             $maxPageApproved = max(1, (int) ceil($countApproved / $perPage));
             $maxPageRejected = max(1, (int) ceil($countRejected / $perPage));
@@ -2139,13 +2232,13 @@ class StudentApplicationController extends Controller {
             $pageRejected = max(1, min((int) $this->get('pr', 1), $maxPageRejected));
 
             $applicationsNew = $activeTab === 'new'
-                ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage)
+                ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage, $choiceFilters)
                 : [];
             $applicationsApproved = $activeTab === 'approved'
-                ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage)
+                ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage, $choiceFilters)
                 : [];
             $applicationsRejected = $activeTab === 'rejected'
-                ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage)
+                ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage, $choiceFilters)
                 : [];
         } else {
             $countNew = 0;
@@ -2162,6 +2255,17 @@ class StudentApplicationController extends Controller {
             $applicationsRejected = [];
         }
 
+        $courseModel = $this->model('CourseModel');
+        $nvqForCourses = $filterLevel === '04' ? '4' : ($filterLevel === '05' ? '5' : null);
+        $filterCoursesByChoice = [];
+        foreach ([1, 2, 3] as $n) {
+            $slotDept = $choiceFilters[$n]['dept_id'] ?? null;
+            $filterCoursesByChoice[$n] = $courseModel->getCoursesWithDepartment([
+                'department_id' => $slotDept,
+                'nvq_level' => $nvqForCourses,
+            ]);
+        }
+
         return $this->view('student_application/admin_index', [
             'title' => 'Online applications',
             'page' => 'student-applications',
@@ -2169,15 +2273,13 @@ class StudentApplicationController extends Controller {
             'filter_department_id' => $filterDeptId,
             'filter_course_id' => $filterCourseId,
             'filter_course_priority' => $filterPriority,
+            'filter_choice_filters' => $choiceFilters,
+            'filter_active_choices' => $activeChoices,
             'filter_language' => $filterLanguage,
             'ajax_table_url' => rtrim(APP_URL, '/') . '/student-applications/ajax-table',
-            // Filter dropdowns: load full catalogue (not just values used by applications).
             'filter_departments' => $this->model('DepartmentModel')->getAll(),
-            'filter_courses' => $this->model('CourseModel')->getCoursesWithDepartment([
-                'department_id' => $filterDeptId,
-                // application_level 04/05 corresponds to course_nvq_level 4/5
-                'nvq_level' => $filterLevel === '04' ? '4' : ($filterLevel === '05' ? '5' : null),
-            ]),
+            'filter_courses' => $filterCoursesByChoice[1] ?? [],
+            'filter_courses_by_choice' => $filterCoursesByChoice,
             'active_view' => $activeView,
             'active_tab' => $activeTab,
             'per_page' => $perPage,
@@ -2207,7 +2309,8 @@ class StudentApplicationController extends Controller {
                 $pageNew,
                 $pageApproved,
                 $pageRejected,
-                $filterLanguage
+                $filterLanguage,
+                $choiceFilters
             ),
             'staff_whatsapp' => $this->staffOnlineApplicationsWhatsAppShortcut(),
             'use_public_layout' => false,
@@ -3000,10 +3103,11 @@ class StudentApplicationController extends Controller {
         $filterCourseId = $filters['course_id'];
         $filterPriority = $filters['priority'];
         $filterLanguage = $filters['language'];
+        $choiceFilters = $filters['choice_filters'];
 
         $model = $this->model('StudentApplicationModel');
         $excludeNicDrafts = $this->staffStudentAppsExcludeNicDrafts($userModel, $uid);
-        $stats = $model->getDashboardStats($filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage);
+        $stats = $model->getDashboardStats($filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, null, $filterPriority, $filterLanguage, $choiceFilters);
 
         $prioLabels = [1 => '1st choice', 2 => '2nd choice', 3 => '3rd choice'];
         $rows = [];
@@ -3058,16 +3162,28 @@ class StudentApplicationController extends Controller {
         if ($filterLevel !== null) {
             $summaryParts[] = 'NVQ Level ' . $filterLevel;
         }
-        $summaryParts[] = ($prioLabels[$filterPriority] ?? '1st choice');
-        if ($filterDeptId !== null) {
-            $deptModel = $this->model('DepartmentModel');
-            $drow = $deptModel->find($filterDeptId);
-            $summaryParts[] = 'Dept: ' . trim((string) ($drow['department_name'] ?? $filterDeptId));
+        $deptModel = $this->model('DepartmentModel');
+        $courseModel = $this->model('CourseModel');
+        foreach ([1, 2, 3] as $n) {
+            $slot = $choiceFilters[$n] ?? [];
+            $slotDept = $slot['dept_id'] ?? null;
+            $slotCourse = $slot['course_id'] ?? null;
+            if ($slotDept === null && $slotCourse === null) {
+                continue;
+            }
+            $bits = [$prioLabels[$n] ?? ('Choice ' . $n)];
+            if ($slotDept !== null) {
+                $drow = $deptModel->find($slotDept);
+                $bits[] = 'Dept: ' . trim((string) ($drow['department_name'] ?? $slotDept));
+            }
+            if ($slotCourse !== null) {
+                $crow = $courseModel->find($slotCourse);
+                $bits[] = 'Course: ' . trim((string) ($crow['course_name'] ?? $slotCourse));
+            }
+            $summaryParts[] = implode(' · ', $bits);
         }
-        if ($filterCourseId !== null) {
-            $courseModel = $this->model('CourseModel');
-            $crow = $courseModel->find($filterCourseId);
-            $summaryParts[] = 'Course: ' . trim((string) ($crow['course_name'] ?? $filterCourseId));
+        if ($filterLanguage !== null && $filterLanguage !== '') {
+            $summaryParts[] = $filterLanguage;
         }
         $filterSummary = implode(' · ', $summaryParts);
 
@@ -3135,33 +3251,14 @@ class StudentApplicationController extends Controller {
         $model = $this->model('StudentApplicationModel');
         $statusParam = strtolower(trim((string) $this->get('status', '')));
         $exportStatus = in_array($statusParam, ['new', 'approved', 'rejected'], true) ? $statusParam : null;
-        $levelRaw = trim((string) $this->get('level', ''));
-        $exportLevel = in_array($levelRaw, ['04', '05'], true) ? $levelRaw : null;
-        $deptRaw = trim((string) $this->get('dept', ''));
-        $courseRaw = trim((string) $this->get('course', ''));
-        $exportDeptId = null;
-        $exportCourseId = null;
-        $prioRaw = (int) $this->get('prio', '1');
-        $exportPriority = in_array($prioRaw, [1, 2, 3], true) ? $prioRaw : 1;
-        $exportLanguage = StudentApplicationModel::normalizedStaffLanguageFilter($this->get('lang', ''));
-        if ($deptRaw !== '') {
-            $deptModel = $this->model('DepartmentModel');
-            $drow = $deptModel->find($deptRaw);
-            if (!empty($drow['department_id'])) {
-                $exportDeptId = (string) $drow['department_id'];
-            }
-        }
-        if ($courseRaw !== '') {
-            $courseModel = $this->model('CourseModel');
-            $crow = $courseModel->find($courseRaw);
-            if (!empty($crow['course_id'])) {
-                $exportCourseId = (string) $crow['course_id'];
-                if ($exportDeptId !== null && (string) ($crow['department_id'] ?? '') !== $exportDeptId) {
-                    $exportCourseId = null;
-                }
-            }
-        }
-        $rows = $model->getAllForStaffExport($exportStatus, $exportLevel, $exportDeptId, $exportCourseId, $excludeNicDrafts, $exportNicRaw, $exportPriority, $exportLanguage);
+        $filters = $this->studentApplicationsAdminListFilters();
+        $exportLevel = $filters['level'];
+        $exportDeptId = $filters['dept_id'];
+        $exportCourseId = $filters['course_id'];
+        $exportPriority = $filters['priority'];
+        $exportLanguage = $filters['language'];
+        $choiceFilters = $filters['choice_filters'];
+        $rows = $model->getAllForStaffExport($exportStatus, $exportLevel, $exportDeptId, $exportCourseId, $excludeNicDrafts, $exportNicRaw, $exportPriority, $exportLanguage, $choiceFilters);
         $allCols = StudentApplicationModel::getStaffExportColumnOrder();
         $colLabels = StudentApplicationModel::getStaffExportColumnLabels();
         $colsParam = trim((string) $this->get('cols', ''));

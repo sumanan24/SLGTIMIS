@@ -55,9 +55,39 @@ $active_view = $active_view === 'dashboard' ? 'dashboard' : 'table';
 $filter_department_id = isset($filter_department_id) && trim((string) $filter_department_id) !== '' ? trim((string) $filter_department_id) : null;
 /** @var string|null $filter_course_id */
 $filter_course_id = isset($filter_course_id) && trim((string) $filter_course_id) !== '' ? trim((string) $filter_course_id) : null;
-/** @var int $filter_course_priority 1, 2, or 3 */
+/** @var int $filter_course_priority 1, 2, or 3 (primary active slot for table highlight fallback) */
 $filter_course_priority = (int) ($filter_course_priority ?? 1);
 $filter_course_priority = in_array($filter_course_priority, [1, 2, 3], true) ? $filter_course_priority : 1;
+/** @var array<int, array{dept_id: ?string, course_id: ?string}> $filter_choice_filters */
+$filter_choice_filters = isset($filter_choice_filters) && is_array($filter_choice_filters) ? $filter_choice_filters : [
+    1 => ['dept_id' => null, 'course_id' => null],
+    2 => ['dept_id' => null, 'course_id' => null],
+    3 => ['dept_id' => null, 'course_id' => null],
+];
+foreach ([1, 2, 3] as $_n) {
+    if (!isset($filter_choice_filters[$_n]) || !is_array($filter_choice_filters[$_n])) {
+        $filter_choice_filters[$_n] = ['dept_id' => null, 'course_id' => null];
+    }
+    $d = trim((string) ($filter_choice_filters[$_n]['dept_id'] ?? ''));
+    $c = trim((string) ($filter_choice_filters[$_n]['course_id'] ?? ''));
+    $filter_choice_filters[$_n] = [
+        'dept_id' => $d !== '' ? $d : null,
+        'course_id' => $c !== '' ? $c : null,
+    ];
+}
+/** @var list<int> $filter_active_choices */
+$filter_active_choices = isset($filter_active_choices) && is_array($filter_active_choices)
+    ? array_values(array_filter(array_map('intval', $filter_active_choices), static function ($n) {
+        return in_array($n, [1, 2, 3], true);
+    }))
+    : [];
+if ($filter_active_choices === []) {
+    foreach ([1, 2, 3] as $_n) {
+        if (($filter_choice_filters[$_n]['dept_id'] ?? null) !== null || ($filter_choice_filters[$_n]['course_id'] ?? null) !== null) {
+            $filter_active_choices[] = $_n;
+        }
+    }
+}
 /** @var string|null $filter_language Tamil, Sinhala, English, or null */
 $filter_language = isset($filter_language) && $filter_language !== '' ? (string) $filter_language : null;
 if ($filter_language !== null && !in_array($filter_language, StudentApplicationModel::STAFF_LANGUAGE_FILTER_VALUES, true)) {
@@ -67,6 +97,12 @@ if ($filter_language !== null && !in_array($filter_language, StudentApplicationM
 $filter_departments = $filter_departments ?? [];
 /** @var list<array{course_id: string, course_name: string}> $filter_courses */
 $filter_courses = $filter_courses ?? [];
+/** @var array<int, list<array{course_id: string, course_name: string}>> $filter_courses_by_choice */
+$filter_courses_by_choice = isset($filter_courses_by_choice) && is_array($filter_courses_by_choice) ? $filter_courses_by_choice : [
+    1 => $filter_courses,
+    2 => [],
+    3 => [],
+];
 /** @var string $ajax_table_url JSON endpoint for NIC-filtered table refresh */
 $ajax_table_url = isset($ajax_table_url) && trim((string) $ajax_table_url) !== '' ? trim((string) $ajax_table_url) : '';
 
@@ -104,15 +140,28 @@ $formatSubmitted = static function (?string $createdAt) use ($esc): array {
 };
 
 $listBase = $appBase . '/student-applications';
-$makeListQuery = static function (?string $level, string $tab, int $pn, int $pa, int $pr, ?string $deptId, ?string $courseId, ?string $viewOverride = null, ?int $prio = null, ?string $language = null) use ($active_view, $filter_course_priority, $filter_language): array {
+$appendChoiceQuery = static function (array $q, array $choices): array {
+    unset($q['prio'], $q['dept'], $q['course']);
+    foreach ([1, 2, 3] as $n) {
+        $slot = is_array($choices[$n] ?? null) ? $choices[$n] : [];
+        $dept = trim((string) ($slot['dept_id'] ?? ''));
+        $course = trim((string) ($slot['course_id'] ?? ''));
+        if ($dept !== '') {
+            $q['dept' . $n] = $dept;
+        }
+        if ($course !== '') {
+            $q['course' . $n] = $course;
+        }
+    }
+
+    return $q;
+};
+$makeListQuery = static function (?string $level, string $tab, int $pn, int $pa, int $pr, ?array $choices = null, ?string $viewOverride = null, ?string $language = null) use ($active_view, $filter_choice_filters, $filter_language, $appendChoiceQuery): array {
     $tab = in_array($tab, ['approved', 'rejected'], true) ? $tab : 'new';
     $q = ['tab' => $tab];
     if ($level === '04' || $level === '05') {
         $q['level'] = $level;
     }
-    $prioVal = $prio ?? $filter_course_priority;
-    $prioVal = in_array((int) $prioVal, [1, 2, 3], true) ? (int) $prioVal : 1;
-    $q['prio'] = (string) $prioVal;
     if ($tab === 'new' && $pn > 1) {
         $q['pn'] = $pn;
     }
@@ -122,13 +171,10 @@ $makeListQuery = static function (?string $level, string $tab, int $pn, int $pa,
     if ($tab === 'rejected' && $pr > 1) {
         $q['pr'] = $pr;
     }
-    if ($deptId !== null && $deptId !== '') {
-        $q['dept'] = $deptId;
+    $langVal = $language;
+    if ($langVal === null) {
+        $langVal = $filter_language;
     }
-    if ($courseId !== null && $courseId !== '') {
-        $q['course'] = $courseId;
-    }
-    $langVal = $language ?? $filter_language;
     if ($langVal !== null && $langVal !== '') {
         $q['lang'] = $langVal;
     }
@@ -136,17 +182,28 @@ $makeListQuery = static function (?string $level, string $tab, int $pn, int $pa,
     if ($effView === 'dashboard') {
         $q['view'] = 'dashboard';
     }
-    return $q;
+    $useChoices = is_array($choices) ? $choices : $filter_choice_filters;
+
+    return $appendChoiceQuery($q, $useChoices);
 };
-$buildListUrl = static function (?string $level, string $tab, int $pn = 1, int $pa = 1, int $pr = 1) use ($listBase, $esc, $makeListQuery, $filter_department_id, $filter_course_id, $filter_course_priority, $filter_language): string {
-    return $esc($listBase . '?' . http_build_query($makeListQuery($level, $tab, $pn, $pa, $pr, $filter_department_id, $filter_course_id, null, $filter_course_priority, $filter_language)));
+$withChoiceSlot = static function (array $choices, int $n, ?string $deptId, ?string $courseId): array {
+    $out = $choices;
+    $out[$n] = [
+        'dept_id' => ($deptId !== null && trim($deptId) !== '') ? trim($deptId) : null,
+        'course_id' => ($courseId !== null && trim($courseId) !== '') ? trim($courseId) : null,
+    ];
+
+    return $out;
+};
+$buildListUrl = static function (?string $level, string $tab, int $pn = 1, int $pa = 1, int $pr = 1) use ($listBase, $esc, $makeListQuery): string {
+    return $esc($listBase . '?' . http_build_query($makeListQuery($level, $tab, $pn, $pa, $pr)));
 };
 $listUrlFromParts = static function (array $q) use ($listBase, $esc): string {
     return $esc($listBase . '?' . http_build_query($q));
 };
 
 $excelBase = $appBase . '/student-applications/export-excel';
-$excelUrl = static function (?string $status, ?string $level) use ($excelBase, $esc, $filter_department_id, $filter_course_id, $filter_course_priority, $filter_language): string {
+$excelUrl = static function (?string $status, ?string $level) use ($excelBase, $esc, $filter_choice_filters, $filter_language, $appendChoiceQuery): string {
     $q = [];
     if ($status === 'new' || $status === 'approved' || $status === 'rejected') {
         $q['status'] = $status;
@@ -154,39 +211,27 @@ $excelUrl = static function (?string $status, ?string $level) use ($excelBase, $
     if ($level === '04' || $level === '05') {
         $q['level'] = $level;
     }
-    $q['prio'] = (string) $filter_course_priority;
-    if ($filter_department_id !== null && $filter_department_id !== '') {
-        $q['dept'] = $filter_department_id;
-    }
-    if ($filter_course_id !== null && $filter_course_id !== '') {
-        $q['course'] = $filter_course_id;
-    }
     if ($filter_language !== null && $filter_language !== '') {
         $q['lang'] = $filter_language;
     }
+    $q = $appendChoiceQuery($q, $filter_choice_filters);
     $qs = http_build_query($q);
     return $esc($excelBase . ($qs !== '' ? '?' . $qs : ''));
 };
 
 $dashPdfBase = $appBase . '/student-applications/export-dashboard-pdf';
-$dashPdfUrl = static function (string $block, ?int $choice = null) use ($dashPdfBase, $esc, $filter_level, $filter_department_id, $filter_course_id, $filter_course_priority, $filter_language): string {
+$dashPdfUrl = static function (string $block, ?int $choice = null) use ($dashPdfBase, $esc, $filter_level, $filter_choice_filters, $filter_language, $appendChoiceQuery): string {
     $q = ['block' => $block];
     if ($choice !== null && in_array($choice, [1, 2, 3], true)) {
         $q['choice'] = (string) $choice;
     }
-    $q['prio'] = (string) $filter_course_priority;
     if ($filter_level === '04' || $filter_level === '05') {
         $q['level'] = $filter_level;
-    }
-    if ($filter_department_id !== null && $filter_department_id !== '') {
-        $q['dept'] = $filter_department_id;
-    }
-    if ($filter_course_id !== null && $filter_course_id !== '') {
-        $q['course'] = $filter_course_id;
     }
     if ($filter_language !== null && $filter_language !== '') {
         $q['lang'] = $filter_language;
     }
+    $q = $appendChoiceQuery($q, $filter_choice_filters);
 
     return $esc($dashPdfBase . '?' . http_build_query($q));
 };
@@ -232,14 +277,20 @@ $ctxParts = [];
 if ($filter_level !== null) {
     $ctxParts[] = 'NVQ Level ' . $esc($filter_level);
 }
-if ($filter_department_id !== null) {
-    $ctxParts[] = 'Department';
-}
-if ($filter_course_id !== null) {
-    $ctxParts[] = 'Course';
-}
-if ($filter_course_priority !== 1) {
-    $ctxParts[] = $prioLabels[$filter_course_priority] ?? 'Course choice';
+foreach ([1, 2, 3] as $n) {
+    $slot = $filter_choice_filters[$n] ?? [];
+    $hasDept = ($slot['dept_id'] ?? null) !== null;
+    $hasCourse = ($slot['course_id'] ?? null) !== null;
+    if ($hasDept || $hasCourse) {
+        $bits = [];
+        if ($hasDept) {
+            $bits[] = 'dept';
+        }
+        if ($hasCourse) {
+            $bits[] = 'course';
+        }
+        $ctxParts[] = ($prioLabels[$n] ?? ('Choice ' . $n)) . ' (' . implode('/', $bits) . ')';
+    }
 }
 if ($filter_language !== null && $filter_language !== '') {
     $ctxParts[] = $esc($filter_language);
@@ -248,7 +299,7 @@ if ($ctxParts !== []) {
     $filterContextSuffix = ' · ' . implode(' · ', $ctxParts);
 }
 ?>
-<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=23">
+<link rel="stylesheet" href="<?php echo $saAdminCss; ?>?v=24">
 <div class="sa-admin-page sa-student-apps-index container-fluid py-3 px-lg-4<?php echo $active_view === 'dashboard' ? ' sa-page-dashboard' : ''; ?>">
     <header class="sa-apps-page-header mb-4 pb-2 border-bottom<?php echo $active_view === 'dashboard' ? ' sa-apps-page-header--dash' : ''; ?>">
         <h1 class="h4 mb-0 fw-semibold text-dark"><i class="fas fa-file-alt me-2 text-primary" aria-hidden="true"></i>Online applications</h1>
@@ -260,14 +311,14 @@ if ($ctxParts !== []) {
             <ul class="nav nav-pills sa-apps-viewnav flex-nowrap px-3 pt-2 pb-2 gap-1" role="tablist">
                 <li class="nav-item" role="presentation">
                     <a class="nav-link text-nowrap py-2 px-3<?php echo $active_view === 'dashboard' ? ' active' : ''; ?>"
-                       href="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $filter_department_id, $filter_course_id, 'dashboard')); ?>"
+                       href="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, null, 'dashboard')); ?>"
                        <?php echo $active_view === 'dashboard' ? 'aria-current="page"' : ''; ?>>
                         <i class="fas fa-chart-pie me-1" aria-hidden="true"></i>Application dashboard
                     </a>
                 </li>
                 <li class="nav-item" role="presentation">
                     <a class="nav-link text-nowrap py-2 px-3<?php echo $active_view === 'table' ? ' active' : ''; ?>"
-                       href="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $filter_department_id, $filter_course_id, 'table')); ?>"
+                       href="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, null, 'table')); ?>"
                        <?php echo $active_view === 'table' ? 'aria-current="page"' : ''; ?>>
                         <i class="fas fa-table me-1" aria-hidden="true"></i>Application table
                     </a>
@@ -283,50 +334,51 @@ if ($ctxParts !== []) {
                             <option value="<?php echo $buildListUrl('05', $active_tab, 1, 1, 1); ?>"<?php echo $filter_level === '05' ? ' selected' : ''; ?>>Level 05</option>
                         </select>
                     </div>
-                    <div class="d-flex flex-column gap-1 sa-apps-filter-field">
-                        <label for="saPrioSelect" class="form-label small text-secondary text-uppercase mb-0 fw-semibold">Course choice</label>
-                        <select id="saPrioSelect" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="Filter by course priority (1st, 2nd, or 3rd choice)">
-                            <?php foreach ([1 => '1st choice', 2 => '2nd choice', 3 => '3rd choice'] as $pv => $plbl): ?>
-                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $filter_department_id, $filter_course_id, null, $pv)); ?>"<?php echo $filter_course_priority === $pv ? ' selected' : ''; ?>><?php echo $esc($plbl); ?></option>
-                            <?php endforeach; ?>
-                        </select>
+                    <?php foreach ([1 => '1st choice', 2 => '2nd choice', 3 => '3rd choice'] as $choiceN => $choiceLbl): ?>
+                    <?php
+                    $slotDept = $filter_choice_filters[$choiceN]['dept_id'] ?? null;
+                    $slotCourse = $filter_choice_filters[$choiceN]['course_id'] ?? null;
+                    $slotCourses = $filter_courses_by_choice[$choiceN] ?? [];
+                    ?>
+                    <div class="d-flex flex-wrap align-items-end gap-2 sa-apps-choice-filter" role="group" aria-label="<?php echo $esc($choiceLbl); ?> filters">
+                        <div class="d-flex flex-column gap-1 sa-apps-filter-field">
+                            <label for="saDeptSelect<?php echo (int) $choiceN; ?>" class="form-label small text-secondary text-uppercase mb-0 fw-semibold"><?php echo $esc($choiceLbl); ?> · Dept</label>
+                            <select id="saDeptSelect<?php echo (int) $choiceN; ?>" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="<?php echo $esc($choiceLbl); ?> department">
+                                <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $withChoiceSlot($filter_choice_filters, $choiceN, null, null))); ?>"<?php echo $slotDept === null ? ' selected' : ''; ?>>All departments</option>
+                                <?php foreach ($filter_departments as $fd): ?>
+                                <?php
+                                $did = (string) ($fd['department_id'] ?? '');
+                                if ($did === '') {
+                                    continue;
+                                }
+                                ?>
+                                <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $withChoiceSlot($filter_choice_filters, $choiceN, $did, null))); ?>"<?php echo $slotDept === $did ? ' selected' : ''; ?>><?php echo $esc((string) ($fd['department_name'] ?? '')); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="d-flex flex-column gap-1 sa-apps-filter-field">
+                            <label for="saCourseSelect<?php echo (int) $choiceN; ?>" class="form-label small text-secondary text-uppercase mb-0 fw-semibold"><?php echo $esc($choiceLbl); ?> · Course</label>
+                            <select id="saCourseSelect<?php echo (int) $choiceN; ?>" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="<?php echo $esc($choiceLbl); ?> course">
+                                <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $withChoiceSlot($filter_choice_filters, $choiceN, $slotDept, null))); ?>"<?php echo $slotCourse === null ? ' selected' : ''; ?>>All courses</option>
+                                <?php foreach ($slotCourses as $fc): ?>
+                                <?php
+                                $cid = (string) ($fc['course_id'] ?? '');
+                                if ($cid === '') {
+                                    continue;
+                                }
+                                ?>
+                                <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $withChoiceSlot($filter_choice_filters, $choiceN, $slotDept, $cid))); ?>"<?php echo $slotCourse === $cid ? ' selected' : ''; ?>><?php echo $esc((string) ($fc['course_name'] ?? '')); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
                     </div>
-                    <div class="d-flex flex-column gap-1 sa-apps-filter-field">
-                        <label for="saDeptSelect" class="form-label small text-secondary text-uppercase mb-0 fw-semibold">Department</label>
-                        <select id="saDeptSelect" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="Filter by department for selected course choice">
-                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, null, null, null, $filter_course_priority)); ?>"<?php echo $filter_department_id === null ? ' selected' : ''; ?>>All departments</option>
-                            <?php foreach ($filter_departments as $fd): ?>
-                            <?php
-                            $did = (string) ($fd['department_id'] ?? '');
-                            if ($did === '') {
-                                continue;
-                            }
-                            ?>
-                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $did, null, null, $filter_course_priority)); ?>"<?php echo $filter_department_id === $did ? ' selected' : ''; ?>><?php echo $esc((string) ($fd['department_name'] ?? '')); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="d-flex flex-column gap-1 sa-apps-filter-field">
-                        <label for="saCourseSelect" class="form-label small text-secondary text-uppercase mb-0 fw-semibold">Course</label>
-                        <select id="saCourseSelect" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="Filter by course for selected course choice">
-                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $filter_department_id, null, null, $filter_course_priority)); ?>"<?php echo $filter_course_id === null ? ' selected' : ''; ?>>All courses</option>
-                            <?php foreach ($filter_courses as $fc): ?>
-                            <?php
-                            $cid = (string) ($fc['course_id'] ?? '');
-                            if ($cid === '') {
-                                continue;
-                            }
-                            ?>
-                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $filter_department_id, $cid, null, $filter_course_priority)); ?>"<?php echo $filter_course_id === $cid ? ' selected' : ''; ?>><?php echo $esc((string) ($fc['course_name'] ?? '')); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
+                    <?php endforeach; ?>
                     <div class="d-flex flex-column gap-1 sa-apps-filter-field">
                         <label for="saLangSelect" class="form-label small text-secondary text-uppercase mb-0 fw-semibold">Language</label>
                         <select id="saLangSelect" class="form-select form-select-sm sa-app-filter-select" data-sa-filter-nav="1" aria-label="Filter by applicant language">
-                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $filter_department_id, $filter_course_id, null, $filter_course_priority, null)); ?>"<?php echo $filter_language === null ? ' selected' : ''; ?>>All languages</option>
+                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, null, null, '')); ?>"<?php echo $filter_language === null ? ' selected' : ''; ?>>All languages</option>
                             <?php foreach (StudentApplicationModel::STAFF_LANGUAGE_FILTER_VALUES as $langOpt): ?>
-                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, $filter_department_id, $filter_course_id, null, $filter_course_priority, $langOpt)); ?>"<?php echo $filter_language === $langOpt ? ' selected' : ''; ?>><?php echo $esc($langOpt); ?></option>
+                            <option value="<?php echo $listUrlFromParts($makeListQuery($filter_level, $active_tab, 1, 1, 1, null, null, $langOpt)); ?>"<?php echo $filter_language === $langOpt ? ' selected' : ''; ?>><?php echo $esc($langOpt); ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -534,14 +586,19 @@ if ($ctxParts !== []) {
                  data-sa-pa="<?php echo (int) $page_approved; ?>"
                  data-sa-pr="<?php echo (int) $page_rejected; ?>"
                  <?php if ($filter_level !== null): ?>data-sa-level="<?php echo $esc($filter_level); ?>"<?php endif; ?>
-                 <?php if ($filter_department_id !== null && $filter_department_id !== ''): ?>data-sa-dept="<?php echo $esc($filter_department_id); ?>"<?php endif; ?>
-                 <?php if ($filter_course_id !== null && $filter_course_id !== ''): ?>data-sa-course="<?php echo $esc($filter_course_id); ?>"<?php endif; ?>
-                 data-sa-prio="<?php echo (int) $filter_course_priority; ?>"
+                 <?php foreach ([1, 2, 3] as $n): ?>
+                 <?php
+                 $mountDept = $filter_choice_filters[$n]['dept_id'] ?? null;
+                 $mountCourse = $filter_choice_filters[$n]['course_id'] ?? null;
+                 ?>
+                 <?php if ($mountDept !== null && $mountDept !== ''): ?>data-sa-dept<?php echo (int) $n; ?>="<?php echo $esc($mountDept); ?>"<?php endif; ?>
+                 <?php if ($mountCourse !== null && $mountCourse !== ''): ?>data-sa-course<?php echo (int) $n; ?>="<?php echo $esc($mountCourse); ?>"<?php endif; ?>
+                 <?php endforeach; ?>
                  <?php if ($filter_language !== null && $filter_language !== ''): ?>data-sa-lang="<?php echo $esc($filter_language); ?>"<?php endif; ?>>
                 <?php
                 $ajax_pagination = true;
                 $rejection_reason_return_path = 'student-applications?' . http_build_query(
-                    $makeListQuery($filter_level, 'rejected', $page_new, $page_approved, $page_rejected, $filter_department_id, $filter_course_id, null, $filter_course_priority, $filter_language)
+                    $makeListQuery($filter_level, 'rejected', $page_new, $page_approved, $page_rejected)
                 );
                 if ($update_reason_action === '') {
                     $update_reason_action = $appBase . '/student-applications/update-rejection-reason';
@@ -575,12 +632,12 @@ if ($ctxParts !== []) {
         p.set('tab', tab);
         var lev = mount.getAttribute('data-sa-level');
         if (lev) p.set('level', lev);
-        var dept = mount.getAttribute('data-sa-dept');
-        if (dept) p.set('dept', dept);
-        var course = mount.getAttribute('data-sa-course');
-        if (course) p.set('course', course);
-        var prio = mount.getAttribute('data-sa-prio') || '1';
-        if (prio) p.set('prio', prio);
+        [1, 2, 3].forEach(function (n) {
+          var dept = mount.getAttribute('data-sa-dept' + n);
+          if (dept) p.set('dept' + n, dept);
+          var course = mount.getAttribute('data-sa-course' + n);
+          if (course) p.set('course' + n, course);
+        });
         var lang = mount.getAttribute('data-sa-lang');
         if (lang) p.set('lang', lang);
         var nicVal = nic.value.trim();

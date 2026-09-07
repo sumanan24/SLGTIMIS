@@ -557,6 +557,7 @@ class StudentApplicationModel extends Model {
 
     /**
      * Course preference (1–3) matches `course` row for list / export filters.
+     * Each priority is filtered separately: prio=1 → course_priority_1, prio=2 → _2, prio=3 → _3.
      *
      * @return array{active: bool, join: string, whereSuffix: string, suffixTypes: string, suffixParams: list<string>}
      */
@@ -590,7 +591,8 @@ class StudentApplicationModel extends Model {
     }
 
     /**
-     * Dept/course filter on selected preference, or (for 2nd/3rd choice only) require that preference to be filled.
+     * Dept/course filter on the selected preference only (1st, 2nd, or 3rd).
+     * When no dept/course is set and priority is 2/3, require that preference slot to be filled.
      *
      * @return array{active: bool, join: string, whereSuffix: string, suffixTypes: string, suffixParams: list<string>}
      */
@@ -616,7 +618,126 @@ class StudentApplicationModel extends Model {
     }
 
     /**
-     * EXISTS scope for dashboard/export — dept/course on preference, or filled 2nd/3rd choice.
+     * AND together independent 1st / 2nd / 3rd choice dept+course filters (EXISTS, no JOIN clash).
+     *
+     * @param array<int, array{dept_id?:?string, course_id?:?string}> $choiceFilters
+     * @return array{active: bool, join: string, whereSuffix: string, suffixTypes: string, suffixParams: list<string>}
+     */
+    private function adminListMultiChoiceScopeParts(array $choiceFilters): array {
+        $whereSuffix = '';
+        $suffixTypes = '';
+        $suffixParams = [];
+        $active = false;
+        foreach ([1, 2, 3] as $priority) {
+            $slot = is_array($choiceFilters[$priority] ?? null) ? $choiceFilters[$priority] : [];
+            $dept = trim((string) ($slot['dept_id'] ?? ''));
+            $crs = trim((string) ($slot['course_id'] ?? ''));
+            if ($dept === '' && $crs === '') {
+                continue;
+            }
+            $exists = $this->adminExportCoursePreferenceExistsParts(
+                $dept !== '' ? $dept : null,
+                $crs !== '' ? $crs : null,
+                $priority
+            );
+            if ($exists['sql'] === '') {
+                continue;
+            }
+            $active = true;
+            $whereSuffix .= $exists['sql'];
+            $suffixTypes .= $exists['types'];
+            foreach ($exists['params'] as $p) {
+                $suffixParams[] = $p;
+            }
+        }
+
+        return [
+            'active' => $active,
+            'join' => '',
+            'whereSuffix' => $whereSuffix,
+            'suffixTypes' => $suffixTypes,
+            'suffixParams' => $suffixParams,
+        ];
+    }
+
+    /**
+     * Resolve list/dashboard/export course filter fragment (multi-choice preferred).
+     *
+     * @param array<int, array{dept_id?:?string, course_id?:?string}>|null $choiceFilters
+     * @return array{active: bool, join: string, whereSuffix: string, suffixTypes: string, suffixParams: list<string>}
+     */
+    private function adminListResolvedCourseScopeParts(
+        ?string $departmentId,
+        ?string $courseId,
+        int $coursePriority,
+        ?array $choiceFilters = null
+    ): array {
+        if (is_array($choiceFilters)) {
+            $normalized = [];
+            foreach ([1, 2, 3] as $p) {
+                $slot = is_array($choiceFilters[$p] ?? null) ? $choiceFilters[$p] : [];
+                $normalized[$p] = [
+                    'dept_id' => trim((string) ($slot['dept_id'] ?? '')) ?: null,
+                    'course_id' => trim((string) ($slot['course_id'] ?? '')) ?: null,
+                ];
+            }
+            $hasAny = false;
+            foreach ($normalized as $slot) {
+                if (($slot['dept_id'] ?? null) !== null || ($slot['course_id'] ?? null) !== null) {
+                    $hasAny = true;
+                    break;
+                }
+            }
+            if ($hasAny) {
+                return $this->adminListMultiChoiceScopeParts($normalized);
+            }
+        }
+
+        return $this->adminListCoursePriorityScopeParts($departmentId, $courseId, $coursePriority);
+    }
+
+    /**
+     * @param array<int, array{dept_id?:?string, course_id?:?string}>|null $choiceFilters
+     * @return array{sql: string, types: string, params: list<string>}
+     */
+    private function adminExportResolvedCourseScopeParts(
+        ?string $departmentId,
+        ?string $courseId,
+        int $priority,
+        ?array $choiceFilters = null
+    ): array {
+        if (is_array($choiceFilters)) {
+            $normalized = [];
+            foreach ([1, 2, 3] as $p) {
+                $slot = is_array($choiceFilters[$p] ?? null) ? $choiceFilters[$p] : [];
+                $normalized[$p] = [
+                    'dept_id' => trim((string) ($slot['dept_id'] ?? '')) ?: null,
+                    'course_id' => trim((string) ($slot['course_id'] ?? '')) ?: null,
+                ];
+            }
+            $hasAny = false;
+            foreach ($normalized as $slot) {
+                if (($slot['dept_id'] ?? null) !== null || ($slot['course_id'] ?? null) !== null) {
+                    $hasAny = true;
+                    break;
+                }
+            }
+            if ($hasAny) {
+                $multi = $this->adminListMultiChoiceScopeParts($normalized);
+
+                return [
+                    'sql' => $multi['whereSuffix'],
+                    'types' => $multi['suffixTypes'],
+                    'params' => $multi['suffixParams'],
+                ];
+            }
+        }
+
+        return $this->adminExportCoursePriorityScopeParts($departmentId, $courseId, $priority);
+    }
+
+    /**
+     * EXISTS scope for dashboard/export — dept/course on selected preference, or filled 2nd/3rd choice.
      *
      * @return array{sql: string, types: string, params: list<string>}
      */
@@ -712,15 +833,17 @@ class StudentApplicationModel extends Model {
     }
 
     /**
-     * Count applications for staff list (optional NVQ level 04 / 05; optional 1st preference department / course).
+     * Count applications for staff list (optional NVQ level 04 / 05; optional department / course per choice 1–3).
+     *
+     * @param array<int, array{dept_id?:?string, course_id?:?string}>|null $choiceFilters
      */
-    public function countListForAdmin(string $status, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null): int {
+    public function countListForAdmin(string $status, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null, ?array $choiceFilters = null): int {
         $this->ensureTable();
         $this->migrateSchema();
         if (!in_array($status, ['new', 'approved', 'rejected'], true)) {
             return 0;
         }
-        $frag = $this->adminListCoursePriorityScopeParts($departmentId, $courseId, $coursePriority);
+        $frag = $this->adminListResolvedCourseScopeParts($departmentId, $courseId, $coursePriority, $choiceFilters);
         $sql = "SELECT COUNT(*) AS `c` FROM `{$this->table}` `sa` {$frag['join']} WHERE `sa`.`status` = ?";
         $types = 's';
         $params = [$status];
@@ -770,9 +893,10 @@ class StudentApplicationModel extends Model {
     /**
      * One page of applications for staff list (new or approved panel).
      *
+     * @param array<int, array{dept_id?:?string, course_id?:?string}>|null $choiceFilters
      * @return list<array<string, mixed>>
      */
-    public function getListPageForAdmin(string $status, ?string $level, int $page, int $perPage, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null): array {
+    public function getListPageForAdmin(string $status, ?string $level, int $page, int $perPage, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null, ?array $choiceFilters = null): array {
         $this->ensureTable();
         $this->migrateSchema();
         if (!in_array($status, ['new', 'approved', 'rejected'], true)) {
@@ -782,7 +906,7 @@ class StudentApplicationModel extends Model {
         $perPage = max(1, min(100, $perPage));
         $offset = ($page - 1) * $perPage;
 
-        $frag = $this->adminListCoursePriorityScopeParts($departmentId, $courseId, $coursePriority);
+        $frag = $this->adminListResolvedCourseScopeParts($departmentId, $courseId, $coursePriority, $choiceFilters);
         $sql = 'SELECT ' . self::APPLICATION_LIST_SELECT . " FROM `{$this->table}` `sa` {$frag['join']} WHERE `sa`.`status` = ?";
         $types = 's';
         $params = [$status];
@@ -838,18 +962,20 @@ class StudentApplicationModel extends Model {
     }
 
     /**
-     * Departments that appear on at least one application (1st preference resolved to `course` / `department`).
+     * Departments that appear on applications for the selected course choice (1st / 2nd / 3rd).
      *
      * @return list<array{department_id: string, department_name: string}>
      */
-    public function getAdminFilterDepartments(?string $level = null): array {
+    public function getAdminFilterDepartments(?string $level = null, int $coursePriority = 1): array {
         $this->ensureTable();
         $this->migrateSchema();
         $conn = $this->db->getConnection();
         $sepEsc = $conn->real_escape_string(self::legacyCourseIdNameSeparator());
         $t = $this->table;
-        $joinC = 'INNER JOIN `course` c ON (' . self::sqlTrimUtf8mb4('c', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', 'course_priority_1') . ' OR '
-            . self::sqlLegacyCourseRowConcatLiteral('c', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', 'course_priority_1') . ')';
+        $priority = $this->normalizeCoursePriority($coursePriority);
+        $fp = 'course_priority_' . $priority;
+        $joinC = 'INNER JOIN `course` c ON (' . self::sqlTrimUtf8mb4('c', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ' OR '
+            . self::sqlLegacyCourseRowConcatLiteral('c', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ')';
         $sql = "SELECT DISTINCT d.`department_id`, d.`department_name` FROM `{$t}` sa {$joinC} "
             . "INNER JOIN `department` d ON d.`department_id` = c.`department_id` "
             . "WHERE TRIM(IFNULL(d.`department_name`,'')) <> ''";
@@ -899,18 +1025,21 @@ class StudentApplicationModel extends Model {
     }
 
     /**
-     * Courses that appear on at least one application (1st preference). Optionally scoped by department and NVQ level.
+     * Courses that appear for the selected course choice (1st / 2nd / 3rd).
+     * Optionally scoped by department and NVQ level.
      *
      * @return list<array{course_id: string, course_name: string}>
      */
-    public function getAdminFilterCourses(?string $level = null, ?string $departmentId = null): array {
+    public function getAdminFilterCourses(?string $level = null, ?string $departmentId = null, int $coursePriority = 1): array {
         $this->ensureTable();
         $this->migrateSchema();
         $conn = $this->db->getConnection();
         $sepEsc = $conn->real_escape_string(self::legacyCourseIdNameSeparator());
         $t = $this->table;
-        $joinC = 'INNER JOIN `course` c ON (' . self::sqlTrimUtf8mb4('c', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', 'course_priority_1') . ' OR '
-            . self::sqlLegacyCourseRowConcatLiteral('c', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', 'course_priority_1') . ')';
+        $priority = $this->normalizeCoursePriority($coursePriority);
+        $fp = 'course_priority_' . $priority;
+        $joinC = 'INNER JOIN `course` c ON (' . self::sqlTrimUtf8mb4('c', 'course_name') . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ' OR '
+            . self::sqlLegacyCourseRowConcatLiteral('c', $sepEsc) . ' = ' . self::sqlTrimUtf8mb4('sa', $fp) . ')';
         $sql = "SELECT DISTINCT c.`course_id`, c.`course_name` FROM `{$t}` sa {$joinC} WHERE TRIM(IFNULL(c.`course_name`,'')) <> ''";
         $types = '';
         $params = [];
@@ -1444,7 +1573,10 @@ class StudentApplicationModel extends Model {
      *
      * @return array{total: int, by_status: array{new: int, approved: int, rejected: int}, by_level: list<array{level: string, count: int}>, by_district: list<array{label: string, count: int}>, by_course: list<array{label: string, count: int}>, by_department: list<array{label: string, count: int}>, by_gender: list<array{label: string, count: int}>, by_course_priority: array<int, array{course: list<array{label: string, count: int}>, department: list<array{label: string, count: int}>}>}
      */
-    public function getDashboardStats(?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null): array {
+    /**
+     * @param array<int, array{dept_id?:?string, course_id?:?string}>|null $choiceFilters
+     */
+    public function getDashboardStats(?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null, ?array $choiceFilters = null): array {
         $this->ensureTable();
         $this->migrateSchema();
         $coursePriority = $this->normalizeCoursePriority($coursePriority);
@@ -1467,7 +1599,7 @@ class StudentApplicationModel extends Model {
         $conn = $this->db->getConnection();
         $sepEsc = $conn->real_escape_string(self::legacyCourseIdNameSeparator());
 
-        $existsPart = $this->adminExportCoursePriorityScopeParts($departmentId, $courseId, $coursePriority);
+        $existsPart = $this->adminExportResolvedCourseScopeParts($departmentId, $courseId, $coursePriority, $choiceFilters);
         $levelPart = '';
         $filterTypes = '';
         $filterParams = [];
@@ -1728,11 +1860,12 @@ class StudentApplicationModel extends Model {
      *
      * @param string|null $status 'new', 'approved', 'rejected', or null for all
      * @param string|null $level '04', '05', or null / empty for all levels
-     * @param string|null $departmentId optional: 1st preference course belongs to this department
-     * @param string|null $courseId optional: 1st preference matches this `course`.`course_id`
+     * @param string|null $departmentId optional: selected preference belongs to this department
+     * @param string|null $courseId optional: selected preference matches this `course`.`course_id`
+     * @param array<int, array{dept_id?:?string, course_id?:?string}>|null $choiceFilters optional multi-choice AND filters
      * @return list<array<string, mixed>>
      */
-    public function getAllForStaffExport(?string $status = null, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null): array {
+    public function getAllForStaffExport(?string $status = null, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null, ?array $choiceFilters = null): array {
         $this->ensureTable();
         $this->migrateSchema();
         $conn = $this->db->getConnection();
@@ -1786,7 +1919,7 @@ class StudentApplicationModel extends Model {
             $types .= 's';
             $params[] = $level;
         }
-        $existsParts = $this->adminExportCoursePriorityScopeParts($departmentId, $courseId, $coursePriority);
+        $existsParts = $this->adminExportResolvedCourseScopeParts($departmentId, $courseId, $coursePriority, $choiceFilters);
         $sql .= $existsParts['sql'];
         $types .= $existsParts['types'];
         foreach ($existsParts['params'] as $ep) {
