@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS `application_admission_schedule_entry` (
     `selection_status` ENUM('scheduled','selected','not_selected','waitlist') NOT NULL DEFAULT 'scheduled',
     `sort_order` INT NOT NULL DEFAULT 0,
     `notes` VARCHAR(255) DEFAULT NULL,
+    `exam_marks` VARCHAR(10) DEFAULT NULL COMMENT 'Entrance/interview marks; ab = absent',
     `whatsapp_sent` TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Staff marked schedule link sent via WhatsApp',
     PRIMARY KEY (`entry_id`),
     UNIQUE KEY `uq_schedule_application` (`schedule_id`, `application_id`),

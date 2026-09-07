@@ -21,6 +21,9 @@ class ApplicationAdmissionScheduleModel extends Model {
     public const SELECTION_NOT_SELECTED = 'not_selected';
     public const SELECTION_WAITLIST = 'waitlist';
 
+    /** Stored in exam_marks when the candidate was absent. */
+    public const MARKS_ABSENT = 'ab';
+
     public function __construct() {
         parent::__construct();
         $this->ensureTables();
@@ -136,6 +139,19 @@ class ApplicationAdmissionScheduleModel extends Model {
             if ($colRoll) {
                 $colRoll->free();
             }
+            $colMarks = $conn->query("SHOW COLUMNS FROM `application_admission_schedule_entry` LIKE 'exam_marks'");
+            $hasMarks = $colMarks && $colMarks->num_rows > 0;
+            if ($colMarks) {
+                $colMarks->free();
+            }
+            if (!$hasMarks) {
+                if (!$conn->query(
+                    "ALTER TABLE `application_admission_schedule_entry` ADD COLUMN `exam_marks` VARCHAR(10) DEFAULT NULL "
+                    . "COMMENT 'Entrance/interview marks; ab = absent' AFTER `whatsapp_sent`"
+                )) {
+                    error_log('ApplicationAdmissionScheduleModel::migrateSchema exam_marks: ' . $conn->error);
+                }
+            }
         } catch (Throwable $e) {
             error_log('ApplicationAdmissionScheduleModel::migrateSchema: ' . $e->getMessage());
         }
@@ -197,6 +213,38 @@ class ApplicationAdmissionScheduleModel extends Model {
             . self::departmentCodeFromEntry($entry) . '/'
             . $level . '/'
             . self::mediumLetterFromSchedule($schedule);
+    }
+
+    /**
+     * Normalize posted marks: a number, or "ab" for absent. Empty → null. Invalid → false.
+     *
+     * @return string|null|false
+     */
+    public static function normalizeExamMarks(?string $raw) {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return null;
+        }
+        $compact = strtolower(preg_replace('/\s+/', '', $raw) ?? $raw);
+        if (in_array($compact, ['ab', 'abs', 'absent', 'ab.'], true)) {
+            return self::MARKS_ABSENT;
+        }
+        if (!preg_match('/^\d{1,3}(?:\.\d{1,2})?$/', $compact)) {
+            return false;
+        }
+        $num = (float) $compact;
+        if ($num < 0 || $num > 999.99) {
+            return false;
+        }
+        if (abs($num - round($num)) < 0.00001) {
+            return (string) (int) round($num);
+        }
+
+        return rtrim(rtrim(sprintf('%.2f', $num), '0'), '.');
+    }
+
+    public static function isAbsentMarks(?string $marks): bool {
+        return strtolower(trim((string) $marks)) === self::MARKS_ABSENT;
     }
 
     /**
@@ -794,7 +842,7 @@ class ApplicationAdmissionScheduleModel extends Model {
         $this->ensureTables();
         $this->migrateSchema();
         $sql = 'SELECT e.`entry_id`, e.`schedule_id`, e.`application_id`, e.`roll_number`, e.`room_or_panel`,'
-            . ' e.`selection_status`, e.`notes`, e.`whatsapp_sent`,'
+            . ' e.`selection_status`, e.`notes`, e.`exam_marks`, e.`whatsapp_sent`,'
             . ' s.`title` AS schedule_title, s.`schedule_type`, s.`schedule_date`, s.`start_time`, s.`end_time`,'
             . ' s.`venue`, s.`application_level` AS schedule_level, s.`course_id` AS schedule_course_id,'
             . ' sa.`student_full_name`, sa.`student_nic`, sa.`student_phone`, sa.`student_whatsapp`, sa.`student_email`,'
@@ -1283,10 +1331,10 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
-     * @param array<string, mixed> $fields roll_number, room_or_panel, selection_status, notes, sort_order
+     * @param array<string, mixed> $fields roll_number, room_or_panel, selection_status, notes, exam_marks, sort_order
      */
     public function updateEntry(int $entryId, int $scheduleId, array $fields): bool {
-        $allowed = ['roll_number', 'room_or_panel', 'selection_status', 'notes', 'sort_order', 'whatsapp_sent'];
+        $allowed = ['roll_number', 'room_or_panel', 'selection_status', 'notes', 'exam_marks', 'sort_order', 'whatsapp_sent'];
         $data = [];
         foreach ($allowed as $col) {
             if (array_key_exists($col, $fields)) {

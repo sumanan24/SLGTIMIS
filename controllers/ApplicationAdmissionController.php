@@ -284,6 +284,7 @@ class ApplicationAdmissionController extends Controller {
                 'application_level' => (string) ($row['application_level'] ?? $row['schedule_level'] ?? ''),
                 'application_status' => (string) ($row['application_status'] ?? ''),
                 'selection_status' => (string) ($row['selection_status'] ?? ''),
+                'exam_marks' => (string) ($row['exam_marks'] ?? ''),
                 'room_or_panel' => (string) ($row['room_or_panel'] ?? ''),
                 'notes' => (string) ($row['notes'] ?? ''),
             ];
@@ -293,7 +294,7 @@ class ApplicationAdmissionController extends Controller {
             'no', 'schedule_title', 'schedule_type', 'schedule_date', 'venue',
             'student_full_name', 'student_nic', 'student_phone', 'student_whatsapp', 'student_email',
             'student_province', 'student_district', 'department', 'course_name', 'application_level',
-            'application_status', 'selection_status', 'room_or_panel', 'notes',
+            'application_status', 'selection_status', 'exam_marks', 'room_or_panel', 'notes',
         ];
         if (!$isInterviewExport) {
             array_splice($cols, 5, 0, ['roll_number']);
@@ -317,6 +318,7 @@ class ApplicationAdmissionController extends Controller {
             'application_level' => 'NVQ Level',
             'application_status' => 'Application status',
             'selection_status' => 'Selection status',
+            'exam_marks' => 'Marks',
             'room_or_panel' => 'Room / Panel',
             'notes' => 'Notes',
         ];
@@ -727,7 +729,7 @@ class ApplicationAdmissionController extends Controller {
             $this->redirect('application-admission');
         }
         $canUpdateSelection = $isInterview ? $canUpdateInterviewSelection : $canManage;
-        $entries = $model->getEntriesWithApplications($id);
+        $entries = $this->sortEntriesByRollNumber($model->getEntriesWithApplications($id));
 
         return $this->view('application_admission/selection', [
             'page' => $isInterview ? 'application-admission-interview' : 'application-admission-entrance',
@@ -758,15 +760,12 @@ class ApplicationAdmissionController extends Controller {
             $this->redirect('application-admission');
         }
         $entryIds = $this->post('entry_ids', []);
-        $selectedPosted = $this->post('selected_ids', []);
+        $marksPosted = $this->post('exam_marks', []);
         if (!is_array($entryIds)) {
             $entryIds = [];
         }
-        $selectedSet = [];
-        if (is_array($selectedPosted)) {
-            foreach ($selectedPosted as $sid) {
-                $selectedSet[(int) $sid] = true;
-            }
+        if (!is_array($marksPosted)) {
+            $marksPosted = [];
         }
         // Prefer posted entry list; fall back to all schedule entries.
         if ($entryIds === []) {
@@ -774,21 +773,27 @@ class ApplicationAdmissionController extends Controller {
                 $entryIds[] = (int) ($row['entry_id'] ?? 0);
             }
         }
+        $invalidMarks = 0;
         foreach ($entryIds as $entryId) {
             $entryId = (int) $entryId;
             if ($entryId < 1) {
                 continue;
             }
-            $status = isset($selectedSet[$entryId])
-                ? ApplicationAdmissionScheduleModel::SELECTION_SELECTED
-                : ApplicationAdmissionScheduleModel::SELECTION_NOT_SELECTED;
+            $rawMarks = (string) ($marksPosted[$entryId] ?? $marksPosted[(string) $entryId] ?? '');
+            $normalizedMarks = ApplicationAdmissionScheduleModel::normalizeExamMarks($rawMarks);
+            if ($normalizedMarks === false) {
+                $invalidMarks++;
+                continue;
+            }
             $model->updateEntry($entryId, $id, [
-                'selection_status' => $status,
+                'exam_marks' => $normalizedMarks === null ? '' : $normalizedMarks,
             ]);
         }
-        $_SESSION['success'] = $isEntrance
-            ? 'Exam results saved. Ticked students are Selected; unticked are Not selected.'
-            : 'Selection saved. Ticked students are Selected; unticked are Not selected.';
+        $savedMsg = $isEntrance ? 'Exam marks saved.' : 'Marks saved.';
+        if ($invalidMarks > 0) {
+            $savedMsg .= ' ' . $invalidMarks . ' mark(s) skipped — use a number or ab for absent.';
+        }
+        $_SESSION['success'] = $savedMsg;
         $this->redirect('application-admission/selection?id=' . $id);
     }
 
@@ -1073,6 +1078,36 @@ class ApplicationAdmissionController extends Controller {
         );
     }
 
+    /**
+     * Sort schedule applicants by roll / index, then name.
+     *
+     * @param list<array<string, mixed>> $entries
+     * @return list<array<string, mixed>>
+     */
+    private function sortEntriesByRollNumber(array $entries): array {
+        usort($entries, static function (array $a, array $b): int {
+            $rollA = trim((string) ($a['roll_number'] ?? ''));
+            $rollB = trim((string) ($b['roll_number'] ?? ''));
+            if ($rollA === '' && $rollB === '') {
+                return strcasecmp((string) ($a['student_full_name'] ?? ''), (string) ($b['student_full_name'] ?? ''));
+            }
+            if ($rollA === '') {
+                return 1;
+            }
+            if ($rollB === '') {
+                return -1;
+            }
+            $cmp = strnatcasecmp($rollA, $rollB);
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return strcasecmp((string) ($a['student_full_name'] ?? ''), (string) ($b['student_full_name'] ?? ''));
+        });
+
+        return $entries;
+    }
+
     private function streamSelectionPdf(int $scheduleId, bool $allowUnpublishedForStaff): void {
         $model = $this->scheduleModel();
         $schedule = $model->findSchedule($scheduleId);
@@ -1089,7 +1124,7 @@ class ApplicationAdmissionController extends Controller {
             echo 'Not published.';
             exit;
         }
-        $entries = $model->getEntriesWithApplications($scheduleId);
+        $entries = $this->sortEntriesByRollNumber($model->getEntriesWithApplications($scheduleId));
         require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
         $inner = ApplicationAdmissionPdfHelper::renderTemplate('selection_list.php', [
             'schedule' => $schedule,
