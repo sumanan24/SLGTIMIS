@@ -1401,14 +1401,19 @@ class ApplicationAdmissionController extends Controller {
         $addIds = array_map('intval', $addIds);
         if (($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW) {
             $cid = $this->scheduleCourseIdOrNull($schedule);
+            $level = (string) ($schedule['application_level'] ?? '');
+            $already = $model->interviewScheduledApplicationIds($level, $id > 0 ? $id : null);
             if ($cid !== null) {
                 require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
-                $eligible = (new ApplicationAdmissionCutoffModel())->interviewEligibleForCourse(
-                    (string) ($schedule['application_level'] ?? ''),
-                    $cid
-                );
-                $addIds = array_values(array_filter($addIds, static function ($appId) use ($eligible): bool {
-                    return isset($eligible[(int) $appId]);
+                $eligible = (new ApplicationAdmissionCutoffModel())->interviewEligibleForCourse($level, $cid);
+                $addIds = array_values(array_filter($addIds, static function ($appId) use ($eligible, $already): bool {
+                    $appId = (int) $appId;
+
+                    return isset($eligible[$appId]) && !isset($already[$appId]);
+                }));
+            } else {
+                $addIds = array_values(array_filter($addIds, static function ($appId) use ($already): bool {
+                    return !isset($already[(int) $appId]);
                 }));
             }
         }
@@ -2329,15 +2334,25 @@ class ApplicationAdmissionController extends Controller {
         }
         $level = (string) ($schedule['application_level'] ?? '');
         require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
-        $selectedCount = count((new ApplicationAdmissionCutoffModel())->interviewEligibleForCourse($level, $courseId));
+        $eligible = (new ApplicationAdmissionCutoffModel())->interviewEligibleForCourse($level, $courseId);
+        $already = $this->scheduleModel()->interviewScheduledApplicationIds(
+            $level,
+            (int) ($schedule['schedule_id'] ?? 0)
+        );
+        $selectedCount = 0;
+        foreach ($eligible as $appId => $_row) {
+            if (!isset($already[(int) $appId])) {
+                $selectedCount++;
+            }
+        }
         if (!$this->scheduleModel()->hasEntranceScheduleForCourse($level, $courseId)) {
             return 'No entrance exam found for this level. Create an entrance exam, enter marks, and set cutoffs first.';
         }
         if ($selectedCount === 0) {
-            return 'No cutoff-eligible candidates yet for this course. Enter exam marks and set cutoffs, then return here.';
+            return 'No cutoff-eligible candidates left to add for this course. Students already assigned to an interview are not listed.';
         }
 
-        return 'Listed by exam marks: students who met this course cutoff (1st choice) or who are eligible as 2nd/3rd option (' . $selectedCount . ' eligible).';
+        return 'Listed by exam marks: students who met this course cutoff (1st choice) or who are eligible as 2nd/3rd option (' . $selectedCount . ' eligible). Applicants already assigned to an interview are not listed.';
     }
 
     /**

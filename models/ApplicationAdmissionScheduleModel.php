@@ -771,6 +771,39 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
+     * Applicants already on any interview for this NVQ level (any course).
+     *
+     * @return array<int, true> application_id => true
+     */
+    public function interviewScheduledApplicationIds(string $level, ?int $exceptScheduleId = null): array {
+        $this->ensureTables();
+        if (!in_array($level, ['04', '05'], true)) {
+            return [];
+        }
+        $sql = 'SELECT DISTINCT e.`application_id` '
+            . 'FROM `application_admission_schedule_entry` e '
+            . 'INNER JOIN `application_admission_schedule` s ON s.`schedule_id` = e.`schedule_id` '
+            . 'WHERE s.`schedule_type` = ? AND s.`application_level` = ?';
+        $types = 'ss';
+        $params = [self::TYPE_INTERVIEW, $level];
+        if ($exceptScheduleId !== null && $exceptScheduleId > 0) {
+            $sql .= ' AND s.`schedule_id` <> ?';
+            $types .= 'i';
+            $params[] = $exceptScheduleId;
+        }
+        $rows = $this->fetchAllPrepared($sql, $types, $params);
+        $ids = [];
+        foreach ($rows as $row) {
+            $aid = (int) ($row['application_id'] ?? 0);
+            if ($aid > 0) {
+                $ids[$aid] = true;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
      * Distinct exam / interview centres (venue) for filter dropdowns.
      *
      * @return list<string>
@@ -1123,6 +1156,20 @@ class ApplicationAdmissionScheduleModel extends Model {
             );
             if ($excludeSet !== []) {
                 $rows = array_values(array_filter($rows, function (array $row) use ($excludeSet): bool {
+                    $appId = (int) ($row['application_id'] ?? 0);
+
+                    return $appId <= 0 || !isset($excludeSet[$appId]);
+                }));
+            }
+        }
+
+        if ($isInterview) {
+            $excludeSet = $this->interviewScheduledApplicationIds(
+                $level,
+                $scheduleId > 0 ? $scheduleId : null
+            );
+            if ($excludeSet !== []) {
+                $rows = array_values(array_filter($rows, static function (array $row) use ($excludeSet): bool {
                     $appId = (int) ($row['application_id'] ?? 0);
 
                     return $appId <= 0 || !isset($excludeSet[$appId]);
