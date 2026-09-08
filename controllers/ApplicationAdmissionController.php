@@ -166,6 +166,760 @@ class ApplicationAdmissionController extends Controller {
         return $this->renderScheduleIndex(ApplicationAdmissionScheduleModel::TYPE_INTERVIEW);
     }
 
+    public function cutoffs() {
+        $uid = $this->requireLogin();
+        $userModel = $this->requireView($uid);
+        $data = $this->cutoffPageData();
+
+        return $this->view('application_admission/cutoffs', [
+            'page' => 'application-admission-cutoff',
+            'level' => $data['level'],
+            'department_id' => $data['department_id'],
+            'course_id' => $data['course_id'],
+            'departments' => $data['departments'],
+            'mediums' => ApplicationAdmissionCutoffModel::mediumsForLevel($data['level']),
+            'courses' => $data['courses'],
+            'cutoffMap' => $data['cutoff_map'],
+            'groups' => $data['groups'],
+            'qualify_total_all' => $data['qualify_total_all'],
+            'filter_query' => $data['filter_query'],
+            'canManage' => $userModel->canManageApplicationAdmissionSchedules($uid),
+        ]);
+    }
+
+    public function cutoffsSave() {
+        $uid = $this->requireLogin();
+        $this->requireManage($uid);
+        $level = (string) $this->post('level', '04');
+        if (!in_array($level, ['04', '05'], true)) {
+            $level = '04';
+        }
+        $posted = $this->post('cutoffs', []);
+        if (!is_array($posted)) {
+            $posted = [];
+        }
+        require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
+        $result = (new ApplicationAdmissionCutoffModel())->saveLevelCutoffs($level, $posted, $uid);
+        if ($result['invalid'] > 0) {
+            $_SESSION['error'] = 'Cutoffs saved, but ' . $result['invalid'] . ' value(s) were skipped. Use a number such as 45 or 52.5.';
+        } else {
+            $_SESSION['success'] = 'Cutoffs saved. Automobile Tamil is separate; Sinhala and English share one cutoff. Other courses use Northern / other-province only.';
+        }
+        $qs = ['level' => $level];
+        $departmentId = trim((string) $this->post('department_id', ''));
+        $courseId = trim((string) $this->post('course_id', ''));
+        if ($departmentId !== '') {
+            $qs['department_id'] = $departmentId;
+        }
+        if ($courseId !== '') {
+            $qs['course_id'] = $courseId;
+        }
+        $this->redirect('application-admission/cutoffs?' . http_build_query($qs));
+    }
+
+    public function pdfCutoffs() {
+        $this->requireView($this->requireLogin());
+        $data = $this->cutoffPageData();
+        require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
+        $inner = ApplicationAdmissionPdfHelper::renderTemplate('cutoff_list.php', [
+            'level' => $data['level'],
+            'mediums' => ApplicationAdmissionCutoffModel::mediumsForLevel($data['level']),
+            'groups' => $data['groups'],
+            'filter_summary' => $data['filter_summary'],
+            'logo_src' => $this->admissionLogoDataUri(),
+        ]);
+        $html = ApplicationAdmissionPdfHelper::wrapPdfDocument($inner);
+        ApplicationAdmissionPdfHelper::streamHtml(
+            $html,
+            'cutoff-list-nvq-' . $data['level'] . '.pdf',
+            'A4',
+            'landscape'
+        );
+    }
+
+    public function exportCutoffs() {
+        $this->requireView($this->requireLogin());
+        $data = $this->cutoffPageData();
+        $rows = $this->flattenCutoffStudents($data['groups']);
+        $level = $data['level'];
+        $filterSummary = implode(' · ', array_filter([
+            'NVQ Level ' . $level,
+            $data['filter_summary'],
+            count($rows) . ' student(s)',
+        ]));
+        $baseName = 'cutoff_students_nvq' . $level . '_' . date('Y-m-d_H-i');
+
+        $cols = [
+            'no', 'department', 'course_name', 'language_group', 'roll_number',
+            'student_full_name', 'student_nic', 'course_priority_2',
+            'student_province', 'region', 'medium',
+            'exam_marks', 'cutoff_applied',
+        ];
+        $colLabels = [
+            'no' => 'No',
+            'department' => 'Department',
+            'course_name' => 'Course',
+            'language_group' => 'Language / group',
+            'roll_number' => 'Roll / Index',
+            'student_full_name' => 'Name',
+            'student_nic' => 'NIC',
+            'course_priority_2' => '2nd choice course',
+            'student_province' => 'Province',
+            'region' => 'Region',
+            'medium' => 'Medium',
+            'exam_marks' => 'Marks',
+            'cutoff_applied' => 'Min cutoff',
+        ];
+
+        $xlsFallback = static function () use ($rows, $cols, $colLabels, $baseName, $filterSummary): void {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $baseName) . '.xls"');
+            header('Cache-Control: private, max-age=0');
+            echo "\xEF\xBB\xBF";
+            $esc = static function (string $s): string {
+                return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+            };
+            echo '<table border="1" cellspacing="0" cellpadding="4">' . "\n";
+            echo '<tr><td colspan="' . count($cols) . '"><b>SLGTI — Cutoff qualifying students</b></td></tr>' . "\n";
+            echo '<tr><td colspan="' . count($cols) . '">' . $esc($filterSummary) . '</td></tr>' . "\n";
+            echo '<tr><td colspan="' . count($cols) . '">Exported: ' . $esc(date('Y-m-d H:i')) . '</td></tr>' . "\n";
+            echo '<thead><tr>';
+            foreach ($cols as $h) {
+                echo '<th style="background:#1F4E79;color:#fff;font-weight:bold;padding:6px;text-align:center;">'
+                    . $esc((string) ($colLabels[$h] ?? $h)) . '</th>';
+            }
+            echo "</tr></thead>\n<tbody>\n";
+            $centerCols = ['no' => true, 'region' => true, 'medium' => true, 'exam_marks' => true, 'cutoff_applied' => true];
+            foreach ($rows as $row) {
+                echo '<tr>';
+                foreach ($cols as $colName) {
+                    $v = isset($row[$colName]) ? (string) $row[$colName] : '';
+                    $align = isset($centerCols[$colName]) ? 'center' : 'left';
+                    echo '<td style="mso-number-format:\'\@\';text-align:' . $align . ';">' . $esc($v) . '</td>';
+                }
+                echo "</tr>\n";
+            }
+            if ($rows === []) {
+                echo '<tr><td colspan="' . count($cols) . '">No qualifying students for the selected filters.</td></tr>' . "\n";
+            }
+            echo "</tbody></table>";
+            exit;
+        };
+
+        $needs = [
+            extension_loaded('zip') && class_exists('ZipArchive', false),
+            extension_loaded('xmlwriter'),
+            extension_loaded('dom'),
+            extension_loaded('simplexml'),
+            extension_loaded('xml'),
+            extension_loaded('mbstring') && function_exists('mb_strlen'),
+            extension_loaded('iconv') && function_exists('iconv'),
+        ];
+        $autoload = BASE_PATH . '/vendor/autoload.php';
+        if (!is_readable($autoload) || in_array(false, $needs, true)) {
+            $xlsFallback();
+        }
+
+        try {
+            require_once $autoload;
+            require_once BASE_PATH . '/helpers/StudentApplicationExportXlsx.php';
+            if (!class_exists(\PhpOffice\PhpSpreadsheet\Spreadsheet::class)) {
+                $xlsFallback();
+            }
+
+            $spreadsheet = StudentApplicationExportXlsx::buildSpreadsheet(
+                $rows,
+                $cols,
+                $colLabels,
+                'Cutoff list',
+                $filterSummary
+            );
+            $spreadsheet->getActiveSheet()->setCellValue('A1', 'SLGTI — Cutoff qualifying students');
+
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $tmpPath = tempnam(sys_get_temp_dir(), 'slgti_cutoff_xlsx_');
+            if ($tmpPath === false) {
+                throw new RuntimeException('Could not create temp file for XLSX export.');
+            }
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save($tmpPath);
+            $size = filesize($tmpPath);
+            if ($size === false || $size < 1) {
+                @unlink($tmpPath);
+                throw new RuntimeException('XLSX temp file not readable after write.');
+            }
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $baseName) . '.xlsx"');
+            header('Cache-Control: private, max-age=0');
+            header('Content-Length: ' . (string) $size);
+            readfile($tmpPath);
+            @unlink($tmpPath);
+            $spreadsheet->disconnectWorksheets();
+            exit;
+        } catch (Throwable $e) {
+            if (isset($tmpPath) && is_string($tmpPath) && $tmpPath !== '') {
+                @unlink($tmpPath);
+            }
+            error_log('ApplicationAdmission exportCutoffs: ' . $e->getMessage());
+            $xlsFallback();
+        }
+    }
+
+    public function secondOption() {
+        $uid = $this->requireLogin();
+        $this->requireView($uid);
+        $data = $this->secondOptionPageData();
+
+        return $this->view('application_admission/second_option', [
+            'page' => 'application-admission-second-option',
+            'level' => $data['level'],
+            'department_id' => $data['department_id'],
+            'course_id' => $data['course_id'],
+            'departments' => $data['departments'],
+            'courses' => $data['courses'],
+            'students' => $data['students'],
+            'groups' => $data['groups'],
+            'min_marks' => $data['min_marks'],
+            'filter_query' => $data['filter_query'],
+        ]);
+    }
+
+    public function pdfSecondOption() {
+        $this->requireView($this->requireLogin());
+        $data = $this->secondOptionPageData();
+        require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
+        $inner = ApplicationAdmissionPdfHelper::renderTemplate('second_option_list.php', [
+            'level' => $data['level'],
+            'min_marks' => $data['min_marks'],
+            'students' => $data['students'],
+            'groups' => $data['groups'],
+            'filter_summary' => $data['filter_summary'],
+            'logo_src' => $this->admissionLogoDataUri(),
+        ]);
+        $html = ApplicationAdmissionPdfHelper::wrapPdfDocument($inner);
+        ApplicationAdmissionPdfHelper::streamHtml(
+            $html,
+            'second-option-nvq-' . $data['level'] . '.pdf',
+            'A4',
+            'landscape'
+        );
+    }
+
+    public function exportSecondOption() {
+        $this->requireView($this->requireLogin());
+        $data = $this->secondOptionPageData();
+        $rows = $this->flattenSecondOptionStudents($data['groups']);
+        $level = $data['level'];
+        $filterSummary = implode(' · ', array_filter([
+            'NVQ Level ' . $level,
+            'Marks ' . $data['min_marks'] . ' to below 1st-choice cutoff',
+            $data['filter_summary'],
+            count($rows) . ' student(s)',
+        ]));
+        $baseName = 'second_option_nvq' . $level . '_' . date('Y-m-d_H-i');
+
+        $cols = [
+            'no', 'department', 'first_course_name', 'roll_number', 'student_full_name', 'student_nic',
+            'exam_marks', 'first_cutoff', 'second_course_name', 'third_course_name', 'consider_choice',
+            'student_province', 'region',
+        ];
+        $colLabels = [
+            'no' => 'No',
+            'department' => 'Department',
+            'first_course_name' => '1st choice course',
+            'roll_number' => 'Roll / Index',
+            'student_full_name' => 'Name',
+            'student_nic' => 'NIC',
+            'exam_marks' => 'Marks',
+            'first_cutoff' => 'Cutoff',
+            'second_course_name' => '2nd option',
+            'third_course_name' => '3rd option',
+            'consider_choice' => 'Consider',
+            'student_province' => 'Province',
+            'region' => 'Region',
+        ];
+
+        $xlsFallback = static function () use ($rows, $cols, $colLabels, $baseName, $filterSummary): void {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $baseName) . '.xls"');
+            header('Cache-Control: private, max-age=0');
+            echo "\xEF\xBB\xBF";
+            $esc = static function (string $s): string {
+                return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+            };
+            echo '<table border="1" cellspacing="0" cellpadding="4">' . "\n";
+            echo '<tr><td colspan="' . count($cols) . '"><b>SLGTI — 2nd option students (below 1st-choice cutoff)</b></td></tr>' . "\n";
+            echo '<tr><td colspan="' . count($cols) . '">' . $esc($filterSummary) . '</td></tr>' . "\n";
+            echo '<tr><td colspan="' . count($cols) . '">Exported: ' . $esc(date('Y-m-d H:i')) . '</td></tr>' . "\n";
+            echo '<thead><tr>';
+            foreach ($cols as $h) {
+                echo '<th style="background:#1F4E79;color:#fff;font-weight:bold;padding:6px;text-align:center;">'
+                    . $esc((string) ($colLabels[$h] ?? $h)) . '</th>';
+            }
+            echo "</tr></thead>\n<tbody>\n";
+            $centerCols = [
+                'no' => true, 'exam_marks' => true, 'first_cutoff' => true, 'consider_choice' => true, 'region' => true,
+            ];
+            foreach ($rows as $row) {
+                echo '<tr>';
+                foreach ($cols as $colName) {
+                    $v = isset($row[$colName]) ? (string) $row[$colName] : '';
+                    $align = isset($centerCols[$colName]) ? 'center' : 'left';
+                    echo '<td style="mso-number-format:\'\@\';text-align:' . $align . ';">' . $esc($v) . '</td>';
+                }
+                echo "</tr>\n";
+            }
+            if ($rows === []) {
+                echo '<tr><td colspan="' . count($cols) . '">No students in this marks band for the selected filters.</td></tr>' . "\n";
+            }
+            echo "</tbody></table>";
+            exit;
+        };
+
+        $needs = [
+            extension_loaded('zip') && class_exists('ZipArchive', false),
+            extension_loaded('xmlwriter'),
+            extension_loaded('dom'),
+            extension_loaded('simplexml'),
+            extension_loaded('xml'),
+            extension_loaded('mbstring') && function_exists('mb_strlen'),
+            extension_loaded('iconv') && function_exists('iconv'),
+        ];
+        $autoload = BASE_PATH . '/vendor/autoload.php';
+        if (!is_readable($autoload) || in_array(false, $needs, true)) {
+            $xlsFallback();
+        }
+
+        try {
+            require_once $autoload;
+            require_once BASE_PATH . '/helpers/StudentApplicationExportXlsx.php';
+            if (!class_exists(\PhpOffice\PhpSpreadsheet\Spreadsheet::class)) {
+                $xlsFallback();
+            }
+
+            $spreadsheet = StudentApplicationExportXlsx::buildSpreadsheet(
+                $rows,
+                $cols,
+                $colLabels,
+                '2nd option',
+                $filterSummary
+            );
+            $spreadsheet->getActiveSheet()->setCellValue('A1', 'SLGTI — 2nd option students (below 1st-choice cutoff)');
+
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $tmpPath = tempnam(sys_get_temp_dir(), 'slgti_secondopt_xlsx_');
+            if ($tmpPath === false) {
+                throw new RuntimeException('Could not create temp file for XLSX export.');
+            }
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save($tmpPath);
+            $size = filesize($tmpPath);
+            if ($size === false || $size < 1) {
+                @unlink($tmpPath);
+                throw new RuntimeException('XLSX temp file not readable after write.');
+            }
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $baseName) . '.xlsx"');
+            header('Cache-Control: private, max-age=0');
+            header('Content-Length: ' . (string) $size);
+            readfile($tmpPath);
+            @unlink($tmpPath);
+            $spreadsheet->disconnectWorksheets();
+            exit;
+        } catch (Throwable $e) {
+            if (isset($tmpPath) && is_string($tmpPath) && $tmpPath !== '') {
+                @unlink($tmpPath);
+            }
+            error_log('ApplicationAdmission exportSecondOption: ' . $e->getMessage());
+            $xlsFallback();
+        }
+    }
+
+    /**
+     * @return array{
+     *   level:string,
+     *   department_id:string,
+     *   course_id:string,
+     *   courses:array<int,array<string,mixed>>,
+     *   departments:array<int,array{department_id:string,department_name:string}>,
+     *   cutoff_map:array<string,mixed>,
+     *   groups:array<int,array<string,mixed>>,
+     *   qualify_total_all:int,
+     *   filter_query:string,
+     *   filter_summary:string
+     * }
+     */
+    private function cutoffPageData(): array {
+        $level = (string) $this->get('level', '04');
+        if (!in_array($level, ['04', '05'], true)) {
+            $level = '04';
+        }
+        $departmentId = trim((string) $this->get('department_id', ''));
+        $courseId = trim((string) $this->get('course_id', ''));
+
+        require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
+        require_once BASE_PATH . '/models/CourseModel.php';
+        $cutoffModel = new ApplicationAdmissionCutoffModel();
+        $nvq = $level === '05' ? '5' : '4';
+        $courses = (new CourseModel())->getCoursesWithDepartment([
+            'nvq_level' => $nvq,
+            'active_only' => true,
+        ]);
+        $departments = $this->departmentsFromCourses($courses);
+
+        $validDept = false;
+        foreach ($departments as $d) {
+            if (strcasecmp((string) ($d['department_id'] ?? ''), $departmentId) === 0) {
+                $validDept = true;
+                break;
+            }
+        }
+        if (!$validDept) {
+            $departmentId = '';
+        }
+
+        $validCourse = false;
+        foreach ($courses as $c) {
+            if (strcasecmp((string) ($c['course_id'] ?? ''), $courseId) !== 0) {
+                continue;
+            }
+            if ($departmentId !== '' && strcasecmp((string) ($c['department_id'] ?? ''), $departmentId) !== 0) {
+                continue;
+            }
+            $validCourse = true;
+            break;
+        }
+        if (!$validCourse) {
+            $courseId = '';
+        }
+
+        $allGroups = $cutoffModel->qualifyingStudentsByCourse($level);
+        $qualifyTotalAll = 0;
+        foreach ($allGroups as $g) {
+            $qualifyTotalAll += (int) ($g['qualify_count'] ?? 0);
+        }
+        $groups = $this->filterCutoffGroups($allGroups, $departmentId, $courseId);
+
+        $qs = ['level' => $level];
+        if ($departmentId !== '') {
+            $qs['department_id'] = $departmentId;
+        }
+        if ($courseId !== '') {
+            $qs['course_id'] = $courseId;
+        }
+
+        return [
+            'level' => $level,
+            'department_id' => $departmentId,
+            'course_id' => $courseId,
+            'courses' => $courses,
+            'departments' => $departments,
+            'cutoff_map' => $cutoffModel->getCutoffMap($level),
+            'groups' => $groups,
+            'qualify_total_all' => $qualifyTotalAll,
+            'filter_query' => http_build_query($qs),
+            'filter_summary' => $this->cutoffFilterSummary($departmentId, $courseId, $courses, $departments),
+        ];
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $courses
+     * @return array<int,array{department_id:string,department_name:string}>
+     */
+    private function departmentsFromCourses(array $courses): array {
+        $departments = [];
+        foreach ($courses as $c) {
+            $did = trim((string) ($c['department_id'] ?? ''));
+            if ($did === '') {
+                continue;
+            }
+            if (!isset($departments[$did])) {
+                $departments[$did] = [
+                    'department_id' => $did,
+                    'department_name' => trim((string) ($c['department_name'] ?? $did)),
+                ];
+            }
+        }
+        uasort($departments, static function (array $a, array $b): int {
+            return strcasecmp((string) $a['department_name'], (string) $b['department_name']);
+        });
+
+        return array_values($departments);
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $groups
+     * @return array<int,array<string,mixed>>
+     */
+    private function filterCutoffGroups(array $groups, string $departmentId, string $courseId): array {
+        if ($departmentId !== '') {
+            $groups = array_values(array_filter($groups, static function ($g) use ($departmentId) {
+                return strcasecmp((string) ($g['department_id'] ?? ''), $departmentId) === 0;
+            }));
+        }
+        if ($courseId !== '') {
+            $groups = array_values(array_filter($groups, static function ($g) use ($courseId) {
+                return strcasecmp((string) ($g['course_id'] ?? ''), $courseId) === 0;
+            }));
+        }
+
+        return array_values($groups);
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $courses
+     * @param array<int,array{department_id:string,department_name:string}> $departments
+     */
+    private function cutoffFilterSummary(string $departmentId, string $courseId, array $courses, array $departments): string {
+        $bits = [];
+        if ($departmentId !== '') {
+            foreach ($departments as $d) {
+                if (strcasecmp((string) ($d['department_id'] ?? ''), $departmentId) === 0) {
+                    $bits[] = 'Department: ' . (string) ($d['department_name'] ?? $departmentId);
+                    break;
+                }
+            }
+        }
+        if ($courseId !== '') {
+            foreach ($courses as $c) {
+                if (strcasecmp((string) ($c['course_id'] ?? ''), $courseId) === 0) {
+                    $bits[] = 'Course: ' . (string) ($c['course_name'] ?? $courseId);
+                    break;
+                }
+            }
+        }
+
+        return $bits !== [] ? implode('  |  ', $bits) : 'All departments and courses';
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $groups
+     * @return array<int,array<string,string>>
+     */
+    private function flattenCutoffStudents(array $groups): array {
+        $rows = [];
+        foreach ($groups as $group) {
+            if (empty($group['has_cutoff'])) {
+                continue;
+            }
+            foreach (($group['by_medium'] ?? []) as $block) {
+                if (empty($block['has_cutoff'])) {
+                    continue;
+                }
+                $n = 0;
+                foreach (($block['students'] ?? []) as $row) {
+                    $n++;
+                    $rows[] = [
+                        'no' => (string) $n,
+                        'department' => (string) ($group['department_name'] ?? ''),
+                        'course_name' => (string) ($group['course_name'] ?? ''),
+                        'language_group' => (string) ($block['label'] ?? ''),
+                        'roll_number' => (string) ($row['roll_number'] ?? ''),
+                        'student_full_name' => (string) ($row['student_full_name'] ?? ''),
+                        'student_nic' => (string) ($row['student_nic'] ?? ''),
+                        'course_priority_2' => (string) ($row['course_priority_2'] ?? ''),
+                        'student_province' => (string) ($row['student_province'] ?? ''),
+                        'region' => (string) ($row['region'] ?? ''),
+                        'medium' => (string) ($row['medium'] ?? ''),
+                        'exam_marks' => $this->formatCutoffNumber($row['marks_num'] ?? $row['exam_marks'] ?? ''),
+                        'cutoff_applied' => $this->formatCutoffNumber($row['cutoff_applied'] ?? ''),
+                    ];
+                }
+            }
+        }
+
+        return $rows;
+    }
+
+    private function formatCutoffNumber($n): string {
+        if ($n === null || $n === '') {
+            return '';
+        }
+        if (is_numeric($n) && abs((float) $n - round((float) $n)) < 0.00001) {
+            return (string) (int) round((float) $n);
+        }
+
+        return is_numeric($n) ? rtrim(rtrim(sprintf('%.2f', (float) $n), '0'), '.') : (string) $n;
+    }
+
+    /**
+     * @return array{
+     *   level:string,
+     *   department_id:string,
+     *   course_id:string,
+     *   courses:array<int,array<string,mixed>>,
+     *   departments:array<int,array{department_id:string,department_name:string}>,
+     *   students:array<int,array<string,mixed>>,
+     *   groups:array<int,array<string,mixed>>,
+     *   min_marks:int,
+     *   filter_query:string,
+     *   filter_summary:string
+     * }
+     */
+    private function secondOptionPageData(): array {
+        $level = (string) $this->get('level', '04');
+        if (!in_array($level, ['04', '05'], true)) {
+            $level = '04';
+        }
+        $departmentId = trim((string) $this->get('department_id', ''));
+        $courseId = trim((string) $this->get('course_id', ''));
+
+        require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
+        require_once BASE_PATH . '/models/CourseModel.php';
+        $cutoffModel = new ApplicationAdmissionCutoffModel();
+        $nvq = $level === '05' ? '5' : '4';
+        $courses = (new CourseModel())->getCoursesWithDepartment([
+            'nvq_level' => $nvq,
+            'active_only' => true,
+        ]);
+        $departments = $this->departmentsFromCourses($courses);
+
+        $validDept = false;
+        foreach ($departments as $d) {
+            if (strcasecmp((string) ($d['department_id'] ?? ''), $departmentId) === 0) {
+                $validDept = true;
+                break;
+            }
+        }
+        if (!$validDept) {
+            $departmentId = '';
+        }
+
+        $validCourse = false;
+        foreach ($courses as $c) {
+            if (strcasecmp((string) ($c['course_id'] ?? ''), $courseId) !== 0) {
+                continue;
+            }
+            if ($departmentId !== '' && strcasecmp((string) ($c['department_id'] ?? ''), $departmentId) !== 0) {
+                continue;
+            }
+            $validCourse = true;
+            break;
+        }
+        if (!$validCourse) {
+            $courseId = '';
+        }
+
+        $payload = $cutoffModel->secondOptionStudents($level);
+        $filtered = $this->filterSecondOptionPayload($payload, $departmentId, $courseId);
+
+        $qs = ['level' => $level];
+        if ($departmentId !== '') {
+            $qs['department_id'] = $departmentId;
+        }
+        if ($courseId !== '') {
+            $qs['course_id'] = $courseId;
+        }
+
+        return [
+            'level' => $level,
+            'department_id' => $departmentId,
+            'course_id' => $courseId,
+            'courses' => $courses,
+            'departments' => $departments,
+            'students' => $filtered['students'],
+            'groups' => $filtered['groups'],
+            'min_marks' => (int) ($payload['min_marks'] ?? ApplicationAdmissionCutoffModel::MARKS_MIN_SECOND_OPTION),
+            'filter_query' => http_build_query($qs),
+            'filter_summary' => $this->cutoffFilterSummary($departmentId, $courseId, $courses, $departments),
+        ];
+    }
+
+    /**
+     * @param array{students?:array,groups?:array} $payload
+     * @return array{students:array<int,array<string,mixed>>,groups:array<int,array<string,mixed>>}
+     */
+    private function filterSecondOptionPayload(array $payload, string $departmentId, string $courseId): array {
+        $students = is_array($payload['students'] ?? null) ? $payload['students'] : [];
+        $groups = is_array($payload['groups'] ?? null) ? $payload['groups'] : [];
+        if ($departmentId === '' && $courseId === '') {
+            return ['students' => $students, 'groups' => $groups];
+        }
+
+        $students = array_values(array_filter($students, static function ($row) use ($departmentId, $courseId) {
+            if ($courseId !== '' && strcasecmp((string) ($row['first_course_id'] ?? ''), $courseId) !== 0) {
+                return false;
+            }
+            if ($departmentId !== '' && strcasecmp((string) ($row['first_department_id'] ?? ''), $departmentId) !== 0) {
+                return false;
+            }
+
+            return true;
+        }));
+
+        $keep = [];
+        foreach ($students as $row) {
+            $keep[(int) ($row['application_id'] ?? 0)] = true;
+        }
+
+        $outGroups = [];
+        foreach ($groups as $g) {
+            if ($courseId !== '' && strcasecmp((string) ($g['course_id'] ?? ''), $courseId) !== 0) {
+                continue;
+            }
+            if ($departmentId !== '' && strcasecmp((string) ($g['department_id'] ?? ''), $departmentId) !== 0) {
+                continue;
+            }
+            $list = [];
+            foreach (($g['students'] ?? []) as $row) {
+                if (isset($keep[(int) ($row['application_id'] ?? 0)])) {
+                    $list[] = $row;
+                }
+            }
+            if ($list === []) {
+                continue;
+            }
+            $g['students'] = $list;
+            $g['count'] = count($list);
+            $outGroups[] = $g;
+        }
+
+        return ['students' => $students, 'groups' => $outGroups];
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $groups
+     * @return array<int,array<string,string>>
+     */
+    private function flattenSecondOptionStudents(array $groups): array {
+        $rows = [];
+        foreach ($groups as $group) {
+            $n = 0;
+            foreach (($group['students'] ?? []) as $row) {
+                $n++;
+                $rows[] = [
+                    'no' => (string) $n,
+                    'department' => (string) ($group['department_name'] ?? $row['first_department_name'] ?? ''),
+                    'first_course_name' => (string) ($group['course_name'] ?? $row['first_course_name'] ?? ''),
+                    'roll_number' => (string) ($row['roll_number'] ?? ''),
+                    'student_full_name' => (string) ($row['student_full_name'] ?? ''),
+                    'student_nic' => (string) ($row['student_nic'] ?? ''),
+                    'exam_marks' => $this->formatCutoffNumber($row['marks_num'] ?? $row['exam_marks'] ?? ''),
+                    'first_cutoff' => $this->formatCutoffNumber($row['first_cutoff'] ?? ''),
+                    'second_course_name' => (string) ($row['second_course_name'] ?? ''),
+                    'third_course_name' => (string) ($row['third_course_name'] ?? ''),
+                    'consider_choice' => ((int) ($row['consider_choice'] ?? 0) === 3)
+                        ? '3rd'
+                        : (((int) ($row['consider_choice'] ?? 0) === 2) ? '2nd' : 'Do not consider'),
+                    'student_province' => (string) ($row['student_province'] ?? ''),
+                    'region' => (string) ($row['region'] ?? ''),
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
     /**
      * @return mixed
      */
@@ -579,12 +1333,23 @@ class ApplicationAdmissionController extends Controller {
         $pickerEntranceFallback = false;
         $hasEntranceSchedule = false;
         $entranceSelectedCount = 0;
+        $cutoffEligible = [];
         if (($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW
             && $courseIdForPicker !== null
         ) {
             $levelForPicker = (string) ($schedule['application_level'] ?? '');
             $hasEntranceSchedule = $model->hasEntranceScheduleForCourse($levelForPicker, $courseIdForPicker);
-            $entranceSelectedCount = count($model->getPassedEntranceApplicationIds($levelForPicker, $courseIdForPicker));
+            require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
+            $cutoffEligible = (new ApplicationAdmissionCutoffModel())->interviewEligibleForCourse(
+                $levelForPicker,
+                $courseIdForPicker
+            );
+            $entranceSelectedCount = count($cutoffEligible);
+            $entries = $this->mergeInterviewCutoffDetails($entries, $cutoffEligible);
+            if ($canManage) {
+                $pickerUnfiltered = $this->mergeInterviewCutoffDetails($pickerUnfiltered, $cutoffEligible);
+                $picker = $this->mergeInterviewCutoffDetails($picker, $cutoffEligible);
+            }
         }
 
         $publicUrl = rtrim(APP_URL, '/') . '/application-admission/public/' . rawurlencode((string) $schedule['public_token']);
@@ -633,7 +1398,21 @@ class ApplicationAdmissionController extends Controller {
         if (!is_array($addIds)) {
             $addIds = [];
         }
-        $added = $model->addApplications($id, array_map('intval', $addIds));
+        $addIds = array_map('intval', $addIds);
+        if (($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW) {
+            $cid = $this->scheduleCourseIdOrNull($schedule);
+            if ($cid !== null) {
+                require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
+                $eligible = (new ApplicationAdmissionCutoffModel())->interviewEligibleForCourse(
+                    (string) ($schedule['application_level'] ?? ''),
+                    $cid
+                );
+                $addIds = array_values(array_filter($addIds, static function ($appId) use ($eligible): bool {
+                    return isset($eligible[(int) $appId]);
+                }));
+            }
+        }
+        $added = $model->addApplications($id, $addIds);
 
         $removeIds = $this->post('remove_entry_ids', []);
         if (is_array($removeIds)) {
@@ -971,6 +1750,7 @@ class ApplicationAdmissionController extends Controller {
             'logo_src' => $this->admissionLogoDataUri(),
             'principal_sig_src' => $this->principalSignatureDataUri(),
             'principal_name' => 'R. Mathaan',
+            'interview_choice' => $this->interviewLetterChoice($schedule, $entry),
         ]);
         $html = ApplicationAdmissionPdfHelper::wrapPdfDocument($inner);
         $name = 'interview-schedule-' . preg_replace('/[^0-9A-Za-z]+/', '', $nic) . '.pdf';
@@ -1190,6 +1970,7 @@ class ApplicationAdmissionController extends Controller {
                 'isInterview' => $isInterview,
                 'principal_sig_src' => $principalSig,
                 'principal_name' => 'R. Mathaan',
+                'interview_choice' => $isInterview ? $this->interviewLetterChoice($schedule, $entry) : null,
             ]);
         }
         if ($entryId !== null && $entryId > 0) {
@@ -1223,6 +2004,71 @@ class ApplicationAdmissionController extends Controller {
             'city_line' => implode(', ', $cityParts),
             'phone' => trim((string) ($entry['student_phone'] ?? '')),
         ];
+    }
+
+    /**
+     * Course and 1st/2nd/3rd choice to print on the interview letter.
+     *
+     * @param array<string, mixed> $schedule
+     * @param array<string, mixed> $entry
+     * @return array{choice:int,choice_label:string,course_id:string,course_name:string,preferences:array{1:string,2:string,3:string}}
+     */
+    private function interviewLetterChoice(array $schedule, array $entry): array {
+        require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
+        require_once BASE_PATH . '/models/CourseModel.php';
+        $cutoffModel = new ApplicationAdmissionCutoffModel();
+        $level = (string) ($schedule['application_level'] ?? $entry['application_level'] ?? '04');
+        if (!in_array($level, ['04', '05'], true)) {
+            $level = '04';
+        }
+        $payload = [
+            'choice' => 1,
+            'choice_label' => ApplicationAdmissionCutoffModel::choiceOrdinal(1),
+            'course_id' => '',
+            'course_name' => '',
+        ];
+        $scheduleCid = trim((string) ($schedule['course_id'] ?? ''));
+        if ($scheduleCid !== '') {
+            $course = (new CourseModel())->find($scheduleCid);
+            if (is_array($course)) {
+                $rank = $cutoffModel->preferenceRankForCourse($entry, $scheduleCid, $course);
+                $name = trim((string) ($course['course_name'] ?? $schedule['course_name'] ?? ''));
+                if ($rank > 0 && $name !== '') {
+                    $payload = [
+                        'choice' => $rank,
+                        'choice_label' => ApplicationAdmissionCutoffModel::choiceOrdinal($rank),
+                        'course_id' => $scheduleCid,
+                        'course_name' => $name,
+                    ];
+                }
+            }
+        }
+        if ($payload['course_name'] === '') {
+            $eligible = $cutoffModel->eligibleChoiceForApplicant($entry, $level);
+            if (is_array($eligible) && trim((string) ($eligible['course_name'] ?? '')) !== '') {
+                $payload = $eligible;
+            }
+        }
+        if ($payload['course_name'] === '') {
+            $fallbackName = '';
+            if (class_exists('ApplicationAdmissionScheduleModel')) {
+                $fallbackName = ApplicationAdmissionScheduleModel::courseNameFromEntry($entry);
+            }
+            if ($fallbackName === '') {
+                $fallbackName = trim((string) ($entry['course_priority_1'] ?? $schedule['course_name'] ?? ''));
+            }
+            $payload['course_name'] = $fallbackName;
+        }
+
+        $prefs = ApplicationAdmissionCutoffModel::preferenceCourseNames($entry);
+        $choice = (int) ($payload['choice'] ?? 0);
+        $selectedName = trim((string) ($payload['course_name'] ?? ''));
+        if ($choice >= 1 && $choice <= 3 && $selectedName !== '' && trim((string) ($prefs[$choice] ?? '')) === '') {
+            $prefs[$choice] = $selectedName;
+        }
+        $payload['preferences'] = $prefs;
+
+        return $payload;
     }
 
     /**
@@ -1473,18 +2319,50 @@ class ApplicationAdmissionController extends Controller {
         }
         $courseId = $this->scheduleCourseIdOrNull($schedule);
         if ($courseId === null) {
-            return 'Select a department course. Only entrance exam Selected students can be added.';
+            return 'Select a department course. Candidates who meet the cutoff (1st choice) or who are eligible as 2nd/3rd option can be added.';
         }
         $level = (string) ($schedule['application_level'] ?? '');
-        $selectedCount = count($this->scheduleModel()->getPassedEntranceApplicationIds($level, $courseId));
+        require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
+        $selectedCount = count((new ApplicationAdmissionCutoffModel())->interviewEligibleForCourse($level, $courseId));
         if (!$this->scheduleModel()->hasEntranceScheduleForCourse($level, $courseId)) {
-            return 'No entrance exam found for this level. Create an entrance exam and mark Selected candidates first.';
+            return 'No entrance exam found for this level. Create an entrance exam, enter marks, and set cutoffs first.';
         }
         if ($selectedCount === 0) {
-            return 'No Selected candidates yet for this course. Mark results on the entrance exam selection page.';
+            return 'No cutoff-eligible candidates yet for this course. Enter exam marks and set cutoffs, then return here.';
         }
 
-        return 'Only applicants marked Selected on the entrance exam for this course can be added (' . $selectedCount . ' eligible).';
+        return 'Listed by exam marks: students who met this course cutoff (1st choice) or who are eligible as 2nd/3rd option (' . $selectedCount . ' eligible).';
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @param array<int, array<string, mixed>> $details
+     * @return list<array<string, mixed>>
+     */
+    private function mergeInterviewCutoffDetails(array $rows, array $details): array {
+        foreach ($rows as &$row) {
+            $aid = (int) ($row['application_id'] ?? 0);
+            if ($aid > 0 && isset($details[$aid])) {
+                $row['exam_marks_num'] = $details[$aid]['exam_marks_num'];
+                $row['cutoff_applied'] = $details[$aid]['cutoff_applied'];
+                $row['interview_choice'] = $details[$aid]['choice'];
+                $row['interview_choice_label'] = $details[$aid]['choice_label'];
+                $row['interview_course_name'] = $details[$aid]['course_name'];
+            }
+        }
+        unset($row);
+        usort($rows, static function (array $a, array $b): int {
+            $ma = isset($a['exam_marks_num']) ? (float) $a['exam_marks_num'] : -1.0;
+            $mb = isset($b['exam_marks_num']) ? (float) $b['exam_marks_num'] : -1.0;
+            $cmp = $mb <=> $ma;
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return strcasecmp((string) ($a['student_full_name'] ?? ''), (string) ($b['student_full_name'] ?? ''));
+        });
+
+        return $rows;
     }
 
     /**

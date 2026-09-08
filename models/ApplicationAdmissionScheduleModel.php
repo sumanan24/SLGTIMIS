@@ -1101,7 +1101,8 @@ class ApplicationAdmissionScheduleModel extends Model {
         $sql .= ' ORDER BY sa.`course_priority_1` ASC, sa.`student_province` ASC, FIELD(sa.`status`, \'approved\', \'rejected\') ASC, sa.`student_full_name` ASC';
         $rows = $this->fetchAllPrepared($sql, $types, $params);
         $courseIdTrim = $courseId !== null ? trim($courseId) : '';
-        if ($courseIdTrim !== '') {
+        $isInterview = ($scheduleType ?? '') === self::TYPE_INTERVIEW;
+        if ($courseIdTrim !== '' && !$isInterview) {
             require_once BASE_PATH . '/models/StudentApplicationModel.php';
             require_once BASE_PATH . '/models/CourseModel.php';
             $appModel = new StudentApplicationModel();
@@ -1208,7 +1209,7 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
-     * Interview picker: only applicants marked Selected on an entrance exam for this course.
+     * Interview picker: cutoff-eligible applicants (1st-choice cutoff, or 2nd/3rd option for this course).
      *
      * @param list<array<string, mixed>> $rows
      * @return list<array<string, mixed>>
@@ -1224,12 +1225,13 @@ class ApplicationAdmissionScheduleModel extends Model {
             return $rows;
         }
         $courseId = trim($courseId);
-        $allowed = array_flip($this->getPassedEntranceApplicationIds($level, $courseId));
+        require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
+        $allowed = (new ApplicationAdmissionCutoffModel())->interviewEligibleForCourse($level, $courseId);
         if ($allowed === []) {
             return [];
         }
 
-        return array_values(array_filter($rows, function (array $row) use ($allowed): bool {
+        return array_values(array_filter($rows, static function (array $row) use ($allowed): bool {
             return isset($allowed[(int) ($row['application_id'] ?? 0)]);
         }));
     }

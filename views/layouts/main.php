@@ -300,6 +300,8 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                 $studentApplicationsPages[] = 'application-admission';
                                 $studentApplicationsPages[] = 'application-admission-entrance';
                                 $studentApplicationsPages[] = 'application-admission-interview';
+                                $studentApplicationsPages[] = 'application-admission-cutoff';
+                                $studentApplicationsPages[] = 'application-admission-second-option';
                             }
                             $showStudentApplicationsMenu = $studentApplicationsPages !== [];
                             $showStudentBusSeasonMenu = !empty($canProcessBusSeasonMenu);
@@ -377,6 +379,18 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                                 <a href="<?php echo APP_URL; ?>/application-admission/interviews" class="<?php echo (isset($page) && $page === 'application-admission-interview') ? 'active' : ''; ?>">
                                                     <i class="fas fa-comments"></i>
                                                     <span>Interviews</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo APP_URL; ?>/application-admission/cutoffs" class="<?php echo (isset($page) && $page === 'application-admission-cutoff') ? 'active' : ''; ?>">
+                                                    <i class="fas fa-filter"></i>
+                                                    <span>Cutoff marks</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo APP_URL; ?>/application-admission/second-option" class="<?php echo (isset($page) && $page === 'application-admission-second-option') ? 'active' : ''; ?>">
+                                                    <i class="fas fa-user-check"></i>
+                                                    <span>2nd option</span>
                                                 </a>
                                             </li>
                                             <?php endif; ?>

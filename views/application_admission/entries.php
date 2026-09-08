@@ -60,6 +60,27 @@ foreach ($whatsAppRecipients ?? [] as $wr) {
     }
 }
 $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq : [];
+$fmtMarks = static function ($n): string {
+    if ($n === null || $n === '') {
+        return '—';
+    }
+    if (is_numeric($n) && abs((float) $n - round((float) $n)) < 0.00001) {
+        return (string) (int) round((float) $n);
+    }
+
+    return is_numeric($n) ? rtrim(rtrim(sprintf('%.2f', (float) $n), '0'), '.') : (string) $n;
+};
+$choiceCell = static function (array $row) use ($e): string {
+    $choice = (int) ($row['interview_choice'] ?? 0);
+    $label = trim((string) ($row['interview_choice_label'] ?? ''));
+    if ($choice < 1 || $label === '') {
+        return '—';
+    }
+    $cls = $choice === 1 ? 'aa-choice-1' : ($choice === 2 ? 'aa-choice-2' : 'aa-choice-3');
+
+    return '<span class="' . $cls . '">' . $e($label) . '</span>';
+};
+$entryColspan = $isInterview ? 13 : 11;
 ?>
 <style>
 .admission-entries-page-wrap {
@@ -201,6 +222,38 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
 .admission-entries-table-readonly col.col-whatsapp { width: 8.5rem; }
 .admission-entries-table col.col-sent,
 .admission-entries-table-readonly col.col-sent { width: 3.75rem; }
+.admission-entries-table col.col-marks,
+.admission-entries-table-readonly col.col-marks,
+.admission-picker-table col.col-marks { width: 4.75rem; }
+.admission-entries-table col.col-choice,
+.admission-entries-table-readonly col.col-choice,
+.admission-picker-table col.col-choice { width: 6.25rem; }
+
+.admission-entries-table .col-marks,
+.admission-entries-table-readonly .col-marks,
+.admission-picker-table .col-marks {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.admission-entries-table .col-choice,
+.admission-entries-table-readonly .col-choice,
+.admission-picker-table .col-choice {
+    text-align: center;
+    white-space: nowrap;
+}
+.aa-choice-1,
+.aa-choice-2,
+.aa-choice-3 {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+}
+.aa-choice-1 { background: #d1e7dd; color: #0f5132; }
+.aa-choice-2 { background: #fff3cd; color: #664d03; }
+.aa-choice-3 { background: #e2d9f3; color: #432874; }
 
 .admission-barcode-toolbar {
     display: flex;
@@ -704,13 +757,14 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
         <?php if (!empty($picker)): ?>
         <div class="admission-picker-card">
             <div class="card-header">
-                <span><?php echo $isInterview ? 'Add Selected entrance candidates' : 'Add applicants (approved or rejected)'; ?></span>
+                <span><?php echo $isInterview ? 'Add cutoff-eligible candidates (by marks)' : 'Add applicants (approved or rejected)'; ?></span>
                 <label class="small"><input type="checkbox" id="picker-select-all" class="form-check-input"> Select all</label>
             </div>
             <div class="admission-picker-scroll">
                 <table class="table admission-picker-table mb-0">
                     <colgroup>
                         <col class="col-pick"><col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-dept"><col class="col-course">
+                        <?php if ($isInterview): ?><col class="col-marks"><col class="col-marks"><col class="col-choice"><?php endif; ?>
                     </colgroup>
                     <thead>
                         <tr>
@@ -721,7 +775,12 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                             <th class="col-province">Province</th>
                             <th class="col-status">Status</th>
                             <th class="col-dept">Dept</th>
-                            <th class="col-course">Course (1st pref.)</th>
+                            <th class="col-course"><?php echo $isInterview ? '1st preference' : 'Course (1st pref.)'; ?></th>
+                            <?php if ($isInterview): ?>
+                            <th class="col-marks">Marks</th>
+                            <th class="col-marks">Cutoff</th>
+                            <th class="col-choice">Choice</th>
+                            <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
@@ -741,6 +800,11 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                         ?><span class="admission-status-badge <?php echo $e($pStatusClass); ?>"><?php echo $e($applicationStatusLabel($p)); ?></span></td>
                         <td class="col-dept" title="<?php echo $e($pDept); ?>"><?php echo $e($pDept !== 'GEN' ? $pDept : '—'); ?></td>
                         <td class="col-course" title="<?php echo $e($p['course_priority_1'] ?? ''); ?>"><?php echo $e($pCourse); ?></td>
+                        <?php if ($isInterview): ?>
+                        <td class="col-marks"><strong><?php echo $e($fmtMarks($p['exam_marks_num'] ?? null)); ?></strong></td>
+                        <td class="col-marks"><?php echo $e($fmtMarks($p['cutoff_applied'] ?? null)); ?></td>
+                        <td class="col-choice"><?php echo $choiceCell($p); ?></td>
+                        <?php endif; ?>
                     </tr>
                     <?php endforeach; ?>
                     </tbody>
@@ -752,11 +816,11 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
             if ($provinceFilterActive) {
                 echo 'No eligible applicants to add for ' . (count($filterProvinces) === 1 ? 'province ' : 'provinces ') . $e($provinceFilterLabel) . '.';
             } elseif ($isInterview && empty($has_entrance_schedule)) {
-                echo 'No entrance exam found for this level yet. Create an entrance exam and mark Selected candidates first.';
+                echo 'No entrance exam found for this level yet. Create an entrance exam, enter marks, and set cutoffs first.';
             } elseif ($isInterview && (int) ($entrance_selected_count ?? 0) === 0) {
-                echo 'No Selected candidates for this course yet. Mark results on the entrance exam selection page.';
+                echo 'No cutoff-eligible candidates for this course yet. Enter exam marks and set cutoffs, then return here.';
             } elseif (!empty($has_entrance_schedule) && (int) ($entrance_selected_count ?? 0) === 0) {
-                echo 'No eligible applicants yet. Open the entrance exam for this course, mark candidates as Selected, then return here.';
+                echo 'No cutoff-eligible applicants yet. Enter exam marks and set cutoffs, then return here.';
             } elseif (!empty($pickerHint)) {
                 echo 'No eligible applicants to add yet.';
             } else {
@@ -788,6 +852,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
             <table class="table admission-entries-table mb-0">
                 <colgroup>
                     <col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-dept"><col class="col-course">
+                    <?php if ($isInterview): ?><col class="col-marks"><col class="col-marks"><col class="col-choice"><?php endif; ?>
                     <?php if (!$isInterview): ?><col class="col-roll"><?php endif; ?>
                     <col class="col-card"><col class="col-whatsapp"><col class="col-sent">
                 </colgroup>
@@ -799,7 +864,12 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                         <th class="col-province">Province</th>
                         <th class="col-status">Status</th>
                         <th class="col-dept">Dept</th>
-                        <th class="col-course">Course</th>
+                        <th class="col-course"><?php echo $isInterview ? '1st preference' : 'Course'; ?></th>
+                        <?php if ($isInterview): ?>
+                        <th class="col-marks">Marks</th>
+                        <th class="col-marks">Cutoff</th>
+                        <th class="col-choice">Choice</th>
+                        <?php endif; ?>
                         <?php if (!$isInterview): ?>
                         <th class="col-roll">Roll / Index</th>
                         <?php endif; ?>
@@ -810,7 +880,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                 </thead>
                 <tbody>
                 <?php if (empty($entries)): ?>
-                    <tr><td colspan="<?php echo $isInterview ? 10 : 11; ?>" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
+                    <tr><td colspan="<?php echo (int) $entryColspan; ?>" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
                 <?php else: ?>
                     <?php $i = 0; foreach ($entries as $row): $i++;
                         $entryId = (int) ($row['entry_id'] ?? 0);
@@ -833,6 +903,11 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                         ?><span class="admission-status-badge <?php echo $e($rowStatusClass); ?>"><?php echo $e($applicationStatusLabel($row)); ?></span></td>
                         <td class="col-dept" title="<?php echo $e($deptKey); ?>"><?php echo $e($deptKey !== 'GEN' ? $deptKey : '—'); ?></td>
                         <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($courseName); ?></td>
+                        <?php if ($isInterview): ?>
+                        <td class="col-marks"><strong><?php echo $e($fmtMarks($row['exam_marks_num'] ?? null)); ?></strong></td>
+                        <td class="col-marks"><?php echo $e($fmtMarks($row['cutoff_applied'] ?? null)); ?></td>
+                        <td class="col-choice"><?php echo $choiceCell($row); ?></td>
+                        <?php endif; ?>
                         <?php if (!$isInterview): ?>
                         <td class="col-roll"><input type="text" class="form-control form-control-sm roll-index-input" name="entries[<?php echo (int) $row['entry_id']; ?>][roll_number]" value="<?php echo $e($rollDisplay); ?>" data-seq="<?php echo $rollSeq; ?>" data-roll-prefix="<?php echo $e($rollPrefix); ?>" data-dept-key="<?php echo $e($deptKey); ?>"></td>
                         <?php endif; ?>
@@ -931,6 +1006,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
         <table class="table admission-entries-table admission-entries-table-readonly mb-0">
             <colgroup>
                 <col class="col-no"><col class="col-name"><col class="col-nic"><col class="col-province"><col class="col-status"><col class="col-dept"><col class="col-course">
+                <?php if ($isInterview): ?><col class="col-marks"><col class="col-marks"><col class="col-choice"><?php endif; ?>
                 <?php if (!$isInterview): ?><col class="col-roll"><?php endif; ?>
                 <col class="col-card"><col class="col-whatsapp"><col class="col-sent">
             </colgroup>
@@ -942,7 +1018,12 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                     <th class="col-province">Province</th>
                     <th class="col-status">Status</th>
                     <th class="col-dept">Dept</th>
-                    <th class="col-course">Course</th>
+                    <th class="col-course"><?php echo $isInterview ? '1st preference' : 'Course'; ?></th>
+                    <?php if ($isInterview): ?>
+                    <th class="col-marks">Marks</th>
+                    <th class="col-marks">Cutoff</th>
+                    <th class="col-choice">Choice</th>
+                    <?php endif; ?>
                     <?php if (!$isInterview): ?>
                     <th class="col-roll">Roll / Index</th>
                     <?php endif; ?>
@@ -953,7 +1034,7 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
             </thead>
             <tbody>
             <?php if (empty($entries)): ?>
-                <tr><td colspan="<?php echo $isInterview ? 10 : 11; ?>" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
+                <tr><td colspan="<?php echo (int) $entryColspan; ?>" class="text-center text-muted py-4">No applicants on this schedule yet.</td></tr>
             <?php else: ?>
                 <?php $i = 0; foreach ($entries as $row): $i++;
                     $entryId = (int) ($row['entry_id'] ?? 0);
@@ -979,6 +1060,11 @@ $courseWiseRollSeq = is_array($courseWiseRollSeq ?? null) ? $courseWiseRollSeq :
                     ?><span class="admission-status-badge <?php echo $e($rowStatusClass); ?>"><?php echo $e($applicationStatusLabel($row)); ?></span></td>
                     <td class="col-dept" title="<?php echo $e($deptKey); ?>"><?php echo $e($deptKey !== 'GEN' ? $deptKey : '—'); ?></td>
                     <td class="col-course" title="<?php echo $e($row['course_priority_1'] ?? ''); ?>"><?php echo $e($courseName); ?></td>
+                    <?php if ($isInterview): ?>
+                    <td class="col-marks"><strong><?php echo $e($fmtMarks($row['exam_marks_num'] ?? null)); ?></strong></td>
+                    <td class="col-marks"><?php echo $e($fmtMarks($row['cutoff_applied'] ?? null)); ?></td>
+                    <td class="col-choice"><?php echo $choiceCell($row); ?></td>
+                    <?php endif; ?>
                     <?php if (!$isInterview): ?>
                     <td class="col-roll"><span class="roll-index-readout"><?php echo $e($rollOut); ?></span></td>
                     <?php endif; ?>

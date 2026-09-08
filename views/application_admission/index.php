@@ -213,6 +213,12 @@ $schedules = is_array($schedules ?? null) ? $schedules : [];
         <a class="<?php echo $isInterview ? 'is-active' : ''; ?>" href="<?php echo $e($interviewUrl); ?>">
             <i class="fas fa-comments"></i> Interviews
         </a>
+        <a href="<?php echo APP_URL; ?>/application-admission/cutoffs">
+            <i class="fas fa-filter"></i> Cutoff marks
+        </a>
+        <a href="<?php echo APP_URL; ?>/application-admission/second-option">
+            <i class="fas fa-user-check"></i> 2nd option
+        </a>
     </nav>
 
     <form method="get" action="<?php echo $e($listBaseUrl); ?>" class="aa-filters">

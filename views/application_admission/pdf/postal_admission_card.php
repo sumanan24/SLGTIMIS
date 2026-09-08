@@ -46,7 +46,11 @@ if ($isInterview && $examCentre === '') {
 }
 $examTitle = trim((string) ($schedule['title'] ?? $cardSubtitle ?? ''));
 $courseLabel = trim((string) ($entry['course_priority_1'] ?? ''));
-if (class_exists('ApplicationAdmissionScheduleModel')) {
+$choiceInfo = is_array($interview_choice ?? null) ? $interview_choice : [];
+$choiceLabel = trim((string) ($choiceInfo['choice_label'] ?? ''));
+if (trim((string) ($choiceInfo['course_name'] ?? '')) !== '') {
+    $courseLabel = trim((string) $choiceInfo['course_name']);
+} elseif (class_exists('ApplicationAdmissionScheduleModel')) {
     $resolved = ApplicationAdmissionScheduleModel::courseNameFromEntry($entry);
     if ($resolved !== '') {
         $courseLabel = $resolved;
@@ -169,7 +173,14 @@ if ($principalName === '') {
         <p class="iv-body-p">
             With reference to your application for admission to a course at the
             <strong>Sri Lanka – German Training Institute (SLGTI)</strong>, we are pleased to inform you
-            that you have been <strong>shortlisted for an interview for the <?php echo $e($examYear); ?> Intake</strong>.
+            that you have been <strong>shortlisted for an interview</strong>
+            <?php if ($choiceLabel !== '' && $courseLabel !== ''): ?>
+            for your <strong><?php echo $e($choiceLabel); ?></strong> course
+            <strong><?php echo $e($courseLabel); ?></strong>
+            <?php elseif ($courseLabel !== ''): ?>
+            for the course <strong><?php echo $e($courseLabel); ?></strong>
+            <?php endif; ?>
+            for the <?php echo $e($examYear); ?> Intake.
         </p>
 
         <p class="iv-body-p">You are kindly requested to attend the interview according to the following details:</p>
@@ -182,6 +193,10 @@ if ($principalName === '') {
             <tr>
                 <th>Course/Programme:</th>
                 <td><?php echo $courseLabel !== '' ? $e($courseLabel) : '—'; ?></td>
+            </tr>
+            <tr>
+                <th>Course choices:</th>
+                <td><?php require BASE_PATH . '/views/application_admission/pdf/_interview_choices.php'; ?></td>
             </tr>
             <tr>
                 <th>Interview Date:</th>

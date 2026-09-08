@@ -21,15 +21,23 @@ $fmtTime = static function (?string $t): string {
 };
 
 $name = trim((string) ($entry['student_full_name'] ?? ''));
-$course = '';
-if (class_exists('ApplicationAdmissionScheduleModel')) {
-    $course = ApplicationAdmissionScheduleModel::courseNameFromEntry($entry);
-}
+$choiceInfo = is_array($interview_choice ?? null) ? $interview_choice : [];
+$course = trim((string) ($choiceInfo['course_name'] ?? ''));
+$choiceLabel = trim((string) ($choiceInfo['choice_label'] ?? ''));
+$choiceNum = (int) ($choiceInfo['choice'] ?? 0);
 if ($course === '') {
-    $course = trim((string) ($entry['course_priority_1'] ?? ''));
+    if (class_exists('ApplicationAdmissionScheduleModel')) {
+        $course = ApplicationAdmissionScheduleModel::courseNameFromEntry($entry);
+    }
+    if ($course === '') {
+        $course = trim((string) ($entry['course_priority_1'] ?? ''));
+    }
+    if ($course === '') {
+        $course = trim((string) ($schedule['course_name'] ?? ''));
+    }
 }
-if ($course === '') {
-    $course = trim((string) ($schedule['course_name'] ?? ''));
+if ($choiceLabel === '' && $choiceNum >= 1 && $choiceNum <= 3 && class_exists('ApplicationAdmissionCutoffModel')) {
+    $choiceLabel = ApplicationAdmissionCutoffModel::choiceOrdinal($choiceNum);
 }
 
 $interviewDate = $fmtDate($schedule['schedule_date'] ?? null);
@@ -75,6 +83,11 @@ if ($principalName === '') {
 .iv-details { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm 0; }
 .iv-details th, .iv-details td { border: none; padding: 1.4mm 0; text-align: left; vertical-align: top; font-size: 10.5pt; }
 .iv-details th { width: 32%; font-weight: 700; }
+.iv-choices { width: 100%; border-collapse: collapse; }
+.iv-choices td { border: 0.5pt solid #bbb; padding: 1.3mm 2mm; font-size: 10pt; vertical-align: middle; }
+.iv-ch-ord { width: 22%; }
+.iv-ch-flag { width: 20%; text-align: center; font-size: 8.5pt; letter-spacing: 0.02em; text-transform: uppercase; }
+.iv-ch-on { background-color: #fff3cd; font-weight: 700; }
 .iv-h { font-size: 11pt; font-weight: 700; margin: 4mm 0 2mm 0; }
 .iv-ul { margin: 0 0 3mm 5mm; padding: 0; }
 .iv-ul li { margin: 0 0 1.5mm 0; }
@@ -110,7 +123,14 @@ if ($principalName === '') {
     <p class="iv-p">
         With reference to your application for admission to a course at the
         <strong>Sri Lanka – German Training Institute (SLGTI)</strong>, we are pleased to inform you
-        that you have been <strong>shortlisted for an interview for the <?php echo $e($year); ?> Intake</strong>.
+        that you have been <strong>shortlisted for an interview</strong>
+        <?php if ($choiceLabel !== '' && $course !== ''): ?>
+        for your <strong><?php echo $e($choiceLabel); ?></strong> course
+        <strong><?php echo $e($course); ?></strong>
+        <?php elseif ($course !== ''): ?>
+        for the course <strong><?php echo $e($course); ?></strong>
+        <?php endif; ?>
+        for the <?php echo $e($year); ?> Intake.
     </p>
 
     <p class="iv-p">You are kindly requested to attend the interview according to the following details:</p>
@@ -123,6 +143,10 @@ if ($principalName === '') {
         <tr>
             <th>Course/Programme:</th>
             <td><?php echo $course !== '' ? $e($course) : '__________________________________'; ?></td>
+        </tr>
+        <tr>
+            <th>Course choices:</th>
+            <td><?php require BASE_PATH . '/views/application_admission/pdf/_interview_choices.php'; ?></td>
         </tr>
         <tr>
             <th>Interview Date:</th>
