@@ -70,11 +70,11 @@ $examYear = (string) ($schedule['schedule_date'] ?? '');
 $examYear = preg_match('/^\d{4}/', $examYear, $ym) ? $ym[0] : date('Y');
 
 $bannerTitle = $isInterview
-    ? 'INTERVIEW INVITATION — ' . $examYear . ' INTAKE'
+    ? 'INVITATION FOR THE SELECTION INTERVIEW — ' . $examYear . ' INTAKE'
     : 'SELECTION EXAMINATION ' . $examYear . ' — ADMISSION CARD';
 
 $docTitle = $cardTitle ?? ($isInterview
-    ? 'INTERVIEW INVITATION — ' . $examYear . ' INTAKE'
+    ? 'INVITATION FOR THE SELECTION INTERVIEW — ' . $examYear . ' INTAKE'
     : 'SELECTION EXAMINATION — ADMISSION CARD');
 
 $logoSrc = (string) ($logo_src ?? '');
@@ -91,6 +91,7 @@ $interviewDateLong = (static function (?string $d): string {
     $ts = $d ? strtotime($d) : false;
     return $ts ? date('d F Y', $ts) : '—';
 })($schedule['schedule_date'] ?? null);
+$entranceExamDateLong = '19th July 2026';
 
 $instrHalf = (int) ceil(count($instructions) / 2);
 $instrLeft = array_slice($instructions, 0, $instrHalf);
@@ -109,10 +110,149 @@ if ($principalName === '') {
     $principalName = 'R. Mathaan';
 }
 ?>
-<div class="adm-page">
+<div class="adm-page<?php echo $isInterview ? ' adm-page-iv' : ''; ?>">
+<?php if ($isInterview): ?>
+<table class="iv-sheet" width="100%" cellspacing="0" cellpadding="0">
+<tr>
+<td class="iv-side" width="7%">&nbsp;</td>
+<td class="iv-main" width="86%">
+
+    <table class="iv-mail" width="100%" cellspacing="0" cellpadding="0">
+        <tr>
+            <td class="iv-mail-banner" colspan="2"><?php echo $e($bannerTitle); ?></td>
+        </tr>
+        <tr>
+            <td class="iv-post-from" width="45%">
+                <div class="iv-post-label">Post from</div>
+                <div class="iv-post-strong"><?php echo $e($postFrom['name']); ?></div>
+                <div class="iv-post-text"><?php echo $e($postFrom['address']); ?></div>
+                <?php if (trim((string) ($postFrom['phone'] ?? '')) !== ''): ?>
+                <div class="iv-post-text"><strong>Phone:</strong> <?php echo $e($postFrom['phone']); ?></div>
+                <?php endif; ?>
+            </td>
+            <td class="iv-post-to" width="55%">
+                <div class="iv-post-label">Post to</div>
+                <div class="iv-post-strong"><?php echo $mailName !== '' ? $e($mailName) : '—'; ?></div>
+                <?php if ($mailAddress !== ''): ?>
+                <div class="iv-post-text"><?php echo nl2br($e($mailAddress)); ?></div>
+                <?php endif; ?>
+                <?php if ($mailCity !== ''): ?>
+                <div class="iv-post-text"><?php echo $e($mailCity); ?></div>
+                <?php endif; ?>
+            </td>
+        </tr>
+    </table>
+
+    <div class="iv-fold">— Fold here —</div>
+
+    <table class="iv-letterhead" width="100%" cellspacing="0" cellpadding="0">
+        <tr>
+            <td class="iv-lh-logo" width="65">
+                <?php if ($logoSrc !== ''): ?>
+                <img class="iv-logo" src="<?php echo $e($logoSrc); ?>" width="60" alt="SLGTI" />
+                <?php else: ?>
+                &nbsp;
+                <?php endif; ?>
+            </td>
+            <td class="iv-lh-mid">
+                <div class="iv-inst">Sri Lanka – German Training Institute (SLGTI)</div>
+                <div class="iv-loc">Ariviyal Nagar, Kilinochchi</div>
+            </td>
+            <td class="iv-lh-meta" width="130">
+                <div class="iv-ref-l">Ref. No.</div>
+                <div class="iv-ref-v"><?php echo $e($refNo); ?></div>
+                <div class="iv-ref-l iv-ref-gap">Date</div>
+                <div class="iv-ref-v"><?php echo $e($letterDateLong); ?></div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="iv-rule"></div>
+
+    <div class="iv-title">Invitation for the Selection Interview – <?php echo $e($examYear); ?> Intake</div>
+
+    <div class="iv-dear">Dear Applicant,</div>
+
+    <div class="iv-p">
+        With reference to the application made by you for the enrollment to a course at the
+        <strong>Sri Lanka – German Training Institute (SLGTI)</strong>, we are pleased to inform you
+        that you have <strong>qualified the entrance examination held on <?php echo $e($entranceExamDateLong); ?></strong>
+        <?php if ($choiceLabel !== '' && $courseLabel !== ''): ?>
+        and are invited for the selection interview for your <strong><?php echo $e($choiceLabel); ?></strong> course
+        <strong><?php echo $e($courseLabel); ?></strong>
+        <?php elseif ($courseLabel !== ''): ?>
+        and are invited for the selection interview for the course <strong><?php echo $e($courseLabel); ?></strong>
+        <?php else: ?>
+        and are invited for the selection interview
+        <?php endif; ?>
+        for the <?php echo $e($examYear); ?> Intake.
+        You are kindly requested to attend the interview according to the following details:
+    </div>
+
+    <div class="iv-details">
+        <div class="iv-detail-line"><strong>Applicant Name:</strong> <?php echo $name !== '' ? $e($name) : '—'; ?></div>
+        <div class="iv-detail-line"><strong>Course/Programme:</strong> <?php echo $courseLabel !== '' ? $e($courseLabel) : '—'; ?></div>
+    </div>
+
+    <div class="iv-choices-block">
+        <div class="iv-choices-label">Course choices:</div>
+        <?php require BASE_PATH . '/views/application_admission/pdf/_interview_choices.php'; ?>
+
+        <div class="iv-info">
+            <div class="iv-info-line"><strong>Interview Date:</strong> <?php echo $e($interviewDateLong); ?></div>
+            <div class="iv-info-line"><strong>Interview Time:</strong> <?php echo $e($timeCell); ?></div>
+            <div class="iv-info-line"><strong>Venue:</strong> <?php echo $e($examCentre); ?></div>
+        </div>
+    </div>
+
+    <div class="iv-h">Documents to Bring</div>
+    <div class="iv-p">
+        Please bring the <strong>original NIC, Birth Certificate, G.C.E. (O/L), G.C.E. (A/L), NVQ certificates, and any other relevant certificates</strong>
+        for verification.
+    </div>
+
+    <div class="iv-h">Dress Code</div>
+    <table class="iv-dress" width="100%" cellspacing="0" cellpadding="0">
+        <tr>
+            <td class="iv-dress-bullet" width="12">•</td>
+            <td class="iv-dress-text"><strong>Male Applicants:</strong> White formal shirt, black trousers/jeans, formal shoes, neat professional haircut, and a clean-shaven</td>
+        </tr>
+        <tr>
+            <td class="iv-dress-bullet" width="12">•</td>
+            <td class="iv-dress-text">
+                <strong>Female Applicants:</strong> White blouse, black skirt/formal black jeans or trousers and formal shoes.
+                <strong>Muslim female applicants may wear a black Abaya with a black or white Hijab.</strong>
+            </td>
+        </tr>
+    </table>
+
+    <div class="iv-p">
+        Arrive <strong>15 minutes before</strong> the scheduled time and maintain a neat, clean and professional appearance.
+        <strong>Being called for an interview does not guarantee admission.</strong>
+        Final selection will follow the applicable admission criteria.
+        We wish you every success in the interview and selection process.
+    </div>
+
+    <div class="iv-sign">
+        <div class="iv-sign-regards"><strong>Regards,</strong></div>
+        <?php if ($principalSig !== ''): ?>
+        <img class="iv-sign-img" src="<?php echo $e($principalSig); ?>" alt="<?php echo $e($principalName); ?>" />
+        <?php else: ?>
+        <div class="iv-sign-line">..........................................................</div>
+        <?php endif; ?>
+        <div class="iv-sign-name"><?php echo $e($principalName); ?></div>
+        <div class="iv-sign-role">Branch Principal</div>
+        <div class="iv-sign-org">Sri Lanka – German Training Institute (SLGTI), Ariviyal Nagar, Kilinochchi</div>
+    </div>
+
+</td>
+<td class="iv-side" width="7%">&nbsp;</td>
+</tr>
+</table>
+<?php else: ?>
 <table class="adm-sheet" width="100%" cellspacing="0" cellpadding="0">
 <tr>
-<td class="adm-side" width="20">&nbsp;</td>
+<td class="adm-side" width="36">&nbsp;</td>
 <td class="adm-main" width="100%">
 
     <div class="adm-banner"><?php echo $e($bannerTitle); ?></div>
@@ -144,116 +284,6 @@ if ($principalName === '') {
     </table>
     <div class="adm-foldhint">Fold with <strong>Post to</strong> on the outside; Post from stays top-left when posted.</div>
     <div class="adm-fold">— Fold here —</div>
-
-    <?php if ($isInterview): ?>
-    <?php /* Interview invitation letter body — postal header above stays unchanged */ ?>
-    <table class="adm-header" width="100%" cellspacing="0" cellpadding="0">
-        <tr>
-            <td class="adm-hmid" width="68%">
-                <div class="adm-institute">Sri Lanka – German Training Institute (SLGTI)</div>
-                <div class="adm-examline">Ariviyal Nagar, Kilinochchi</div>
-            </td>
-            <td class="adm-hmeta" width="32%">
-                <?php if ($logoSrc !== ''): ?>
-                <img class="adm-logo" src="<?php echo $e($logoSrc); ?>" alt="SLGTI" />
-                <?php endif; ?>
-                <div class="adm-meta-l">Ref. No.</div>
-                <div class="adm-meta-v"><?php echo $e($refNo); ?></div>
-                <div class="adm-meta-l adm-meta-gap">Date</div>
-                <div class="adm-meta-v"><?php echo $e($letterDateLong); ?></div>
-            </td>
-        </tr>
-    </table>
-
-    <div class="iv-body">
-        <div class="iv-body-title">Interview Invitation – <?php echo $e($examYear); ?> Intake</div>
-
-        <p class="iv-body-dear">Dear Applicant,</p>
-
-        <p class="iv-body-p">
-            With reference to your application for admission to a course at the
-            <strong>Sri Lanka – German Training Institute (SLGTI)</strong>, we are pleased to inform you
-            that you have been <strong>shortlisted for an interview</strong>
-            <?php if ($choiceLabel !== '' && $courseLabel !== ''): ?>
-            for your <strong><?php echo $e($choiceLabel); ?></strong> course
-            <strong><?php echo $e($courseLabel); ?></strong>
-            <?php elseif ($courseLabel !== ''): ?>
-            for the course <strong><?php echo $e($courseLabel); ?></strong>
-            <?php endif; ?>
-            for the <?php echo $e($examYear); ?> Intake.
-        </p>
-
-        <p class="iv-body-p">You are kindly requested to attend the interview according to the following details:</p>
-
-        <table class="iv-body-details" width="100%" cellspacing="0" cellpadding="0">
-            <tr>
-                <th>Applicant Name:</th>
-                <td><?php echo $name !== '' ? $e($name) : '—'; ?></td>
-            </tr>
-            <tr>
-                <th>Course/Programme:</th>
-                <td><?php echo $courseLabel !== '' ? $e($courseLabel) : '—'; ?></td>
-            </tr>
-            <tr>
-                <th>Course choices:</th>
-                <td><?php require BASE_PATH . '/views/application_admission/pdf/_interview_choices.php'; ?></td>
-            </tr>
-            <tr>
-                <th>Interview Date:</th>
-                <td><?php echo $e($interviewDateLong); ?></td>
-            </tr>
-            <tr>
-                <th>Interview Time:</th>
-                <td><?php echo $e($timeCell); ?></td>
-            </tr>
-            <tr>
-                <th>Venue:</th>
-                <td><?php echo $e($examCentre); ?></td>
-            </tr>
-        </table>
-
-        <div class="iv-body-h">Documents to Bring</div>
-        <p class="iv-body-p">
-            Please bring the <strong>original NIC, Birth Certificate, and relevant educational/NVQ certificates</strong>
-            for verification.
-        </p>
-
-        <div class="iv-body-h">Dress Code</div>
-        <ul class="iv-body-ul">
-            <li><strong>Male Applicants:</strong> White shirt, black jeans/trousers and formal shoes.</li>
-            <li>
-                <strong>Female Applicants:</strong> White blouse, black skirt/formal black jeans or trousers and formal shoes.
-                <strong>Muslim female applicants may wear a black Abaya with a black or white Hijab.</strong>
-            </li>
-        </ul>
-
-        <p class="iv-body-p">
-            Applicants are requested to arrive <strong>15 minutes before the scheduled interview time</strong>
-            and maintain a neat, clean and professional appearance.
-        </p>
-
-        <p class="iv-body-p">
-            Please note that <strong>being called for an interview does not guarantee admission</strong>.
-            Final selection will be made in accordance with the applicable admission criteria and selection process.
-        </p>
-
-        <p class="iv-body-p">We wish you every success in the interview and selection process.</p>
-
-        <div class="iv-body-sign">
-            <div><strong>Regards,</strong></div>
-            <?php if ($principalSig !== ''): ?>
-            <img class="iv-body-sign-img" src="<?php echo $e($principalSig); ?>" alt="<?php echo $e($principalName); ?>" />
-            <?php else: ?>
-            <div>..........................................................</div>
-            <?php endif; ?>
-            <div class="iv-body-sign-name"><?php echo $e($principalName); ?></div>
-            <div class="iv-body-sign-role">Branch Principal</div>
-            <div class="iv-body-sign-org">Sri Lanka – German Training Institute (SLGTI)</div>
-            <div class="iv-body-sign-org">Ariviyal Nagar, Kilinochchi</div>
-        </div>
-    </div>
-
-    <?php else: ?>
 
     <table class="adm-header" width="100%" cellspacing="0" cellpadding="0">
         <tr>
@@ -400,10 +430,9 @@ if ($principalName === '') {
 
     <div class="adm-note">Bring this admission card and your original NIC / Passport / Driving License to the <?php echo $e($centreNote); ?> centre.</div>
 
-    <?php endif; ?>
-
 </td>
-<td class="adm-side" width="20">&nbsp;</td>
+<td class="adm-side" width="36">&nbsp;</td>
 </tr>
 </table>
+<?php endif; ?>
 </div>

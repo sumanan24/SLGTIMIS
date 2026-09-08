@@ -66,37 +66,38 @@ $principalName = trim((string) ($principal_name ?? 'R. Mathaan'));
 if ($principalName === '') {
     $principalName = 'R. Mathaan';
 }
+$entranceExamDateLong = '19th July 2026';
 ?>
 <style>
-.iv-letter { font-family: DejaVu Sans, Helvetica, Arial, sans-serif; font-size: 10.5pt; color: #111; line-height: 1.45; }
-.iv-head { text-align: center; margin: 0 0 4mm 0; }
-.iv-logo { height: 14mm; width: auto; display: block; margin: 0 auto 2mm auto; }
-.iv-inst { font-size: 12pt; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; }
-.iv-addr { font-size: 9.5pt; margin-top: 1mm; }
-.iv-rule { border: none; border-top: 1.2pt solid #111; margin: 3mm 0 4mm 0; }
-.iv-meta { width: 100%; border-collapse: collapse; margin: 0 0 4mm 0; }
-.iv-meta td { border: none; padding: 0; vertical-align: top; font-size: 10pt; }
+.iv-letter { font-family: DejaVu Sans, Helvetica, Arial, sans-serif; font-size: 9.5pt; color: #111; line-height: 1.35; }
+.iv-head { text-align: center; margin: 0 0 2mm 0; }
+.iv-logo { height: 11mm; width: auto; display: block; margin: 0 auto 1.5mm auto; }
+.iv-inst { font-size: 11pt; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; }
+.iv-addr { font-size: 9pt; margin-top: 0.5mm; }
+.iv-rule { border: none; border-top: 1pt solid #111; margin: 2mm 0 3mm 0; }
+.iv-meta { width: 100%; border-collapse: collapse; margin: 0 0 2.5mm 0; }
+.iv-meta td { border: none; padding: 0; vertical-align: top; font-size: 9.5pt; }
 .iv-meta td.right { text-align: right; }
-.iv-title { text-align: center; font-size: 13pt; font-weight: 700; text-transform: uppercase; margin: 0 0 5mm 0; letter-spacing: 0.03em; }
-.iv-dear { font-weight: 700; margin: 0 0 3mm 0; }
-.iv-p { margin: 0 0 3mm 0; text-align: justify; }
-.iv-details { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm 0; }
-.iv-details th, .iv-details td { border: none; padding: 1.4mm 0; text-align: left; vertical-align: top; font-size: 10.5pt; }
-.iv-details th { width: 32%; font-weight: 700; }
+.iv-title { text-align: center; font-size: 11pt; font-weight: 700; text-transform: uppercase; margin: 0 0 3mm 0; letter-spacing: 0.02em; }
+.iv-dear { font-weight: 700; margin: 0 0 2mm 0; }
+.iv-p { margin: 0 0 2mm 0; text-align: justify; font-size: 9.5pt; line-height: 1.35; }
+.iv-details { width: 100%; border-collapse: collapse; margin: 1mm 0 2.5mm 0; }
+.iv-details th, .iv-details td { border: none; padding: 0.8mm 0; text-align: left; vertical-align: top; font-size: 9.5pt; }
+.iv-details th { width: 30%; font-weight: 700; }
 .iv-choices { width: 100%; border-collapse: collapse; }
-.iv-choices td { border: 0.5pt solid #bbb; padding: 1.3mm 2mm; font-size: 10pt; vertical-align: middle; }
+.iv-choices td { border: 0.5pt solid #bbb; padding: 0.8mm 1.5mm; font-size: 9pt; vertical-align: middle; }
 .iv-ch-ord { width: 22%; }
-.iv-ch-flag { width: 20%; text-align: center; font-size: 8.5pt; letter-spacing: 0.02em; text-transform: uppercase; }
+.iv-ch-flag { width: 20%; text-align: center; font-size: 8pt; letter-spacing: 0.02em; text-transform: uppercase; }
 .iv-ch-on { background-color: #fff3cd; font-weight: 700; }
-.iv-h { font-size: 11pt; font-weight: 700; margin: 4mm 0 2mm 0; }
-.iv-ul { margin: 0 0 3mm 5mm; padding: 0; }
-.iv-ul li { margin: 0 0 1.5mm 0; }
-.iv-sign { margin-top: 8mm; }
-.iv-sign-line { margin: 0 0 1mm 0; }
-.iv-sign-img { height: 8mm; width: auto; max-width: 32mm; display: block; margin: 0.5mm 0 0 0; }
-.iv-sign-name { font-weight: 700; margin: 2mm 0 0 0; }
+.iv-h { font-size: 10pt; font-weight: 700; margin: 2.5mm 0 1mm 0; }
+.iv-ul { margin: 0 0 2mm 4mm; padding: 0; font-size: 9.5pt; }
+.iv-ul li { margin: 0 0 0.8mm 0; }
+.iv-sign { margin-top: 4mm; }
+.iv-sign-line { margin: 0 0 0.5mm 0; }
+.iv-sign-img { height: 7mm; width: auto; max-width: 28mm; display: block; margin: 0.3mm 0 0 0; }
+.iv-sign-name { font-weight: 700; margin: 1.5mm 0 0 0; }
 .iv-sign-role { font-weight: 700; margin: 0; }
-.iv-sign-org { margin: 0; font-size: 9.5pt; }
+.iv-sign-org { margin: 0; font-size: 9pt; }
 </style>
 
 <div class="iv-letter">
@@ -116,19 +117,21 @@ if ($principalName === '') {
         </tr>
     </table>
 
-    <div class="iv-title">Interview Invitation – <?php echo $e($year); ?> Intake</div>
+    <div class="iv-title">Invitation for the Selection Interview – <?php echo $e($year); ?> Intake</div>
 
     <p class="iv-dear">Dear Applicant,</p>
 
     <p class="iv-p">
-        With reference to your application for admission to a course at the
+        With reference to the application made by you for the enrollment to a course at the
         <strong>Sri Lanka – German Training Institute (SLGTI)</strong>, we are pleased to inform you
-        that you have been <strong>shortlisted for an interview</strong>
+        that you have <strong>qualified the entrance examination held on <?php echo $e($entranceExamDateLong); ?></strong>
         <?php if ($choiceLabel !== '' && $course !== ''): ?>
-        for your <strong><?php echo $e($choiceLabel); ?></strong> course
+        and are invited for the selection interview for your <strong><?php echo $e($choiceLabel); ?></strong> course
         <strong><?php echo $e($course); ?></strong>
         <?php elseif ($course !== ''): ?>
-        for the course <strong><?php echo $e($course); ?></strong>
+        and are invited for the selection interview for the course <strong><?php echo $e($course); ?></strong>
+        <?php else: ?>
+        and are invited for the selection interview
         <?php endif; ?>
         for the <?php echo $e($year); ?> Intake.
     </p>
@@ -164,13 +167,13 @@ if ($principalName === '') {
 
     <div class="iv-h">Documents to Bring</div>
     <p class="iv-p">
-        Please bring the <strong>original NIC, Birth Certificate, and relevant educational/NVQ certificates</strong>
+        Please bring the <strong>original NIC, Birth Certificate, G.C.E. (O/L), G.C.E. (A/L), NVQ certificates, and any other relevant certificates</strong>
         for verification.
     </p>
 
     <div class="iv-h">Dress Code</div>
     <ul class="iv-ul">
-        <li><strong>Male Applicants:</strong> White shirt, black jeans/trousers and formal shoes.</li>
+        <li><strong>Male Applicants:</strong> White formal shirt, black trousers/jeans, formal shoes, neat professional haircut, and a clean-shaven</li>
         <li>
             <strong>Female Applicants:</strong> White blouse, black skirt/formal black jeans or trousers and formal shoes.
             <strong>Muslim female applicants may wear a black Abaya with a black or white Hijab.</strong>
@@ -178,13 +181,9 @@ if ($principalName === '') {
     </ul>
 
     <p class="iv-p">
-        Applicants are requested to arrive <strong>15 minutes before the scheduled interview time</strong>
-        and maintain a neat, clean and professional appearance.
-    </p>
-
-    <p class="iv-p">
-        Please note that <strong>being called for an interview does not guarantee admission</strong>.
-        Final selection will be made in accordance with the applicable admission criteria and selection process.
+        Arrive <strong>15 minutes before</strong> the scheduled time. Maintain a neat, clean and professional appearance.
+        <strong>Being called for an interview does not guarantee admission.</strong>
+        Final selection will follow the applicable admission criteria.
     </p>
 
     <p class="iv-p">We wish you every success in the interview and selection process.</p>
