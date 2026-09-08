@@ -2040,6 +2040,12 @@ class ApplicationAdmissionController extends Controller {
                         'course_id' => $scheduleCid,
                         'course_name' => $name,
                     ];
+                    if ($rank === 2 && ApplicationAdmissionCutoffModel::isRestrictedSecondOptionCourse($course, $name, $level)) {
+                        $eligible = $cutoffModel->eligibleChoiceForApplicant($entry, $level);
+                        if (is_array($eligible) && (int) ($eligible['choice'] ?? 0) === 3) {
+                            $payload = $eligible;
+                        }
+                    }
                 }
             }
         }

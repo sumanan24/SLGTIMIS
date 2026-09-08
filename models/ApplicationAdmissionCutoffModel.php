@@ -152,26 +152,63 @@ class ApplicationAdmissionCutoffModel extends Model {
     }
 
     /**
-     * Automobile Technician and Computer Hardware & Network Technician are not used as
-     * 2nd-option fallbacks. If 2nd is one of these, consider 3rd instead (unless 3rd is
-     * the same restricted course).
+     * These courses are not used as 2nd-option fallbacks. If 2nd is one of them, consider 3rd
+     * instead (unless 3rd is the same restricted course).
+     * Level 04: Automobile Technician, Computer Hardware and Network Technician.
+     * Level 05: Diploma in Information and Communication Technology, Diploma in Automotive Technology.
      *
      * @param array<string, mixed>|null $course
      */
-    public static function isRestrictedSecondOptionCourse(?array $course, ?string $nameFallback = ''): bool {
+    public static function isRestrictedSecondOptionCourse(?array $course, ?string $nameFallback = '', ?string $level = null): bool {
         $course = $course ?? [];
         $cid = strtoupper(trim((string) ($course['course_id'] ?? '')));
         $dept = strtoupper(trim((string) ($course['department_id'] ?? '')));
         $fromCourse = trim((string) ($course['course_name'] ?? ''));
         $name = mb_strtolower($fromCourse !== '' ? $fromCourse : trim((string) $nameFallback), 'UTF-8');
+        $nvq = self::normalizeApplicationLevel($level !== null && trim($level) !== ''
+            ? $level
+            : (string) ($course['application_level'] ?? $course['course_nvq_level'] ?? ''));
 
+        if ($nvq === '05') {
+            return self::isLevel05RestrictedSecondOption($cid, $name);
+        }
+        if ($nvq === '04') {
+            return self::isLevel04RestrictedSecondOption($cid, $dept, $name);
+        }
+
+        return self::isLevel04RestrictedSecondOption($cid, $dept, $name)
+            || self::isLevel05RestrictedSecondOption($cid, $name);
+    }
+
+    public static function restrictedSecondOptionLabel(string $level): string {
+        $nvq = self::normalizeApplicationLevel($level);
+        if ($nvq === '05') {
+            return 'Diploma in Information and Communication Technology or Diploma in Automotive Technology';
+        }
+
+        return 'Automobile Technician or Computer Hardware and Network Technician';
+    }
+
+    private static function normalizeApplicationLevel(string $level): string {
+        $level = trim($level);
+        if ($level === '4' || $level === '04') {
+            return '04';
+        }
+        if ($level === '5' || $level === '05') {
+            return '05';
+        }
+
+        return $level;
+    }
+
+    private static function isLevel04RestrictedSecondOption(string $cid, string $dept, string $name): bool {
         if ($cid === '4AT' || $dept === 'AUT') {
             return true;
         }
         if (strpos($name, 'automobile') !== false || strpos($name, 'automotive') !== false) {
             return true;
         }
-        if (in_array($cid, ['4CHN', '4CHNT', 'CHN', '4HNT', '4CNT', '4HW'], true)) {
+        if (in_array($cid, ['4IT', '4CHN', '4CHNT', 'CHN', '4HNT', '4CNT', '4HW'], true)) {
             return true;
         }
         if (strpos($name, 'computer hardware') !== false) {
@@ -179,6 +216,19 @@ class ApplicationAdmissionCutoffModel extends Model {
         }
 
         return strpos($name, 'hardware') !== false && strpos($name, 'network') !== false;
+    }
+
+    private static function isLevel05RestrictedSecondOption(string $cid, string $name): bool {
+        if ($cid === '5IT' || $cid === '5AT') {
+            return true;
+        }
+        if (strpos($name, 'information and communication') !== false
+            || strpos($name, 'information & communication') !== false
+        ) {
+            return true;
+        }
+
+        return strpos($name, 'automotive') !== false || strpos($name, 'automobile') !== false;
     }
 
     public static function choiceOrdinal(int $n): string {
@@ -291,7 +341,7 @@ class ApplicationAdmissionCutoffModel extends Model {
         }
         $second = $this->findCourseForPreference($row, 'course_priority_2', $courses, $appModel);
         $third = $this->findCourseForPreference($row, 'course_priority_3', $courses, $appModel);
-        $picked = $this->consideredSecondOption($row, $second, $third);
+        $picked = $this->consideredSecondOption($row, $second, $third, $level);
         $consider = (int) ($picked['consider_choice'] ?? 0);
         if ($consider === 2 && $second !== null) {
             return $this->choicePayload(2, $second);
@@ -821,7 +871,7 @@ class ApplicationAdmissionCutoffModel extends Model {
             $row['third_department_name'] = $third !== null ? trim((string) ($third['department_name'] ?? '')) : '';
             $row['third_cutoff'] = $thirdCutoff;
             $row['third_meets'] = $thirdCutoff !== null && $marks + 0.00001 >= $thirdCutoff;
-            $picked = $this->consideredSecondOption($row, $second, $third);
+            $picked = $this->consideredSecondOption($row, $second, $third, $level);
             $row['second_restricted'] = $picked['second_restricted'];
             $row['third_restricted'] = $picked['third_restricted'];
             $row['consider_choice'] = $picked['consider_choice'];
@@ -900,15 +950,18 @@ class ApplicationAdmissionCutoffModel extends Model {
      * @param array<string, mixed>|null $third
      * @return array{second_restricted:bool,third_restricted:bool,consider_choice:int}
      */
-    private function consideredSecondOption(array $row, ?array $second, ?array $third): array {
+    private function consideredSecondOption(array $row, ?array $second, ?array $third, ?string $level = null): array {
+        $level = $level !== null && trim($level) !== ''
+            ? $level
+            : (string) ($row['application_level'] ?? '');
         $secondName = $second !== null
             ? trim((string) ($second['course_name'] ?? ''))
             : trim((string) ($row['course_priority_2'] ?? ''));
         $thirdName = $third !== null
             ? trim((string) ($third['course_name'] ?? ''))
             : trim((string) ($row['course_priority_3'] ?? ''));
-        $secondRestricted = $secondName !== '' && self::isRestrictedSecondOptionCourse($second, $secondName);
-        $thirdRestricted = $thirdName !== '' && self::isRestrictedSecondOptionCourse($third, $thirdName);
+        $secondRestricted = $secondName !== '' && self::isRestrictedSecondOptionCourse($second, $secondName, $level);
+        $thirdRestricted = $thirdName !== '' && self::isRestrictedSecondOptionCourse($third, $thirdName, $level);
         $secondId = $second !== null ? trim((string) ($second['course_id'] ?? '')) : '';
         $thirdId = $third !== null ? trim((string) ($third['course_id'] ?? '')) : '';
         $same = ($secondId !== '' && $thirdId !== '' && strcasecmp($secondId, $thirdId) === 0)

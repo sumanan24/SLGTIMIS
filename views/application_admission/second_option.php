@@ -146,7 +146,9 @@ $aaNavActive = 'second-option';
                 Course-wise list of students with marks from <strong><?php echo (int) $minMarks; ?></strong>
                 up to (below) that course’s cutoff. They were not selected for 1st choice.
                 Use <strong>2nd option</strong> and <strong>3rd option</strong> to consider them for another course.
-                If 2nd option is <strong>Automobile Technician</strong> or <strong>Computer Hardware and Network Technician</strong>,
+                If 2nd option is a restricted course
+                (Level 04: <strong>Automobile Technician</strong> or <strong>Computer Hardware and Network Technician</strong>;
+                Level 05: <strong>Diploma in Information and Communication Technology</strong> or <strong>Diploma in Automotive Technology</strong>),
                 use 3rd option instead. If 3rd is the same restricted course, do not consider.
                 The course to consider is highlighted in <strong>green</strong>.
             </p>

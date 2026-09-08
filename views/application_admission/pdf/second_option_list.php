@@ -19,7 +19,7 @@ $groups = is_array($groups ?? null) ? $groups : [];
 <td style="text-align:left;border:none;">
 <div class="inst">Sri Lanka German Training Institute</div>
 <div class="title">2nd option list — NVQ Level <?php echo $e($level); ?></div>
-<div class="sub">Course-wise students with marks from <?php echo (int) $minMarks; ?> up to (below) the 1st-choice cutoff. Automobile Technician and Computer Hardware and Network Technician are not used as 2nd-option fallbacks — use 3rd instead unless 3rd is the same. Green cell = course to consider.<?php
+<div class="sub">Course-wise students with marks from <?php echo (int) $minMarks; ?> up to (below) the 1st-choice cutoff. Restricted 2nd-option courses (<?php echo $e(ApplicationAdmissionCutoffModel::restrictedSecondOptionLabel($level)); ?>) are skipped — use 3rd instead unless 3rd is the same. Green cell = course to consider.<?php
 if (!empty($filter_summary)) {
     echo '<br>' . $e((string) $filter_summary);
 }
