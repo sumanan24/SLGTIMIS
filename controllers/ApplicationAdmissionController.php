@@ -1632,11 +1632,17 @@ class ApplicationAdmissionController extends Controller {
         if ($level !== '' && !in_array($level, ['04', '05'], true)) {
             $level = '';
         }
-        $rows = $this->scheduleModel()->interviewCommonResultRows($level !== '' ? $level : null);
+        $groups = $this->scheduleModel()->interviewCommonResultGroups($level !== '' ? $level : null);
+        $total = 0;
+        foreach ($groups as $group) {
+            $total += count($group['rows'] ?? []);
+        }
         $levelLabel = $level !== '' ? $level : '';
         require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
         $inner = ApplicationAdmissionPdfHelper::renderTemplate('interview_result_sheet.php', [
-            'rows' => $rows,
+            'groups' => $groups,
+            'rows' => [],
+            'total' => $total,
             'level' => $levelLabel,
             'logo_src' => $this->admissionLogoDataUri(),
         ]);
@@ -1647,7 +1653,7 @@ class ApplicationAdmissionController extends Controller {
         $fileLevel = $levelLabel !== '' ? $levelLabel : 'all';
         ApplicationAdmissionPdfHelper::streamHtml(
             $html,
-            'interview-common-result-sheet-nvq-' . $fileLevel . '.pdf',
+            'interview-result-sheet-nvq-' . $fileLevel . '.pdf',
             'A4',
             'landscape'
         );

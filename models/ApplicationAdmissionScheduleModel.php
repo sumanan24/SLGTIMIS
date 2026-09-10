@@ -878,10 +878,11 @@ class ApplicationAdmissionScheduleModel extends Model {
             . ' e.`selection_status`, e.`notes`, e.`exam_marks`, e.`whatsapp_sent`,'
             . ' s.`title` AS schedule_title, s.`schedule_type`, s.`schedule_date`, s.`start_time`, s.`end_time`,'
             . ' s.`venue`, s.`application_level` AS schedule_level, s.`course_id` AS schedule_course_id,'
+            . ' s.`student_language` AS schedule_language,'
             . ' sa.`student_full_name`, sa.`student_nic`, sa.`student_phone`, sa.`student_whatsapp`, sa.`student_email`,'
             . ' sa.`student_address`, sa.`student_district`, sa.`student_province`, sa.`student_zip_code`,'
             . ' sa.`course_priority_1`, sa.`course_priority_2`, sa.`course_priority_3`,'
-            . ' sa.`application_level`, sa.`status` AS application_status'
+            . ' sa.`application_level`, sa.`student_language`, sa.`status` AS application_status'
             . ' FROM `application_admission_schedule_entry` e'
             . ' INNER JOIN `application_admission_schedule` s ON s.`schedule_id` = e.`schedule_id`'
             . ' INNER JOIN `student_applications` sa ON sa.`application_id` = e.`application_id`'
@@ -956,6 +957,8 @@ class ApplicationAdmissionScheduleModel extends Model {
                 'roll_number' => $roll,
                 'student_full_name' => (string) ($row['student_full_name'] ?? ''),
                 'student_nic' => (string) ($row['student_nic'] ?? ''),
+                'student_language' => (string) ($row['student_language'] ?? ''),
+                'schedule_language' => (string) ($row['schedule_language'] ?? ''),
                 'applied_course' => $applied,
                 'selected_course' => $selected,
                 'department_name' => (string) ($row['department_name'] ?? ''),
@@ -989,6 +992,60 @@ class ApplicationAdmissionScheduleModel extends Model {
         });
 
         return $out;
+    }
+
+    /**
+     * Result-sheet rows grouped Tamil → Sinhala → English.
+     *
+     * @return list<array{language:string,rows:list<array<string, mixed>>}>
+     */
+    public function interviewCommonResultGroups(?string $level = null): array {
+        $buckets = ['Tamil' => [], 'Sinhala' => [], 'English' => [], 'Other' => []];
+        foreach ($this->interviewCommonResultRows($level) as $row) {
+            $label = self::resultSheetLanguageLabel($row);
+            if (!isset($buckets[$label])) {
+                $label = 'Other';
+            }
+            $buckets[$label][] = $row;
+        }
+        $out = [];
+        foreach (['Tamil', 'Sinhala', 'English', 'Other'] as $label) {
+            if ($buckets[$label] === []) {
+                continue;
+            }
+            $out[] = [
+                'language' => $label,
+                'rows' => $buckets[$label],
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    public static function resultSheetLanguageLabel(array $row): string {
+        $raw = trim((string) ($row['student_language'] ?? ''));
+        if ($raw === '') {
+            $raw = trim((string) ($row['schedule_language'] ?? ''));
+        }
+        $level = trim((string) ($row['application_level'] ?? ''));
+        if ($raw === '' && ($level === '05' || $level === '5')) {
+            return 'English';
+        }
+        $lower = mb_strtolower($raw, 'UTF-8');
+        if (strpos($lower, 'tamil') !== false) {
+            return 'Tamil';
+        }
+        if (strpos($lower, 'sinhala') !== false) {
+            return 'Sinhala';
+        }
+        if (strpos($lower, 'english') !== false) {
+            return 'English';
+        }
+
+        return $raw !== '' ? $raw : 'Other';
     }
 
     /**
