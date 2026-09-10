@@ -70,11 +70,11 @@ $examYear = (string) ($schedule['schedule_date'] ?? '');
 $examYear = preg_match('/^\d{4}/', $examYear, $ym) ? $ym[0] : date('Y');
 
 $bannerTitle = $isInterview
-    ? 'INVITATION FOR THE SELECTION INTERVIEW — ' . $examYear . ' INTAKE'
+    ? 'INVITATION FOR THE SELECTION INTERVIEW – ' . $examYear . ' INTAKE'
     : 'SELECTION EXAMINATION ' . $examYear . ' — ADMISSION CARD';
 
 $docTitle = $cardTitle ?? ($isInterview
-    ? 'INVITATION FOR THE SELECTION INTERVIEW — ' . $examYear . ' INTAKE'
+    ? 'INVITATION FOR THE SELECTION INTERVIEW – ' . $examYear . ' INTAKE'
     : 'SELECTION EXAMINATION — ADMISSION CARD');
 
 $logoSrc = (string) ($logo_src ?? '');
@@ -169,7 +169,7 @@ if ($principalName === '') {
 
     <div class="iv-rule"></div>
 
-    <div class="iv-title">Invitation for the Selection Interview – <?php echo $e($examYear); ?> Intake</div>
+    <div class="iv-title">INVITATION FOR THE SELECTION INTERVIEW – <?php echo $e($examYear); ?> INTAKE</div>
 
     <div class="iv-dear">Dear Applicant,</div>
 
@@ -243,6 +243,7 @@ if ($principalName === '') {
         <div class="iv-sign-name"><?php echo $e($principalName); ?></div>
         <div class="iv-sign-role">Branch Principal</div>
         <div class="iv-sign-org">Sri Lanka – German Training Institute (SLGTI), Ariviyal Nagar, Kilinochchi</div>
+        <div class="iv-sign-org">Contact Student Affairs Office 0703060138 / 021 492 7799</div>
     </div>
 
 </td>

@@ -117,7 +117,7 @@ $entranceExamDateLong = '19th July 2026';
         </tr>
     </table>
 
-    <div class="iv-title">Invitation for the Selection Interview – <?php echo $e($year); ?> Intake</div>
+    <div class="iv-title">INVITATION FOR THE SELECTION INTERVIEW – <?php echo $e($year); ?> INTAKE</div>
 
     <p class="iv-dear">Dear Applicant,</p>
 
@@ -199,5 +199,6 @@ $entranceExamDateLong = '19th July 2026';
         <p class="iv-sign-role">Branch Principal</p>
         <p class="iv-sign-org">Sri Lanka – German Training Institute (SLGTI)</p>
         <p class="iv-sign-org">Ariviyal Nagar, Kilinochchi</p>
+        <p class="iv-sign-org">Contact Student Affairs Office 0703060138 / 021 492 7799</p>
     </div>
 </div>

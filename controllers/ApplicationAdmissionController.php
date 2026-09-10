@@ -1694,34 +1694,93 @@ class ApplicationAdmissionController extends Controller {
     }
 
     /**
-     * Public page: students enter NIC and download their interview letter.
+     * Public page: students enter NIC, see applied vs selected course, then download the letter.
      */
     public function publicInterviewLetter() {
-        $nic = trim((string) $this->get('nic', ''));
+        $nic = trim((string) $this->post('nic', $this->get('nic', '')));
+        $result = null;
+        if ($nic !== '') {
+            $found = $this->findPublishedInterviewLetterOrError($nic);
+            if ($found !== null) {
+                $result = $this->buildPublicInterviewLetterResult($found['schedule'], $found['entry']);
+                $nic = trim((string) ($found['entry']['student_nic'] ?? $nic));
+            }
+        }
 
         return $this->view('application_admission/public_interview_letter', [
             'use_public_layout' => true,
             'page' => 'public-interview-letter',
-            'title' => 'Download interview letter',
+            'title' => 'INVITATION FOR THE SELECTION INTERVIEW – 2026 INTAKE',
             'seo_robots' => 'noindex, nofollow',
             'nic' => $nic,
+            'result' => $result,
+            'lookupAction' => rtrim(APP_URL, '/') . '/application-admission/interview-letter',
             'formAction' => rtrim(APP_URL, '/') . '/application-admission/interview-letter/download',
         ]);
     }
 
     public function publicInterviewLetterDownload() {
         $nic = trim((string) $this->post('nic', $this->get('nic', '')));
+        $found = $this->findPublishedInterviewLetterOrError($nic);
+        if ($found === null) {
+            $qs = ApplicationAdmissionScheduleModel::normalizedNic($nic);
+            $this->redirect(
+                'application-admission/interview-letter' . ($qs !== '' ? ('?nic=' . rawurlencode($nic)) : '')
+            );
+        }
+        $this->streamInterviewLetterPdf($found['schedule'], $found['entry']);
+    }
+
+    /**
+     * @return array{schedule: array<string, mixed>, entry: array<string, mixed>}|null
+     */
+    private function findPublishedInterviewLetterOrError(string $nic): ?array {
         $normalized = ApplicationAdmissionScheduleModel::normalizedNic($nic);
         if ($normalized === '') {
-            $_SESSION['error'] = 'Enter your NIC number as on the application.';
-            $this->redirect('application-admission/interview-letter');
+            $_SESSION['error'] = 'Check your NIC number.';
+            return null;
         }
         $found = $this->scheduleModel()->findPublishedInterviewByNic($normalized);
         if ($found === null) {
-            $_SESSION['error'] = 'No interview letter was found for this NIC. Check the number as on your application, or wait until your interview is published.';
-            $this->redirect('application-admission/interview-letter');
+            $_SESSION['error'] = 'Check your NIC number.';
+            return null;
         }
-        $this->streamInterviewLetterPdf($found['schedule'], $found['entry']);
+
+        return $found;
+    }
+
+    /**
+     * @param array<string, mixed> $schedule
+     * @param array<string, mixed> $entry
+     * @return array<string, mixed>
+     */
+    private function buildPublicInterviewLetterResult(array $schedule, array $entry): array {
+        $choice = $this->interviewLetterChoice($schedule, $entry);
+        $dateTs = !empty($schedule['schedule_date']) ? strtotime((string) $schedule['schedule_date']) : false;
+        $startTs = !empty($schedule['start_time']) ? strtotime((string) $schedule['start_time']) : false;
+        $endTs = !empty($schedule['end_time']) ? strtotime((string) $schedule['end_time']) : false;
+        $time = $startTs ? date('g:i A', $startTs) : '';
+        if ($endTs && $time !== '') {
+            $time .= ' – ' . date('g:i A', $endTs);
+        }
+        $venue = trim((string) ($schedule['venue'] ?? ''));
+        if ($venue === '') {
+            $venue = 'Sri Lanka – German Training Institute, Ariviyal Nagar, Kilinochchi';
+        }
+
+        return [
+            'name' => trim((string) ($entry['student_full_name'] ?? '')),
+            'nic' => trim((string) ($entry['student_nic'] ?? '')),
+            'level' => (string) ($schedule['application_level'] ?? $entry['application_level'] ?? ''),
+            'interview_date' => $dateTs ? date('d F Y', $dateTs) : '',
+            'interview_time' => $time,
+            'venue' => $venue,
+            'selected_course' => trim((string) ($choice['course_name'] ?? '')),
+            'selected_choice' => (int) ($choice['choice'] ?? 0),
+            'selected_label' => trim((string) ($choice['choice_label'] ?? '')),
+            'preferences' => is_array($choice['preferences'] ?? null) ? $choice['preferences'] : [1 => '', 2 => '', 3 => ''],
+            'choice' => $choice,
+        ];
     }
 
     /** Public landing — no login */
