@@ -964,6 +964,9 @@ class ApplicationAdmissionController extends Controller {
             'listBaseUrl' => $isInterview
                 ? (rtrim(APP_URL, '/') . '/application-admission/interviews')
                 : (rtrim(APP_URL, '/') . '/application-admission'),
+            'interviewLetterPublicUrl' => $isInterview
+                ? (rtrim(APP_URL, '/') . '/application-admission/interview-letter')
+                : '',
         ]);
     }
 
@@ -1621,6 +1624,36 @@ class ApplicationAdmissionController extends Controller {
     }
 
     /**
+     * Combined interview result sheet (roll number, name, selected course).
+     */
+    public function pdfInterviewResults() {
+        $this->requireView($this->requireLogin());
+        $level = trim((string) $this->get('level', ''));
+        if ($level !== '' && !in_array($level, ['04', '05'], true)) {
+            $level = '';
+        }
+        $rows = $this->scheduleModel()->interviewCommonResultRows($level !== '' ? $level : null);
+        $levelLabel = $level !== '' ? $level : '';
+        require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
+        $inner = ApplicationAdmissionPdfHelper::renderTemplate('interview_result_sheet.php', [
+            'rows' => $rows,
+            'level' => $levelLabel,
+            'logo_src' => $this->admissionLogoDataUri(),
+        ]);
+        $html = ApplicationAdmissionPdfHelper::wrapPdfDocument(
+            $inner,
+            ApplicationAdmissionPdfHelper::interviewResultSheetStyles()
+        );
+        $fileLevel = $levelLabel !== '' ? $levelLabel : 'all';
+        ApplicationAdmissionPdfHelper::streamHtml(
+            $html,
+            'interview-common-result-sheet-nvq-' . $fileLevel . '.pdf',
+            'A4',
+            'landscape'
+        );
+    }
+
+    /**
      * Single applicant postal admission / interview card (mailing panel on top).
      */
     public function admissionCard() {
@@ -1658,6 +1691,37 @@ class ApplicationAdmissionController extends Controller {
             $_SESSION['error'] = $e->getMessage();
             $this->redirect($this->entriesRedirectUrl($scheduleId, $provinces));
         }
+    }
+
+    /**
+     * Public page: students enter NIC and download their interview letter.
+     */
+    public function publicInterviewLetter() {
+        $nic = trim((string) $this->get('nic', ''));
+
+        return $this->view('application_admission/public_interview_letter', [
+            'use_public_layout' => true,
+            'page' => 'public-interview-letter',
+            'title' => 'Download interview letter',
+            'seo_robots' => 'noindex, nofollow',
+            'nic' => $nic,
+            'formAction' => rtrim(APP_URL, '/') . '/application-admission/interview-letter/download',
+        ]);
+    }
+
+    public function publicInterviewLetterDownload() {
+        $nic = trim((string) $this->post('nic', $this->get('nic', '')));
+        $normalized = ApplicationAdmissionScheduleModel::normalizedNic($nic);
+        if ($normalized === '') {
+            $_SESSION['error'] = 'Enter your NIC number as on the application.';
+            $this->redirect('application-admission/interview-letter');
+        }
+        $found = $this->scheduleModel()->findPublishedInterviewByNic($normalized);
+        if ($found === null) {
+            $_SESSION['error'] = 'No interview letter was found for this NIC. Check the number as on your application, or wait until your interview is published.';
+            $this->redirect('application-admission/interview-letter');
+        }
+        $this->streamInterviewLetterPdf($found['schedule'], $found['entry']);
     }
 
     /** Public landing — no login */
@@ -1748,18 +1812,37 @@ class ApplicationAdmissionController extends Controller {
             $_SESSION['error'] = 'No matching applicant on this interview schedule.';
             $this->redirect('application-admission/public/' . rawurlencode((string) $token));
         }
+        $this->streamInterviewLetterPdf($schedule, $entry);
+    }
+
+    /**
+     * Same interview invitation letter staff download from Applicants (postal card).
+     *
+     * @param array<string, mixed> $schedule
+     * @param array<string, mixed> $entry
+     */
+    private function streamInterviewLetterPdf(array $schedule, array $entry): void {
         require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
-        $inner = ApplicationAdmissionPdfHelper::renderTemplate('interview_slip.php', [
-            'schedule' => $schedule,
-            'entry' => $entry,
-            'logo_src' => $this->admissionLogoDataUri(),
-            'principal_sig_src' => $this->principalSignatureDataUri(),
-            'principal_name' => 'R. Mathaan',
-            'interview_choice' => $this->interviewLetterChoice($schedule, $entry),
-        ]);
-        $html = ApplicationAdmissionPdfHelper::wrapPdfDocument($inner);
-        $name = 'interview-schedule-' . preg_replace('/[^0-9A-Za-z]+/', '', $nic) . '.pdf';
-        ApplicationAdmissionPdfHelper::streamHtml($html, $name);
+        $entry['roll_number'] = '';
+        $nic = preg_replace('/[^0-9A-Za-z]+/', '', ApplicationAdmissionScheduleModel::normalizedNic((string) ($entry['student_nic'] ?? '')));
+        $scheduleId = (int) ($schedule['schedule_id'] ?? 0);
+        $entryId = (int) ($entry['entry_id'] ?? 0);
+        $html = ApplicationAdmissionPdfHelper::wrapPostalAdmissionCardsDocument(
+            ApplicationAdmissionPdfHelper::renderTemplate('postal_admission_card.php', [
+                'schedule' => $schedule,
+                'entry' => $entry,
+                'logo_src' => $this->admissionLogoDataUri(),
+                'mailing' => $this->formatEntryMailingBlock($entry),
+                'cardTitle' => 'INTERVIEW — ADMISSION CARD',
+                'cardSubtitle' => (string) ($schedule['title'] ?? ''),
+                'isInterview' => true,
+                'principal_sig_src' => $this->principalSignatureDataUri(),
+                'principal_name' => 'R. Mathaan',
+                'interview_choice' => $this->interviewLetterChoice($schedule, $entry),
+            ])
+        );
+        $filename = 'interview-letter-' . $scheduleId . '-' . ($nic !== '' ? $nic : (string) $entryId) . '.pdf';
+        ApplicationAdmissionPdfHelper::streamHtml($html, $filename);
     }
 
     private function streamSchedulePdf(int $scheduleId, bool $allowUnpublishedForStaff): void {
@@ -2493,7 +2576,7 @@ class ApplicationAdmissionController extends Controller {
      * Public PDF / slip URLs for a published schedule (token-based).
      *
      * @param array<string, mixed> $schedule
-     * @return array{schedule_pdf: string, slip_base: string}
+     * @return array{schedule_pdf: string, slip_base: string, interview_letter: string}
      */
     private function publicScheduleDownloadUrls(array $schedule): array {
         $tokenEsc = rawurlencode((string) ($schedule['public_token'] ?? ''));
@@ -2504,6 +2587,7 @@ class ApplicationAdmissionController extends Controller {
         return [
             'schedule_pdf' => $base . '/schedule-pdf',
             'slip_base' => $base . '/' . $slipSeg,
+            'interview_letter' => rtrim(APP_URL, '/') . '/application-admission/interview-letter',
         ];
     }
 
@@ -2555,6 +2639,14 @@ class ApplicationAdmissionController extends Controller {
         $lines[] = 'Download full schedule (PDF):';
         $lines[] = $downloadUrls['schedule_pdf'];
         $lines[] = '';
+        if ($isInterview) {
+            $letterLink = (string) ($downloadUrls['interview_letter'] ?? '');
+            if ($letterLink !== '') {
+                $lines[] = 'Download your interview letter (enter your NIC):';
+                $lines[] = $letterLink;
+                $lines[] = '';
+            }
+        }
         $lines[] = 'Download your personal slip (PDF):';
         $lines[] = $slipLink;
         $lines[] = '';

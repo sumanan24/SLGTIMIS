@@ -190,11 +190,20 @@ $schedules = is_array($schedules ?? null) ? $schedules : [];
                 ? 'Department and course interviews — add only entrance exam Selected students.'
                 : 'Entrance exams by centre / language. Mark Selected candidates for interview schedules.'; ?></p>
         </div>
-        <?php if (!empty($canManage)): ?>
+        <?php if ($isInterview || !empty($canManage)): ?>
         <div class="d-flex flex-wrap gap-2">
+            <?php if ($isInterview):
+                $resultPdfQs = ($levelFilter ?? '') !== '' ? ('?level=' . rawurlencode((string) $levelFilter)) : '';
+            ?>
+            <a href="<?php echo APP_URL; ?>/application-admission/pdf-interview-results<?php echo $e($resultPdfQs); ?>" class="btn btn-sm btn-outline-dark" title="Download common result sheet (roll number, name, course applied, selected course)">
+                <i class="fas fa-file-pdf me-1"></i> Common result sheet
+            </a>
+            <?php endif; ?>
+            <?php if (!empty($canManage)): ?>
             <a href="<?php echo APP_URL; ?>/application-admission/create?type=<?php echo $e($createType); ?>" class="btn btn-primary btn-sm">
                 <i class="fas fa-plus me-1"></i> New <?php echo $e(strtolower($typeLabel)); ?>
             </a>
+            <?php endif; ?>
         </div>
         <?php endif; ?>
     </div>
@@ -220,6 +229,44 @@ $schedules = is_array($schedules ?? null) ? $schedules : [];
             <i class="fas fa-user-check"></i> 2nd option
         </a>
     </nav>
+
+    <?php if ($isInterview):
+        $letterPublicUrl = (string) ($interviewLetterPublicUrl ?? (APP_URL . '/application-admission/interview-letter'));
+    ?>
+    <div class="alert alert-light border d-flex flex-wrap align-items-center justify-content-between gap-2 py-2 px-3 mb-3">
+        <div>
+            <strong class="d-block">Student interview letter</strong>
+            <span class="small text-muted">Students enter their NIC and download the letter. Share this public link:</span>
+            <div class="small mt-1"><code><?php echo $e($letterPublicUrl); ?></code></div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="aa-copy-letter-url" data-url="<?php echo $e($letterPublicUrl); ?>">
+                <i class="fas fa-copy me-1"></i> Copy link
+            </button>
+            <a href="<?php echo $e($letterPublicUrl); ?>" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
+                <i class="fas fa-external-link-alt me-1"></i> Open
+            </a>
+        </div>
+    </div>
+    <script>
+    (function () {
+        var btn = document.getElementById('aa-copy-letter-url');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+            var url = btn.getAttribute('data-url') || '';
+            if (!url) return;
+            var done = function () {
+                var prev = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check me-1"></i> Copied';
+                setTimeout(function () { btn.innerHTML = prev; }, 1600);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(done).catch(function () {});
+            }
+        });
+    })();
+    </script>
+    <?php endif; ?>
 
     <form method="get" action="<?php echo $e($listBaseUrl); ?>" class="aa-filters">
         <div class="aa-field">

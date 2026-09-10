@@ -204,7 +204,7 @@ class ApplicationAdmissionPdfHelper {
         ];
     }
 
-    public static function wrapPdfDocument(string $bodyHtml): string {
+    public static function wrapPdfDocument(string $bodyHtml, string $extraCss = ''): string {
         $css = '@page{margin:14mm;}'
             . 'body{font-family:DejaVu Sans,Helvetica,Arial,sans-serif;font-size:10pt;color:#0f172a;}'
             . 'table.grid{width:100%;border-collapse:collapse;margin:8px 0;}table.grid th,table.grid td{border:1px solid #cbd5e1;padding:5px 7px;text-align:left;}'
@@ -212,8 +212,31 @@ class ApplicationAdmissionPdfHelper {
             . 'table.grid td.sig{height:22px;}'
             . '.head-row{width:100%;border-collapse:collapse;margin-bottom:8px;}.head-row td{border:none;vertical-align:top;}'
             . '.inst{font-size:13px;font-weight:700;}.title{font-size:12px;font-weight:700;margin-top:4px;}.sub{font-size:10px;color:#475569;}'
-            . '.logo-img{height:44px;width:auto;}.muted{color:#64748b;font-size:9px;}';
+            . '.logo-img{height:44px;width:auto;}.muted{color:#64748b;font-size:9px;}'
+            . $extraCss;
         return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' . $css . '</style></head><body>' . $bodyHtml . '</body></html>';
+    }
+
+    public static function interviewResultSheetStyles(): string {
+        return ''
+            . 'body{font-size:9.5pt;}'
+            . 'table.rs-banner{width:100%;border-collapse:collapse;margin:0 0 8px 0;}'
+            . 'table.rs-banner td{border:none;text-align:center;vertical-align:top;padding:0;}'
+            . '.rs-logo{height:48px;width:auto;display:block;margin:0 auto 6px auto;}'
+            . '.rs-inst{font-size:13.5pt;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;line-height:1.2;}'
+            . '.rs-title{font-size:12pt;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin-top:5px;}'
+            . '.rs-meta{font-size:9pt;color:#334155;margin-top:5px;line-height:1.45;}'
+            . 'table.rs-grid{width:100%;border-collapse:collapse;margin:6px 0 0 0;table-layout:fixed;}'
+            . 'table.rs-grid th,table.rs-grid td{border:0.8pt solid #1e293b;padding:5px 6px;vertical-align:middle;}'
+            . 'table.rs-grid th{background:#1e3a5f;color:#fff;font-size:8pt;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;text-align:center;}'
+            . 'table.rs-grid td.rs-no,table.rs-grid td.rs-roll{text-align:center;}'
+            . 'table.rs-grid td.rs-roll{font-family:DejaVu Sans Mono,Courier New,monospace;font-size:8.5pt;font-weight:700;}'
+            . 'table.rs-grid td.rs-name{text-align:left;font-weight:700;font-size:8.5pt;}'
+            . 'table.rs-grid td.rs-course{text-align:left;font-size:8.5pt;line-height:1.3;}'
+            . 'table.rs-grid td.rs-selected{text-align:left;font-size:8.5pt;font-weight:700;line-height:1.3;}'
+            . 'table.rs-grid tr.rs-alt td{background:#f1f5f9;}'
+            . 'table.rs-grid tr.rs-diff td.rs-selected{background:#dcfce7;}'
+            . '.rs-foot{margin:10px 0 0 0;font-size:8pt;color:#475569;text-align:left;}';
     }
 
     /**

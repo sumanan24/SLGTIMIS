@@ -917,6 +917,157 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
+     * Combined interview result sheet: entrance-exam roll, name, selected (interview) course.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function interviewCommonResultRows(?string $level = null): array {
+        $this->ensureTables();
+        $this->migrateSchema();
+        if ($level !== null && !in_array($level, ['04', '05'], true)) {
+            $level = null;
+        }
+        $rows = $this->getParticipantsAcrossSchedules(self::TYPE_INTERVIEW, $level);
+        if ($rows === []) {
+            return [];
+        }
+        $rollMap = $this->entranceExamRollMap($level);
+        foreach ($rows as &$row) {
+            $row['course_id'] = trim((string) ($row['schedule_course_id'] ?? ''));
+        }
+        unset($row);
+        $rows = $this->attachCourseNames($rows);
+
+        $byKey = [];
+        foreach ($rows as $row) {
+            $appId = (int) ($row['application_id'] ?? 0);
+            $entryId = (int) ($row['entry_id'] ?? 0);
+            $key = $appId > 0 ? 'a' . $appId : 'e' . $entryId;
+            $storedRoll = trim((string) ($row['roll_number'] ?? ''));
+            $examRoll = $appId > 0 ? trim((string) ($rollMap[$appId] ?? '')) : '';
+            $roll = $examRoll !== '' ? $examRoll : $storedRoll;
+            $selected = trim((string) ($row['course_name'] ?? ''));
+            $applied = self::courseNameFromEntry($row);
+            if ($selected === '') {
+                $selected = $applied;
+            }
+            $byKey[$key] = [
+                'application_id' => $appId,
+                'roll_number' => $roll,
+                'student_full_name' => (string) ($row['student_full_name'] ?? ''),
+                'student_nic' => (string) ($row['student_nic'] ?? ''),
+                'applied_course' => $applied,
+                'selected_course' => $selected,
+                'department_name' => (string) ($row['department_name'] ?? ''),
+                'application_level' => (string) ($row['schedule_level'] ?? $row['application_level'] ?? ''),
+            ];
+        }
+
+        $out = array_values($byKey);
+        usort($out, static function (array $a, array $b): int {
+            $courseCmp = strcasecmp((string) ($a['selected_course'] ?? ''), (string) ($b['selected_course'] ?? ''));
+            if ($courseCmp !== 0) {
+                return $courseCmp;
+            }
+            $rollA = trim((string) ($a['roll_number'] ?? ''));
+            $rollB = trim((string) ($b['roll_number'] ?? ''));
+            if ($rollA === '' && $rollB === '') {
+                return strcasecmp((string) ($a['student_full_name'] ?? ''), (string) ($b['student_full_name'] ?? ''));
+            }
+            if ($rollA === '') {
+                return 1;
+            }
+            if ($rollB === '') {
+                return -1;
+            }
+            $cmp = strnatcasecmp($rollA, $rollB);
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return strcasecmp((string) ($a['student_full_name'] ?? ''), (string) ($b['student_full_name'] ?? ''));
+        });
+
+        return $out;
+    }
+
+    /**
+     * Latest non-empty entrance-exam roll number keyed by application_id.
+     *
+     * @return array<int, string>
+     */
+    private function entranceExamRollMap(?string $level = null): array {
+        $sql = 'SELECT e.`application_id`, e.`roll_number`'
+            . ' FROM `application_admission_schedule_entry` e'
+            . ' INNER JOIN `application_admission_schedule` s ON s.`schedule_id` = e.`schedule_id`'
+            . ' WHERE s.`schedule_type` = ?'
+            . ' AND TRIM(IFNULL(e.`roll_number`, \'\')) <> \'\'';
+        $types = 's';
+        $params = [self::TYPE_ENTRANCE];
+        if ($level !== null && in_array($level, ['04', '05'], true)) {
+            $sql .= ' AND s.`application_level` = ?';
+            $types .= 's';
+            $params[] = $level;
+        }
+        $sql .= ' ORDER BY s.`schedule_date` ASC, e.`entry_id` ASC';
+        $map = [];
+        foreach ($this->fetchAllPrepared($sql, $types, $params) as $row) {
+            $appId = (int) ($row['application_id'] ?? 0);
+            $roll = trim((string) ($row['roll_number'] ?? ''));
+            if ($appId > 0 && $roll !== '') {
+                $map[$appId] = $roll;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Latest published interview schedule entry for this NIC (public letter download).
+     *
+     * @return array{schedule: array<string, mixed>, entry: array<string, mixed>}|null
+     */
+    public function findPublishedInterviewByNic(string $nic): ?array {
+        $this->ensureTables();
+        $this->migrateSchema();
+        $nic = self::normalizedNic($nic);
+        if ($nic === '') {
+            return null;
+        }
+        $sql = 'SELECT e.`entry_id`, e.`schedule_id`, sa.`student_nic`'
+            . ' FROM `application_admission_schedule_entry` e'
+            . ' INNER JOIN `application_admission_schedule` s ON s.`schedule_id` = e.`schedule_id`'
+            . ' INNER JOIN `student_applications` sa ON sa.`application_id` = e.`application_id`'
+            . ' WHERE s.`schedule_type` = ? AND s.`is_published` = 1'
+            . ' ORDER BY s.`schedule_date` DESC, e.`entry_id` DESC';
+        foreach ($this->fetchAllPrepared($sql, 's', [self::TYPE_INTERVIEW]) as $row) {
+            if (self::normalizedNic((string) ($row['student_nic'] ?? '')) !== $nic) {
+                continue;
+            }
+            $scheduleId = (int) ($row['schedule_id'] ?? 0);
+            if ($scheduleId < 1) {
+                continue;
+            }
+            $schedule = $this->findSchedule($scheduleId);
+            if (!$schedule || !(int) ($schedule['is_published'] ?? 0)) {
+                continue;
+            }
+            $entry = $this->findEntryByNic($scheduleId, $nic);
+            if ($entry === null) {
+                continue;
+            }
+
+            return ['schedule' => $schedule, 'entry' => $entry];
+        }
+
+        return null;
+    }
+
+    public static function normalizedNic(string $nic): string {
+        return strtoupper(preg_replace('/\s+|-|_/', '', trim($nic)) ?? '');
+    }
+
+    /**
      * @param list<array<string, mixed>> $rows
      * @return list<array<string, mixed>>
      */
@@ -1440,14 +1591,13 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     public function findEntryByNic(int $scheduleId, string $nic): ?array {
-        $nic = strtoupper(preg_replace('/\s+|-|_/', '', trim($nic)));
+        $nic = self::normalizedNic($nic);
         if ($nic === '') {
             return null;
         }
         $entries = $this->getEntriesWithApplications($scheduleId);
         foreach ($entries as $row) {
-            $rowNic = strtoupper(preg_replace('/\s+|-|_/', '', (string) ($row['student_nic'] ?? '')));
-            if ($rowNic === $nic) {
+            if (self::normalizedNic((string) ($row['student_nic'] ?? '')) === $nic) {
                 return $row;
             }
         }
