@@ -166,6 +166,92 @@ class ApplicationAdmissionController extends Controller {
         return $this->renderScheduleIndex(ApplicationAdmissionScheduleModel::TYPE_INTERVIEW);
     }
 
+    public function report() {
+        $uid = $this->requireLogin();
+        $this->requireView($uid);
+        $data = $this->selectionReportPageData();
+        $viewData = [
+            'page' => 'application-admission-report',
+            'level' => $data['level'],
+            'department_id' => $data['department_id'],
+            'course_id' => $data['course_id'],
+            'departments' => $data['departments'],
+            'courses' => $data['courses'],
+            'groups' => $data['groups'],
+            'fail_groups' => $data['fail_groups'],
+            'total_students' => $data['total_students'],
+            'total_fail' => $data['total_fail'],
+            'choice_counts' => $data['choice_counts'],
+            'fail_counts' => $data['fail_counts'],
+            'min_marks' => $data['min_marks'],
+            'overview' => $data['overview'],
+            'has_course' => !empty($data['has_filter'] ?? $data['has_course']),
+            'has_filter' => !empty($data['has_filter'] ?? $data['has_course']),
+            'filter_query' => $data['filter_query'],
+            'filter_summary' => $data['filter_summary'],
+        ];
+        if ($this->wantsReportPartial()) {
+            header('Content-Type: text/html; charset=UTF-8');
+            header('Cache-Control: no-store');
+            echo $this->renderSelectionReportResults($viewData);
+            exit;
+        }
+
+        return $this->view('application_admission/report', $viewData);
+    }
+
+    private function wantsReportPartial(): bool {
+        $xrw = strtolower(trim((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')));
+        if ($xrw === 'xmlhttprequest') {
+            return true;
+        }
+
+        return (string) $this->get('partial', '') === '1';
+    }
+
+    /**
+     * @param array<string,mixed> $data
+     */
+    private function renderSelectionReportResults(array $data): string {
+        extract($data, EXTR_SKIP);
+        ob_start();
+        include BASE_PATH . '/views/application_admission/_report_results.php';
+
+        return (string) ob_get_clean();
+    }
+
+    public function pdfReport() {
+        $this->requireView($this->requireLogin());
+        $data = $this->selectionReportPageData();
+        if (empty($data['has_filter'] ?? $data['has_course'])) {
+            $_SESSION['error'] = 'Select a department and a course, then open the PDF report.';
+            $this->redirect('application-admission/report?' . (string) ($data['filter_query'] ?? 'level=04'));
+        }
+        require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
+        $inner = ApplicationAdmissionPdfHelper::renderTemplate('selection_report.php', [
+            'level' => $data['level'],
+            'groups' => $data['groups'],
+            'fail_groups' => $data['fail_groups'],
+            'total_students' => $data['total_students'],
+            'total_fail' => $data['total_fail'],
+            'min_marks' => $data['min_marks'],
+            'overview' => $data['overview'],
+            'filter_summary' => $data['filter_summary'],
+            'logo_src' => $this->admissionLogoDataUri(),
+        ]);
+        $html = ApplicationAdmissionPdfHelper::wrapPdfDocument(
+            $inner,
+            ApplicationAdmissionPdfHelper::selectionReportStyles()
+        );
+        ApplicationAdmissionPdfHelper::streamHtml(
+            $html,
+            'admission-selection-report-nvq-' . $data['level'] . '.pdf',
+            'A4',
+            'landscape',
+            true
+        );
+    }
+
     public function cutoffs() {
         $uid = $this->requireLogin();
         $userModel = $this->requireView($uid);
@@ -661,7 +747,16 @@ class ApplicationAdmissionController extends Controller {
      * @param array<int,array<string,mixed>> $groups
      * @return array<int,array<string,mixed>>
      */
-    private function filterCutoffGroups(array $groups, string $departmentId, string $courseId): array {
+    private function filterCutoffGroups(array $groups, string $departmentId, string $courseId, bool $matchOr = false): array {
+        if ($departmentId === '' && $courseId === '') {
+            return array_values($groups);
+        }
+        if ($matchOr && $departmentId !== '' && $courseId !== '') {
+            return array_values(array_filter($groups, static function ($g) use ($departmentId, $courseId) {
+                return strcasecmp((string) ($g['department_id'] ?? ''), $departmentId) === 0
+                    || strcasecmp((string) ($g['course_id'] ?? ''), $courseId) === 0;
+            }));
+        }
         if ($departmentId !== '') {
             $groups = array_values(array_filter($groups, static function ($g) use ($departmentId) {
                 return strcasecmp((string) ($g['department_id'] ?? ''), $departmentId) === 0;
@@ -674,6 +769,180 @@ class ApplicationAdmissionController extends Controller {
         }
 
         return array_values($groups);
+    }
+
+    /**
+     * @return array{
+     *   level:string,
+     *   department_id:string,
+     *   course_id:string,
+     *   courses:array<int,array<string,mixed>>,
+     *   departments:array<int,array{department_id:string,department_name:string}>,
+     *   groups:array<int,array<string,mixed>>,
+     *   fail_groups:array<int,array<string,mixed>>,
+     *   total_students:int,
+     *   total_fail:int,
+     *   choice_counts:array<string,int>,
+     *   fail_counts:array<string,int>,
+     *   min_marks:int,
+     *   overview:array{totals:array<string,int>,departments:list<array<string,mixed>>,courses:list<array<string,mixed>>},
+     *   filter_query:string,
+     *   filter_summary:string
+     * }
+     */
+    private function selectionReportPageData(): array {
+        $level = (string) $this->get('level', '04');
+        if (!in_array($level, ['04', '05'], true)) {
+            $level = '04';
+        }
+        $departmentId = trim((string) $this->get('department_id', ''));
+        $courseId = trim((string) $this->get('course_id', ''));
+
+        require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
+        require_once BASE_PATH . '/models/CourseModel.php';
+        $cutoffModel = new ApplicationAdmissionCutoffModel();
+        $nvq = $level === '05' ? '5' : '4';
+        $courses = (new CourseModel())->getCoursesWithDepartment([
+            'nvq_level' => $nvq,
+            'active_only' => true,
+        ]);
+        $departments = $this->departmentsFromCourses($courses);
+
+        $validDept = false;
+        foreach ($departments as $d) {
+            if (strcasecmp((string) ($d['department_id'] ?? ''), $departmentId) === 0) {
+                $validDept = true;
+                break;
+            }
+        }
+        if (!$validDept) {
+            $departmentId = '';
+        }
+        $validCourse = false;
+        foreach ($courses as $c) {
+            if (strcasecmp((string) ($c['course_id'] ?? ''), $courseId) !== 0) {
+                continue;
+            }
+            if ($departmentId !== '' && strcasecmp((string) ($c['department_id'] ?? ''), $departmentId) !== 0) {
+                continue;
+            }
+            $validCourse = true;
+            break;
+        }
+        if (!$validCourse) {
+            $courseId = '';
+        }
+
+        $hasFilter = $departmentId !== '' && $courseId !== '';
+
+        $minMarks = ApplicationAdmissionCutoffModel::MARKS_MIN_SECOND_OPTION;
+        $emptyOverview = [
+            'totals' => [
+                'sat' => 0, 'selected' => 0, 'failed' => 0, 'second_option' => 0,
+                'interview' => 0, 'cutoff_courses' => 0, 'courses' => 0, 'departments' => 0,
+            ],
+            'departments' => [],
+            'courses' => [],
+        ];
+        $qs = ['level' => $level];
+        if ($departmentId !== '') {
+            $qs['department_id'] = $departmentId;
+        }
+        if ($courseId !== '') {
+            $qs['course_id'] = $courseId;
+        }
+
+        if (!$hasFilter) {
+            return [
+                'level' => $level,
+                'department_id' => $departmentId,
+                'course_id' => $courseId,
+                'has_course' => false,
+                'has_filter' => false,
+                'courses' => $courses,
+                'departments' => $departments,
+                'groups' => [],
+                'fail_groups' => [],
+                'total_students' => 0,
+                'total_fail' => 0,
+                'choice_counts' => ['1st' => 0, '2nd' => 0, '3rd' => 0, 'interview' => 0],
+                'fail_counts' => ['below_min' => 0, 'absent' => 0, 'missed_cutoff' => 0],
+                'min_marks' => $minMarks,
+                'overview' => $emptyOverview,
+                'filter_query' => http_build_query($qs),
+                'filter_summary' => $this->cutoffFilterSummary($departmentId, $courseId, $courses, $departments),
+            ];
+        }
+
+        $allGroups = $cutoffModel->selectionReportGroups($level);
+        $selectedIds = [];
+        foreach ($allGroups as $g) {
+            foreach ((is_array($g['students'] ?? null) ? $g['students'] : []) as $row) {
+                $aid = (int) ($row['application_id'] ?? 0);
+                if ($aid > 0) {
+                    $selectedIds[] = $aid;
+                }
+            }
+        }
+        $allFailGroups = $cutoffModel->selectionFailReportGroups($level, $selectedIds);
+        $overview = $cutoffModel->selectionOverviewCards($level, $allGroups, $allFailGroups);
+        $overview = $this->filterSelectionOverview($overview, $departmentId, $courseId);
+        $groups = $this->filterCutoffGroups($allGroups, $departmentId, $courseId);
+        $failGroups = $this->filterCutoffGroups($allFailGroups, $departmentId, $courseId);
+        $total = 0;
+        $choiceCounts = ['1st' => 0, '2nd' => 0, '3rd' => 0, 'interview' => 0];
+        foreach ($groups as $g) {
+            $list = is_array($g['students'] ?? null) ? $g['students'] : [];
+            $total += count($list);
+            foreach ($list as $row) {
+                $choice = (int) ($row['choice'] ?? 0);
+                if ($choice === 1) {
+                    $choiceCounts['1st']++;
+                } elseif ($choice === 2) {
+                    $choiceCounts['2nd']++;
+                } elseif ($choice === 3) {
+                    $choiceCounts['3rd']++;
+                } else {
+                    $choiceCounts['interview']++;
+                }
+            }
+        }
+        $totalFail = 0;
+        $failCounts = ['below_min' => 0, 'absent' => 0, 'missed_cutoff' => 0];
+        foreach ($failGroups as $g) {
+            $list = is_array($g['students'] ?? null) ? $g['students'] : [];
+            $totalFail += count($list);
+            foreach ($list as $row) {
+                $reason = strtolower(trim((string) ($row['fail_reason'] ?? '')));
+                if ($reason === 'absent') {
+                    $failCounts['absent']++;
+                } elseif (strpos($reason, 'below') === 0) {
+                    $failCounts['below_min']++;
+                } else {
+                    $failCounts['missed_cutoff']++;
+                }
+            }
+        }
+
+        return [
+            'level' => $level,
+            'department_id' => $departmentId,
+            'course_id' => $courseId,
+            'has_course' => true,
+            'has_filter' => true,
+            'courses' => $courses,
+            'departments' => $departments,
+            'groups' => $groups,
+            'fail_groups' => $failGroups,
+            'total_students' => $total,
+            'total_fail' => $totalFail,
+            'choice_counts' => $choiceCounts,
+            'fail_counts' => $failCounts,
+            'min_marks' => $minMarks,
+            'overview' => $overview,
+            'filter_query' => http_build_query($qs),
+            'filter_summary' => $this->cutoffFilterSummary($departmentId, $courseId, $courses, $departments),
+        ];
     }
 
     /**
@@ -700,6 +969,59 @@ class ApplicationAdmissionController extends Controller {
         }
 
         return $bits !== [] ? implode('  |  ', $bits) : 'All departments and courses';
+    }
+
+    /**
+     * Keep overview cards for the selected course (and its department) only.
+     *
+     * @param array{totals:array<string,int>,departments:list<array<string,mixed>>,courses:list<array<string,mixed>>} $overview
+     * @return array{totals:array<string,int>,departments:list<array<string,mixed>>,courses:list<array<string,mixed>>}
+     */
+    private function filterSelectionOverview(array $overview, string $departmentId, string $courseId): array {
+        $courses = is_array($overview['courses'] ?? null) ? $overview['courses'] : [];
+        if ($courseId !== '') {
+            $courses = array_values(array_filter($courses, static function ($c) use ($courseId) {
+                return strcasecmp((string) ($c['course_id'] ?? ''), $courseId) === 0;
+            }));
+        } elseif ($departmentId !== '') {
+            $courses = array_values(array_filter($courses, static function ($c) use ($departmentId) {
+                return strcasecmp((string) ($c['department_id'] ?? ''), $departmentId) === 0;
+            }));
+        }
+        $deptIds = [];
+        $totals = [
+            'sat' => 0, 'selected' => 0, 'failed' => 0, 'second_option' => 0,
+            'interview' => 0, 'cutoff_courses' => 0, 'courses' => count($courses), 'departments' => 0,
+        ];
+        foreach ($courses as $c) {
+            $did = trim((string) ($c['department_id'] ?? ''));
+            if ($did !== '') {
+                $deptIds[strtolower($did)] = true;
+            }
+            $totals['sat'] += (int) ($c['sat'] ?? 0);
+            $totals['selected'] += (int) ($c['selected'] ?? 0);
+            $totals['failed'] += (int) ($c['failed'] ?? 0);
+            $totals['second_option'] += (int) ($c['second_option'] ?? 0);
+            $totals['interview'] += (int) ($c['interview'] ?? 0);
+            if (!empty($c['has_cutoff'])) {
+                $totals['cutoff_courses']++;
+            }
+        }
+        $departments = is_array($overview['departments'] ?? null) ? $overview['departments'] : [];
+        if ($deptIds !== []) {
+            $departments = array_values(array_filter($departments, static function ($d) use ($deptIds) {
+                return isset($deptIds[strtolower(trim((string) ($d['department_id'] ?? '')))]);
+            }));
+        } elseif ($courseId !== '') {
+            $departments = [];
+        }
+        $totals['departments'] = count($departments);
+
+        return [
+            'totals' => $totals,
+            'departments' => $departments,
+            'courses' => $courses,
+        ];
     }
 
     /**
@@ -1700,6 +2022,42 @@ class ApplicationAdmissionController extends Controller {
         }
     }
 
+    /** Single DL long envelope (From / To) for one applicant. */
+    public function envelope() {
+        $uid = $this->requireLogin();
+        $this->requireView($uid);
+        $scheduleId = (int) $this->get('id', 0);
+        $entryId = (int) $this->get('entry_id', 0);
+        if ($scheduleId < 1 || $entryId < 1) {
+            $_SESSION['error'] = 'Invalid schedule or applicant.';
+            $this->redirect('application-admission');
+        }
+        $this->streamEnvelopesPdf($scheduleId, $entryId, []);
+    }
+
+    /** Bulk DL long envelopes — optional province filter (same as entries page). */
+    public function envelopesBulk() {
+        $uid = $this->requireLogin();
+        $this->requireView($uid);
+        $scheduleId = (int) $this->get('id', 0);
+        if ($scheduleId < 1) {
+            $_SESSION['error'] = 'Invalid schedule.';
+            $this->redirect('application-admission');
+        }
+        $provinces = ApplicationAdmissionScheduleModel::normalizedProvinceFilters($this->get('province', ''));
+        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
+        if (!ExamPdfHelper::dompdfAvailable()) {
+            $_SESSION['error'] = 'PDF engine not installed. Run: composer install.';
+            $this->redirect($this->entriesRedirectUrl($scheduleId, $provinces));
+        }
+        try {
+            $this->streamEnvelopesPdf($scheduleId, null, $provinces);
+        } catch (RuntimeException $e) {
+            $_SESSION['error'] = $e->getMessage();
+            $this->redirect($this->entriesRedirectUrl($scheduleId, $provinces));
+        }
+    }
+
     /**
      * Public page: students enter NIC, see applied vs selected course, then download the letter.
      */
@@ -2138,6 +2496,70 @@ class ApplicationAdmissionController extends Controller {
             : '';
         $filename = ($isInterview ? 'interview' : 'admission') . '-cards-' . $scheduleId . $suffix . '.pdf';
         ApplicationAdmissionPdfHelper::streamPostalAdmissionCardsMerged($parts, $filename);
+    }
+
+    /**
+     * @param list<string>|null $provinces
+     */
+    private function streamEnvelopesPdf(int $scheduleId, ?int $entryId, ?array $provinces = null): void {
+        $provinces = ApplicationAdmissionScheduleModel::normalizedProvinceFilters($provinces);
+        $model = $this->scheduleModel();
+        $schedule = $model->findSchedule($scheduleId);
+        if (!$schedule) {
+            $_SESSION['error'] = 'Schedule not found.';
+            $this->redirect('application-admission');
+        }
+        $entries = ApplicationAdmissionScheduleModel::sortEntryRowsByCourseAndProvince(
+            $model->getEntriesWithApplications($scheduleId)
+        );
+        $courseWiseRollSeq = ApplicationAdmissionScheduleModel::courseWiseSequenceMap($entries);
+        if ($entryId !== null && $entryId > 0) {
+            $entries = array_values(array_filter($entries, static function (array $row) use ($entryId): bool {
+                return (int) ($row['entry_id'] ?? 0) === $entryId;
+            }));
+        } elseif ($provinces !== []) {
+            $entries = array_values(array_filter($entries, static function (array $row) use ($provinces): bool {
+                return ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $provinces);
+            }));
+        }
+        if ($entries === []) {
+            $_SESSION['error'] = $entryId !== null && $entryId > 0
+                ? 'Applicant not found on this schedule.'
+                : 'No applicants on this schedule for envelopes.';
+            $this->redirect($this->entriesRedirectUrl($scheduleId, $provinces));
+        }
+
+        require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
+        $isInterview = ($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW;
+        $logoSrc = ApplicationAdmissionPdfHelper::grayscaleImageDataUri($this->admissionLogoDataUri());
+        $parts = [];
+        foreach ($entries as $entry) {
+            if (!$isInterview) {
+                $entryIdForRoll = (int) ($entry['entry_id'] ?? 0);
+                $seq = $courseWiseRollSeq[$entryIdForRoll] ?? 1;
+                $entry['roll_number'] = ApplicationAdmissionScheduleModel::defaultRollIndexForEntry($schedule, $entry, $seq);
+            } else {
+                $entry['roll_number'] = '';
+            }
+            $parts[] = ApplicationAdmissionPdfHelper::renderTemplate('envelope.php', [
+                'schedule' => $schedule,
+                'entry' => $entry,
+                'logo_src' => $logoSrc,
+                'mailing' => $this->formatEntryMailingBlock($entry),
+                'isInterview' => $isInterview,
+            ]);
+        }
+        if ($entryId !== null && $entryId > 0) {
+            $nic = preg_replace('/[^0-9A-Za-z]+/', '', (string) ($entries[0]['student_nic'] ?? ''));
+            $filename = 'envelope-' . $scheduleId . '-' . ($nic !== '' ? $nic : (string) $entryId) . '.pdf';
+            ApplicationAdmissionPdfHelper::streamEnvelopesMerged($parts, $filename);
+
+            return;
+        }
+        $suffix = $provinces !== []
+            ? '-' . preg_replace('/[^A-Za-z0-9]+/', '_', ApplicationAdmissionScheduleModel::provinceFilterLabel($provinces))
+            : '';
+        ApplicationAdmissionPdfHelper::streamEnvelopesMerged($parts, 'envelopes-' . $scheduleId . $suffix . '.pdf');
     }
 
     /**

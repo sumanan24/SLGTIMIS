@@ -190,8 +190,12 @@ $schedules = is_array($schedules ?? null) ? $schedules : [];
                 ? 'Department and course interviews — add only entrance exam Selected students.'
                 : 'Entrance exams by centre / language. Mark Selected candidates for interview schedules.'; ?></p>
         </div>
-        <?php if ($isInterview || !empty($canManage)): ?>
         <div class="d-flex flex-wrap gap-2">
+            <?php if (!$isInterview): ?>
+            <a href="<?php echo APP_URL; ?>/application-admission/report<?php echo ($levelFilter ?? '') !== '' ? ('?level=' . rawurlencode((string) $levelFilter)) : ''; ?>" class="btn btn-sm btn-outline-dark" title="Entrance exam results, cutoff and selected course list">
+                <i class="fas fa-file-alt me-1"></i> Selection report
+            </a>
+            <?php endif; ?>
             <?php if ($isInterview):
                 $resultPdfQs = ($levelFilter ?? '') !== '' ? ('?level=' . rawurlencode((string) $levelFilter)) : '';
             ?>
@@ -205,7 +209,6 @@ $schedules = is_array($schedules ?? null) ? $schedules : [];
             </a>
             <?php endif; ?>
         </div>
-        <?php endif; ?>
     </div>
 
     <?php if (!empty($_SESSION['success'])): ?>
@@ -227,6 +230,9 @@ $schedules = is_array($schedules ?? null) ? $schedules : [];
         </a>
         <a href="<?php echo APP_URL; ?>/application-admission/second-option">
             <i class="fas fa-user-check"></i> 2nd option
+        </a>
+        <a href="<?php echo APP_URL; ?>/application-admission/report">
+            <i class="fas fa-file-alt"></i> Selection report
         </a>
     </nav>
 

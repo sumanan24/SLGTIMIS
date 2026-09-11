@@ -5,6 +5,7 @@ $entranceUrl = rtrim(APP_URL, '/') . '/application-admission';
 $interviewUrl = rtrim(APP_URL, '/') . '/application-admission/interviews';
 $cutoffUrl = rtrim(APP_URL, '/') . '/application-admission/cutoffs';
 $secondOptionUrl = rtrim(APP_URL, '/') . '/application-admission/second-option';
+$reportUrl = rtrim(APP_URL, '/') . '/application-admission/report';
 ?>
 <style>
 .aa-module-nav {
@@ -52,5 +53,8 @@ $secondOptionUrl = rtrim(APP_URL, '/') . '/application-admission/second-option';
     </a>
     <a class="<?php echo $aaNavActive === 'second-option' ? 'is-active' : ''; ?>" href="<?php echo $e($secondOptionUrl); ?>">
         <i class="fas fa-user-check"></i> 2nd option
+    </a>
+    <a class="<?php echo $aaNavActive === 'report' ? 'is-active' : ''; ?>" href="<?php echo $e($reportUrl); ?>">
+        <i class="fas fa-file-alt"></i> Selection report
     </a>
 </nav>

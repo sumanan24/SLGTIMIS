@@ -11,6 +11,9 @@ class ApplicationAdmissionPdfHelper {
 
     public const INSTITUTE_POST_FROM_PHONE = '0703060138';
 
+    /** DL long envelope (220 × 110 mm), already landscape in envelopePaperSize(). */
+    public const ENVELOPE_ORIENTATION = 'portrait';
+
     /**
      * @return array{name: string, address: string, phone: string}
      */
@@ -20,6 +23,17 @@ class ApplicationAdmissionPdfHelper {
             'address' => self::INSTITUTE_POST_FROM_ADDRESS,
             'phone' => self::INSTITUTE_POST_FROM_PHONE,
         ];
+    }
+
+    /**
+     * DL long envelope 220 mm × 110 mm, in PDF points.
+     *
+     * @return array{0:float,1:float,2:float,3:float}
+     */
+    public static function envelopePaperSize(): array {
+        $mmToPt = 72.0 / 25.4;
+
+        return [0.0, 0.0, 220.0 * $mmToPt, 110.0 * $mmToPt];
     }
 
     public static function admissionCardReference(int $scheduleId, string $roll, int $entryId): string {
@@ -51,6 +65,75 @@ class ApplicationAdmissionPdfHelper {
     public static function wrapPostalAdmissionCardsDocument(string $bodyHtml): string {
         $css = self::postalAdmissionCardStylesheet();
         return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' . $css . '</style></head><body>' . $bodyHtml . '</body></html>';
+    }
+
+    public static function wrapEnvelopeDocument(string $bodyHtml): string {
+        $css = self::envelopeStylesheet();
+        return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' . $css . '</style></head><body>' . $bodyHtml . '</body></html>';
+    }
+
+    /**
+     * Convert a PNG/JPEG data URI to grayscale for envelope print.
+     */
+    public static function grayscaleImageDataUri(string $dataUri): string {
+        $dataUri = trim($dataUri);
+        if ($dataUri === '' || !function_exists('imagecreatefromstring') || !function_exists('imagefilter')) {
+            return $dataUri;
+        }
+        if (!preg_match('#^data:image/(png|jpe?g);base64,(.+)$#i', $dataUri, $m)) {
+            return $dataUri;
+        }
+        $raw = base64_decode((string) $m[2], true);
+        if ($raw === false || $raw === '') {
+            return $dataUri;
+        }
+        $im = @imagecreatefromstring($raw);
+        if ($im === false) {
+            return $dataUri;
+        }
+        imagealphablending($im, true);
+        imagesavealpha($im, true);
+        imagefilter($im, IMG_FILTER_GRAYSCALE);
+        ob_start();
+        imagepng($im);
+        $out = (string) ob_get_clean();
+        imagedestroy($im);
+        if ($out === '') {
+            return $dataUri;
+        }
+
+        return 'data:image/png;base64,' . base64_encode($out);
+    }
+
+    /**
+     * DL long envelope (220 × 110 mm): heading + From | To columns, grayscale.
+     */
+    private static function envelopeStylesheet(): string {
+        return ''
+            . '@page{size:220mm 110mm;margin:8mm 14mm 12mm 14mm;}'
+            . 'html,body{margin:0;padding:0;}'
+            . 'body{font-family:DejaVu Sans,Helvetica,Arial,sans-serif;font-size:9pt;color:#222;}'
+            . 'table{border-collapse:collapse;}'
+            . 'img{border:0;}'
+            . '.env-page{width:100%;page-break-inside:avoid;}'
+            . '.env-page+.env-page{page-break-before:always;}'
+            . '.env-top-space{height:30px;line-height:30px;font-size:1px;}'
+            . 'td.env-left-space{width:10px;padding:0;font-size:1px;line-height:1px;}'
+            . 'table.env-head{width:100%;margin:0 0 5mm 0;padding:0 0 3.5mm 0;border-bottom:0.6pt solid #bbb;}'
+            . 'td.env-logo{width:16%;vertical-align:middle;padding:0 3mm 0 0;}'
+            . '.env-logo-img{height:13mm;width:auto;display:block;}'
+            . 'td.env-head-text{width:68%;vertical-align:middle;text-align:center;padding:0 2mm;}'
+            . 'td.env-head-pad{width:16%;padding:0;font-size:1px;line-height:1px;}'
+            . '.env-inst{font-size:10.5pt;font-weight:700;line-height:1.25;color:#111;letter-spacing:0.02em;}'
+            . '.env-place{font-size:8pt;color:#444;margin-top:0.7mm;line-height:1.25;}'
+            . '.env-banner{font-size:7.5pt;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#222;margin-top:1.8mm;line-height:1.3;}'
+            . 'table.env-cols{width:100%;margin-top:3mm;}'
+            . 'td.env-from{width:48%;vertical-align:top;padding:1mm 6mm 0 0;text-align:left;}'
+            . 'td.env-gap{width:4%;padding:0;font-size:1px;line-height:1px;}'
+            . 'td.env-to{width:48%;vertical-align:top;padding:1mm 0 0 6mm;border-left:1.4pt solid #333;text-align:left;}'
+            . '.env-label{font-size:8.5pt;font-weight:700;color:#222;margin:0 0 1.6mm 0;}'
+            . '.env-name{font-size:9.5pt;font-weight:700;line-height:1.3;color:#111;margin:0 0 0.8mm 0;}'
+            . '.env-addr{font-size:8.5pt;line-height:1.4;color:#333;}';
     }
 
     /**
@@ -254,6 +337,39 @@ class ApplicationAdmissionPdfHelper {
             . '.rs-foot{margin:8px 0 0 0;font-size:7pt;color:#475569;text-align:left;}';
     }
 
+    public static function selectionReportStyles(): string {
+        return ''
+            . '@page{margin:12mm 10mm 16mm 10mm;}'
+            . 'body{font-size:8pt;}'
+            . 'table.rs-banner{width:100%;border-collapse:collapse;margin:0 0 6px 0;}'
+            . 'table.rs-banner td{border:none;text-align:center;vertical-align:top;padding:0;}'
+            . '.rs-logo{height:40px;width:auto;display:block;margin:0 auto 4px auto;}'
+            . '.rs-inst{font-size:12pt;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;line-height:1.2;}'
+            . '.rs-title{font-size:12.5pt;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-top:4px;}'
+            . '.rs-meta{font-size:8pt;color:#334155;margin-top:4px;line-height:1.4;}'
+            . '.rs-section{width:100%;margin:0 0 8px 0;}'
+            . '.rs-section-break{page-break-before:always;}'
+            . '.rs-lang{background:#1e3a5f;color:#fff;font-size:9pt;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;text-align:center;padding:5px 8px;margin:8px 0 0 0;}'
+            . '.rs-lang-fail{background:#7f1d1d;}'
+            . '.rs-lang-count{font-weight:600;letter-spacing:0.02em;text-transform:none;}'
+            . 'table.rs-grid thead{display:table-header-group;}'
+            . 'table.rs-grid th,table.rs-grid td{border:0.6pt solid #1e293b;padding:3px 4px;vertical-align:middle;height:22px;line-height:1.2;overflow:hidden;}'
+            . 'table.rs-grid th{background:#1e3a5f;color:#fff;font-size:6.5pt;font-weight:700;letter-spacing:0.03em;text-transform:uppercase;text-align:center;}'
+            . 'table.rs-grid td.rs-no{text-align:center;font-weight:700;font-size:7.5pt;width:4%;}'
+            . 'table.rs-grid td.rs-roll{text-align:center;font-family:DejaVu Sans Mono,Courier New,monospace;font-size:7pt;font-weight:700;width:11%;}'
+            . 'table.rs-grid td.rs-name{text-align:left;font-weight:700;font-size:7.5pt;width:18%;}'
+            . 'table.rs-grid td.rs-course{text-align:left;font-size:7.5pt;width:16%;}'
+            . 'table.rs-grid td.rs-marks,table.rs-grid td.rs-cut{text-align:center;font-weight:700;font-size:7.5pt;width:7%;}'
+            . 'table.rs-grid td.rs-selected{text-align:left;font-size:7.5pt;font-weight:700;width:16%;}'
+            . 'table.rs-grid td.rs-choice{text-align:center;font-size:7pt;width:9%;}'
+            . 'table.rs-grid td.rs-reason{text-align:center;font-size:7.5pt;font-weight:700;color:#7f1d1d;}'
+            . 'table.rs-grid tr.rs-alt td{background:#f1f5f9;}'
+            . 'table.rs-grid tr.rs-diff td.rs-selected{background:#dcfce7;}'
+            . 'table.rs-ov td{text-align:center;}'
+            . 'table.rs-ov td.rs-name,table.rs-ov td.rs-course{text-align:left;}'
+            . '.rs-foot{margin:8px 0 0 0;font-size:7pt;color:#475569;text-align:left;}';
+    }
+
     /**
      * @throws RuntimeException
      */
@@ -294,6 +410,97 @@ class ApplicationAdmissionPdfHelper {
         }
 
         self::streamPostalAdmissionCardsZip($bodyHtmlParts, $filename, $chunkSize);
+    }
+
+    /**
+     * Render many DL long envelopes without exhausting PHP memory (chunk + merge).
+     *
+     * @param list<string> $bodyHtmlParts One envelope HTML fragment per page
+     * @throws RuntimeException
+     */
+    public static function streamEnvelopesMerged(array $bodyHtmlParts, string $filename, int $chunkSize = 25): void {
+        if ($bodyHtmlParts === []) {
+            throw new RuntimeException('No envelopes to render.');
+        }
+        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
+        if (!ExamPdfHelper::dompdfAvailable()) {
+            throw new RuntimeException('PDF engine not installed. Run: composer install.');
+        }
+
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(600);
+
+        if (count($bodyHtmlParts) === 1) {
+            self::streamHtml(
+                self::wrapEnvelopeDocument($bodyHtmlParts[0]),
+                $filename,
+                self::envelopePaperSize(),
+                self::ENVELOPE_ORIENTATION
+            );
+
+            return;
+        }
+
+        ExamPdfHelper::loadDompdf();
+        if (class_exists('\setasign\Fpdi\Fpdi')) {
+            $tempFiles = [];
+            try {
+                foreach (array_chunk($bodyHtmlParts, max(1, $chunkSize)) as $chunk) {
+                    $html = self::wrapEnvelopeDocument(implode('', $chunk));
+                    $bytes = ExamPdfHelper::renderPdfBytes($html, self::envelopePaperSize(), self::ENVELOPE_ORIENTATION);
+                    unset($html);
+                    $tmp = tempnam(sys_get_temp_dir(), 'slgti_env_');
+                    if ($tmp === false) {
+                        throw new RuntimeException('Could not create temporary PDF file.');
+                    }
+                    file_put_contents($tmp, $bytes);
+                    unset($bytes);
+                    $tempFiles[] = $tmp;
+                }
+                self::streamMergedPdfFiles($tempFiles, $filename);
+            } finally {
+                foreach ($tempFiles as $path) {
+                    if (is_file($path)) {
+                        @unlink($path);
+                    }
+                }
+            }
+
+            return;
+        }
+
+        if (!class_exists('ZipArchive')) {
+            throw new RuntimeException(
+                'Bulk envelopes need either the FPDI library (run composer install) or PHP ZipArchive.'
+            );
+        }
+        $zip = new ZipArchive();
+        $tmpZip = tempnam(sys_get_temp_dir(), 'slgti_env_zip_');
+        if ($tmpZip === false) {
+            throw new RuntimeException('Could not create temporary ZIP file.');
+        }
+        @unlink($tmpZip);
+        if ($zip->open($tmpZip, ZipArchive::CREATE) !== true) {
+            throw new RuntimeException('Could not open ZIP archive for envelopes.');
+        }
+        $partNo = 0;
+        foreach (array_chunk($bodyHtmlParts, max(1, $chunkSize)) as $chunk) {
+            $partNo++;
+            $html = self::wrapEnvelopeDocument(implode('', $chunk));
+            $bytes = ExamPdfHelper::renderPdfBytes($html, self::envelopePaperSize(), self::ENVELOPE_ORIENTATION);
+            unset($html);
+            $zip->addFromString(sprintf('part-%03d.pdf', $partNo), $bytes);
+            unset($bytes);
+        }
+        $zip->close();
+        $base = preg_replace('/\.pdf$/i', '', preg_replace('/[^a-zA-Z0-9._-]+/', '_', $filename) ?: 'envelopes');
+        $zipName = $base . '.zip';
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . $zipName . '"');
+        header('Content-Length: ' . (string) filesize($tmpZip));
+        readfile($tmpZip);
+        @unlink($tmpZip);
+        exit;
     }
 
     /**

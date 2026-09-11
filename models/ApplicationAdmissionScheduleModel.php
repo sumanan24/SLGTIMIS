@@ -965,6 +965,7 @@ class ApplicationAdmissionScheduleModel extends Model {
                 'schedule_language' => (string) ($row['schedule_language'] ?? ''),
                 'applied_course' => $applied,
                 'selected_course' => $selected,
+                'course_id' => (string) ($row['course_id'] ?? ''),
                 'contact_number' => $phone,
                 'department_name' => (string) ($row['department_name'] ?? ''),
                 'application_level' => (string) ($row['schedule_level'] ?? $row['application_level'] ?? ''),

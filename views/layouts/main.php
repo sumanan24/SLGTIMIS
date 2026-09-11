@@ -302,6 +302,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                 $studentApplicationsPages[] = 'application-admission-interview';
                                 $studentApplicationsPages[] = 'application-admission-cutoff';
                                 $studentApplicationsPages[] = 'application-admission-second-option';
+                                $studentApplicationsPages[] = 'application-admission-report';
                             }
                             $showStudentApplicationsMenu = $studentApplicationsPages !== [];
                             $showStudentBusSeasonMenu = !empty($canProcessBusSeasonMenu);
@@ -391,6 +392,12 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                                 <a href="<?php echo APP_URL; ?>/application-admission/second-option" class="<?php echo (isset($page) && $page === 'application-admission-second-option') ? 'active' : ''; ?>">
                                                     <i class="fas fa-user-check"></i>
                                                     <span>2nd option</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo APP_URL; ?>/application-admission/report" class="<?php echo (isset($page) && $page === 'application-admission-report') ? 'active' : ''; ?>">
+                                                    <i class="fas fa-file-alt"></i>
+                                                    <span>Selection report</span>
                                                 </a>
                                             </li>
                                             <?php endif; ?>
