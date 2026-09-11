@@ -13,6 +13,26 @@ if ($total < 1) {
 }
 $levelLine = $level !== '' ? ('NVQ Level ' . $level) : 'NVQ Level 04 and 05';
 $printed = date('d M Y');
+$headerCells = static function (): void {
+    echo '<th class="rs-no">No</th>'
+        . '<th class="rs-roll">Roll No.</th>'
+        . '<th class="rs-name">Name</th>'
+        . '<th class="rs-course">Course applied</th>'
+        . '<th class="rs-selected">Selected course</th>'
+        . '<th class="rs-phone">Contact number</th>'
+        . '<th class="rs-call">Call status</th>';
+};
+$colgroup = static function (): void {
+    echo '<colgroup>'
+        . '<col class="rs-no">'
+        . '<col class="rs-roll">'
+        . '<col class="rs-name">'
+        . '<col class="rs-course">'
+        . '<col class="rs-selected">'
+        . '<col class="rs-phone">'
+        . '<col class="rs-call">'
+        . '</colgroup>';
+};
 ?>
 <table class="rs-banner">
 <tr>
@@ -35,18 +55,13 @@ $printed = date('d M Y');
 
 <?php if ($groups === []): ?>
 <table class="grid rs-grid">
+<?php $colgroup(); ?>
 <thead>
-<tr>
-<th class="rs-no">No</th>
-<th class="rs-roll">Roll No.</th>
-<th class="rs-name">Name</th>
-<th class="rs-course">Course applied</th>
-<th class="rs-selected">Selected course</th>
-</tr>
+<tr><?php $headerCells(); ?></tr>
 </thead>
 <tbody>
 <tr>
-<td colspan="5" class="muted" style="text-align:center;padding:12px 8px;">
+<td colspan="7" class="muted" style="text-align:center;padding:12px 8px;">
     No students are listed on interview schedules<?php echo $level !== '' ? ' for this NVQ level' : ''; ?>.
 </td>
 </tr>
@@ -66,26 +81,14 @@ $printed = date('d M Y');
         <span class="rs-lang-count"> — <?php echo count($list); ?> student(s)</span>
     </div>
     <table class="grid rs-grid">
-    <colgroup>
-        <col class="rs-no">
-        <col class="rs-roll">
-        <col class="rs-name">
-        <col class="rs-course">
-        <col class="rs-selected">
-    </colgroup>
+    <?php $colgroup(); ?>
     <thead>
-    <tr>
-    <th class="rs-no">No</th>
-    <th class="rs-roll">Roll No.</th>
-    <th class="rs-name">Name</th>
-    <th class="rs-course">Course applied</th>
-    <th class="rs-selected">Selected course</th>
-    </tr>
+    <tr><?php $headerCells(); ?></tr>
     </thead>
     <tbody>
     <?php if ($list === []): ?>
     <tr>
-    <td colspan="5" class="muted" style="text-align:center;padding:12px 8px;">No students.</td>
+    <td colspan="7" class="muted" style="text-align:center;padding:12px 8px;">No students.</td>
     </tr>
     <?php else: ?>
     <?php $n = 0; foreach ($list as $row): $n++;
@@ -93,6 +96,7 @@ $printed = date('d M Y');
         $name = trim((string) ($row['student_full_name'] ?? ''));
         $applied = trim((string) ($row['applied_course'] ?? ''));
         $selected = trim((string) ($row['selected_course'] ?? ''));
+        $phone = trim((string) ($row['contact_number'] ?? ''));
         $diff = $applied !== '' && $selected !== '' && strcasecmp($applied, $selected) !== 0;
         $alt = ($n % 2) === 0 ? ' rs-alt' : '';
         $diffClass = $diff ? ' rs-diff' : '';
@@ -103,6 +107,8 @@ $printed = date('d M Y');
     <td class="rs-name"><?php echo $e($name !== '' ? mb_strtoupper($name, 'UTF-8') : ''); ?></td>
     <td class="rs-course"><?php echo $e($applied !== '' ? $applied : '—'); ?></td>
     <td class="rs-selected"><?php echo $e($selected !== '' ? $selected : '—'); ?></td>
+    <td class="rs-phone"><?php echo $e($phone !== '' ? $phone : '—'); ?></td>
+    <td class="rs-call">&nbsp;</td>
     </tr>
     <?php endforeach; ?>
     <?php endif; ?>
@@ -111,4 +117,4 @@ $printed = date('d M Y');
 </div>
 <?php endforeach; ?>
 <?php endif; ?>
-<p class="rs-foot">Course applied is the student&apos;s 1st-choice course. Selected course is the interview course. A green selected-course cell means the student was selected for a course other than 1st choice. Being listed does not guarantee admission.</p>
+<p class="rs-foot">Course applied is the student&apos;s 1st-choice course. Selected course is the interview course. Call status is for office use. Being listed does not guarantee admission.</p>

@@ -1655,7 +1655,8 @@ class ApplicationAdmissionController extends Controller {
             $html,
             'interview-result-sheet-nvq-' . $fileLevel . '.pdf',
             'A4',
-            'landscape'
+            'landscape',
+            true
         );
     }
 

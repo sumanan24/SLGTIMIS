@@ -219,41 +219,47 @@ class ApplicationAdmissionPdfHelper {
 
     public static function interviewResultSheetStyles(): string {
         return ''
-            . 'body{font-size:8.5pt;}'
+            . '@page{margin:12mm 10mm 16mm 10mm;}'
+            . 'body{font-size:8pt;}'
             . 'table.rs-banner{width:100%;border-collapse:collapse;margin:0 0 6px 0;}'
             . 'table.rs-banner td{border:none;text-align:center;vertical-align:top;padding:0;}'
-            . '.rs-logo{height:42px;width:auto;display:block;margin:0 auto 4px auto;}'
-            . '.rs-inst{font-size:12.5pt;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;line-height:1.2;}'
-            . '.rs-title{font-size:13pt;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-top:4px;}'
-            . '.rs-meta{font-size:8.5pt;color:#334155;margin-top:4px;line-height:1.4;}'
+            . '.rs-logo{height:40px;width:auto;display:block;margin:0 auto 4px auto;}'
+            . '.rs-inst{font-size:12pt;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;line-height:1.2;}'
+            . '.rs-title{font-size:12.5pt;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin-top:4px;}'
+            . '.rs-meta{font-size:8pt;color:#334155;margin-top:4px;line-height:1.4;}'
             . '.rs-section{width:100%;margin:0 0 8px 0;}'
             . '.rs-section-break{page-break-before:always;}'
-            . '.rs-lang{background:#1e3a5f;color:#fff;font-size:10pt;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;text-align:center;padding:5px 8px;margin:8px 0 0 0;}'
+            . '.rs-lang{background:#1e3a5f;color:#fff;font-size:9.5pt;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;text-align:center;padding:5px 8px;margin:8px 0 0 0;}'
             . '.rs-lang-count{font-weight:600;letter-spacing:0.02em;text-transform:none;}'
-            . 'table.rs-grid col.rs-no{width:6%;}'
-            . 'table.rs-grid col.rs-roll{width:18%;}'
-            . 'table.rs-grid col.rs-name{width:30%;}'
-            . 'table.rs-grid col.rs-course{width:23%;}'
-            . 'table.rs-grid col.rs-selected{width:23%;}'
+            . 'table.rs-grid col.rs-no{width:4%;}'
+            . 'table.rs-grid col.rs-roll{width:12%;}'
+            . 'table.rs-grid col.rs-name{width:20%;}'
+            . 'table.rs-grid col.rs-course{width:16%;}'
+            . 'table.rs-grid col.rs-selected{width:16%;}'
+            . 'table.rs-grid col.rs-phone{width:14%;}'
+            . 'table.rs-grid col.rs-call{width:18%;}'
             . 'table.rs-grid thead{display:table-header-group;}'
-            . 'table.rs-grid th,table.rs-grid td{border:0.6pt solid #1e293b;padding:3px 5px;vertical-align:middle;height:26px;line-height:1.2;overflow:hidden;}'
-            . 'table.rs-grid th{background:#1e3a5f;color:#fff;font-size:7.5pt;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;text-align:center;height:22px;}'
-            . 'table.rs-grid td.rs-no{width:6%;text-align:center;font-weight:700;font-size:8pt;}'
-            . 'table.rs-grid td.rs-roll{width:18%;text-align:center;font-family:DejaVu Sans Mono,Courier New,monospace;font-size:7.5pt;font-weight:700;}'
-            . 'table.rs-grid td.rs-name{width:30%;text-align:left;font-weight:700;font-size:8pt;}'
-            . 'table.rs-grid td.rs-course{width:23%;text-align:center;font-size:8pt;}'
-            . 'table.rs-grid td.rs-selected{width:23%;text-align:center;font-size:8pt;font-weight:700;}'
+            . 'table.rs-grid th,table.rs-grid td{border:0.6pt solid #1e293b;padding:3px 4px;vertical-align:middle;height:24px;line-height:1.2;overflow:hidden;}'
+            . 'table.rs-grid th{background:#1e3a5f;color:#fff;font-size:7pt;font-weight:700;letter-spacing:0.03em;text-transform:uppercase;text-align:center;height:22px;}'
+            . 'table.rs-grid td.rs-no{text-align:center;font-weight:700;font-size:7.5pt;}'
+            . 'table.rs-grid td.rs-roll{text-align:center;font-family:DejaVu Sans Mono,Courier New,monospace;font-size:7pt;font-weight:700;}'
+            . 'table.rs-grid td.rs-name{text-align:left;font-weight:700;font-size:7.5pt;}'
+            . 'table.rs-grid td.rs-course{text-align:center;font-size:7.5pt;}'
+            . 'table.rs-grid td.rs-selected{text-align:center;font-size:7.5pt;font-weight:700;}'
+            . 'table.rs-grid td.rs-phone{text-align:center;font-family:DejaVu Sans Mono,Courier New,monospace;font-size:7.5pt;}'
+            . 'table.rs-grid td.rs-call{text-align:center;background:#fff;height:26px;}'
             . 'table.rs-grid tr.rs-alt td{background:#f1f5f9;}'
+            . 'table.rs-grid tr.rs-alt td.rs-call{background:#fff;}'
             . 'table.rs-grid tr.rs-diff td.rs-selected{background:#dcfce7;}'
-            . '.rs-foot{margin:8px 0 0 0;font-size:7.5pt;color:#475569;text-align:left;}';
+            . '.rs-foot{margin:8px 0 0 0;font-size:7pt;color:#475569;text-align:left;}';
     }
 
     /**
      * @throws RuntimeException
      */
-    public static function streamHtml(string $html, string $filename, $paper = 'A4', string $orientation = 'portrait'): void {
+    public static function streamHtml(string $html, string $filename, $paper = 'A4', string $orientation = 'portrait', bool $pageNumbers = false): void {
         require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
-        ExamPdfHelper::streamHtml($html, $filename, $paper, $orientation);
+        ExamPdfHelper::streamHtml($html, $filename, $paper, $orientation, $pageNumbers);
     }
 
     /**

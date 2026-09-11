@@ -204,18 +204,38 @@ class ExamPdfHelper {
         self::streamMergedPdfBytes($pdfChunks, $filename);
     }
 
-    public static function streamHtml(string $html, string $filename, $paper = 'A4', string $orientation = 'portrait'): void {
+    public static function streamHtml(string $html, string $filename, $paper = 'A4', string $orientation = 'portrait', bool $pageNumbers = false): void {
         self::prepareBulkPdfJob();
         $dompdf = self::createDompdf();
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper($paper, $orientation);
         $dompdf->render();
+        if ($pageNumbers) {
+            self::stampPageNumbers($dompdf);
+        }
         $safe = preg_replace('/[^a-zA-Z0-9._-]+/', '_', $filename) ?: 'document.pdf';
         if (substr($safe, -4) !== '.pdf') {
             $safe .= '.pdf';
         }
         $dompdf->stream($safe, ['Attachment' => true]);
         exit;
+    }
+
+    private static function stampPageNumbers(\Dompdf\Dompdf $dompdf): void {
+        $canvas = $dompdf->getCanvas();
+        if ($canvas === null) {
+            return;
+        }
+        $metrics = $dompdf->getFontMetrics();
+        $font = $metrics->getFont('Helvetica');
+        $size = 8;
+        $w = $canvas->get_width();
+        $h = $canvas->get_height();
+        $sample = 'Page 8 of 8';
+        $tw = $metrics->getTextWidth($sample, $font, $size);
+        $x = max(0, ($w - $tw) / 2);
+        $y = max(8, $h - 14);
+        $canvas->page_text($x, $y, 'Page {PAGE_NUM} of {PAGE_COUNT}', $font, $size, [0.29, 0.33, 0.39]);
     }
 
     /**

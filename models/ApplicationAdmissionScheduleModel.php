@@ -952,6 +952,10 @@ class ApplicationAdmissionScheduleModel extends Model {
             if ($selected === '') {
                 $selected = $applied;
             }
+            $phone = trim((string) ($row['student_phone'] ?? ''));
+            if ($phone === '') {
+                $phone = trim((string) ($row['student_whatsapp'] ?? ''));
+            }
             $byKey[$key] = [
                 'application_id' => $appId,
                 'roll_number' => $roll,
@@ -961,6 +965,7 @@ class ApplicationAdmissionScheduleModel extends Model {
                 'schedule_language' => (string) ($row['schedule_language'] ?? ''),
                 'applied_course' => $applied,
                 'selected_course' => $selected,
+                'contact_number' => $phone,
                 'department_name' => (string) ($row['department_name'] ?? ''),
                 'application_level' => (string) ($row['schedule_level'] ?? $row['application_level'] ?? ''),
             ];
