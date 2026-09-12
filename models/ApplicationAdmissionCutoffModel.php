@@ -1307,24 +1307,7 @@ class ApplicationAdmissionCutoffModel extends Model {
             if ($cid === '' && $cname === '') {
                 continue;
             }
-            $key = $cid !== '' ? strtolower($cid) : ('n:' . mb_strtolower($cname, 'UTF-8'));
-            if (!isset($grouped[$key])) {
-                $grouped[$key] = [
-                    'course_id' => $cid,
-                    'course_name' => $cname,
-                    'department_id' => trim((string) ($row['department_id'] ?? '')),
-                    'department_name' => trim((string) ($row['department_name'] ?? '')),
-                    'students' => [],
-                ];
-            } else {
-                if (trim((string) ($grouped[$key]['department_name'] ?? '')) === '' && trim((string) ($row['department_name'] ?? '')) !== '') {
-                    $grouped[$key]['department_name'] = trim((string) $row['department_name']);
-                }
-                if (trim((string) ($grouped[$key]['department_id'] ?? '')) === '' && trim((string) ($row['department_id'] ?? '')) !== '') {
-                    $grouped[$key]['department_id'] = trim((string) $row['department_id']);
-                }
-            }
-            $grouped[$key]['students'][] = $row;
+            $this->pushSelectionGroupStudent($grouped, $row, $level, $cid, $cname);
         }
 
         return $this->sortSelectionReportGroups(array_values($grouped));
@@ -1465,24 +1448,7 @@ class ApplicationAdmissionCutoffModel extends Model {
             if ($cid === '' && $cname === '') {
                 continue;
             }
-            $key = $cid !== '' ? strtolower($cid) : ('n:' . mb_strtolower($cname, 'UTF-8'));
-            if (!isset($grouped[$key])) {
-                $grouped[$key] = [
-                    'course_id' => $cid,
-                    'course_name' => $cname,
-                    'department_id' => trim((string) ($row['department_id'] ?? '')),
-                    'department_name' => trim((string) ($row['department_name'] ?? '')),
-                    'students' => [],
-                ];
-            } else {
-                if (trim((string) ($grouped[$key]['department_name'] ?? '')) === '' && trim((string) ($row['department_name'] ?? '')) !== '') {
-                    $grouped[$key]['department_name'] = trim((string) $row['department_name']);
-                }
-                if (trim((string) ($grouped[$key]['department_id'] ?? '')) === '' && trim((string) ($row['department_id'] ?? '')) !== '') {
-                    $grouped[$key]['department_id'] = trim((string) $row['department_id']);
-                }
-            }
-            $grouped[$key]['students'][] = $row;
+            $this->pushSelectionGroupStudent($grouped, $row, $level, $cid, $cname);
         }
 
         return $this->sortSelectionReportGroups(array_values($grouped));
@@ -1492,14 +1458,73 @@ class ApplicationAdmissionCutoffModel extends Model {
      * @param list<array<string, mixed>> $out
      * @return list<array<string, mixed>>
      */
+    /**
+     * @param array<string, array<string, mixed>> $grouped
+     * @param array<string, mixed> $row
+     */
+    private function pushSelectionGroupStudent(array &$grouped, array $row, string $level, string $cid, string $cname): void {
+        $split = $this->automobileMediumGroup($level, [
+            'course_id' => $cid,
+            'course_name' => $cname,
+            'department_id' => $row['department_id'] ?? '',
+        ], (string) ($row['medium'] ?? ''));
+        $base = $cid !== '' ? strtolower($cid) : ('n:' . mb_strtolower($cname, 'UTF-8'));
+        $key = $split !== null ? ($base . '|m:' . strtolower($split['key'])) : $base;
+        if (!isset($grouped[$key])) {
+            $grouped[$key] = [
+                'course_id' => $cid,
+                'course_name' => $cname,
+                'department_id' => trim((string) ($row['department_id'] ?? '')),
+                'department_name' => trim((string) ($row['department_name'] ?? '')),
+                'medium_key' => $split['key'] ?? '',
+                'medium_label' => $split['label'] ?? '',
+                'split_by_medium' => $split !== null,
+                'students' => [],
+            ];
+        } else {
+            if (trim((string) ($grouped[$key]['department_name'] ?? '')) === '' && trim((string) ($row['department_name'] ?? '')) !== '') {
+                $grouped[$key]['department_name'] = trim((string) $row['department_name']);
+            }
+            if (trim((string) ($grouped[$key]['department_id'] ?? '')) === '' && trim((string) ($row['department_id'] ?? '')) !== '') {
+                $grouped[$key]['department_id'] = trim((string) $row['department_id']);
+            }
+        }
+        $grouped[$key]['students'][] = $row;
+    }
+
+    /**
+     * @param array<string, mixed> $course
+     * @return array{key: string, label: string}|null
+     */
+    private function automobileMediumGroup(string $level, array $course, string $studentMedium): ?array {
+        if (!self::isAutomobileLevel04($level, $course)) {
+            return null;
+        }
+        $medium = self::normalizeMedium($studentMedium);
+        if ($medium === 'Tamil') {
+            return ['key' => 'Tamil', 'label' => 'Tamil'];
+        }
+        if ($medium === 'Sinhala' || $medium === 'English') {
+            return ['key' => 'Sinhala_English', 'label' => 'Sinhala / English'];
+        }
+
+        return ['key' => 'Other', 'label' => 'Other medium'];
+    }
+
     private function sortSelectionReportGroups(array $out): array {
-        usort($out, static function (array $a, array $b): int {
+        $mediumOrder = ['Tamil' => 0, 'Sinhala_English' => 1, 'Other' => 2];
+        usort($out, static function (array $a, array $b) use ($mediumOrder): int {
             $dept = strcasecmp((string) ($a['department_name'] ?? ''), (string) ($b['department_name'] ?? ''));
             if ($dept !== 0) {
                 return $dept;
             }
+            $course = strcasecmp((string) ($a['course_name'] ?? ''), (string) ($b['course_name'] ?? ''));
+            if ($course !== 0) {
+                return $course;
+            }
 
-            return strcasecmp((string) ($a['course_name'] ?? ''), (string) ($b['course_name'] ?? ''));
+            return ($mediumOrder[(string) ($a['medium_key'] ?? '')] ?? 9)
+                <=> ($mediumOrder[(string) ($b['medium_key'] ?? '')] ?? 9);
         });
         foreach ($out as &$group) {
             usort($group['students'], static function (array $a, array $b): int {
@@ -1586,6 +1611,9 @@ class ApplicationAdmissionCutoffModel extends Model {
         foreach ($qualify as $g) {
             $cid = trim((string) ($g['course_id'] ?? ''));
             $cname = trim((string) ($g['course_name'] ?? ''));
+            $deptId = trim((string) ($g['department_id'] ?? ''));
+            $deptName = trim((string) ($g['department_name'] ?? ''));
+            $languageSplit = !empty($g['uses_language']);
             $parts = [];
             $north = null;
             $other = null;
@@ -1607,16 +1635,48 @@ class ApplicationAdmissionCutoffModel extends Model {
                     'cutoff_other' => $oCut,
                 ];
             }
-            $courses[] = [
+            $base = [
                 'course_id' => $cid,
                 'course_name' => $cname,
-                'department_id' => trim((string) ($g['department_id'] ?? '')),
-                'department_name' => trim((string) ($g['department_name'] ?? '')),
+                'department_id' => $deptId,
+                'department_name' => $deptName,
+                'second_option' => $pick($countSecond, $cid, $cname),
+                'interview' => $pick($countInterview, $cid, $cname),
+            ];
+            if ($languageSplit) {
+                foreach (($g['by_medium'] ?? []) as $block) {
+                    $mKey = trim((string) ($block['medium'] ?? ''));
+                    $mLabel = trim((string) ($block['label'] ?? $mKey));
+                    $mNorth = $block['cutoff_northern'] ?? null;
+                    $mOther = $block['cutoff_other'] ?? null;
+                    $courses[] = $base + [
+                        'medium_key' => $mKey,
+                        'medium_label' => $mLabel,
+                        'sat' => (int) ($block['sat_count'] ?? 0),
+                        'selected' => $mKey !== ''
+                            ? (int) ($countSelected['id:' . strtolower($cid) . '|m:' . strtolower($mKey)] ?? 0)
+                            : $pick($countSelected, $cid, $cname),
+                        'failed' => $mKey !== ''
+                            ? (int) ($countFailed['id:' . strtolower($cid) . '|m:' . strtolower($mKey)] ?? 0)
+                            : $pick($countFailed, $cid, $cname),
+                        'has_cutoff' => !empty($block['has_cutoff']),
+                        'cutoff_northern' => $mNorth,
+                        'cutoff_other' => $mOther,
+                        'cutoff_parts' => [[
+                            'label' => $mLabel,
+                            'cutoff_northern' => $mNorth,
+                            'cutoff_other' => $mOther,
+                        ]],
+                    ];
+                }
+                continue;
+            }
+            $courses[] = $base + [
+                'medium_key' => '',
+                'medium_label' => '',
                 'sat' => (int) ($g['sat_count'] ?? 0),
                 'selected' => $pick($countSelected, $cid, $cname),
                 'failed' => $pick($countFailed, $cid, $cname),
-                'second_option' => $pick($countSecond, $cid, $cname),
-                'interview' => $pick($countInterview, $cid, $cname),
                 'has_cutoff' => !empty($g['has_cutoff']),
                 'cutoff_northern' => $north,
                 'cutoff_other' => $other,
@@ -1661,8 +1721,12 @@ class ApplicationAdmissionCutoffModel extends Model {
             if ($dept !== 0) {
                 return $dept;
             }
+            $course = strcasecmp((string) ($a['course_name'] ?? ''), (string) ($b['course_name'] ?? ''));
+            if ($course !== 0) {
+                return $course;
+            }
 
-            return strcasecmp((string) ($a['course_name'] ?? ''), (string) ($b['course_name'] ?? ''));
+            return strcasecmp((string) ($a['medium_label'] ?? ''), (string) ($b['medium_label'] ?? ''));
         });
 
         $totals = [
@@ -1708,6 +1772,10 @@ class ApplicationAdmissionCutoffModel extends Model {
             }
             if ($cname !== '') {
                 $map['n:' . $cname] = ($map['n:' . $cname] ?? 0) + $n;
+            }
+            $medium = strtolower(trim((string) ($g['medium_key'] ?? '')));
+            if ($cid !== '' && $medium !== '') {
+                $map['id:' . $cid . '|m:' . $medium] = ($map['id:' . $cid . '|m:' . $medium] ?? 0) + $n;
             }
         }
 

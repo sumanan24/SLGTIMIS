@@ -246,10 +246,6 @@ class ApplicationAdmissionController extends Controller {
     public function pdfReport() {
         $this->requireView($this->requireLogin());
         $data = $this->selectionReportPageData();
-        if (empty($data['has_filter'] ?? $data['has_course'])) {
-            $_SESSION['error'] = 'Select a department and a course, then open the PDF report.';
-            $this->redirect('application-admission/report?' . (string) ($data['filter_query'] ?? 'level=04'));
-        }
         require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
         $inner = ApplicationAdmissionPdfHelper::renderTemplate('selection_report.php', [
             'level' => $data['level'],
@@ -856,45 +852,15 @@ class ApplicationAdmissionController extends Controller {
             $courseId = '';
         }
 
-        $hasFilter = $departmentId !== '' && $courseId !== '';
+        $hasFilter = $departmentId !== '' || $courseId !== '';
 
         $minMarks = ApplicationAdmissionCutoffModel::MARKS_MIN_SECOND_OPTION;
-        $emptyOverview = [
-            'totals' => [
-                'sat' => 0, 'selected' => 0, 'failed' => 0, 'second_option' => 0,
-                'interview' => 0, 'cutoff_courses' => 0, 'courses' => 0, 'departments' => 0,
-            ],
-            'departments' => [],
-            'courses' => [],
-        ];
         $qs = ['level' => $level];
         if ($departmentId !== '') {
             $qs['department_id'] = $departmentId;
         }
         if ($courseId !== '') {
             $qs['course_id'] = $courseId;
-        }
-
-        if (!$hasFilter) {
-            return [
-                'level' => $level,
-                'department_id' => $departmentId,
-                'course_id' => $courseId,
-                'has_course' => false,
-                'has_filter' => false,
-                'courses' => $courses,
-                'departments' => $departments,
-                'groups' => [],
-                'fail_groups' => [],
-                'total_students' => 0,
-                'total_fail' => 0,
-                'choice_counts' => ['1st' => 0, '2nd' => 0, '3rd' => 0, 'interview' => 0],
-                'fail_counts' => ['below_min' => 0, 'absent' => 0, 'missed_cutoff' => 0],
-                'min_marks' => $minMarks,
-                'overview' => $emptyOverview,
-                'filter_query' => http_build_query($qs),
-                'filter_summary' => $this->cutoffFilterSummary($departmentId, $courseId, $courses, $departments),
-            ];
         }
 
         $allGroups = $cutoffModel->selectionReportGroups($level);
@@ -951,8 +917,8 @@ class ApplicationAdmissionController extends Controller {
             'level' => $level,
             'department_id' => $departmentId,
             'course_id' => $courseId,
-            'has_course' => true,
-            'has_filter' => true,
+            'has_course' => $courseId !== '',
+            'has_filter' => $hasFilter,
             'courses' => $courses,
             'departments' => $departments,
             'groups' => $groups,
