@@ -303,6 +303,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                 $studentApplicationsPages[] = 'application-admission-cutoff';
                                 $studentApplicationsPages[] = 'application-admission-second-option';
                                 $studentApplicationsPages[] = 'application-admission-report';
+                                $studentApplicationsPages[] = 'application-admission-nic-result';
                             }
                             $showStudentApplicationsMenu = $studentApplicationsPages !== [];
                             $showStudentBusSeasonMenu = !empty($canProcessBusSeasonMenu);
@@ -398,6 +399,12 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                                 <a href="<?php echo APP_URL; ?>/application-admission/report" class="<?php echo (isset($page) && $page === 'application-admission-report') ? 'active' : ''; ?>">
                                                     <i class="fas fa-file-alt"></i>
                                                     <span>Selection report</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo APP_URL; ?>/application-admission/nic-result" class="<?php echo (isset($page) && $page === 'application-admission-nic-result') ? 'active' : ''; ?>">
+                                                    <i class="fas fa-id-card"></i>
+                                                    <span>NIC result</span>
                                                 </a>
                                             </li>
                                             <?php endif; ?>

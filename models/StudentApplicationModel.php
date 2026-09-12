@@ -1156,6 +1156,50 @@ class StudentApplicationModel extends Model {
     }
 
     /**
+     * Staff NIC lookup — both NVQ levels, ignoring spaces / dashes in the stored NIC.
+     *
+     * @param list<string> $levels
+     * @return list<array<string, mixed>>
+     */
+    public function findAllByNormalizedNic(string $nic, array $levels = ['04', '05']): array {
+        $this->ensureTable();
+        $this->migrateSchema();
+        $want = strtoupper(preg_replace('/\s+|-|_/', '', trim($nic)) ?? '');
+        if ($want === '') {
+            return [];
+        }
+        $levels = array_values(array_filter($levels, static fn($lv): bool => in_array($lv, ['04', '05'], true)));
+        if ($levels === []) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($levels), '?'));
+        $normExpr = "REPLACE(REPLACE(REPLACE(UPPER(TRIM(`student_nic`)), ' ', ''), '-', ''), '_', '')";
+        $sql = 'SELECT ' . self::APPLICATION_DETAIL_SELECT
+            . " FROM `{$this->table}` WHERE {$normExpr} = ? AND `application_level` IN ({$placeholders})"
+            . ' ORDER BY `application_level` ASC, `application_id` DESC';
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return [];
+        }
+        $params = array_merge([$want], $levels);
+        if (!$this->bindParamsTyped($stmt, str_repeat('s', count($params)), $params)) {
+            $stmt->close();
+            return [];
+        }
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $rows = [];
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $rows[] = $row;
+            }
+        }
+        $stmt->close();
+
+        return $rows;
+    }
+
+    /**
      * Space + Unicode em dash + space — same as legacy public form stored value `course_id + sep + course_name`.
      */
     private static function legacyCourseIdNameSeparator(): string {

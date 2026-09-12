@@ -195,6 +195,9 @@ $schedules = is_array($schedules ?? null) ? $schedules : [];
             <a href="<?php echo APP_URL; ?>/application-admission/report<?php echo ($levelFilter ?? '') !== '' ? ('?level=' . rawurlencode((string) $levelFilter)) : ''; ?>" class="btn btn-sm btn-outline-dark" title="Entrance exam results, cutoff and selected course list">
                 <i class="fas fa-file-alt me-1"></i> Selection report
             </a>
+            <a href="<?php echo APP_URL; ?>/application-admission/nic-result" class="btn btn-sm btn-outline-secondary" title="Check marks, cutoff, applied and selected course by NIC">
+                <i class="fas fa-id-card me-1"></i> NIC result
+            </a>
             <?php endif; ?>
             <?php if ($isInterview):
                 $resultPdfQs = ($levelFilter ?? '') !== '' ? ('?level=' . rawurlencode((string) $levelFilter)) : '';
@@ -233,6 +236,9 @@ $schedules = is_array($schedules ?? null) ? $schedules : [];
         </a>
         <a href="<?php echo APP_URL; ?>/application-admission/report">
             <i class="fas fa-file-alt"></i> Selection report
+        </a>
+        <a href="<?php echo APP_URL; ?>/application-admission/nic-result">
+            <i class="fas fa-id-card"></i> NIC result
         </a>
     </nav>
 

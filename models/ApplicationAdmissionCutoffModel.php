@@ -1748,4 +1748,213 @@ class ApplicationAdmissionCutoffModel extends Model {
             'third_course' => (string) ($extra['third_course'] ?? ''),
         ];
     }
+
+    /**
+     * Staff NIC lookup: marks, cutoff, applied choices, and selected course.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function lookupSelectionByNic(string $nic, string $level = ''): array {
+        require_once BASE_PATH . '/models/StudentApplicationModel.php';
+        require_once BASE_PATH . '/models/ApplicationAdmissionScheduleModel.php';
+
+        $want = ApplicationAdmissionScheduleModel::normalizedNic($nic);
+        if ($want === '') {
+            return [];
+        }
+        $levels = in_array($level, ['04', '05'], true) ? [$level] : ['04', '05'];
+        $appModel = new StudentApplicationModel();
+        $apps = $appModel->findAllByNormalizedNic($want, $levels);
+
+        $out = [];
+        $seen = [];
+        foreach ($apps as $app) {
+            $card = $this->lookupForApplication($app, (string) ($app['application_level'] ?? ''));
+            if ($card === null) {
+                continue;
+            }
+            $key = (string) ($card['application_id'] ?? '') . ':' . (string) ($card['level'] ?? '');
+            $seen[$key] = true;
+            $out[] = $card;
+        }
+
+        if ($out !== []) {
+            return $out;
+        }
+
+        foreach ($levels as $lv) {
+            $card = $this->findSelectionCardByNic($want, $lv);
+            if ($card === null) {
+                continue;
+            }
+            $key = (string) ($card['application_id'] ?? '') . ':' . (string) ($card['level'] ?? '');
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $out[] = $card;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $app
+     * @return array<string, mixed>|null
+     */
+    private function lookupForApplication(array $app, string $level): ?array {
+        if (!in_array($level, ['04', '05'], true)) {
+            return null;
+        }
+        $aid = (int) ($app['application_id'] ?? 0);
+        $hit = $this->findSelectionRowByApplicationId($aid, $level);
+        if ($hit !== null) {
+            return $this->formatNicLookup($hit['row'], $level, $hit['status'], $app);
+        }
+
+        return $this->formatNicLookupFromApplication($app, $level);
+    }
+
+    /**
+     * @return array{row: array<string, mixed>, status: string}|null
+     */
+    private function findSelectionRowByApplicationId(int $applicationId, string $level): ?array {
+        if ($applicationId < 1) {
+            return null;
+        }
+        $selectedGroups = $this->selectionReportGroups($level);
+        $selectedIds = [];
+        foreach ($selectedGroups as $group) {
+            foreach (($group['students'] ?? []) as $row) {
+                $sid = (int) ($row['application_id'] ?? 0);
+                if ($sid > 0) {
+                    $selectedIds[] = $sid;
+                }
+                if ($sid === $applicationId) {
+                    return ['row' => $row, 'status' => 'selected'];
+                }
+            }
+        }
+        foreach ($this->selectionFailReportGroups($level, $selectedIds) as $group) {
+            foreach (($group['students'] ?? []) as $row) {
+                if ((int) ($row['application_id'] ?? 0) === $applicationId) {
+                    return ['row' => $row, 'status' => 'failed'];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function findSelectionCardByNic(string $normalizedNic, string $level): ?array {
+        $selectedGroups = $this->selectionReportGroups($level);
+        $selectedIds = [];
+        foreach ($selectedGroups as $group) {
+            foreach (($group['students'] ?? []) as $row) {
+                $sid = (int) ($row['application_id'] ?? 0);
+                if ($sid > 0) {
+                    $selectedIds[] = $sid;
+                }
+                if (ApplicationAdmissionScheduleModel::normalizedNic((string) ($row['student_nic'] ?? '')) === $normalizedNic) {
+                    return $this->formatNicLookup($row, $level, 'selected', null);
+                }
+            }
+        }
+        foreach ($this->selectionFailReportGroups($level, $selectedIds) as $group) {
+            foreach (($group['students'] ?? []) as $row) {
+                if (ApplicationAdmissionScheduleModel::normalizedNic((string) ($row['student_nic'] ?? '')) === $normalizedNic) {
+                    return $this->formatNicLookup($row, $level, 'failed', null);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @param array<string, mixed>|null $app
+     * @return array<string, mixed>
+     */
+    private function formatNicLookup(array $row, string $level, string $status, ?array $app): array {
+        if ($app === null) {
+            $aid = (int) ($row['application_id'] ?? 0);
+            if ($aid > 0) {
+                require_once BASE_PATH . '/models/StudentApplicationModel.php';
+                $app = (new StudentApplicationModel())->findById($aid);
+            }
+        }
+        $prefs = $app !== null ? self::preferenceCourseNames($app) : [1 => '', 2 => '', 3 => ''];
+        $applied = trim((string) ($row['applied_course'] ?? ''));
+        $second = trim((string) ($row['second_course'] ?? ''));
+        $third = trim((string) ($row['third_course'] ?? ''));
+        if ($applied === '') {
+            $applied = $prefs[1];
+        }
+        if ($second === '') {
+            $second = $prefs[2];
+        }
+        if ($third === '') {
+            $third = $prefs[3];
+        }
+        $selectedCourse = $status === 'selected' ? trim((string) ($row['selected_course'] ?? '')) : '';
+        $failReason = $status === 'failed' ? trim((string) ($row['fail_reason'] ?? '')) : '';
+
+        return [
+            'status' => $status,
+            'level' => $level,
+            'application_id' => (int) ($row['application_id'] ?? $app['application_id'] ?? 0),
+            'name' => trim((string) ($row['student_full_name'] ?? $app['student_full_name'] ?? '')),
+            'nic' => trim((string) ($row['student_nic'] ?? $app['student_nic'] ?? '')),
+            'roll_number' => trim((string) ($row['roll_number'] ?? '')),
+            'phone' => trim((string) ($row['contact_number'] ?? $app['student_phone'] ?? '')),
+            'medium' => trim((string) ($row['medium'] ?? $app['student_language'] ?? '')),
+            'region' => trim((string) ($row['region'] ?? '')),
+            'exam_marks' => $row['exam_marks'] ?? '',
+            'cutoff_applied' => $row['cutoff_applied'] ?? null,
+            'applied_course' => $applied,
+            'second_course' => $second,
+            'third_course' => $third,
+            'selected_course' => $selectedCourse,
+            'choice' => (int) ($row['choice'] ?? 0),
+            'choice_label' => trim((string) ($row['choice_label'] ?? '')),
+            'source' => trim((string) ($row['source'] ?? '')),
+            'fail_reason' => $failReason,
+            'department_name' => trim((string) ($row['department_name'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $app
+     * @return array<string, mixed>
+     */
+    private function formatNicLookupFromApplication(array $app, string $level): array {
+        $prefs = self::preferenceCourseNames($app);
+
+        return [
+            'status' => 'applied',
+            'level' => $level,
+            'application_id' => (int) ($app['application_id'] ?? 0),
+            'name' => trim((string) ($app['student_full_name'] ?? '')),
+            'nic' => trim((string) ($app['student_nic'] ?? '')),
+            'roll_number' => '',
+            'phone' => trim((string) ($app['student_phone'] ?? $app['student_whatsapp'] ?? '')),
+            'medium' => trim((string) ($app['student_language'] ?? '')),
+            'region' => '',
+            'exam_marks' => '',
+            'cutoff_applied' => null,
+            'applied_course' => $prefs[1],
+            'second_course' => $prefs[2],
+            'third_course' => $prefs[3],
+            'selected_course' => '',
+            'choice' => 0,
+            'choice_label' => '',
+            'source' => '',
+            'fail_reason' => '',
+            'department_name' => '',
+        ];
+    }
 }

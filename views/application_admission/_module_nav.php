@@ -6,6 +6,7 @@ $interviewUrl = rtrim(APP_URL, '/') . '/application-admission/interviews';
 $cutoffUrl = rtrim(APP_URL, '/') . '/application-admission/cutoffs';
 $secondOptionUrl = rtrim(APP_URL, '/') . '/application-admission/second-option';
 $reportUrl = rtrim(APP_URL, '/') . '/application-admission/report';
+$nicResultUrl = rtrim(APP_URL, '/') . '/application-admission/nic-result';
 ?>
 <style>
 .aa-module-nav {
@@ -56,5 +57,8 @@ $reportUrl = rtrim(APP_URL, '/') . '/application-admission/report';
     </a>
     <a class="<?php echo $aaNavActive === 'report' ? 'is-active' : ''; ?>" href="<?php echo $e($reportUrl); ?>">
         <i class="fas fa-file-alt"></i> Selection report
+    </a>
+    <a class="<?php echo $aaNavActive === 'nic-result' ? 'is-active' : ''; ?>" href="<?php echo $e($nicResultUrl); ?>">
+        <i class="fas fa-id-card"></i> NIC result
     </a>
 </nav>

@@ -200,6 +200,29 @@ class ApplicationAdmissionController extends Controller {
         return $this->view('application_admission/report', $viewData);
     }
 
+    public function nicResult() {
+        $this->requireView($this->requireLogin());
+        $nic = trim((string) ($this->post('nic', $this->get('nic', ''))));
+        $level = trim((string) ($this->post('level', $this->get('level', ''))));
+        if (!in_array($level, ['', '04', '05'], true)) {
+            $level = '';
+        }
+        $results = [];
+        $searched = $nic !== '';
+        if ($searched) {
+            require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
+            $results = (new ApplicationAdmissionCutoffModel())->lookupSelectionByNic($nic, $level);
+        }
+
+        return $this->view('application_admission/nic_result', [
+            'page' => 'application-admission-nic-result',
+            'nic' => $nic,
+            'level' => $level,
+            'results' => $results,
+            'searched' => $searched,
+        ]);
+    }
+
     private function wantsReportPartial(): bool {
         $xrw = strtolower(trim((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')));
         if ($xrw === 'xmlhttprequest') {
