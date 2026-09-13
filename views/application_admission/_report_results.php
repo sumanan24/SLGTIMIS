@@ -30,12 +30,12 @@ if (!isset($fmtCut) || !is_callable($fmtCut)) {
         return implode(' · ', $bits);
     };
 }
-$level = (string) ($level ?? '04');
+$level = trim((string) ($level ?? ''));
 $departmentId = trim((string) ($department_id ?? $departmentId ?? ''));
 $courseId = trim((string) ($course_id ?? $courseId ?? ''));
 $groups = is_array($groups ?? null) ? $groups : [];
 $failGroups = is_array($fail_groups ?? $failGroups ?? null) ? ($fail_groups ?? $failGroups) : [];
-$filterQuery = (string) ($filter_query ?? $filterQuery ?? ('level=' . rawurlencode($level)));
+$filterQuery = (string) ($filter_query ?? $filterQuery ?? '');
 $total = (int) ($total_students ?? $total ?? 0);
 $totalFail = (int) ($total_fail ?? $totalFail ?? 0);
 $choiceCounts = is_array($choice_counts ?? $choiceCounts ?? null) ? ($choice_counts ?? $choiceCounts) : [];
@@ -47,73 +47,31 @@ $ovDepartments = is_array($overview['departments'] ?? null) ? $overview['departm
 $ovCourses = is_array($overview['courses'] ?? null) ? $overview['courses'] : [];
 $hasFilter = !empty($has_filter);
 $reportBase = rtrim(APP_URL, '/') . '/application-admission/report';
-$dashScope = $courseId !== ''
-    ? 'Counts and cutoff for the selected course. Open the selection report below for student lists.'
-    : ($departmentId !== ''
-        ? 'Counts and cutoff for this department. Use the course filter to narrow further.'
-        : 'Counts and cutoff for all departments. Use the filter or open a department/course card to narrow.');
+$dashScope = $hasFilter
+    ? 'Counts for the applied filter. Open the student lists below, or clear the filter to see all NVQ 04 and 05 students.'
+    : 'All NVQ 04 and 05 students. Apply a level, department, or course filter only when you need a subset.';
 $reportScope = $hasFilter
     ? 'Selected and failed student lists for the filters above. Cutoff is shown with exam marks, applied course, and selected course.'
-    : 'Selected and failed student lists for all departments. Cutoff is shown with exam marks, applied course, and selected course.';
+    : 'Selected and failed student lists for all NVQ 04 and 05 students. Cutoff is shown with exam marks, applied course, and selected course.';
 ?>
 
 <div class="aa-part-jump">
-    <a href="#aa-exam-dashboard"><i class="fas fa-chart-bar"></i> Exam result dashboard</a>
+    <a href="#aa-exam-dashboard"><i class="fas fa-table"></i> Selection summary</a>
     <a href="#aa-selection-report"><i class="fas fa-file-alt"></i> Selection report</a>
 </div>
 
 <div class="aa-part aa-part-dashboard" id="aa-exam-dashboard">
     <div class="aa-part-head">
         <div>
-            <h2>Exam result dashboard</h2>
+            <h2>Selection summary</h2>
             <p><?php echo $e($dashScope); ?></p>
         </div>
-    </div>
-
-    <div class="aa-ov-kpis">
-    <a class="aa-ov-kpi" href="<?php echo APP_URL; ?>/application-admission?level=<?php echo $e($level); ?>">
-        <strong><?php echo (int) ($ovTotals['sat'] ?? 0); ?></strong>
-        <span>Sat the examination</span>
-        <em>Entrance exams</em>
-    </a>
-    <a class="aa-ov-kpi" href="<?php echo APP_URL; ?>/application-admission/cutoffs?level=<?php echo $e($level); ?>">
-        <strong><?php echo (int) ($ovTotals['cutoff_courses'] ?? 0); ?></strong>
-        <span>Courses with cutoff</span>
-        <em>Cutoff marks</em>
-    </a>
-    <a class="aa-ov-kpi" href="<?php echo APP_URL; ?>/application-admission/second-option?level=<?php echo $e($level); ?>">
-        <strong><?php echo (int) ($ovTotals['second_option'] ?? 0); ?></strong>
-        <span>2nd option</span>
-        <em>2nd option list</em>
-    </a>
-    <a class="aa-ov-kpi" href="<?php echo APP_URL; ?>/application-admission/interviews?level=<?php echo $e($level); ?>">
-        <strong><?php echo (int) ($ovTotals['interview'] ?? 0); ?></strong>
-        <span>Interview listed</span>
-        <em>Interviews</em>
-    </a>
-    <a class="aa-ov-kpi" href="<?php echo $e($reportBase); ?>?<?php echo $e($filterQuery); ?>#aa-selection-report">
-        <strong><?php echo (int) ($ovTotals['selected'] ?? 0); ?></strong>
-        <span>Selected</span>
-        <em>Selection report</em>
-    </a>
-    <a class="aa-ov-kpi is-fail" href="<?php echo $e($reportBase); ?>?<?php echo $e($filterQuery); ?>#aa-selection-report">
-        <strong><?php echo (int) ($ovTotals['failed'] ?? 0); ?></strong>
-        <span>Failed</span>
-        <em>Selection report</em>
-    </a>
+        <a href="<?php echo APP_URL; ?>/application-admission/export-report?<?php echo $e($filterQuery); ?>" class="btn btn-sm btn-outline-success">
+            <i class="fas fa-file-excel me-1"></i> Download Excel
+        </a>
     </div>
 
     <?php
-        $deptKey = static function (array $row): string {
-            $did = strtolower(trim((string) ($row['department_id'] ?? '')));
-            if ($did !== '') {
-                return 'id:' . $did;
-            }
-            $dname = trim((string) ($row['department_name'] ?? ''));
-            $dname = function_exists('mb_strtolower') ? mb_strtolower($dname, 'UTF-8') : strtolower($dname);
-
-            return 'n:' . ($dname !== '' ? $dname : 'other');
-        };
         $fmtCutFull = static function (array $card) use ($fmt): string {
             $parts = is_array($card['cutoff_parts'] ?? null) ? $card['cutoff_parts'] : [];
             if ($parts === []) {
@@ -136,127 +94,107 @@ $reportScope = $hasFilter
 
             return implode(' · ', $bits);
         };
-        $deptCards = [];
-        foreach ($ovDepartments as $d) {
-            $key = $deptKey($d);
-            $deptCards[$key] = $d;
-            $deptCards[$key]['course_list'] = [];
-        }
-        foreach ($ovCourses as $cRow) {
-            $key = $deptKey($cRow);
-            if (!isset($deptCards[$key])) {
-                $deptCards[$key] = [
-                    'department_id' => trim((string) ($cRow['department_id'] ?? '')),
-                    'department_name' => trim((string) ($cRow['department_name'] ?? '')) !== ''
-                        ? trim((string) $cRow['department_name'])
-                        : 'Department',
-                    'sat' => 0,
-                    'selected' => 0,
-                    'failed' => 0,
-                    'second_option' => 0,
-                    'interview' => 0,
-                    'courses' => 0,
-                    'cutoff_courses' => 0,
-                    'course_list' => [],
-                ];
-            }
-            $deptCards[$key]['course_list'][] = $cRow;
-        }
     ?>
-    <?php if ($deptCards !== []): ?>
-    <h2 class="aa-section-title">Departments</h2>
-    <p class="aa-sub mb-3">One card per department. Each card lists the full course names with students who sat the examination, cutoff, selected, failed, second option, and interview counts.</p>
-    <div class="aa-dept-stack">
-        <?php foreach ($deptCards as $d):
-            $did = trim((string) ($d['department_id'] ?? ''));
-            $dname = trim((string) ($d['department_name'] ?? ''));
-            $deptCourses = is_array($d['course_list'] ?? null) ? $d['course_list'] : [];
-            $deptActive = $did !== '' && strcasecmp($departmentId, $did) === 0;
-            $deptHref = $reportBase . '?level=' . rawurlencode($level)
-                . ($did !== '' ? '&department_id=' . rawurlencode($did) : '')
-                . '#aa-selection-report';
-            $courseCount = count($deptCourses);
-            $cutoffCount = (int) ($d['cutoff_courses'] ?? 0);
-        ?>
-        <article class="aa-dept-card<?php echo $deptActive ? ' is-active' : ''; ?>">
-            <div class="aa-dept-card-head">
-                <a class="aa-dept-link" href="<?php echo $e($deptHref); ?>"
-                   data-aa-dept="<?php echo $e($did); ?>" data-aa-course="">
-                    <h3>
-                        <?php echo $e($dname !== '' ? $dname : 'Department'); ?>
-                        <?php if ($did !== '' && strcasecmp($did, $dname) !== 0): ?>
-                            <span class="aa-dept-code"><?php echo $e($did); ?></span>
-                        <?php endif; ?>
-                    </h3>
-                    <p class="aa-dept-sub">
-                        <?php echo (int) $courseCount; ?> course<?php echo $courseCount === 1 ? '' : 's'; ?>
-                        · cutoff set on <?php echo (int) $cutoffCount; ?>
-                    </p>
-                </a>
-                <div class="aa-dept-totals">
-                    <span><strong><?php echo (int) ($d['sat'] ?? 0); ?></strong><em>Sat the examination</em></span>
-                    <span><strong><?php echo (int) ($d['selected'] ?? 0); ?></strong><em>Selected</em></span>
-                    <span class="is-fail"><strong><?php echo (int) ($d['failed'] ?? 0); ?></strong><em>Failed</em></span>
-                    <span><strong><?php echo (int) ($d['second_option'] ?? 0); ?></strong><em>Second option</em></span>
-                    <span><strong><?php echo (int) ($d['interview'] ?? 0); ?></strong><em>Interview</em></span>
-                </div>
-            </div>
-            <div class="aa-course-wrap">
-                <table class="aa-course-table">
-                    <thead>
-                        <tr>
-                            <th>Course</th>
-                            <th>Medium</th>
-                            <th>Cutoff (Northern / Other)</th>
-                            <th class="aa-num">Sat the examination</th>
-                            <th class="aa-num">Selected</th>
-                            <th class="aa-num">Failed</th>
-                            <th class="aa-num">Second option</th>
-                            <th class="aa-num">Interview</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php if ($deptCourses === []): ?>
-                        <tr><td colspan="8" class="aa-empty">No courses for this department.</td></tr>
-                    <?php else: ?>
-                        <?php foreach ($deptCourses as $c):
-                            $cid = trim((string) ($c['course_id'] ?? ''));
-                            $cname = trim((string) ($c['course_name'] ?? ''));
-                            $cDid = trim((string) ($c['department_id'] ?? $did));
-                            $rowActive = $cid !== '' && strcasecmp($courseId, $cid) === 0;
-                            $courseHref = $reportBase . '?level=' . rawurlencode($level);
-                            if ($cDid !== '') {
-                                $courseHref .= '&department_id=' . rawurlencode($cDid);
-                            }
-                            if ($cid !== '') {
-                                $courseHref .= '&course_id=' . rawurlencode($cid);
-                            }
-                            $courseHref .= '#aa-selection-report';
-                        ?>
-                        <tr class="<?php echo $rowActive ? 'is-active' : ''; ?>">
-                            <td>
-                                <a class="aa-course-row" href="<?php echo $e($courseHref); ?>"
-                                   data-aa-dept="<?php echo $e($cDid); ?>" data-aa-course="<?php echo $e($cid); ?>">
-                                    <?php echo $e($cname !== '' ? $cname : $cid); ?>
-                                </a>
-                            </td>
-                            <td><?php echo $e(trim((string) ($c['medium_label'] ?? '')) !== '' ? (string) $c['medium_label'] : 'All languages'); ?></td>
-                            <td class="aa-course-cut"><?php echo $e($fmtCutFull($c)); ?></td>
-                            <td class="aa-num"><?php echo (int) ($c['sat'] ?? 0); ?></td>
-                            <td class="aa-num"><?php echo (int) ($c['selected'] ?? 0); ?></td>
-                            <td class="aa-num is-fail"><?php echo (int) ($c['failed'] ?? 0); ?></td>
-                            <td class="aa-num"><?php echo (int) ($c['second_option'] ?? 0); ?></td>
-                            <td class="aa-num"><?php echo (int) ($c['interview'] ?? 0); ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </article>
-        <?php endforeach; ?>
+    <div class="table-responsive aa-sum-wrap">
+        <table class="aa-sum-table">
+            <thead>
+                <tr>
+                    <th class="aa-col-no">No</th>
+                    <th>NVQ</th>
+                    <th>Department</th>
+                    <th>Course</th>
+                    <th>Medium</th>
+                    <th class="aa-num">Applied students</th>
+                    <th class="aa-num">Exam students</th>
+                    <th class="aa-num">Met cutoff</th>
+                    <th class="aa-num">Below cutoff (not failed)</th>
+                    <th class="aa-num">Selected students</th>
+                    <th class="aa-num">1st option</th>
+                    <th class="aa-num">2nd option</th>
+                    <th class="aa-num">3rd option</th>
+                    <th class="aa-num">Selected other course</th>
+                    <th>Cutoff (Northern / Other)</th>
+                    <th class="aa-num">Failed students (below 30)</th>
+                    <th class="aa-num">Absent students</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php if ($ovCourses === []): ?>
+                <tr><td colspan="17" class="aa-empty">No course counts yet. Enter entrance exam marks and set cutoffs first.</td></tr>
+            <?php else: ?>
+                <?php $n = 0; foreach ($ovCourses as $c):
+                    $n++;
+                    $cid = trim((string) ($c['course_id'] ?? ''));
+                    $cname = trim((string) ($c['course_name'] ?? ''));
+                    $cDid = trim((string) ($c['department_id'] ?? ''));
+                    $dname = trim((string) ($c['department_name'] ?? ''));
+                    $medium = trim((string) ($c['medium_label'] ?? ''));
+                    $rowLevel = trim((string) ($c['application_level'] ?? $level));
+                    $rowActive = $cid !== '' && strcasecmp($courseId, $cid) === 0;
+                    $qs = [];
+                    if ($rowLevel !== '') {
+                        $qs['level'] = $rowLevel;
+                    }
+                    if ($cDid !== '') {
+                        $qs['department_id'] = $cDid;
+                    }
+                    $deptHref = $reportBase . ($qs !== [] ? ('?' . http_build_query($qs)) : '') . '#aa-selection-report';
+                    if ($cid !== '') {
+                        $qs['course_id'] = $cid;
+                    }
+                    $courseHref = $reportBase . ($qs !== [] ? ('?' . http_build_query($qs)) : '') . '#aa-selection-report';
+                ?>
+                <tr class="<?php echo $rowActive ? 'is-active' : ''; ?>">
+                    <td class="aa-col-no"><?php echo (int) $n; ?></td>
+                    <td><?php echo $e($rowLevel !== '' ? $rowLevel : '—'); ?></td>
+                    <td>
+                        <a class="aa-dept-link" href="<?php echo $e($deptHref); ?>"
+                           data-aa-dept="<?php echo $e($cDid); ?>" data-aa-course=""><?php echo $e($dname !== '' ? $dname : '—'); ?></a>
+                    </td>
+                    <td>
+                        <a class="aa-course-row" href="<?php echo $e($courseHref); ?>"
+                           data-aa-dept="<?php echo $e($cDid); ?>" data-aa-course="<?php echo $e($cid); ?>" data-aa-level="<?php echo $e($rowLevel); ?>">
+                            <?php echo $e($cname !== '' ? $cname : $cid); ?>
+                        </a>
+                    </td>
+                    <td><?php echo $e($medium !== '' ? $medium : 'All languages'); ?></td>
+                    <td class="aa-num"><?php echo (int) ($c['applied'] ?? 0); ?></td>
+                    <td class="aa-num"><?php echo (int) ($c['sat'] ?? 0); ?></td>
+                    <td class="aa-num"><?php echo (int) ($c['met_cutoff'] ?? 0); ?></td>
+                    <td class="aa-num"><?php echo (int) ($c['below_cutoff'] ?? 0); ?></td>
+                    <td class="aa-num"><?php echo (int) ($c['selected'] ?? 0); ?></td>
+                    <td class="aa-num"><?php echo (int) ($c['selected_1st'] ?? 0); ?></td>
+                    <td class="aa-num"><?php echo (int) ($c['selected_2nd'] ?? 0); ?></td>
+                    <td class="aa-num"><?php echo (int) ($c['selected_3rd'] ?? 0); ?></td>
+                    <td class="aa-num"><?php echo (int) ($c['selected_other'] ?? 0); ?></td>
+                    <td class="aa-course-cut"><?php echo $e($fmtCutFull($c)); ?></td>
+                    <td class="aa-num is-fail"><?php echo (int) ($c['failed'] ?? 0); ?></td>
+                    <td class="aa-num is-fail"><?php echo (int) ($c['absent'] ?? 0); ?></td>
+                </tr>
+                <?php endforeach; ?>
+            <?php endif; ?>
+            </tbody>
+            <?php if ($ovCourses !== []): ?>
+            <tfoot>
+                <tr>
+                    <th colspan="5">Total</th>
+                    <th class="aa-num"><?php echo (int) ($ovTotals['applied'] ?? 0); ?></th>
+                    <th class="aa-num"><?php echo (int) ($ovTotals['sat'] ?? 0); ?></th>
+                    <th class="aa-num"><?php echo (int) ($ovTotals['met_cutoff'] ?? 0); ?></th>
+                    <th class="aa-num"><?php echo (int) ($ovTotals['below_cutoff'] ?? 0); ?></th>
+                    <th class="aa-num"><?php echo (int) ($ovTotals['selected'] ?? 0); ?></th>
+                    <th class="aa-num"><?php echo (int) ($ovTotals['selected_1st'] ?? 0); ?></th>
+                    <th class="aa-num"><?php echo (int) ($ovTotals['selected_2nd'] ?? 0); ?></th>
+                    <th class="aa-num"><?php echo (int) ($ovTotals['selected_3rd'] ?? 0); ?></th>
+                    <th class="aa-num"><?php echo (int) ($ovTotals['selected_other'] ?? 0); ?></th>
+                    <th></th>
+                    <th class="aa-num is-fail"><?php echo (int) ($ovTotals['failed'] ?? 0); ?></th>
+                    <th class="aa-num is-fail"><?php echo (int) ($ovTotals['absent'] ?? 0); ?></th>
+                </tr>
+            </tfoot>
+            <?php endif; ?>
+        </table>
     </div>
-    <?php endif; ?>
 </div>
 
 <div class="aa-part aa-part-report" id="aa-selection-report">
@@ -276,7 +214,7 @@ $reportScope = $hasFilter
         <div class="aa-stat"><strong><?php echo (int) ($choiceCounts['1st'] ?? 0); ?></strong><span>1st choice</span></div>
         <div class="aa-stat"><strong><?php echo (int) ($choiceCounts['2nd'] ?? 0); ?></strong><span>2nd option</span></div>
         <div class="aa-stat"><strong><?php echo (int) ($choiceCounts['3rd'] ?? 0); ?></strong><span>3rd option</span></div>
-        <div class="aa-stat aa-stat-fail"><strong><?php echo (int) $totalFail; ?></strong><span>Failed students</span></div>
+        <div class="aa-stat aa-stat-fail"><strong><?php echo (int) $totalFail; ?></strong><span>Failed students (below 30)</span></div>
         <div class="aa-stat aa-stat-fail"><strong><?php echo (int) ($failCounts['below_min'] ?? 0); ?></strong><span>Below <?php echo (int) $minMarks; ?></span></div>
         <div class="aa-stat aa-stat-fail"><strong><?php echo (int) ($failCounts['absent'] ?? 0); ?></strong><span>Absent</span></div>
     </div>
@@ -307,7 +245,11 @@ $reportScope = $hasFilter
             <div>
                 <h2><?php echo $e($g['course_name'] ?? ''); ?></h2>
                 <div class="aa-meta">
-                    <?php echo $e($g['department_name'] ?? ''); ?>
+                    <?php
+                        $gLv = trim((string) ($g['application_level'] ?? ''));
+                        echo $e($g['department_name'] ?? '');
+                        echo $gLv !== '' ? $e(' · NVQ ' . $gLv) : '';
+                    ?>
                     <?php if (trim((string) ($g['medium_label'] ?? '')) !== ''): ?>
                         · Medium: <?php echo $e((string) $g['medium_label']); ?>
                     <?php endif; ?>
@@ -376,7 +318,11 @@ $reportScope = $hasFilter
             <div>
                 <h2><?php echo $e($g['course_name'] ?? ''); ?></h2>
                 <div class="aa-meta">
-                    <?php echo $e($g['department_name'] ?? ''); ?>
+                    <?php
+                        $gLv = trim((string) ($g['application_level'] ?? ''));
+                        echo $e($g['department_name'] ?? '');
+                        echo $gLv !== '' ? $e(' · NVQ ' . $gLv) : '';
+                    ?>
                     <?php if (trim((string) ($g['medium_label'] ?? '')) !== ''): ?>
                         · Medium: <?php echo $e((string) $g['medium_label']); ?>
                     <?php endif; ?>

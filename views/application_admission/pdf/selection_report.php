@@ -66,7 +66,7 @@ $fmtCut = static function (array $card) use ($fmt): string {
     <table class="grid rs-grid rs-ov">
     <thead>
     <tr>
-    <th>Sat the examination</th><th>Cutoff courses</th><th>2nd option</th><th>Interview</th><th>Selected</th><th>Failed</th>
+    <th>Sat the examination</th><th>Cutoff courses</th><th>2nd option</th><th>Interview</th><th>Selected</th><th>Failed (below 30)</th>
     </tr>
     </thead>
     <tbody>
@@ -87,7 +87,7 @@ $fmtCut = static function (array $card) use ($fmt): string {
     <table class="grid rs-grid rs-ov">
     <thead>
     <tr>
-    <th>Department</th><th>Courses</th><th>Sat the examination</th><th>Cutoff set</th><th>Selected</th><th>Failed</th><th>2nd option</th><th>Interview</th>
+    <th>Department</th><th>Courses</th><th>Sat the examination</th><th>Cutoff set</th><th>Selected</th><th>Failed (below 30)</th><th>2nd option</th><th>Interview</th>
     </tr>
     </thead>
     <tbody>
@@ -113,7 +113,7 @@ $fmtCut = static function (array $card) use ($fmt): string {
     <table class="grid rs-grid rs-ov">
     <thead>
     <tr>
-    <th>Department</th><th>Course</th><th>Cutoff</th><th>Sat the examination</th><th>Selected</th><th>Failed</th><th>2nd option</th><th>Interview</th>
+    <th>Department</th><th>Course</th><th>Cutoff</th><th>Sat the examination</th><th>Selected</th><th>Failed (below 30)</th><th>2nd option</th><th>Interview</th>
     </tr>
     </thead>
     <tbody>

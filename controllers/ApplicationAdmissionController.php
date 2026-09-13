@@ -271,6 +271,145 @@ class ApplicationAdmissionController extends Controller {
         );
     }
 
+    public function exportReport() {
+        $this->requireView($this->requireLogin());
+        $data = $this->selectionReportPageData();
+        $rows = $this->flattenSelectionOverviewRows($data['overview'] ?? []);
+        $level = (string) ($data['level'] ?? '04');
+        $filterSummary = implode(' · ', array_filter([
+            'NVQ Level ' . $level,
+            (string) ($data['filter_summary'] ?? ''),
+            count($rows) . ' course row(s)',
+        ]));
+        $baseName = 'selection_report_nvq' . $level . '_' . date('Y-m-d_H-i');
+        $cols = [
+            'no', 'nvq_level', 'department', 'course_name', 'medium',
+            'applied_students', 'exam_students', 'met_cutoff', 'below_cutoff',
+            'selected_students', 'selected_1st', 'selected_2nd', 'selected_3rd', 'selected_other', 'cutoff',
+            'failed_students', 'absent_students',
+        ];
+        $colLabels = [
+            'no' => 'No',
+            'nvq_level' => 'NVQ',
+            'department' => 'Department',
+            'course_name' => 'Course',
+            'medium' => 'Medium',
+            'applied_students' => 'Applied students',
+            'exam_students' => 'Exam students',
+            'met_cutoff' => 'Met cutoff',
+            'below_cutoff' => 'Below cutoff (not failed)',
+            'selected_students' => 'Selected students',
+            'selected_1st' => '1st option',
+            'selected_2nd' => '2nd option',
+            'selected_3rd' => '3rd option',
+            'selected_other' => 'Selected other course',
+            'cutoff' => 'Cutoff (Northern / Other)',
+            'failed_students' => 'Failed students (below 30)',
+            'absent_students' => 'Absent students',
+        ];
+
+        $xlsFallback = static function () use ($rows, $cols, $colLabels, $baseName, $filterSummary): void {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $baseName) . '.xls"');
+            header('Cache-Control: private, max-age=0');
+            echo "\xEF\xBB\xBF";
+            $esc = static function (string $s): string {
+                return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+            };
+            echo '<table border="1" cellspacing="0" cellpadding="4">' . "\n";
+            echo '<tr><td colspan="' . count($cols) . '"><b>SLGTI — Admission selection report</b></td></tr>' . "\n";
+            echo '<tr><td colspan="' . count($cols) . '">' . $esc($filterSummary) . '</td></tr>' . "\n";
+            echo '<tr><td colspan="' . count($cols) . '">Exported: ' . $esc(date('Y-m-d H:i')) . '</td></tr>' . "\n";
+            echo '<thead><tr>';
+            foreach ($cols as $h) {
+                echo '<th style="background:#1F4E79;color:#fff;font-weight:bold;padding:6px;text-align:center;">'
+                    . $esc((string) ($colLabels[$h] ?? $h)) . '</th>';
+            }
+            echo "</tr></thead>\n<tbody>\n";
+            $centerCols = [
+                'no' => true, 'applied_students' => true, 'exam_students' => true,
+                'met_cutoff' => true, 'below_cutoff' => true, 'selected_students' => true,
+                'selected_1st' => true, 'selected_2nd' => true, 'selected_3rd' => true, 'selected_other' => true,
+                'failed_students' => true, 'absent_students' => true,
+            ];
+            foreach ($rows as $row) {
+                echo '<tr>';
+                foreach ($cols as $colName) {
+                    $v = isset($row[$colName]) ? (string) $row[$colName] : '';
+                    $align = isset($centerCols[$colName]) ? 'center' : 'left';
+                    echo '<td style="mso-number-format:\'\@\';text-align:' . $align . ';">' . $esc($v) . '</td>';
+                }
+                echo "</tr>\n";
+            }
+            if ($rows === []) {
+                echo '<tr><td colspan="' . count($cols) . '">No course counts for the selected filters.</td></tr>' . "\n";
+            }
+            echo "</tbody></table>";
+            exit;
+        };
+
+        $needs = [
+            extension_loaded('zip') && class_exists('ZipArchive', false),
+            extension_loaded('xmlwriter'),
+            extension_loaded('dom'),
+            extension_loaded('simplexml'),
+            extension_loaded('xml'),
+            extension_loaded('mbstring') && function_exists('mb_strlen'),
+            extension_loaded('iconv') && function_exists('iconv'),
+        ];
+        $autoload = BASE_PATH . '/vendor/autoload.php';
+        if (!is_readable($autoload) || in_array(false, $needs, true)) {
+            $xlsFallback();
+        }
+
+        try {
+            require_once $autoload;
+            require_once BASE_PATH . '/helpers/StudentApplicationExportXlsx.php';
+            if (!class_exists(\PhpOffice\PhpSpreadsheet\Spreadsheet::class)) {
+                $xlsFallback();
+            }
+            $spreadsheet = StudentApplicationExportXlsx::buildSpreadsheet(
+                $rows,
+                $cols,
+                $colLabels,
+                'Selection report',
+                $filterSummary
+            );
+            $spreadsheet->getActiveSheet()->setCellValue('A1', 'SLGTI — Admission selection report');
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $tmpPath = tempnam(sys_get_temp_dir(), 'slgti_selreport_xlsx_');
+            if ($tmpPath === false) {
+                throw new RuntimeException('Could not create temp file for XLSX export.');
+            }
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save($tmpPath);
+            $size = filesize($tmpPath);
+            if ($size === false || $size < 1) {
+                @unlink($tmpPath);
+                throw new RuntimeException('XLSX temp file not readable after write.');
+            }
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $baseName) . '.xlsx"');
+            header('Cache-Control: private, max-age=0');
+            header('Content-Length: ' . (string) $size);
+            readfile($tmpPath);
+            @unlink($tmpPath);
+            $spreadsheet->disconnectWorksheets();
+            exit;
+        } catch (Throwable $e) {
+            if (isset($tmpPath) && is_string($tmpPath) && $tmpPath !== '') {
+                @unlink($tmpPath);
+            }
+            error_log('ApplicationAdmission exportReport: ' . $e->getMessage());
+            $xlsFallback();
+        }
+    }
+
     public function cutoffs() {
         $uid = $this->requireLogin();
         $userModel = $this->requireView($uid);
@@ -810,21 +949,29 @@ class ApplicationAdmissionController extends Controller {
      * }
      */
     private function selectionReportPageData(): array {
-        $level = (string) $this->get('level', '04');
-        if (!in_array($level, ['04', '05'], true)) {
-            $level = '04';
+        $level = trim((string) $this->get('level', ''));
+        if (!in_array($level, ['04', '05', ''], true)) {
+            $level = '';
         }
         $departmentId = trim((string) $this->get('department_id', ''));
         $courseId = trim((string) $this->get('course_id', ''));
+        $levels = $level !== '' ? [$level] : ['04', '05'];
 
         require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
         require_once BASE_PATH . '/models/CourseModel.php';
         $cutoffModel = new ApplicationAdmissionCutoffModel();
-        $nvq = $level === '05' ? '5' : '4';
-        $courses = (new CourseModel())->getCoursesWithDepartment([
-            'nvq_level' => $nvq,
-            'active_only' => true,
-        ]);
+        $courseModel = new CourseModel();
+        $courses = [];
+        foreach ($levels as $lv) {
+            $batch = $courseModel->getCoursesWithDepartment([
+                'nvq_level' => $lv === '05' ? '5' : '4',
+                'active_only' => true,
+            ]);
+            foreach ($batch as $c) {
+                $c['application_level'] = $lv;
+                $courses[] = $c;
+            }
+        }
         $departments = $this->departmentsFromCourses($courses);
 
         $validDept = false;
@@ -852,10 +999,13 @@ class ApplicationAdmissionController extends Controller {
             $courseId = '';
         }
 
-        $hasFilter = $departmentId !== '' || $courseId !== '';
+        $hasFilter = $level !== '' || $departmentId !== '' || $courseId !== '';
 
         $minMarks = ApplicationAdmissionCutoffModel::MARKS_MIN_SECOND_OPTION;
-        $qs = ['level' => $level];
+        $qs = [];
+        if ($level !== '') {
+            $qs['level'] = $level;
+        }
         if ($departmentId !== '') {
             $qs['department_id'] = $departmentId;
         }
@@ -863,18 +1013,42 @@ class ApplicationAdmissionController extends Controller {
             $qs['course_id'] = $courseId;
         }
 
-        $allGroups = $cutoffModel->selectionReportGroups($level);
-        $selectedIds = [];
-        foreach ($allGroups as $g) {
-            foreach ((is_array($g['students'] ?? null) ? $g['students'] : []) as $row) {
-                $aid = (int) ($row['application_id'] ?? 0);
-                if ($aid > 0) {
-                    $selectedIds[] = $aid;
+        $allGroups = [];
+        $allFailGroups = [];
+        $overview = [
+            'totals' => [
+                'applied' => 0, 'sat' => 0, 'selected' => 0, 'failed' => 0, 'absent' => 0,
+                'second_option' => 0, 'interview' => 0, 'cutoff_courses' => 0,
+                'courses' => 0, 'departments' => 0,
+            ],
+            'departments' => [],
+            'courses' => [],
+        ];
+        foreach ($levels as $lv) {
+            $levelGroups = $cutoffModel->selectionReportGroups($lv);
+            foreach ($levelGroups as &$g) {
+                $g['application_level'] = $lv;
+            }
+            unset($g);
+            $selectedIds = [];
+            foreach ($levelGroups as $g) {
+                foreach ((is_array($g['students'] ?? null) ? $g['students'] : []) as $row) {
+                    $aid = (int) ($row['application_id'] ?? 0);
+                    if ($aid > 0) {
+                        $selectedIds[] = $aid;
+                    }
                 }
             }
+            $levelFail = $cutoffModel->selectionFailReportGroups($lv, $selectedIds);
+            foreach ($levelFail as &$fg) {
+                $fg['application_level'] = $lv;
+            }
+            unset($fg);
+            $levelOverview = $cutoffModel->selectionOverviewCards($lv, $levelGroups, $levelFail);
+            $allGroups = array_merge($allGroups, $levelGroups);
+            $allFailGroups = array_merge($allFailGroups, $levelFail);
+            $overview = $this->mergeSelectionOverviews($overview, $levelOverview);
         }
-        $allFailGroups = $cutoffModel->selectionFailReportGroups($level, $selectedIds);
-        $overview = $cutoffModel->selectionOverviewCards($level, $allGroups, $allFailGroups);
         $overview = $this->filterSelectionOverview($overview, $departmentId, $courseId);
         $groups = $this->filterCutoffGroups($allGroups, $departmentId, $courseId);
         $failGroups = $this->filterCutoffGroups($allFailGroups, $departmentId, $courseId);
@@ -897,16 +1071,17 @@ class ApplicationAdmissionController extends Controller {
             }
         }
         $totalFail = 0;
-        $failCounts = ['below_min' => 0, 'absent' => 0, 'missed_cutoff' => 0];
+        $failCounts = ['below_min' => 0, 'absent' => (int) ($overview['totals']['absent'] ?? 0), 'missed_cutoff' => 0];
         foreach ($failGroups as $g) {
             $list = is_array($g['students'] ?? null) ? $g['students'] : [];
-            $totalFail += count($list);
             foreach ($list as $row) {
                 $reason = strtolower(trim((string) ($row['fail_reason'] ?? '')));
                 if ($reason === 'absent') {
-                    $failCounts['absent']++;
-                } elseif (strpos($reason, 'below') === 0) {
+                    continue;
+                }
+                if (strpos($reason, 'below') === 0) {
                     $failCounts['below_min']++;
+                    $totalFail++;
                 } else {
                     $failCounts['missed_cutoff']++;
                 }
@@ -930,7 +1105,7 @@ class ApplicationAdmissionController extends Controller {
             'min_marks' => $minMarks,
             'overview' => $overview,
             'filter_query' => http_build_query($qs),
-            'filter_summary' => $this->cutoffFilterSummary($departmentId, $courseId, $courses, $departments),
+            'filter_summary' => $this->selectionReportFilterSummary($level, $departmentId, $courseId, $courses, $departments),
         ];
     }
 
@@ -979,7 +1154,9 @@ class ApplicationAdmissionController extends Controller {
         }
         $deptIds = [];
         $totals = [
-            'sat' => 0, 'selected' => 0, 'failed' => 0, 'second_option' => 0,
+            'applied' => 0, 'sat' => 0, 'met_cutoff' => 0, 'below_cutoff' => 0,
+            'selected' => 0, 'selected_1st' => 0, 'selected_2nd' => 0, 'selected_3rd' => 0, 'selected_other' => 0,
+            'failed' => 0, 'absent' => 0, 'second_option' => 0,
             'interview' => 0, 'cutoff_courses' => 0, 'courses' => count($courses), 'departments' => 0,
         ];
         foreach ($courses as $c) {
@@ -987,9 +1164,17 @@ class ApplicationAdmissionController extends Controller {
             if ($did !== '') {
                 $deptIds[strtolower($did)] = true;
             }
+            $totals['applied'] += (int) ($c['applied'] ?? 0);
             $totals['sat'] += (int) ($c['sat'] ?? 0);
+            $totals['met_cutoff'] += (int) ($c['met_cutoff'] ?? 0);
+            $totals['below_cutoff'] += (int) ($c['below_cutoff'] ?? 0);
             $totals['selected'] += (int) ($c['selected'] ?? 0);
+            $totals['selected_1st'] += (int) ($c['selected_1st'] ?? 0);
+            $totals['selected_2nd'] += (int) ($c['selected_2nd'] ?? 0);
+            $totals['selected_3rd'] += (int) ($c['selected_3rd'] ?? 0);
+            $totals['selected_other'] += (int) ($c['selected_other'] ?? 0);
             $totals['failed'] += (int) ($c['failed'] ?? 0);
+            $totals['absent'] += (int) ($c['absent'] ?? 0);
             $totals['second_option'] += (int) ($c['second_option'] ?? 0);
             $totals['interview'] += (int) ($c['interview'] ?? 0);
             if (!empty($c['has_cutoff'])) {
@@ -1011,6 +1196,108 @@ class ApplicationAdmissionController extends Controller {
             'departments' => $departments,
             'courses' => $courses,
         ];
+    }
+
+    /**
+     * @param array{totals:array<string,int>,departments:list<array<string,mixed>>,courses:list<array<string,mixed>>} $left
+     * @param array{totals:array<string,int>,departments:list<array<string,mixed>>,courses:list<array<string,mixed>>} $right
+     * @return array{totals:array<string,int>,departments:list<array<string,mixed>>,courses:list<array<string,mixed>>}
+     */
+    private function mergeSelectionOverviews(array $left, array $right): array {
+        $courses = array_merge(
+            is_array($left['courses'] ?? null) ? $left['courses'] : [],
+            is_array($right['courses'] ?? null) ? $right['courses'] : []
+        );
+        $deptMap = [];
+        foreach (array_merge(
+            is_array($left['departments'] ?? null) ? $left['departments'] : [],
+            is_array($right['departments'] ?? null) ? $right['departments'] : []
+        ) as $d) {
+            $did = strtolower(trim((string) ($d['department_id'] ?? '')));
+            $dname = mb_strtolower(trim((string) ($d['department_name'] ?? '')), 'UTF-8');
+            $key = $did !== '' ? 'id:' . $did : ('n:' . ($dname !== '' ? $dname : 'other'));
+            if (!isset($deptMap[$key])) {
+                $deptMap[$key] = $d;
+                continue;
+            }
+            foreach (['applied', 'sat', 'met_cutoff', 'below_cutoff', 'selected', 'selected_1st', 'selected_2nd', 'selected_3rd', 'selected_other', 'failed', 'absent', 'second_option', 'interview', 'courses', 'cutoff_courses'] as $k) {
+                $deptMap[$key][$k] = (int) ($deptMap[$key][$k] ?? 0) + (int) ($d[$k] ?? 0);
+            }
+        }
+        $departments = array_values($deptMap);
+        usort($departments, static function (array $a, array $b): int {
+            return strcasecmp((string) ($a['department_name'] ?? ''), (string) ($b['department_name'] ?? ''));
+        });
+        usort($courses, static function (array $a, array $b): int {
+            $lv = strcasecmp((string) ($a['application_level'] ?? ''), (string) ($b['application_level'] ?? ''));
+            if ($lv !== 0) {
+                return $lv;
+            }
+            $dept = strcasecmp((string) ($a['department_name'] ?? ''), (string) ($b['department_name'] ?? ''));
+            if ($dept !== 0) {
+                return $dept;
+            }
+            $course = strcasecmp((string) ($a['course_name'] ?? ''), (string) ($b['course_name'] ?? ''));
+            if ($course !== 0) {
+                return $course;
+            }
+
+            return strcasecmp((string) ($a['medium_label'] ?? ''), (string) ($b['medium_label'] ?? ''));
+        });
+        $totals = [
+            'applied' => 0, 'sat' => 0, 'met_cutoff' => 0, 'below_cutoff' => 0,
+            'selected' => 0, 'selected_1st' => 0, 'selected_2nd' => 0, 'selected_3rd' => 0, 'selected_other' => 0,
+            'failed' => 0, 'absent' => 0,
+            'second_option' => 0, 'interview' => 0, 'cutoff_courses' => 0,
+            'courses' => count($courses), 'departments' => count($departments),
+        ];
+        foreach ($courses as $c) {
+            $totals['applied'] += (int) ($c['applied'] ?? 0);
+            $totals['sat'] += (int) ($c['sat'] ?? 0);
+            $totals['met_cutoff'] += (int) ($c['met_cutoff'] ?? 0);
+            $totals['below_cutoff'] += (int) ($c['below_cutoff'] ?? 0);
+            $totals['selected'] += (int) ($c['selected'] ?? 0);
+            $totals['selected_1st'] += (int) ($c['selected_1st'] ?? 0);
+            $totals['selected_2nd'] += (int) ($c['selected_2nd'] ?? 0);
+            $totals['selected_3rd'] += (int) ($c['selected_3rd'] ?? 0);
+            $totals['selected_other'] += (int) ($c['selected_other'] ?? 0);
+            $totals['failed'] += (int) ($c['failed'] ?? 0);
+            $totals['absent'] += (int) ($c['absent'] ?? 0);
+            $totals['second_option'] += (int) ($c['second_option'] ?? 0);
+            $totals['interview'] += (int) ($c['interview'] ?? 0);
+            if (!empty($c['has_cutoff'])) {
+                $totals['cutoff_courses']++;
+            }
+        }
+
+        return [
+            'totals' => $totals,
+            'departments' => $departments,
+            'courses' => $courses,
+        ];
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $courses
+     * @param array<int,array{department_id:string,department_name:string}> $departments
+     */
+    private function selectionReportFilterSummary(
+        string $level,
+        string $departmentId,
+        string $courseId,
+        array $courses,
+        array $departments
+    ): string {
+        $bits = [];
+        $bits[] = $level !== '' ? ('NVQ Level ' . $level) : 'All NVQ levels';
+        $rest = $this->cutoffFilterSummary($departmentId, $courseId, $courses, $departments);
+        if ($rest !== '' && $rest !== 'All departments and courses') {
+            $bits[] = $rest;
+        } elseif ($level === '' && $departmentId === '' && $courseId === '') {
+            $bits[] = 'All departments and courses';
+        }
+
+        return implode('  |  ', $bits);
     }
 
     /**
@@ -1050,6 +1337,76 @@ class ApplicationAdmissionController extends Controller {
         }
 
         return $rows;
+    }
+
+    /**
+     * @param array{totals?:array<string,int>,courses?:list<array<string,mixed>>} $overview
+     * @return list<array<string,string>>
+     */
+    private function flattenSelectionOverviewRows(array $overview): array {
+        $rows = [];
+        $n = 0;
+        foreach ((is_array($overview['courses'] ?? null) ? $overview['courses'] : []) as $c) {
+            $n++;
+            $medium = trim((string) ($c['medium_label'] ?? ''));
+            $rows[] = [
+                'no' => (string) $n,
+                'nvq_level' => trim((string) ($c['application_level'] ?? '')),
+                'department' => trim((string) ($c['department_name'] ?? '')),
+                'course_name' => trim((string) ($c['course_name'] ?? '')),
+                'medium' => $medium !== '' ? $medium : 'All languages',
+                'applied_students' => (string) (int) ($c['applied'] ?? 0),
+                'exam_students' => (string) (int) ($c['sat'] ?? 0),
+                'met_cutoff' => (string) (int) ($c['met_cutoff'] ?? 0),
+                'below_cutoff' => (string) (int) ($c['below_cutoff'] ?? 0),
+                'selected_students' => (string) (int) ($c['selected'] ?? 0),
+                'selected_1st' => (string) (int) ($c['selected_1st'] ?? 0),
+                'selected_2nd' => (string) (int) ($c['selected_2nd'] ?? 0),
+                'selected_3rd' => (string) (int) ($c['selected_3rd'] ?? 0),
+                'selected_other' => (string) (int) ($c['selected_other'] ?? 0),
+                'cutoff' => $this->formatOverviewCutoffText($c),
+                'failed_students' => (string) (int) ($c['failed'] ?? 0),
+                'absent_students' => (string) (int) ($c['absent'] ?? 0),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param array<string, mixed> $card
+     */
+    private function formatOverviewCutoffText(array $card): string {
+        $fmt = static function ($n): string {
+            if ($n === null || $n === '') {
+                return '—';
+            }
+            if (is_numeric($n) && abs((float) $n - round((float) $n)) < 0.00001) {
+                return (string) (int) round((float) $n);
+            }
+
+            return is_numeric($n) ? rtrim(rtrim(sprintf('%.2f', (float) $n), '0'), '.') : (string) $n;
+        };
+        $parts = is_array($card['cutoff_parts'] ?? null) ? $card['cutoff_parts'] : [];
+        if ($parts === []) {
+            if (empty($card['has_cutoff'])) {
+                return 'Not set';
+            }
+
+            return 'Northern ' . $fmt($card['cutoff_northern'] ?? null)
+                . ' / Other ' . $fmt($card['cutoff_other'] ?? null);
+        }
+        $bits = [];
+        foreach ($parts as $p) {
+            $pair = 'Northern ' . $fmt($p['cutoff_northern'] ?? null)
+                . ' / Other ' . $fmt($p['cutoff_other'] ?? null);
+            $label = trim((string) ($p['label'] ?? ''));
+            $bits[] = ($label !== '' && strcasecmp($label, 'All languages') !== 0)
+                ? ($label . ': ' . $pair)
+                : $pair;
+        }
+
+        return implode(' · ', $bits);
     }
 
     private function formatCutoffNumber($n): string {

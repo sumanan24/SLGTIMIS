@@ -297,6 +297,7 @@ return [
     'application-admission/export-second-option' => 'ApplicationAdmissionController@exportSecondOption',
     'application-admission/report' => 'ApplicationAdmissionController@report',
     'application-admission/pdf-report' => 'ApplicationAdmissionController@pdfReport',
+    'application-admission/export-report' => 'ApplicationAdmissionController@exportReport',
     'application-admission/nic-result' => 'ApplicationAdmissionController@nicResult',
     'application-admission/interview-letter' => 'ApplicationAdmissionController@publicInterviewLetter',
     'application-admission/interview-letter/download' => 'ApplicationAdmissionController@publicInterviewLetterDownload',
