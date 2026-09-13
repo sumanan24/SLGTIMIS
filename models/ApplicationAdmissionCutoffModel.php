@@ -718,7 +718,7 @@ class ApplicationAdmissionCutoffModel extends Model {
                 ? self::automobileCutoffGroups()
                 : [[
                     'key' => self::MEDIUM_ALL,
-                    'label' => 'All languages',
+                    'label' => 'English',
                     'store' => [self::MEDIUM_ALL],
                 ]];
             foreach ($groupsSpec as $groupSpec) {
@@ -1214,6 +1214,7 @@ class ApplicationAdmissionCutoffModel extends Model {
                     }
                     $byApp[$aid] = $this->selectionReportStudentRow($row, [
                         'applied_course' => $selectedName,
+                        'applied_course_id' => $selectedId,
                         'selected_course' => $selectedName,
                         'selected_course_id' => $selectedId,
                         'department_name' => $dept,
@@ -1253,8 +1254,10 @@ class ApplicationAdmissionCutoffModel extends Model {
                 continue;
             }
             $applied = trim((string) ($row['first_course_name'] ?? $row['course_priority_1'] ?? ''));
+            $appliedId = trim((string) ($row['first_course_id'] ?? ''));
             $byApp[$aid] = $this->selectionReportStudentRow($row, [
                 'applied_course' => $applied,
+                'applied_course_id' => $appliedId,
                 'selected_course' => $selectedName,
                 'selected_course_id' => $selectedId,
                 'department_name' => $dept,
@@ -1425,6 +1428,7 @@ class ApplicationAdmissionCutoffModel extends Model {
 
             $byApp[(int) ($row['application_id'] ?? 0)] = $this->selectionReportStudentRow($row, [
                 'applied_course' => $appliedName,
+                'applied_course_id' => $appliedId,
                 'selected_course' => $selectedName,
                 'selected_course_id' => $appliedId,
                 'department_name' => $dept,
@@ -1570,39 +1574,41 @@ class ApplicationAdmissionCutoffModel extends Model {
      */
     public function selectionOverviewCards(string $level, array $selectedGroups, array $failGroups): array {
         $qualify = $this->qualifyingStudentsByCourse($level);
-        $second = $this->secondOptionStudents($level);
         require_once BASE_PATH . '/models/ApplicationAdmissionScheduleModel.php';
         $interviewRows = (new ApplicationAdmissionScheduleModel())->interviewCommonResultRows($level);
+        $unique = $this->selectionOverviewUniqueCounts($level, $selectedGroups);
 
-        $countSelected = $this->countGroupStudentsByCourse($selectedGroups);
-        $countChoice = $this->countSelectedByCourseChoice($selectedGroups);
-        $countFailed = $this->countGroupStudentsByFailReason($failGroups, 'below', true);
-        $countAbsent = $this->countAbsentByCourseLanguage($level);
-        $countApplied = $this->countAppliedByCourseLanguage($level);
-        $countBelowCutoff = $this->countBelowCutoffByCourseLanguage($level, $second['students'] ?? []);
-        $countSelectedOther = $this->countSelectedOtherByAppliedCourse($level, $selectedGroups);
-        $countSecond = [];
-        foreach (($second['groups'] ?? []) as $g) {
-            $cid = strtolower(trim((string) ($g['course_id'] ?? '')));
-            $cname = mb_strtolower(trim((string) ($g['course_name'] ?? '')), 'UTF-8');
-            $n = (int) ($g['count'] ?? count($g['students'] ?? []));
-            if ($cid !== '') {
-                $countSecond['id:' . $cid] = $n;
-            }
-            if ($cname !== '') {
-                $countSecond['n:' . $cname] = ($countSecond['n:' . $cname] ?? 0) + $n;
-            }
-        }
+        $countApplied = $unique['applied'];
+        $countSat = $unique['sat'];
+        $countMet = $unique['met_cutoff'];
+        $countBelowCutoff = $unique['below_cutoff'];
+        $countSelected = $unique['selected'];
+        $countChoice = [
+            1 => $unique['selected_1st'],
+            2 => $unique['selected_2nd'],
+            3 => $unique['selected_3rd'],
+        ];
+        $countSelectedOther = $unique['selected_other'];
+        $countFailed = $unique['failed'];
+        $countAbsent = $unique['absent'];
+        $countSecond = $unique['below_cutoff'];
         $countInterview = [];
+        $interviewSeen = [];
         foreach ($interviewRows as $row) {
-            $cid = strtolower(trim((string) ($row['course_id'] ?? $row['selected_course_id'] ?? '')));
-            $cname = mb_strtolower(trim((string) ($row['selected_course'] ?? '')), 'UTF-8');
-            if ($cid !== '') {
-                $countInterview['id:' . $cid] = ($countInterview['id:' . $cid] ?? 0) + 1;
+            $aid = (int) ($row['application_id'] ?? 0);
+            if ($aid > 0) {
+                if (isset($interviewSeen[$aid])) {
+                    continue;
+                }
+                $interviewSeen[$aid] = true;
             }
-            if ($cname !== '') {
-                $countInterview['n:' . $cname] = ($countInterview['n:' . $cname] ?? 0) + 1;
-            }
+            $this->addToCourseLangMap(
+                $countInterview,
+                $level,
+                (string) ($row['course_id'] ?? $row['selected_course_id'] ?? ''),
+                (string) ($row['selected_course'] ?? ''),
+                $row['medium'] ?? $row['student_language'] ?? ''
+            );
         }
 
         $pick = static function (array $map, string $cid, string $cname): int {
@@ -1622,6 +1628,9 @@ class ApplicationAdmissionCutoffModel extends Model {
         foreach ($qualify as $g) {
             $cid = trim((string) ($g['course_id'] ?? ''));
             $cname = trim((string) ($g['course_name'] ?? ''));
+            if ($this->omitFromSelectionOverview($g)) {
+                continue;
+            }
             $deptId = trim((string) ($g['department_id'] ?? ''));
             $deptName = trim((string) ($g['department_name'] ?? ''));
             $languageSplit = !empty($g['uses_language']);
@@ -1652,8 +1661,6 @@ class ApplicationAdmissionCutoffModel extends Model {
                 'department_id' => $deptId,
                 'department_name' => $deptName,
                 'application_level' => $level,
-                'second_option' => $pick($countSecond, $cid, $cname),
-                'interview' => $pick($countInterview, $cid, $cname),
             ];
             if ($languageSplit) {
                 foreach (($g['by_medium'] ?? []) as $block) {
@@ -1667,13 +1674,17 @@ class ApplicationAdmissionCutoffModel extends Model {
                         'applied' => $mKey !== ''
                             ? $this->pickCountByCourseLanguage($countApplied, $cid, $cname, $mKey)
                             : $pick($countApplied, $cid, $cname),
-                        'sat' => (int) ($block['sat_count'] ?? 0),
-                        'met_cutoff' => (int) ($block['qualify_count'] ?? 0),
+                        'sat' => $mKey !== ''
+                            ? $this->pickCountByCourseLanguage($countSat, $cid, $cname, $mKey)
+                            : $pick($countSat, $cid, $cname),
+                        'met_cutoff' => $mKey !== ''
+                            ? $this->pickCountByCourseLanguage($countMet, $cid, $cname, $mKey)
+                            : $pick($countMet, $cid, $cname),
                         'below_cutoff' => $mKey !== ''
                             ? $this->pickCountByCourseLanguage($countBelowCutoff, $cid, $cname, $mKey)
                             : $pick($countBelowCutoff, $cid, $cname),
                         'selected' => $mKey !== ''
-                            ? (int) ($countSelected['id:' . strtolower($cid) . '|m:' . strtolower($mKey)] ?? 0)
+                            ? $this->pickCountByCourseLanguage($countSelected, $cid, $cname, $mKey)
                             : $pick($countSelected, $cid, $cname),
                         'selected_1st' => $mKey !== ''
                             ? (int) (($countChoice[1]['id:' . strtolower($cid) . '|m:' . strtolower($mKey)] ?? 0))
@@ -1688,11 +1699,17 @@ class ApplicationAdmissionCutoffModel extends Model {
                             ? $this->pickCountByCourseLanguage($countSelectedOther, $cid, $cname, $mKey)
                             : $pick($countSelectedOther, $cid, $cname),
                         'failed' => $mKey !== ''
-                            ? (int) ($countFailed['id:' . strtolower($cid) . '|m:' . strtolower($mKey)] ?? 0)
+                            ? $this->pickCountByCourseLanguage($countFailed, $cid, $cname, $mKey)
                             : $pick($countFailed, $cid, $cname),
                         'absent' => $mKey !== ''
                             ? $this->pickCountByCourseLanguage($countAbsent, $cid, $cname, $mKey)
                             : $pick($countAbsent, $cid, $cname),
+                        'second_option' => $mKey !== ''
+                            ? $this->pickCountByCourseLanguage($countSecond, $cid, $cname, $mKey)
+                            : $pick($countSecond, $cid, $cname),
+                        'interview' => $mKey !== ''
+                            ? $this->pickCountByCourseLanguage($countInterview, $cid, $cname, $mKey)
+                            : $pick($countInterview, $cid, $cname),
                         'has_cutoff' => !empty($block['has_cutoff']),
                         'cutoff_northern' => $mNorth,
                         'cutoff_other' => $mOther,
@@ -1720,10 +1737,10 @@ class ApplicationAdmissionCutoffModel extends Model {
             }
             $courses[] = $base + [
                 'medium_key' => '',
-                'medium_label' => 'All languages',
+                'medium_label' => 'English',
                 'applied' => $pick($countApplied, $cid, $cname),
-                'sat' => (int) ($g['sat_count'] ?? 0),
-                'met_cutoff' => (int) ($g['qualify_count'] ?? 0),
+                'sat' => $pick($countSat, $cid, $cname),
+                'met_cutoff' => $pick($countMet, $cid, $cname),
                 'below_cutoff' => $pick($countBelowCutoff, $cid, $cname),
                 'selected' => $pick($countSelected, $cid, $cname),
                 'selected_1st' => $pick($countChoice[1], $cid, $cname),
@@ -1732,6 +1749,8 @@ class ApplicationAdmissionCutoffModel extends Model {
                 'selected_other' => $pick($countSelectedOther, $cid, $cname),
                 'failed' => $pick($countFailed, $cid, $cname),
                 'absent' => $pick($countAbsent, $cid, $cname),
+                'second_option' => $pick($countSecond, $cid, $cname),
+                'interview' => $pick($countInterview, $cid, $cname),
                 'has_cutoff' => !empty($g['has_cutoff']),
                 'cutoff_northern' => $north,
                 'cutoff_other' => $other,
@@ -1845,114 +1864,32 @@ class ApplicationAdmissionCutoffModel extends Model {
     }
 
     /**
-     * @param list<array<string, mixed>> $groups
-     * @return array<string, int>
-     */
-    private function countGroupStudentsByCourse(array $groups): array {
-        $map = [];
-        foreach ($groups as $g) {
-            $n = count(is_array($g['students'] ?? null) ? $g['students'] : []);
-            $cid = strtolower(trim((string) ($g['course_id'] ?? '')));
-            $cname = mb_strtolower(trim((string) ($g['course_name'] ?? '')), 'UTF-8');
-            if ($cid !== '') {
-                $map['id:' . $cid] = ($map['id:' . $cid] ?? 0) + $n;
-            }
-            if ($cname !== '') {
-                $map['n:' . $cname] = ($map['n:' . $cname] ?? 0) + $n;
-            }
-            $medium = strtolower(trim((string) ($g['medium_key'] ?? '')));
-            if ($cid !== '' && $medium !== '') {
-                $map['id:' . $cid . '|m:' . $medium] = ($map['id:' . $cid . '|m:' . $medium] ?? 0) + $n;
-            }
-        }
-
-        return $map;
-    }
-
-    /**
-     * Selected students split by 1st / 2nd / 3rd option.
+     * Unique-student occupancy for the intake summary.
      *
-     * @param list<array<string, mixed>> $groups
-     * @return array<int, array<string, int>>
-     */
-    private function countSelectedByCourseChoice(array $groups): array {
-        $out = [1 => [], 2 => [], 3 => []];
-        foreach ($groups as $g) {
-            $counts = [1 => 0, 2 => 0, 3 => 0];
-            foreach ((is_array($g['students'] ?? null) ? $g['students'] : []) as $row) {
-                $choice = (int) ($row['choice'] ?? 0);
-                if (isset($counts[$choice])) {
-                    $counts[$choice]++;
-                }
-            }
-            $cid = strtolower(trim((string) ($g['course_id'] ?? '')));
-            $cname = mb_strtolower(trim((string) ($g['course_name'] ?? '')), 'UTF-8');
-            $medium = strtolower(trim((string) ($g['medium_key'] ?? '')));
-            foreach ([1, 2, 3] as $choice) {
-                $n = $counts[$choice];
-                if ($n < 1) {
-                    continue;
-                }
-                if ($cid !== '') {
-                    $out[$choice]['id:' . $cid] = ($out[$choice]['id:' . $cid] ?? 0) + $n;
-                }
-                if ($cname !== '') {
-                    $out[$choice]['n:' . $cname] = ($out[$choice]['n:' . $cname] ?? 0) + $n;
-                }
-                if ($cid !== '' && $medium !== '') {
-                    $key = 'id:' . $cid . '|m:' . $medium;
-                    $out[$choice][$key] = ($out[$choice][$key] ?? 0) + $n;
-                }
-            }
-        }
-
-        return $out;
-    }
-
-    /**
-     * @param list<array<string, mixed>> $groups
-     * @return array<string, int>
-     */
-    private function countGroupStudentsByFailReason(array $groups, string $reason, bool $prefix = false): array {
-        $want = strtolower(trim($reason));
-        $map = [];
-        foreach ($groups as $g) {
-            $n = 0;
-            foreach ((is_array($g['students'] ?? null) ? $g['students'] : []) as $row) {
-                $got = strtolower(trim((string) ($row['fail_reason'] ?? '')));
-                $match = $prefix ? (strpos($got, $want) === 0) : ($got === $want);
-                if ($match) {
-                    $n++;
-                }
-            }
-            if ($n < 1) {
-                continue;
-            }
-            $cid = strtolower(trim((string) ($g['course_id'] ?? '')));
-            $cname = mb_strtolower(trim((string) ($g['course_name'] ?? '')), 'UTF-8');
-            if ($cid !== '') {
-                $map['id:' . $cid] = ($map['id:' . $cid] ?? 0) + $n;
-            }
-            if ($cname !== '') {
-                $map['n:' . $cname] = ($map['n:' . $cname] ?? 0) + $n;
-            }
-            $medium = strtolower(trim((string) ($g['medium_key'] ?? '')));
-            if ($cid !== '' && $medium !== '') {
-                $map['id:' . $cid . '|m:' . $medium] = ($map['id:' . $cid . '|m:' . $medium] ?? 0) + $n;
-            }
-        }
-
-        return $map;
-    }
-
-    /**
-     * Unique exam-schedule students with a roll number, by 1st-choice course and language.
+     * Applied-axis (1st preference): applied, sat, met_cutoff, below_cutoff, failed, absent, selected_other.
+     * Destination-axis (selected course / interview): selected, selected_1st / selected_2nd / selected_3rd.
+     * Selected is a unique count of students placed into that course for interview, not 1st+2nd+3rd added as extra.
      *
-     * @return array<string, int>
+     * @param list<array<string, mixed>> $selectedGroups
+     * @return array{
+     *   applied:array<string,int>,
+     *   sat:array<string,int>,
+     *   met_cutoff:array<string,int>,
+     *   below_cutoff:array<string,int>,
+     *   failed:array<string,int>,
+     *   absent:array<string,int>,
+     *   selected:array<string,int>,
+     *   selected_other:array<string,int>,
+     *   selected_1st:array<string,int>,
+     *   selected_2nd:array<string,int>,
+     *   selected_3rd:array<string,int>,
+     *   leftovers:list<array<string,string>>
+     * }
      */
-    private function countAppliedByCourseLanguage(string $level): array {
+    private function selectionOverviewUniqueCounts(string $level, array $selectedGroups): array {
         require_once BASE_PATH . '/models/CourseModel.php';
         require_once BASE_PATH . '/models/StudentApplicationModel.php';
+        require_once BASE_PATH . '/models/ApplicationAdmissionScheduleModel.php';
 
         $nvq = $level === '05' ? '5' : '4';
         $courses = (new CourseModel())->getCoursesWithDepartment([
@@ -1960,6 +1897,9 @@ class ApplicationAdmissionCutoffModel extends Model {
             'active_only' => true,
         ]);
         $appModel = new StudentApplicationModel();
+        $cutoffMap = $this->getCutoffMap($level);
+        $minMarks = (float) self::MARKS_MIN_SECOND_OPTION;
+
         $byApp = [];
         foreach ($this->entranceMarkedEntries($level, false) as $row) {
             $appId = (int) ($row['application_id'] ?? 0);
@@ -1967,67 +1907,145 @@ class ApplicationAdmissionCutoffModel extends Model {
                 continue;
             }
             $row['medium'] = self::mediumFromEntry($row, $level);
+            $marks = self::numericMarks($row['exam_marks'] ?? null);
+            $absent = ApplicationAdmissionScheduleModel::isAbsentMarks($row['exam_marks'] ?? null);
+            $row['marks_num'] = $marks;
+            $row['is_absent'] = $absent && $marks === null;
             if (!isset($byApp[$appId])) {
                 $byApp[$appId] = $row;
                 continue;
             }
-            $prevMedium = self::normalizeMedium($byApp[$appId]['medium'] ?? null);
+            $prev = $byApp[$appId];
+            if ($marks !== null && ($prev['marks_num'] === null || $marks > (float) $prev['marks_num'])) {
+                $byApp[$appId] = $row;
+                continue;
+            }
+            if ($prev['marks_num'] !== null) {
+                continue;
+            }
+            if (!empty($row['is_absent']) && empty($prev['is_absent'])) {
+                $byApp[$appId] = $row;
+                continue;
+            }
+            $prevMedium = self::normalizeMedium($prev['medium'] ?? null);
             $curMedium = self::normalizeMedium($row['medium'] ?? null);
             if ($prevMedium === null && $curMedium !== null) {
                 $byApp[$appId] = $row;
             }
         }
 
-        return $this->mapStudentsByCourseLanguage($level, $byApp, $courses, $appModel);
-    }
-
-    /**
-     * Marks at least 30 but below 1st-choice cutoff, by applied course and language.
-     *
-     * @param list<array<string, mixed>> $students
-     * @return array<string, int>
-     */
-    private function countBelowCutoffByCourseLanguage(string $level, array $students): array {
-        $map = [];
-        foreach ($students as $row) {
-            if (trim((string) ($row['roll_number'] ?? '')) === '') {
-                continue;
+        $leftovers = [];
+        foreach ($byApp as $appId => $row) {
+            $first = $this->findCourseForPreference($row, 'course_priority_1', $courses, $appModel);
+            $cid = $first !== null ? trim((string) ($first['course_id'] ?? '')) : '';
+            $cname = $first !== null
+                ? trim((string) ($first['course_name'] ?? ''))
+                : trim((string) ($row['course_priority_1'] ?? ''));
+            $byApp[$appId]['_first_cid'] = $cid;
+            $byApp[$appId]['_first_cname'] = $cname;
+            $byApp[$appId]['_first_dept_id'] = $first !== null ? trim((string) ($first['department_id'] ?? '')) : '';
+            $byApp[$appId]['_first_dept_name'] = $first !== null ? trim((string) ($first['department_name'] ?? '')) : '';
+            if ($first === null && $cname !== '') {
+                $lkey = strtolower($cid) . '|' . mb_strtolower($cname, 'UTF-8');
+                $leftovers[$lkey] = [
+                    'course_id' => $cid,
+                    'course_name' => $cname,
+                    'department_id' => '',
+                    'department_name' => '',
+                ];
             }
-            $cid = trim((string) ($row['first_course_id'] ?? ''));
-            $cname = trim((string) ($row['first_course_name'] ?? $row['course_priority_1'] ?? ''));
-            $this->addToCourseLangMap($map, $level, $cid, $cname, $row['medium'] ?? '');
         }
 
-        return $map;
-    }
+        $maps = [
+            'applied' => [],
+            'sat' => [],
+            'met_cutoff' => [],
+            'below_cutoff' => [],
+            'failed' => [],
+            'absent' => [],
+            'selected' => [],
+            'selected_other' => [],
+            'selected_1st' => [],
+            'selected_2nd' => [],
+            'selected_3rd' => [],
+        ];
+        $selectedSeen = [];
+        foreach ($byApp as $row) {
+            $cid = (string) ($row['_first_cid'] ?? '');
+            $cname = (string) ($row['_first_cname'] ?? '');
+            $medium = $row['medium'] ?? '';
+            $this->addToCourseLangMap($maps['applied'], $level, $cid, $cname, $medium);
+            $marks = $row['marks_num'] ?? null;
+            if ($marks !== null) {
+                $this->addToCourseLangMap($maps['sat'], $level, $cid, $cname, $medium);
+                $firstCourse = ($cid !== '' || $cname !== '') ? [
+                    'course_id' => $cid,
+                    'course_name' => $cname,
+                    'department_id' => $row['_first_dept_id'] ?? '',
+                ] : null;
+                $cutoff = $firstCourse !== null
+                    ? $this->appliedCutoffForStudent($row, $firstCourse, $level, $cutoffMap)
+                    : null;
+                if ((float) $marks + 0.00001 < $minMarks) {
+                    $this->addToCourseLangMap($maps['failed'], $level, $cid, $cname, $medium);
+                } elseif ($cutoff !== null && (float) $marks + 0.00001 >= $cutoff) {
+                    $this->addToCourseLangMap($maps['met_cutoff'], $level, $cid, $cname, $medium);
+                } elseif ($cutoff !== null) {
+                    $this->addToCourseLangMap($maps['below_cutoff'], $level, $cid, $cname, $medium);
+                }
+            } elseif (!empty($row['is_absent'])) {
+                $this->addToCourseLangMap($maps['absent'], $level, $cid, $cname, $medium);
+            }
+        }
 
-    /**
-     * Applied to this course, selected for a different course (2nd/3rd option).
-     *
-     * @param list<array<string, mixed>> $groups
-     * @return array<string, int>
-     */
-    private function countSelectedOtherByAppliedCourse(string $level, array $groups): array {
-        $map = [];
-        foreach ($groups as $g) {
+        foreach ($selectedGroups as $g) {
+            $destId = trim((string) ($g['course_id'] ?? ''));
+            $destName = trim((string) ($g['course_name'] ?? ''));
             foreach ((is_array($g['students'] ?? null) ? $g['students'] : []) as $row) {
+                $aid = (int) ($row['application_id'] ?? 0);
+                if ($aid > 0 && isset($selectedSeen[$aid])) {
+                    continue;
+                }
+                if ($aid > 0) {
+                    $selectedSeen[$aid] = true;
+                }
+                $src = $aid > 0 && isset($byApp[$aid]) ? $byApp[$aid] : null;
+                $appliedId = $src !== null
+                    ? (string) ($src['_first_cid'] ?? '')
+                    : trim((string) ($row['applied_course_id'] ?? ''));
+                $appliedName = $src !== null
+                    ? (string) ($src['_first_cname'] ?? '')
+                    : trim((string) ($row['applied_course'] ?? ''));
+                $medium = $src['medium'] ?? ($row['medium'] ?? '');
                 $choice = (int) ($row['choice'] ?? 0);
-                if ($choice !== 2 && $choice !== 3) {
-                    continue;
+                $placedName = trim((string) ($row['selected_course'] ?? $destName));
+                $placedId = $destId !== '' ? $destId : trim((string) ($row['selected_course_id'] ?? ''));
+                $this->addToCourseLangMap($maps['selected'], $level, $placedId, $placedName, $medium);
+
+                $compareApplied = $appliedName !== '' ? $appliedName : trim((string) ($row['applied_course'] ?? ''));
+                if (
+                    ($choice === 2 || $choice === 3)
+                    && $compareApplied !== ''
+                    && $placedName !== ''
+                    && strcasecmp($compareApplied, $placedName) !== 0
+                ) {
+                    $this->addToCourseLangMap($maps['selected_other'], $level, $appliedId, $appliedName, $medium);
                 }
-                if (trim((string) ($row['roll_number'] ?? '')) === '') {
-                    continue;
+
+                $mapKey = $choice === 1 ? 'selected_1st' : ($choice === 2 ? 'selected_2nd' : ($choice === 3 ? 'selected_3rd' : ''));
+                if ($mapKey !== '') {
+                    $this->addToCourseLangMap(
+                        $maps[$mapKey],
+                        $level,
+                        $placedId,
+                        $placedName,
+                        $medium
+                    );
                 }
-                $applied = trim((string) ($row['applied_course'] ?? ''));
-                $selected = trim((string) ($row['selected_course'] ?? ''));
-                if ($applied === '' || strcasecmp($applied, $selected) === 0) {
-                    continue;
-                }
-                $this->addToCourseLangMap($map, $level, '', $applied, $row['medium'] ?? '');
             }
         }
 
-        return $map;
+        return $maps + ['leftovers' => array_values($leftovers)];
     }
 
     /**
@@ -2061,104 +2079,20 @@ class ApplicationAdmissionCutoffModel extends Model {
     }
 
     /**
-     * Unique students marked `ab` only (no numeric marks), by 1st-choice course and language.
+     * Courses that should not appear on the selection summary (no intake this round).
      *
-     * @return array<string, int>
+     * @param array<string, mixed> $course
      */
-    private function countAbsentByCourseLanguage(string $level): array {
-        require_once BASE_PATH . '/models/CourseModel.php';
-        require_once BASE_PATH . '/models/StudentApplicationModel.php';
-        require_once BASE_PATH . '/models/ApplicationAdmissionScheduleModel.php';
-
-        $nvq = $level === '05' ? '5' : '4';
-        $courses = (new CourseModel())->getCoursesWithDepartment([
-            'nvq_level' => $nvq,
-            'active_only' => true,
-        ]);
-        $appModel = new StudentApplicationModel();
-        $hasMarks = [];
-        $absents = [];
-        foreach ($this->entranceMarkedEntries($level) as $row) {
-            $appId = (int) ($row['application_id'] ?? 0);
-            if ($appId < 1 || trim((string) ($row['roll_number'] ?? '')) === '') {
-                continue;
-            }
-            $marks = self::numericMarks($row['exam_marks'] ?? null);
-            $absent = ApplicationAdmissionScheduleModel::isAbsentMarks($row['exam_marks'] ?? null);
-            if ($marks !== null) {
-                $hasMarks[$appId] = true;
-                unset($absents[$appId]);
-                continue;
-            }
-            if (!$absent || isset($hasMarks[$appId])) {
-                continue;
-            }
-            $row['medium'] = self::mediumFromEntry($row, $level);
-            if (!isset($absents[$appId])) {
-                $absents[$appId] = $row;
-                continue;
-            }
-            $prevMedium = self::normalizeMedium($absents[$appId]['medium'] ?? null);
-            $curMedium = self::normalizeMedium($row['medium'] ?? null);
-            if ($prevMedium === null && $curMedium !== null) {
-                $absents[$appId] = $row;
-            }
+    private function omitFromSelectionOverview(array $course): bool {
+        $name = mb_strtolower(trim((string) ($course['course_name'] ?? '')), 'UTF-8');
+        if ($name === '') {
+            return false;
+        }
+        if (strpos($name, 'drafting') !== false) {
+            return true;
         }
 
-        $kept = [];
-        foreach ($absents as $appId => $row) {
-            if (isset($hasMarks[(int) $appId])) {
-                continue;
-            }
-            $kept[$appId] = $row;
-        }
-
-        return $this->mapStudentsByCourseLanguage($level, $kept, $courses, $appModel);
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $students
-     * @param list<array<string, mixed>> $courses
-     * @return array<string, int>
-     */
-    private function mapStudentsByCourseLanguage(
-        string $level,
-        array $students,
-        array $courses,
-        $appModel
-    ): array {
-        $map = [];
-        foreach ($students as $row) {
-            $first = $this->findCourseForPreference($row, 'course_priority_1', $courses, $appModel);
-            $cid = $first !== null ? trim((string) ($first['course_id'] ?? '')) : '';
-            $cname = $first !== null
-                ? trim((string) ($first['course_name'] ?? ''))
-                : trim((string) ($row['course_priority_1'] ?? ''));
-            if ($cid === '' && $cname === '') {
-                continue;
-            }
-            $lang = $this->reportLanguageGroup($level, $first ?? [
-                'course_id' => $cid,
-                'course_name' => $cname,
-            ], $row['medium'] ?? '');
-            $mKey = strtolower(trim((string) ($lang['key'] ?? '')));
-            if ($cid !== '') {
-                $idKey = 'id:' . strtolower($cid);
-                $map[$idKey] = ($map[$idKey] ?? 0) + 1;
-                if ($mKey !== '') {
-                    $map[$idKey . '|m:' . $mKey] = ($map[$idKey . '|m:' . $mKey] ?? 0) + 1;
-                }
-            }
-            if ($cname !== '') {
-                $nKey = 'n:' . mb_strtolower($cname, 'UTF-8');
-                $map[$nKey] = ($map[$nKey] ?? 0) + 1;
-                if ($mKey !== '') {
-                    $map[$nKey . '|m:' . $mKey] = ($map[$nKey . '|m:' . $mKey] ?? 0) + 1;
-                }
-            }
-        }
-
-        return $map;
+        return strpos($name, 'renewable energy') !== false;
     }
 
     /**
@@ -2198,6 +2132,7 @@ class ApplicationAdmissionCutoffModel extends Model {
             'medium' => (string) ($row['medium'] ?? ''),
             'region' => (string) ($row['region'] ?? ''),
             'applied_course' => (string) ($extra['applied_course'] ?? ''),
+            'applied_course_id' => (string) ($extra['applied_course_id'] ?? ''),
             'selected_course' => (string) ($extra['selected_course'] ?? ''),
             'selected_course_id' => (string) ($extra['selected_course_id'] ?? ''),
             'department_name' => (string) ($extra['department_name'] ?? ''),

@@ -274,14 +274,27 @@ class ApplicationAdmissionController extends Controller {
     public function exportReport() {
         $this->requireView($this->requireLogin());
         $data = $this->selectionReportPageData();
-        $rows = $this->flattenSelectionOverviewRows($data['overview'] ?? []);
-        $level = (string) ($data['level'] ?? '04');
+        $overview = is_array($data['overview'] ?? null) ? $data['overview'] : [];
+        $rows = $this->flattenSelectionOverviewRows($overview);
+        $level = (string) ($data['level'] ?? '');
+        $exportedAt = date('Y-m-d H:i');
+        $totals = is_array($overview['totals'] ?? null) ? $overview['totals'] : [];
+        $courseRows = 0;
+        foreach ($rows as $row) {
+            if (empty($row['is_total'])) {
+                $courseRows++;
+            }
+        }
         $filterSummary = implode(' · ', array_filter([
-            'NVQ Level ' . $level,
-            (string) ($data['filter_summary'] ?? ''),
-            count($rows) . ' course row(s)',
-        ]));
-        $baseName = 'selection_report_nvq' . $level . '_' . date('Y-m-d_H-i');
+            (string) ($data['filter_summary'] ?? ($level !== '' ? ('NVQ Level ' . $level) : 'All NVQ levels')),
+            $courseRows . ' course row(s)',
+            'Total applied ' . (int) ($totals['applied'] ?? 0),
+            'Total exam ' . (int) ($totals['sat'] ?? 0),
+            'Total selected ' . (int) ($totals['selected'] ?? 0),
+        ], static function ($v): bool {
+            return trim((string) $v) !== '';
+        }));
+        $baseName = 'selection_report_nvq' . ($level !== '' ? $level : 'all') . '_' . date('Y-m-d_H-i');
         $cols = [
             'no', 'nvq_level', 'department', 'course_name', 'medium',
             'applied_students', 'exam_students', 'met_cutoff', 'below_cutoff',
@@ -308,7 +321,7 @@ class ApplicationAdmissionController extends Controller {
             'absent_students' => 'Absent students',
         ];
 
-        $xlsFallback = static function () use ($rows, $cols, $colLabels, $baseName, $filterSummary): void {
+        $xlsFallback = static function () use ($rows, $cols, $colLabels, $baseName, $filterSummary, $exportedAt): void {
             while (ob_get_level() > 0) {
                 ob_end_clean();
             }
@@ -322,7 +335,7 @@ class ApplicationAdmissionController extends Controller {
             echo '<table border="1" cellspacing="0" cellpadding="4">' . "\n";
             echo '<tr><td colspan="' . count($cols) . '"><b>SLGTI — Admission selection report</b></td></tr>' . "\n";
             echo '<tr><td colspan="' . count($cols) . '">' . $esc($filterSummary) . '</td></tr>' . "\n";
-            echo '<tr><td colspan="' . count($cols) . '">Exported: ' . $esc(date('Y-m-d H:i')) . '</td></tr>' . "\n";
+            echo '<tr><td colspan="' . count($cols) . '">Exported: ' . $esc($exportedAt) . '</td></tr>' . "\n";
             echo '<thead><tr>';
             foreach ($cols as $h) {
                 echo '<th style="background:#1F4E79;color:#fff;font-weight:bold;padding:6px;text-align:center;">'
@@ -336,11 +349,16 @@ class ApplicationAdmissionController extends Controller {
                 'failed_students' => true, 'absent_students' => true,
             ];
             foreach ($rows as $row) {
+                $isTotal = !empty($row['is_total']);
+                $cellExtra = $isTotal ? 'font-weight:bold;background:#e8eef4;' : '';
                 echo '<tr>';
                 foreach ($cols as $colName) {
                     $v = isset($row[$colName]) ? (string) $row[$colName] : '';
-                    $align = isset($centerCols[$colName]) ? 'center' : 'left';
-                    echo '<td style="mso-number-format:\'\@\';text-align:' . $align . ';">' . $esc($v) . '</td>';
+                    $align = isset($centerCols[$colName]) || $isTotal ? 'center' : 'left';
+                    if ($isTotal && $colName === 'no') {
+                        $align = 'left';
+                    }
+                    echo '<td style="mso-number-format:\'\@\';' . $cellExtra . 'text-align:' . $align . ';">' . $esc($v) . '</td>';
                 }
                 echo "</tr>\n";
             }
@@ -378,7 +396,21 @@ class ApplicationAdmissionController extends Controller {
                 'Selection report',
                 $filterSummary
             );
-            $spreadsheet->getActiveSheet()->setCellValue('A1', 'SLGTI — Admission selection report');
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setCellValue('A1', 'SLGTI — Admission selection report');
+            $sheet->setCellValue('A3', 'Exported: ' . $exportedAt);
+            $lastRow = (int) $sheet->getHighestRow();
+            $lastColLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($cols));
+            if ($lastRow > 5 && $rows !== [] && !empty($rows[count($rows) - 1]['is_total'])) {
+                $totalRange = 'A' . $lastRow . ':' . $lastColLetter . $lastRow;
+                $sheet->getStyle($totalRange)->getFont()->setBold(true);
+                $sheet->getStyle($totalRange)->getFill()
+                    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                    ->getStartColor()->setRGB('E8EEF4');
+                if ($lastRow > 6) {
+                    $sheet->setAutoFilter('A5:' . $lastColLetter . ($lastRow - 1));
+                }
+            }
             while (ob_get_level() > 0) {
                 ob_end_clean();
             }
@@ -1054,10 +1086,18 @@ class ApplicationAdmissionController extends Controller {
         $failGroups = $this->filterCutoffGroups($allFailGroups, $departmentId, $courseId);
         $total = 0;
         $choiceCounts = ['1st' => 0, '2nd' => 0, '3rd' => 0, 'interview' => 0];
+        $selectedSeen = [];
         foreach ($groups as $g) {
             $list = is_array($g['students'] ?? null) ? $g['students'] : [];
-            $total += count($list);
             foreach ($list as $row) {
+                $aid = (int) ($row['application_id'] ?? 0);
+                if ($aid > 0) {
+                    if (isset($selectedSeen[$aid])) {
+                        continue;
+                    }
+                    $selectedSeen[$aid] = true;
+                }
+                $total++;
                 $choice = (int) ($row['choice'] ?? 0);
                 if ($choice === 1) {
                     $choiceCounts['1st']++;
@@ -1072,9 +1112,17 @@ class ApplicationAdmissionController extends Controller {
         }
         $totalFail = 0;
         $failCounts = ['below_min' => 0, 'absent' => (int) ($overview['totals']['absent'] ?? 0), 'missed_cutoff' => 0];
+        $failSeen = [];
         foreach ($failGroups as $g) {
             $list = is_array($g['students'] ?? null) ? $g['students'] : [];
             foreach ($list as $row) {
+                $aid = (int) ($row['application_id'] ?? 0);
+                if ($aid > 0) {
+                    if (isset($failSeen[$aid]) || isset($selectedSeen[$aid])) {
+                        continue;
+                    }
+                    $failSeen[$aid] = true;
+                }
                 $reason = strtolower(trim((string) ($row['fail_reason'] ?? '')));
                 if ($reason === 'absent') {
                     continue;
@@ -1354,7 +1402,7 @@ class ApplicationAdmissionController extends Controller {
                 'nvq_level' => trim((string) ($c['application_level'] ?? '')),
                 'department' => trim((string) ($c['department_name'] ?? '')),
                 'course_name' => trim((string) ($c['course_name'] ?? '')),
-                'medium' => $medium !== '' ? $medium : 'All languages',
+                'medium' => ($medium !== '' && strcasecmp($medium, 'All languages') !== 0) ? $medium : 'English',
                 'applied_students' => (string) (int) ($c['applied'] ?? 0),
                 'exam_students' => (string) (int) ($c['sat'] ?? 0),
                 'met_cutoff' => (string) (int) ($c['met_cutoff'] ?? 0),
@@ -1367,6 +1415,29 @@ class ApplicationAdmissionController extends Controller {
                 'cutoff' => $this->formatOverviewCutoffText($c),
                 'failed_students' => (string) (int) ($c['failed'] ?? 0),
                 'absent_students' => (string) (int) ($c['absent'] ?? 0),
+            ];
+        }
+        if ($rows !== []) {
+            $t = is_array($overview['totals'] ?? null) ? $overview['totals'] : [];
+            $rows[] = [
+                'no' => 'Total',
+                'nvq_level' => '',
+                'department' => '',
+                'course_name' => '',
+                'medium' => '',
+                'applied_students' => (string) (int) ($t['applied'] ?? 0),
+                'exam_students' => (string) (int) ($t['sat'] ?? 0),
+                'met_cutoff' => (string) (int) ($t['met_cutoff'] ?? 0),
+                'below_cutoff' => (string) (int) ($t['below_cutoff'] ?? 0),
+                'selected_students' => (string) (int) ($t['selected'] ?? 0),
+                'selected_1st' => (string) (int) ($t['selected_1st'] ?? 0),
+                'selected_2nd' => (string) (int) ($t['selected_2nd'] ?? 0),
+                'selected_3rd' => (string) (int) ($t['selected_3rd'] ?? 0),
+                'selected_other' => (string) (int) ($t['selected_other'] ?? 0),
+                'cutoff' => '',
+                'failed_students' => (string) (int) ($t['failed'] ?? 0),
+                'absent_students' => (string) (int) ($t['absent'] ?? 0),
+                'is_total' => '1',
             ];
         }
 

@@ -56,7 +56,7 @@ foreach ($groups as $g):
     }
     $students = is_array($block['students'] ?? null) ? $block['students'] : [];
 ?>
-<div class="sub" style="margin-top:8px;"><strong><?php echo $e($block['label'] ?? ($usesLanguage ? $medium : 'All languages')); ?></strong>
+<div class="sub" style="margin-top:8px;"><strong><?php echo $e($block['label'] ?? ($usesLanguage ? $medium : 'English')); ?></strong>
  · Northern min <?php echo $e($fmt($block['cutoff_northern'] ?? null)); ?>
  · Other min <?php echo $e($fmt($block['cutoff_other'] ?? null)); ?>
  · <?php echo (int) ($block['qualify_count'] ?? 0); ?> qualified
