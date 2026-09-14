@@ -2481,11 +2481,15 @@ class ApplicationAdmissionController extends Controller {
     public function publicInterviewLetter() {
         $nic = trim((string) $this->post('nic', $this->get('nic', '')));
         $result = null;
+        $ineligible = false;
         if ($nic !== '') {
             $found = $this->findPublishedInterviewLetterOrError($nic);
             if ($found !== null) {
                 $result = $this->buildPublicInterviewLetterResult($found['schedule'], $found['entry']);
                 $nic = trim((string) ($found['entry']['student_nic'] ?? $nic));
+            } else {
+                $err = strtolower(trim((string) ($_SESSION['error'] ?? '')));
+                $ineligible = strpos($err, 'not eligible') !== false;
             }
         }
 
@@ -2496,6 +2500,7 @@ class ApplicationAdmissionController extends Controller {
             'seo_robots' => 'noindex, nofollow',
             'nic' => $nic,
             'result' => $result,
+            'ineligible' => $ineligible,
             'lookupAction' => rtrim(APP_URL, '/') . '/application-admission/interview-letter',
             'formAction' => rtrim(APP_URL, '/') . '/application-admission/interview-letter/download',
         ]);
@@ -2522,6 +2527,24 @@ class ApplicationAdmissionController extends Controller {
             $_SESSION['error'] = 'Check your NIC number.';
             return null;
         }
+        require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
+        $cards = (new ApplicationAdmissionCutoffModel())->lookupSelectionByNic($nic);
+        $notEligible = false;
+        $cutoffEligible = false;
+        foreach ($cards as $card) {
+            $status = strtolower(trim((string) ($card['status'] ?? '')));
+            if ($status === 'selected') {
+                $cutoffEligible = true;
+                continue;
+            }
+            if ($status === 'failed' && $this->isInterviewNotEligibleFailReason((string) ($card['fail_reason'] ?? ''))) {
+                $notEligible = true;
+            }
+        }
+        if ($notEligible && !$cutoffEligible) {
+            $_SESSION['error'] = 'Not eligible.';
+            return null;
+        }
         $found = $this->scheduleModel()->findPublishedInterviewByNic($normalized);
         if ($found === null) {
             $_SESSION['error'] = 'Check your NIC number.';
@@ -2529,6 +2552,24 @@ class ApplicationAdmissionController extends Controller {
         }
 
         return $found;
+    }
+
+    private function isInterviewNotEligibleFailReason(string $reason): bool {
+        $r = strtolower(trim($reason));
+        if ($r === '' || $r === 'absent') {
+            return true;
+        }
+        if (strpos($r, 'below') === 0) {
+            return true;
+        }
+        if (strpos($r, 'did not meet') !== false) {
+            return true;
+        }
+        if ($r === 'not selected') {
+            return true;
+        }
+
+        return false;
     }
 
     /**

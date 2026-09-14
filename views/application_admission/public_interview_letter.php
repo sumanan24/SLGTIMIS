@@ -5,6 +5,7 @@ $lookupAction = (string) ($lookupAction ?? (APP_URL . '/application-admission/in
 $formAction = (string) ($formAction ?? (APP_URL . '/application-admission/interview-letter/download'));
 $logoUrl = rtrim(APP_URL, '/') . '/assets/img/logo.png';
 $result = is_array($result ?? null) ? $result : null;
+$ineligible = !empty($ineligible);
 $prefs = is_array($result['preferences'] ?? null) ? $result['preferences'] : [1 => '', 2 => '', 3 => ''];
 $selected = (int) ($result['selected_choice'] ?? 0);
 $ordLabels = [1 => '1st choice', 2 => '2nd choice', 3 => '3rd choice'];
@@ -113,6 +114,16 @@ $allChoicesSameCourse = $namedNames !== [] && count(array_unique($namedNames)) =
     margin-bottom: 1rem;
 }
 .iv-selected-banner strong { display: block; font-size: 1rem; margin-top: 0.15rem; }
+.iv-ineligible {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    border-radius: 0.5rem;
+    padding: 0.85rem 1rem;
+    margin-top: 1.15rem;
+    text-align: center;
+}
+.iv-ineligible strong { display: block; font-size: 1.15rem; margin-bottom: 0.2rem; }
 </style>
 
 <div class="iv-letter-page">
@@ -126,8 +137,9 @@ $allChoicesSameCourse = $namedNames !== [] && count(array_unique($namedNames)) =
                 <p class="iv-sub">Enter your NIC to see your applied and selected courses, then download the letter.</p>
             </div>
 
-            <?php if (!empty($_SESSION['error'])): ?>
+            <?php if (!empty($_SESSION['error']) && empty($ineligible)): ?>
                 <div class="alert alert-danger py-2"><?php echo $e($_SESSION['error']); unset($_SESSION['error']); ?></div>
+            <?php elseif (!empty($_SESSION['error'])): unset($_SESSION['error']); ?>
             <?php endif; ?>
             <?php if (!empty($_SESSION['success'])): ?>
                 <div class="alert alert-success py-2"><?php echo $e($_SESSION['success']); unset($_SESSION['success']); ?></div>
@@ -153,7 +165,12 @@ $allChoicesSameCourse = $namedNames !== [] && count(array_unique($namedNames)) =
             <p class="iv-letter-note">Use the NIC exactly as on your application. Details are available after your interview schedule is published.</p>
             <p class="iv-letter-contact">Contact Student Affairs Office 0703060138 / 021 492 7799</p>
 
-            <?php if ($result !== null): ?>
+            <?php if ($ineligible): ?>
+            <div class="iv-ineligible">
+                <strong>Not eligible.</strong>
+                Your exam marks are below 30, or you did not meet the cutoff.
+            </div>
+            <?php elseif ($result !== null): ?>
             <div class="iv-result">
                 <h2>Your interview details</h2>
                 <dl class="iv-meta-list">
