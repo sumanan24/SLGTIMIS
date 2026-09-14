@@ -168,7 +168,6 @@ $allChoicesSameCourse = $namedNames !== [] && count(array_unique($namedNames)) =
             <?php if ($ineligible): ?>
             <div class="iv-ineligible">
                 <strong>Not eligible.</strong>
-                Your exam marks are below 30, or you did not meet the cutoff.
             </div>
             <?php elseif ($result !== null): ?>
             <div class="iv-result">
