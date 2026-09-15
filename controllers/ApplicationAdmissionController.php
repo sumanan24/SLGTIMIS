@@ -2380,6 +2380,26 @@ class ApplicationAdmissionController extends Controller {
         }
     }
 
+    /**
+     * Interview result / mark sheet as Excel (same columns as the PDF).
+     */
+    public function exportInterviewMarks() {
+        $uid = $this->requireLogin();
+        $this->requireView($uid);
+        $id = (int) $this->get('id', 0);
+        if ($id < 1) {
+            $_SESSION['error'] = 'Invalid schedule.';
+            $this->redirect('application-admission');
+        }
+        $provinces = ApplicationAdmissionScheduleModel::normalizedProvinceFilters($this->get('province', ''));
+        try {
+            $this->streamInterviewMarkSheetExcel($id, $provinces);
+        } catch (RuntimeException $e) {
+            $_SESSION['error'] = $e->getMessage();
+            $this->redirect($this->entriesRedirectUrl($id, $provinces));
+        }
+    }
+
     public function pdfSelection() {
         $uid = $this->requireLogin();
         $this->requireView($uid);
@@ -2859,8 +2879,9 @@ class ApplicationAdmissionController extends Controller {
 
     /**
      * @param list<string>|string|null $provinces
+     * @return array{schedule: array<string, mixed>, entries: list<array<string, mixed>>, province_label: string}
      */
-    private function streamInterviewMarkSheetPdf(int $scheduleId, $provinces = null): void {
+    private function interviewResultSheetData(int $scheduleId, $provinces = null): array {
         $provinces = ApplicationAdmissionScheduleModel::normalizedProvinceFilters($provinces);
         $model = $this->scheduleModel();
         $schedule = $model->findSchedule($scheduleId);
@@ -2907,21 +2928,36 @@ class ApplicationAdmissionController extends Controller {
                 (string) ($b['student_full_name'] ?? '')
             );
         });
+
+        return [
+            'schedule' => $schedule,
+            'entries' => $entries,
+            'province_label' => $provinces !== []
+                ? ApplicationAdmissionScheduleModel::provinceFilterLabel($provinces)
+                : '',
+        ];
+    }
+
+    /**
+     * @param list<string>|string|null $provinces
+     */
+    private function streamInterviewMarkSheetPdf(int $scheduleId, $provinces = null): void {
+        $data = $this->interviewResultSheetData($scheduleId, $provinces);
+        $schedule = $data['schedule'];
+        $entries = $data['entries'];
         require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
         $inner = ApplicationAdmissionPdfHelper::renderTemplate('interview_mark_sheet.php', [
             'schedule' => $schedule,
             'entries' => $entries,
             'logo_src' => $this->admissionLogoDataUri(),
-            'province_filter_label' => $provinces !== []
-                ? ApplicationAdmissionScheduleModel::provinceFilterLabel($provinces)
-                : '',
+            'province_filter_label' => $data['province_label'],
         ]);
         $html = ApplicationAdmissionPdfHelper::wrapPdfDocument(
             $inner,
             ApplicationAdmissionPdfHelper::interviewMarkSheetStyles()
         );
-        $suffix = $provinces !== []
-            ? '-' . preg_replace('/[^A-Za-z0-9]+/', '_', ApplicationAdmissionScheduleModel::provinceFilterLabel($provinces))
+        $suffix = $data['province_label'] !== ''
+            ? '-' . preg_replace('/[^A-Za-z0-9]+/', '_', $data['province_label'])
             : '';
         ApplicationAdmissionPdfHelper::streamHtml(
             $html,
@@ -2930,6 +2966,225 @@ class ApplicationAdmissionController extends Controller {
             'landscape',
             true
         );
+    }
+
+    /**
+     * @param list<string>|string|null $provinces
+     */
+    private function streamInterviewMarkSheetExcel(int $scheduleId, $provinces = null): void {
+        $data = $this->interviewResultSheetData($scheduleId, $provinces);
+        $schedule = $data['schedule'];
+        $entries = $data['entries'];
+        $title = trim((string) ($schedule['title'] ?? ''));
+        $level = trim((string) ($schedule['application_level'] ?? ''));
+        $course = trim((string) ($schedule['course_name'] ?? ''));
+        $courseLine = $course !== '' ? $course : $title;
+        if ($level !== '') {
+            $courseLine .= ($courseLine !== '' ? '  ·  ' : '') . 'NVQ Level ' . $level;
+        }
+        $dateLine = trim((string) ($schedule['schedule_date'] ?? ''));
+        if ($dateLine !== '') {
+            $ts = strtotime($dateLine);
+            $dateLine = $ts ? date('d M Y', $ts) : $dateLine;
+        }
+        $metaBits = array_filter([
+            $courseLine,
+            $dateLine !== '' ? ('Date: ' . $dateLine) : '',
+            $data['province_label'] !== '' ? ('Province: ' . $data['province_label']) : '',
+            count($entries) . ' candidate(s)',
+        ], static fn ($v): bool => trim((string) $v) !== '');
+        $filterSummary = implode('  |  ', $metaBits);
+        $scaleLine = 'Entrance Marks 50 + Education Qualification 15 + Other Qualification 5 + Question-Aptitude 20 + Performance at Interview 10 = Total 100';
+        $suffix = $data['province_label'] !== ''
+            ? '-' . preg_replace('/[^A-Za-z0-9]+/', '_', $data['province_label'])
+            : '';
+        $baseName = 'interview-result-sheet-' . $scheduleId . $suffix;
+        $headers = [
+            'No',
+            'NIC',
+            'Name of candidate',
+            'Entrance Marks (50)',
+            'Education Qualification (15)',
+            'Other Qualification (5)',
+            'Question-Aptitude (20)',
+            'Performance at Interview (10)',
+            'Total (100)',
+            'Remarks',
+        ];
+        $xlsFallback = function () use ($entries, $headers, $baseName, $filterSummary, $scaleLine): void {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $baseName) . '.xls"');
+            header('Cache-Control: private, max-age=0');
+            echo "\xEF\xBB\xBF";
+            $esc = static function (string $s): string {
+                return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+            };
+            echo '<table border="1" cellspacing="0" cellpadding="4">' . "\n";
+            echo '<tr><td colspan="10"><b>SLGTI — Interview Result Sheet</b></td></tr>' . "\n";
+            echo '<tr><td colspan="10">' . $esc($filterSummary) . '</td></tr>' . "\n";
+            echo '<tr><td colspan="10">' . $esc($scaleLine) . '</td></tr>' . "\n";
+            echo '<thead><tr>';
+            foreach ($headers as $label) {
+                echo '<th style="background:#1F4E79;color:#fff;font-weight:bold;text-align:center;">' . $esc($label) . '</th>';
+            }
+            echo "</tr></thead>\n<tbody>\n";
+            $n = 0;
+            foreach ($entries as $row) {
+                $n++;
+                $absent = !empty($row['entrance_absent']);
+                $out50 = $row['entrance_out_of_50'] ?? null;
+                if ($absent) {
+                    $entrance = 'Ab';
+                } elseif ($out50 !== null && $out50 !== '') {
+                    $entrance = ApplicationAdmissionCutoffModel::formatMarksValue($out50);
+                } else {
+                    $entrance = '';
+                }
+                $name = mb_strtoupper(trim((string) ($row['student_full_name'] ?? '')), 'UTF-8');
+                $nic = strtoupper(trim((string) ($row['student_nic'] ?? '')));
+                echo '<tr>';
+                echo '<td style="text-align:center;">' . $n . '</td>';
+                echo '<td style="mso-number-format:\'\@\';text-align:center;">' . $esc($nic) . '</td>';
+                echo '<td>' . $esc($name) . '</td>';
+                echo '<td style="text-align:center;">' . $esc((string) $entrance) . '</td>';
+                echo '<td></td><td></td><td></td><td></td><td></td><td></td>';
+                echo "</tr>\n";
+            }
+            echo "</tbody></table>";
+            exit;
+        };
+        $needs = [
+            extension_loaded('zip') && class_exists('ZipArchive', false),
+            extension_loaded('xmlwriter'),
+            extension_loaded('mbstring') && function_exists('mb_strlen'),
+        ];
+        $autoload = BASE_PATH . '/vendor/autoload.php';
+        if (!is_readable($autoload) || in_array(false, $needs, true)) {
+            $xlsFallback();
+        }
+        try {
+            require_once $autoload;
+            if (!class_exists(\PhpOffice\PhpSpreadsheet\Spreadsheet::class)) {
+                $xlsFallback();
+            }
+            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Result sheet');
+            $sheet->setCellValue('A1', 'SLGTI — Interview Result Sheet');
+            $sheet->setCellValue('A2', $filterSummary);
+            $sheet->setCellValue('A3', $scaleLine);
+            $sheet->mergeCells('A1:J1');
+            $sheet->mergeCells('A2:J2');
+            $sheet->mergeCells('A3:J3');
+            $headerRow = 5;
+            $col = 1;
+            foreach ($headers as $label) {
+                $coord = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col) . $headerRow;
+                $sheet->setCellValue($coord, $label);
+                $col++;
+            }
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A2:A3')->getFont()->setSize(10)->getColor()->setRGB('444444');
+            $headerStyle = $sheet->getStyle('A' . $headerRow . ':J' . $headerRow);
+            $headerStyle->getFont()->setBold(true)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('FFFFFFFF'));
+            $headerStyle->getFill()
+                ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                ->getStartColor()->setRGB('1F4E79');
+            $headerStyle->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER)
+                ->setWrapText(true);
+            $sheet->getRowDimension($headerRow)->setRowHeight(32);
+            $n = 0;
+            $r = $headerRow + 1;
+            foreach ($entries as $row) {
+                $n++;
+                $name = mb_strtoupper(trim((string) ($row['student_full_name'] ?? '')), 'UTF-8');
+                $nic = strtoupper(trim((string) ($row['student_nic'] ?? '')));
+                $absent = !empty($row['entrance_absent']);
+                $out50 = $row['entrance_out_of_50'] ?? null;
+                $sheet->setCellValue('A' . $r, $n);
+                $sheet->setCellValueExplicit('B' . $r, $nic, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                $sheet->setCellValue('C' . $r, $name);
+                if ($absent) {
+                    $sheet->setCellValueExplicit('D' . $r, 'Ab', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                } elseif ($out50 !== null && $out50 !== '') {
+                    $sheet->setCellValue('D' . $r, (float) $out50);
+                    $sheet->setCellValue('I' . $r, '=SUM(D' . $r . ':H' . $r . ')');
+                } else {
+                    $sheet->setCellValue('I' . $r, '=SUM(D' . $r . ':H' . $r . ')');
+                }
+                if ($n % 2 === 0) {
+                    $sheet->getStyle('A' . $r . ':J' . $r)->getFill()
+                        ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                        ->getStartColor()->setRGB('F5F8FC');
+                }
+                $r++;
+            }
+            $lastDataRow = max($headerRow, $r - 1);
+            $sheet->getStyle('A' . ($headerRow + 1) . ':J' . $lastDataRow)->getBorders()->getAllBorders()
+                ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN)
+                ->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('FFD0D0D0'));
+            $sheet->getStyle('A' . $headerRow . ':J' . $headerRow)->getBorders()->getAllBorders()
+                ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('A' . ($headerRow + 1) . ':A' . $lastDataRow)
+                ->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('B' . ($headerRow + 1) . ':B' . $lastDataRow)
+                ->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('D' . ($headerRow + 1) . ':I' . $lastDataRow)
+                ->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('D' . ($headerRow + 1) . ':I' . $lastDataRow)
+                ->getNumberFormat()->setFormatCode('0.0');
+            $sheet->freezePane('A' . ($headerRow + 1));
+            $sheet->setAutoFilter('A' . $headerRow . ':J' . $lastDataRow);
+            $sheet->getColumnDimension('A')->setWidth(6);
+            $sheet->getColumnDimension('B')->setWidth(16);
+            $sheet->getColumnDimension('C')->setWidth(42);
+            $sheet->getColumnDimension('D')->setWidth(16);
+            $sheet->getColumnDimension('E')->setWidth(18);
+            $sheet->getColumnDimension('F')->setWidth(16);
+            $sheet->getColumnDimension('G')->setWidth(18);
+            $sheet->getColumnDimension('H')->setWidth(20);
+            $sheet->getColumnDimension('I')->setWidth(12);
+            $sheet->getColumnDimension('J')->setWidth(18);
+            $sheet->getPageSetup()
+                ->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE)
+                ->setFitToPage(true)
+                ->setFitToWidth(1)
+                ->setFitToHeight(0);
+            $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd($headerRow, $headerRow);
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $tmpPath = tempnam(sys_get_temp_dir(), 'slgti_intmarks_xlsx_');
+            if ($tmpPath === false) {
+                throw new RuntimeException('Could not create temp file for Excel export.');
+            }
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save($tmpPath);
+            $size = filesize($tmpPath);
+            if ($size === false || $size < 1) {
+                @unlink($tmpPath);
+                throw new RuntimeException('Excel temp file not readable after write.');
+            }
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="' . str_replace('"', '', $baseName) . '.xlsx"');
+            header('Cache-Control: private, max-age=0');
+            header('Content-Length: ' . (string) $size);
+            readfile($tmpPath);
+            @unlink($tmpPath);
+            $spreadsheet->disconnectWorksheets();
+            exit;
+        } catch (Throwable $e) {
+            if (isset($tmpPath) && is_string($tmpPath) && $tmpPath !== '') {
+                @unlink($tmpPath);
+            }
+            error_log('ApplicationAdmission exportInterviewMarks: ' . $e->getMessage());
+            $xlsFallback();
+        }
     }
 
     /**

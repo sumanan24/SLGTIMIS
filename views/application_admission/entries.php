@@ -35,12 +35,14 @@ $admissionCardsBulkUrl = $appBase . '/application-admission/admission-cards-bulk
 $envelopesBulkUrl = $appBase . '/application-admission/envelopes-bulk?id=' . (int) ($sch['schedule_id'] ?? 0);
 $attendanceSheetUrl = $appBase . '/application-admission/pdf-attendance?id=' . (int) ($sch['schedule_id'] ?? 0);
 $interviewMarkSheetUrl = $appBase . '/application-admission/pdf-interview-marks?id=' . (int) ($sch['schedule_id'] ?? 0);
+$interviewMarkExcelUrl = $appBase . '/application-admission/export-interview-marks?id=' . (int) ($sch['schedule_id'] ?? 0);
 if ($filterProvinces !== []) {
     foreach ($filterProvinces as $province) {
         $admissionCardsBulkUrl .= '&province[]=' . rawurlencode($province);
         $envelopesBulkUrl .= '&province[]=' . rawurlencode($province);
         $attendanceSheetUrl .= '&province[]=' . rawurlencode($province);
         $interviewMarkSheetUrl .= '&province[]=' . rawurlencode($province);
+        $interviewMarkExcelUrl .= '&province[]=' . rawurlencode($province);
     }
 }
 $admissionCardUrl = static function (int $entryId) use ($appBase, $sch): string {
@@ -675,7 +677,8 @@ $entryColspan = $isInterview ? 13 : 11;
             <?php if ($entryCount > 0): ?>
             <a href="<?php echo $e($attendanceSheetUrl); ?>" class="btn btn-sm btn-outline-dark" target="_blank" rel="noopener" title="Download printable attendance sheet"><i class="fas fa-clipboard-list me-1"></i> Attendance sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <?php if ($isInterview): ?>
-            <a href="<?php echo $e($interviewMarkSheetUrl); ?>" class="btn btn-sm btn-outline-dark" target="_blank" rel="noopener" title="Download interview result / mark sheet"><i class="fas fa-file-pdf me-1"></i> Result sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
+            <a href="<?php echo $e($interviewMarkSheetUrl); ?>" class="btn btn-sm btn-outline-dark" target="_blank" rel="noopener" title="Download interview result / mark sheet PDF"><i class="fas fa-file-pdf me-1"></i> Result sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
+            <a href="<?php echo $e($interviewMarkExcelUrl); ?>" class="btn btn-sm btn-outline-success" title="Download interview result / mark sheet Excel"><i class="fas fa-file-excel me-1"></i> Result Excel<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <?php endif; ?>
             <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener" title="<?php echo $isInterview ? 'Download interview invitation letters' : 'Download postal admission cards (name &amp; address on top)'; ?>"><i class="fas fa-id-card me-1"></i> <?php echo $isInterview ? 'Invitation letters' : 'Admission cards'; ?><?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <a href="<?php echo $e($envelopesBulkUrl); ?>" class="btn btn-sm btn-outline-dark" target="_blank" rel="noopener" title="Download long envelopes with From (SLGTI) and To (applicant) addresses"><i class="fas fa-envelope me-1"></i> Envelopes<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
@@ -976,7 +979,8 @@ $entryColspan = $isInterview ? 13 : 11;
             <?php if ($entryCount > 0): ?>
             <a href="<?php echo $e($attendanceSheetUrl); ?>" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener" title="Download printable attendance sheet"><i class="fas fa-clipboard-list me-1"></i> Attendance sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <?php if ($isInterview): ?>
-            <a href="<?php echo $e($interviewMarkSheetUrl); ?>" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener" title="Download interview result / mark sheet"><i class="fas fa-file-pdf me-1"></i> Result sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
+            <a href="<?php echo $e($interviewMarkSheetUrl); ?>" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener" title="Download interview result / mark sheet PDF"><i class="fas fa-file-pdf me-1"></i> Result sheet<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
+            <a href="<?php echo $e($interviewMarkExcelUrl); ?>" class="btn btn-outline-success btn-sm" title="Download interview result / mark sheet Excel"><i class="fas fa-file-excel me-1"></i> Result Excel<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <?php endif; ?>
             <a href="<?php echo $e($admissionCardsBulkUrl); ?>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener"><i class="fas fa-id-card me-1"></i> <?php echo $isInterview ? 'Invitation letters' : 'Admission cards'; ?><?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
             <a href="<?php echo $e($envelopesBulkUrl); ?>" class="btn btn-outline-dark btn-sm" target="_blank" rel="noopener" title="Download long envelopes with From and To addresses"><i class="fas fa-envelope me-1"></i> Envelopes<?php echo $provinceFilterActive ? ' (' . $e($provinceFilterLabel) . ')' : ''; ?></a>
