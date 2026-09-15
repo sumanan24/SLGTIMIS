@@ -2355,6 +2355,31 @@ class ApplicationAdmissionController extends Controller {
         }
     }
 
+    /**
+     * Interview result / mark sheet (NIC, name, entrance /50, panel columns).
+     */
+    public function pdfInterviewMarks() {
+        $uid = $this->requireLogin();
+        $this->requireView($uid);
+        $id = (int) $this->get('id', 0);
+        if ($id < 1) {
+            $_SESSION['error'] = 'Invalid schedule.';
+            $this->redirect('application-admission');
+        }
+        $provinces = ApplicationAdmissionScheduleModel::normalizedProvinceFilters($this->get('province', ''));
+        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
+        if (!ExamPdfHelper::dompdfAvailable()) {
+            $_SESSION['error'] = 'PDF engine not installed. Run: composer install.';
+            $this->redirect($this->entriesRedirectUrl($id, $provinces));
+        }
+        try {
+            $this->streamInterviewMarkSheetPdf($id, $provinces);
+        } catch (RuntimeException $e) {
+            $_SESSION['error'] = $e->getMessage();
+            $this->redirect($this->entriesRedirectUrl($id, $provinces));
+        }
+    }
+
     public function pdfSelection() {
         $uid = $this->requireLogin();
         $this->requireView($uid);
@@ -2774,7 +2799,10 @@ class ApplicationAdmissionController extends Controller {
                 ? ApplicationAdmissionScheduleModel::provinceFilterLabel($provinces)
                 : '',
         ]);
-        $html = ApplicationAdmissionPdfHelper::wrapPdfDocument($inner);
+        $html = ApplicationAdmissionPdfHelper::wrapPdfDocument(
+            $inner,
+            ApplicationAdmissionPdfHelper::attendanceSheetStyles()
+        );
         $label = $schedule['schedule_type'] === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW ? 'interview' : 'entrance';
         $suffix = $provinces !== []
             ? '-' . preg_replace('/[^A-Za-z0-9]+/', '_', ApplicationAdmissionScheduleModel::provinceFilterLabel($provinces))
@@ -2783,7 +2811,83 @@ class ApplicationAdmissionController extends Controller {
             $html,
             $label . '-attendance-' . $scheduleId . $suffix . '.pdf',
             'A4',
-            'landscape'
+            'landscape',
+            true
+        );
+    }
+
+    /**
+     * @param list<string>|string|null $provinces
+     */
+    private function streamInterviewMarkSheetPdf(int $scheduleId, $provinces = null): void {
+        $provinces = ApplicationAdmissionScheduleModel::normalizedProvinceFilters($provinces);
+        $model = $this->scheduleModel();
+        $schedule = $model->findSchedule($scheduleId);
+        if (!$schedule) {
+            throw new RuntimeException('Schedule not found.');
+        }
+        if (($schedule['schedule_type'] ?? '') !== ApplicationAdmissionScheduleModel::TYPE_INTERVIEW) {
+            throw new RuntimeException('The interview result sheet is available only for interview schedules.');
+        }
+        $entries = $model->getEntriesWithApplications($scheduleId);
+        if ($provinces !== []) {
+            $entries = array_values(array_filter($entries, static function (array $row) use ($provinces): bool {
+                return ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $provinces);
+            }));
+        }
+        if ($entries === []) {
+            throw new RuntimeException('No applicants to include on the result sheet.');
+        }
+        $appIds = [];
+        foreach ($entries as $row) {
+            $appIds[] = (int) ($row['application_id'] ?? 0);
+        }
+        require_once BASE_PATH . '/models/ApplicationAdmissionCutoffModel.php';
+        $marksMap = (new ApplicationAdmissionCutoffModel())->entranceMarksLookup(
+            (string) ($schedule['application_level'] ?? ''),
+            $appIds
+        );
+        foreach ($entries as &$row) {
+            $aid = (int) ($row['application_id'] ?? 0);
+            $info = $marksMap[$aid] ?? [
+                'raw' => '',
+                'num' => null,
+                'absent' => false,
+                'out_of_50' => null,
+            ];
+            $row['entrance_marks_num'] = $info['num'];
+            $row['entrance_out_of_50'] = $info['out_of_50'];
+            $row['entrance_absent'] = !empty($info['absent']);
+        }
+        unset($row);
+        usort($entries, static function (array $a, array $b): int {
+            return strcasecmp(
+                (string) ($a['student_full_name'] ?? ''),
+                (string) ($b['student_full_name'] ?? '')
+            );
+        });
+        require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
+        $inner = ApplicationAdmissionPdfHelper::renderTemplate('interview_mark_sheet.php', [
+            'schedule' => $schedule,
+            'entries' => $entries,
+            'logo_src' => $this->admissionLogoDataUri(),
+            'province_filter_label' => $provinces !== []
+                ? ApplicationAdmissionScheduleModel::provinceFilterLabel($provinces)
+                : '',
+        ]);
+        $html = ApplicationAdmissionPdfHelper::wrapPdfDocument(
+            $inner,
+            ApplicationAdmissionPdfHelper::interviewMarkSheetStyles()
+        );
+        $suffix = $provinces !== []
+            ? '-' . preg_replace('/[^A-Za-z0-9]+/', '_', ApplicationAdmissionScheduleModel::provinceFilterLabel($provinces))
+            : '';
+        ApplicationAdmissionPdfHelper::streamHtml(
+            $html,
+            'interview-result-sheet-' . $scheduleId . $suffix . '.pdf',
+            'A4',
+            'landscape',
+            true
         );
     }
 

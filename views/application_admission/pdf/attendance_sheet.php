@@ -1,28 +1,32 @@
 <?php
 $e = static fn (?string $s): string => htmlspecialchars((string) ($s ?? ''), ENT_QUOTES, 'UTF-8');
 $fmtDate = static function (?string $d): string {
-    if ($d === null || trim($d) === '') return '—';
+    if ($d === null || trim($d) === '') {
+        return '—';
+    }
     $ts = strtotime($d);
     return $ts ? date('d M Y', $ts) : $d;
 };
 $fmtTime = static function (?string $t): string {
-    if ($t === null || trim($t) === '') return '';
+    if ($t === null || trim($t) === '') {
+        return '';
+    }
     $ts = strtotime($t);
     return $ts ? date('g:i A', $ts) : $t;
 };
 $isInterview = ($schedule['schedule_type'] ?? '') === 'interview';
-$docTitle = $isInterview ? 'INTERVIEW ATTENDANCE SHEET' : 'ENTRANCE EXAMINATION ATTENDANCE SHEET';
+$docTitle = $isInterview ? 'Interview Attendance Sheet' : 'Entrance Examination Attendance Sheet';
 $filterNote = trim((string) ($province_filter_label ?? ''));
 
 $title = trim((string) ($schedule['title'] ?? ''));
 $level = trim((string) ($schedule['application_level'] ?? ''));
 $course = trim((string) ($schedule['course_name'] ?? ''));
-$examLine = $title;
-if ($level !== '' && stripos($title, 'NVQ') === false && stripos($title, 'Level ' . $level) === false) {
-    $examLine .= ($examLine !== '' ? ' — ' : '') . 'NVQ Level ' . $level;
+$examLine = $course !== '' ? $course : $title;
+if ($level !== '') {
+    $examLine .= ($examLine !== '' ? '  ·  ' : '') . 'NVQ Level ' . $level;
 }
-if ($course !== '' && ($title === '' || stripos($title, $course) === false)) {
-    $examLine .= ($examLine !== '' ? ' — ' : '') . $course;
+if ($title !== '' && $course !== '' && strcasecmp($title, $course) !== 0) {
+    $examLine .= '  ·  ' . $title;
 }
 
 $dateLine = $fmtDate($schedule['schedule_date'] ?? null);
@@ -34,77 +38,113 @@ if ($venueLine === '') {
     $venueLine = '—';
 }
 $total = (int) count($entries ?? []);
+$colCount = $isInterview ? 6 : 6;
 ?>
-<table class="head-row" style="margin-bottom:10px;">
+<table class="at-banner">
 <tr>
-<td style="border:none;text-align:center;vertical-align:top;">
+<td>
 <?php if (!empty($logo_src)): ?>
-<img class="logo-img" src="<?php echo $e($logo_src); ?>" alt="SLGTI" style="display:block;margin:0 auto 6px auto;">
+<img class="at-logo" src="<?php echo $e($logo_src); ?>" alt="SLGTI">
 <?php endif; ?>
-<div class="inst" style="text-align:center;text-transform:uppercase;letter-spacing:0.04em;">Sri Lanka German Training Institute</div>
-<div class="title" style="text-align:center;margin-top:6px;text-transform:uppercase;letter-spacing:0.03em;"><?php echo $e($docTitle); ?></div>
+<div class="at-inst">Sri Lanka German Training Institute</div>
+<div class="at-addr">Ariviyal Nagar, Kilinochchi</div>
+<div class="at-title"><?php echo $e($docTitle); ?></div>
 <?php if ($examLine !== ''): ?>
-<div class="sub" style="text-align:center;margin-top:8px;color:#0f172a;font-size:10.5px;font-weight:700;"><?php echo $e($examLine); ?></div>
+<div class="at-course"><?php echo $e($examLine); ?></div>
 <?php endif; ?>
-<div class="sub" style="text-align:center;margin-top:6px;line-height:1.55;">
-<strong>Date:</strong> <?php echo $e($dateLine); ?>
-&nbsp;&nbsp;|&nbsp;&nbsp;
-<strong>Time:</strong> <?php echo $e($timeLine); ?>
-<br>
-<strong>Venue:</strong> <?php echo $e($venueLine); ?>
-<?php if ($filterNote !== ''): ?>
-<br><strong>Province:</strong> <?php echo $e($filterNote); ?>
-<?php endif; ?>
-</div>
 </td>
 </tr>
 </table>
-<table class="grid">
+<table class="at-meta">
+<tr>
+<th>Date</th>
+<td><?php echo $e($dateLine); ?></td>
+<th>Time</th>
+<td><?php echo $e($timeLine); ?></td>
+<th>Venue</th>
+<td><?php echo $e($venueLine); ?></td>
+<th>Candidates</th>
+<td><?php echo $total; ?></td>
+</tr>
+<?php if ($filterNote !== ''): ?>
+<tr>
+<th>Province</th>
+<td colspan="7" style="text-align:left;"><?php echo $e($filterNote); ?></td>
+</tr>
+<?php endif; ?>
+</table>
+<table class="grid at-grid">
 <thead>
 <tr>
-<th style="width:5%;text-align:center;">No</th>
+<th style="width:6%;">No</th>
 <?php if (!$isInterview): ?>
-<th style="width:14%;text-align:center;">Roll / Index</th>
+<th style="width:13%;">Index No.</th>
 <?php endif; ?>
-<th style="width:<?php echo $isInterview ? '40%' : '30%'; ?>;text-align:center;">Name</th>
-<th style="width:15%;text-align:center;">NIC</th>
-<th style="width:<?php echo $isInterview ? '20%' : '18%'; ?>;text-align:center;">Candidate signature</th>
-<th style="width:<?php echo $isInterview ? '20%' : '18%'; ?>;text-align:center;"><?php echo $isInterview ? 'Panel signature' : 'Invigilator signature'; ?></th>
+<th style="width:14%;">NIC</th>
+<th><?php echo $isInterview ? 'Full name of candidate' : 'Full name'; ?></th>
+<th style="width:16%;">Signature of candidate</th>
+<th style="width:<?php echo $isInterview ? '10%' : '16%'; ?>;"><?php echo $isInterview ? 'Time' : 'Invigilator'; ?></th>
+<?php if ($isInterview): ?>
+<th style="width:12%;">Remarks</th>
+<?php endif; ?>
 </tr>
 </thead>
 <tbody>
 <?php if (empty($entries)): ?>
-<tr><td colspan="<?php echo $isInterview ? 5 : 6; ?>" class="muted">No applicants listed.</td></tr>
+<tr><td colspan="<?php echo (int) $colCount; ?>" class="muted" style="text-align:center;">No applicants listed.</td></tr>
 <?php else: ?>
-<?php $n = 0; foreach ($entries as $row): $n++; ?>
-<tr>
-<td style="text-align:center;"><?php echo $n; ?></td>
+<?php $n = 0; foreach ($entries as $row): $n++;
+    $alt = ($n % 2) === 0 ? ' at-alt' : '';
+    $name = mb_strtoupper(trim((string) ($row['student_full_name'] ?? '')), 'UTF-8');
+    $nic = strtoupper(trim((string) ($row['student_nic'] ?? '')));
+?>
+<tr class="<?php echo trim($alt); ?>">
+<td class="at-no"><?php echo $n; ?></td>
 <?php if (!$isInterview): ?>
-<td style="text-align:center;"><?php echo $e($row['roll_number'] ?? '—'); ?></td>
+<td class="at-roll"><?php echo $e(trim((string) ($row['roll_number'] ?? '')) !== '' ? (string) $row['roll_number'] : '—'); ?></td>
 <?php endif; ?>
-<td><?php echo $e(mb_strtoupper(trim((string) ($row['student_full_name'] ?? '')), 'UTF-8')); ?></td>
-<td style="text-align:center;"><?php echo $e($row['student_nic'] ?? ''); ?></td>
-<td class="sig">&nbsp;</td>
-<td class="sig">&nbsp;</td>
+<td class="at-nic"><?php echo $e($nic); ?></td>
+<td class="at-name"><?php echo $e($name); ?></td>
+<td class="at-sig">&nbsp;</td>
+<?php if ($isInterview): ?>
+<td class="at-time">&nbsp;</td>
+<td class="at-note">&nbsp;</td>
+<?php else: ?>
+<td class="at-sig">&nbsp;</td>
+<?php endif; ?>
 </tr>
 <?php endforeach; ?>
 <?php endif; ?>
 </tbody>
 </table>
-<p class="muted" style="margin:10px 0 0 0;">Total candidates: <?php echo $total; ?>. This sheet is for manual attendance use only.</p>
-<table style="width:100%;border-collapse:collapse;margin-top:28px;">
+<table class="at-tally">
 <tr>
-<td style="width:34%;border:none;vertical-align:bottom;padding:0 12px 0 0;">
-<div style="height:36px;">&nbsp;</div>
-<div style="border-top:1px solid #111;padding-top:6px;font-size:9px;text-align:center;">Supervisor&apos;s name</div>
+<th style="width:16%;">Present</th>
+<td style="width:17%;">&nbsp;</td>
+<th style="width:16%;">Absent</th>
+<td style="width:17%;">&nbsp;</td>
+<th style="width:16%;">Total listed</th>
+<td style="width:18%;"><?php echo $total; ?></td>
+</tr>
+</table>
+<table class="at-sign">
+<tr>
+<td>
+<div style="height:34px;">&nbsp;</div>
+<div class="at-sign-line"><?php echo $isInterview ? 'Interviewer' : 'Invigilator'; ?></div>
 </td>
-<td style="width:33%;border:none;vertical-align:bottom;padding:0 12px;">
-<div style="height:36px;">&nbsp;</div>
-<div style="border-top:1px solid #111;padding-top:6px;font-size:9px;text-align:center;">Supervisor&apos;s signature</div>
+<td>
+<div style="height:34px;">&nbsp;</div>
+<div class="at-sign-line"><?php echo $isInterview ? 'Panel member' : 'Supervisor'; ?></div>
 </td>
-<td style="width:33%;border:none;vertical-align:bottom;padding:0 0 0 12px;">
-<div style="height:36px;">&nbsp;</div>
-<div style="border-top:1px solid #111;padding-top:6px;font-size:9px;text-align:center;">Date</div>
+<td>
+<div style="height:34px;">&nbsp;</div>
+<div class="at-sign-line">Head of Department</div>
+</td>
+<td>
+<div style="height:34px;">&nbsp;</div>
+<div class="at-sign-line">Date</div>
 </td>
 </tr>
 </table>
+<p class="at-foot">This sheet is for hall / interview attendance only. Candidates must sign against their own name and NIC. Being listed does not guarantee admission.</p>

@@ -281,6 +281,7 @@ return [
     'application-admission/selection-save' => 'ApplicationAdmissionController@selectionSave',
     'application-admission/pdf-schedule' => 'ApplicationAdmissionController@pdfSchedule',
     'application-admission/pdf-attendance' => 'ApplicationAdmissionController@pdfAttendance',
+    'application-admission/pdf-interview-marks' => 'ApplicationAdmissionController@pdfInterviewMarks',
     'application-admission/pdf-selection' => 'ApplicationAdmissionController@pdfSelection',
     'application-admission/pdf-interview-results' => 'ApplicationAdmissionController@pdfInterviewResults',
     'application-admission/admission-card' => 'ApplicationAdmissionController@admissionCard',

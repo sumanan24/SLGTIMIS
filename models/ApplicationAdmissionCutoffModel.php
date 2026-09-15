@@ -461,6 +461,103 @@ class ApplicationAdmissionCutoffModel extends Model {
     }
 
     /**
+     * Convert stored entrance marks (out of 100) to the interview scale of 50.
+     */
+    public static function entranceMarksOutOf50(?float $marksOn100): ?float {
+        if ($marksOn100 === null) {
+            return null;
+        }
+
+        return round($marksOn100 / 2, 1);
+    }
+
+    public static function formatMarksValue($n): string {
+        if ($n === null || $n === '') {
+            return '—';
+        }
+        if (is_numeric($n) && abs((float) $n - round((float) $n)) < 0.00001) {
+            return (string) (int) round((float) $n);
+        }
+
+        return is_numeric($n) ? rtrim(rtrim(sprintf('%.1f', (float) $n), '0'), '.') : (string) $n;
+    }
+
+    /**
+     * Best entrance-exam result for each application (numeric preferred over absent).
+     *
+     * @param list<int|string> $applicationIds
+     * @return array<int, array{raw:string,num:?float,absent:bool,out_of_50:?float}>
+     */
+    public function entranceMarksLookup(string $level, array $applicationIds): array {
+        $wanted = [];
+        foreach ($applicationIds as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $wanted[$id] = true;
+            }
+        }
+        $out = [];
+        foreach (array_keys($wanted) as $id) {
+            $out[$id] = [
+                'raw' => '',
+                'num' => null,
+                'absent' => false,
+                'out_of_50' => null,
+            ];
+        }
+        if ($wanted === [] || !in_array($level, ['04', '05'], true)) {
+            return $out;
+        }
+        require_once BASE_PATH . '/models/ApplicationAdmissionScheduleModel.php';
+        $sql = 'SELECT e.`application_id`, e.`exam_marks` FROM `application_admission_schedule_entry` e'
+            . ' INNER JOIN `application_admission_schedule` s ON s.`schedule_id` = e.`schedule_id`'
+            . ' WHERE s.`schedule_type` = ? AND s.`application_level` = ?'
+            . ' AND e.`exam_marks` IS NOT NULL AND TRIM(e.`exam_marks`) <> \'\'';
+        $type = ApplicationAdmissionScheduleModel::TYPE_ENTRANCE;
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return $out;
+        }
+        $stmt->bind_param('ss', $type, $level);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        if ($res) {
+            while ($row = $res->fetch_assoc()) {
+                $aid = (int) ($row['application_id'] ?? 0);
+                if ($aid < 1 || !isset($out[$aid])) {
+                    continue;
+                }
+                $raw = trim((string) ($row['exam_marks'] ?? ''));
+                $absent = ApplicationAdmissionScheduleModel::isAbsentMarks($raw);
+                $num = self::numericMarks($raw);
+                $cur = $out[$aid];
+                if ($num !== null) {
+                    if ($cur['num'] === null || $num > $cur['num']) {
+                        $out[$aid] = [
+                            'raw' => $raw,
+                            'num' => $num,
+                            'absent' => false,
+                            'out_of_50' => self::entranceMarksOutOf50($num),
+                        ];
+                    }
+                    continue;
+                }
+                if ($absent && $cur['num'] === null) {
+                    $out[$aid] = [
+                        'raw' => $raw,
+                        'num' => null,
+                        'absent' => true,
+                        'out_of_50' => null,
+                    ];
+                }
+            }
+        }
+        $stmt->close();
+
+        return $out;
+    }
+
+    /**
      * @param array<string, mixed> $course
      * @return list<string>
      */
