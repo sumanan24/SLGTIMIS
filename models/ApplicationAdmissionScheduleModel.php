@@ -506,8 +506,138 @@ class ApplicationAdmissionScheduleModel extends Model {
             $needles[] = 'automobile';
             $needles[] = 'automotive';
         }
+        if (preg_match('/\bict\b|information and communication|communication technology/', $title)) {
+            $needles[] = 'information and communication';
+            $needles[] = 'communication technology';
+        }
+        if (preg_match('/mechatronic/', $title)) {
+            $needles[] = 'mechatronic';
+        }
+        if (preg_match('/food/', $title)) {
+            $needles[] = 'food';
+        }
+        if (preg_match('/electrical/', $title)) {
+            $needles[] = 'electrical';
+        }
+        if (preg_match('/construction/', $title)) {
+            $needles[] = 'construction';
+        }
+        if (preg_match('/production/', $title)) {
+            $needles[] = 'production';
+        }
+        if (preg_match('/drafting/', $title)) {
+            $needles[] = 'drafting';
+        }
 
-        return $needles;
+        return array_values(array_unique($needles));
+    }
+
+    public static function reExamPreferenceLabel(array $schedule): string {
+        $title = mb_strtolower((string) ($schedule['title'] ?? ''), 'UTF-8');
+        if (preg_match('/auto(motive|mobile)/', $title)) {
+            return 'Automobile / Automotive';
+        }
+        if (preg_match('/\bict\b|information and communication|communication technology/', $title)) {
+            return 'ICT';
+        }
+        if (preg_match('/mechatronic/', $title)) {
+            return 'Mechatronics';
+        }
+        if (preg_match('/food/', $title)) {
+            return 'Food Technology';
+        }
+        if (preg_match('/electrical/', $title)) {
+            return 'Electrical';
+        }
+        if (preg_match('/construction/', $title)) {
+            return 'Construction';
+        }
+        if (preg_match('/production/', $title)) {
+            return 'Production';
+        }
+        if (preg_match('/drafting/', $title)) {
+            return 'Drafting';
+        }
+
+        return '';
+    }
+
+    /**
+     * Group picker / entry rows by resolved 1st-preference course name.
+     *
+     * @param list<array<string, mixed>> $rows
+     * @return list<array{course:string,rows:list<array<string, mixed>>}>
+     */
+    public static function groupRowsByCourse(array $rows): array {
+        $grouped = [];
+        foreach ($rows as $row) {
+            $course = self::courseNameFromEntry($row);
+            if ($course === '') {
+                $course = trim((string) ($row['course_priority_1'] ?? ''));
+            }
+            if ($course === '') {
+                $course = 'Other';
+            }
+            if (!isset($grouped[$course])) {
+                $grouped[$course] = [];
+            }
+            $grouped[$course][] = $row;
+        }
+        uksort($grouped, static function (string $a, string $b): int {
+            return strcasecmp($a, $b);
+        });
+        $out = [];
+        foreach ($grouped as $course => $list) {
+            usort($list, static function (array $a, array $b): int {
+                $ka = (($a['reexam_kind'] ?? '') === 'absent') ? 0 : 1;
+                $kb = (($b['reexam_kind'] ?? '') === 'absent') ? 0 : 1;
+                if ($ka !== $kb) {
+                    return $ka <=> $kb;
+                }
+
+                return strcasecmp((string) ($a['student_full_name'] ?? ''), (string) ($b['student_full_name'] ?? ''));
+            });
+            $out[] = [
+                'course' => $course,
+                'rows' => $list,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<string> $needles
+     */
+    public static function rowMatchesReExamNeedles(array $row, array $needles): bool {
+        if ($needles === []) {
+            return true;
+        }
+        $pref = mb_strtolower((string) ($row['course_priority_1'] ?? ''), 'UTF-8');
+        foreach ($needles as $needle) {
+            if ($needle !== '' && mb_strpos($pref, $needle) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Tag rows as previous-exam absent or new (never sat).
+     *
+     * @param list<array<string, mixed>> $rows
+     * @param array<int, true> $absentSet
+     * @return list<array<string, mixed>>
+     */
+    public static function markReExamRowKinds(array $rows, array $absentSet): array {
+        foreach ($rows as &$row) {
+            $aid = (int) ($row['application_id'] ?? 0);
+            $row['reexam_kind'] = ($aid > 0 && isset($absentSet[$aid])) ? 'absent' : 'new';
+        }
+        unset($row);
+
+        return $rows;
     }
 
     /**
@@ -1458,24 +1588,29 @@ class ApplicationAdmissionScheduleModel extends Model {
                     $level,
                     $scheduleId > 0 ? $scheduleId : null
                 );
-                $rows = array_values(array_filter($rows, static function (array $row) use ($absentSet): bool {
-                    $appId = (int) ($row['application_id'] ?? 0);
-
-                    return $appId > 0 && isset($absentSet[$appId]);
-                }));
+                $alreadyExam = $this->entranceScheduledApplicationIds(
+                    $level,
+                    $scheduleId > 0 ? $scheduleId : null
+                );
                 $needles = self::reExamPreferenceNeedles($scheduleRow);
-                if ($needles !== []) {
-                    $rows = array_values(array_filter($rows, static function (array $row) use ($needles): bool {
-                        $pref = mb_strtolower((string) ($row['course_priority_1'] ?? ''), 'UTF-8');
-                        foreach ($needles as $needle) {
-                            if ($needle !== '' && mb_strpos($pref, $needle) !== false) {
-                                return true;
-                            }
-                        }
-
+                $rows = array_values(array_filter($rows, static function (array $row) use ($absentSet, $alreadyExam, $needles): bool {
+                    $appId = (int) ($row['application_id'] ?? 0);
+                    if ($appId < 1) {
                         return false;
-                    }));
+                    }
+                    if (!self::rowMatchesReExamNeedles($row, $needles)) {
+                        return false;
+                    }
+                    $isAbsent = isset($absentSet[$appId]);
+                    $isNew = !isset($alreadyExam[$appId]);
+
+                    return $isAbsent || $isNew;
+                }));
+                foreach ($rows as &$row) {
+                    $appId = (int) ($row['application_id'] ?? 0);
+                    $row['reexam_kind'] = isset($absentSet[$appId]) ? 'absent' : 'new';
                 }
+                unset($row);
             } else {
                 $excludeSet = $this->entranceScheduledApplicationIds(
                     $level,
@@ -1657,8 +1792,10 @@ class ApplicationAdmissionScheduleModel extends Model {
             $level = (string) ($schedule['application_level'] ?? '');
             if (in_array($level, ['04', '05'], true)) {
                 if (self::isReExamSchedule($schedule)) {
-                    $allowed = $this->entranceAbsentApplicationIds($level, $scheduleId);
+                    $absent = $this->entranceAbsentApplicationIds($level, $scheduleId);
+                    $alreadyExam = $this->entranceScheduledApplicationIds($level, $scheduleId);
                     $needles = self::reExamPreferenceNeedles($schedule);
+                    $prefOk = null;
                     if ($needles !== [] && $applicationIds !== []) {
                         $prefRows = $this->fetchAllPrepared(
                             'SELECT `application_id`, `course_priority_1` FROM `student_applications` '
@@ -1668,24 +1805,24 @@ class ApplicationAdmissionScheduleModel extends Model {
                         );
                         $prefOk = [];
                         foreach ($prefRows as $prefRow) {
-                            $pref = mb_strtolower((string) ($prefRow['course_priority_1'] ?? ''), 'UTF-8');
-                            foreach ($needles as $needle) {
-                                if ($needle !== '' && mb_strpos($pref, $needle) !== false) {
-                                    $prefOk[(int) ($prefRow['application_id'] ?? 0)] = true;
-                                    break;
-                                }
+                            if (self::rowMatchesReExamNeedles($prefRow, $needles)) {
+                                $prefOk[(int) ($prefRow['application_id'] ?? 0)] = true;
                             }
                         }
-                        $applicationIds = array_values(array_filter($applicationIds, static function ($id) use ($allowed, $prefOk): bool {
-                            $id = (int) $id;
-
-                            return isset($allowed[$id]) && isset($prefOk[$id]);
-                        }));
-                    } else {
-                        $applicationIds = array_values(array_filter($applicationIds, static function ($id) use ($allowed): bool {
-                            return isset($allowed[(int) $id]);
-                        }));
                     }
+                    $applicationIds = array_values(array_filter($applicationIds, static function ($id) use ($absent, $alreadyExam, $prefOk): bool {
+                        $id = (int) $id;
+                        if ($id < 1) {
+                            return false;
+                        }
+                        if ($prefOk !== null && !isset($prefOk[$id])) {
+                            return false;
+                        }
+                        $isAbsent = isset($absent[$id]);
+                        $isNew = !isset($alreadyExam[$id]);
+
+                        return $isAbsent || $isNew;
+                    }));
                 } else {
                     $exclude = $this->entranceScheduledApplicationIds($level, $scheduleId);
                     if ($exclude !== []) {

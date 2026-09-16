@@ -2071,6 +2071,12 @@ class ApplicationAdmissionController extends Controller {
 
         $pickerHint = $this->schedulePickerHint($schedule);
 
+        if (ApplicationAdmissionScheduleModel::isReExamSchedule($schedule)) {
+            $levelForReExam = (string) ($schedule['application_level'] ?? '');
+            $absentSet = $model->entranceAbsentApplicationIds($levelForReExam, $id);
+            $entries = ApplicationAdmissionScheduleModel::markReExamRowKinds($entries, $absentSet);
+        }
+
         $courseIdForPicker = $this->scheduleCourseIdOrNull($schedule);
         $pickerEntranceFallback = false;
         $hasEntranceSchedule = false;
@@ -3678,12 +3684,12 @@ class ApplicationAdmissionController extends Controller {
     private function schedulePickerHint(array $schedule): string {
         if (($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_ENTRANCE) {
             if (ApplicationAdmissionScheduleModel::isReExamSchedule($schedule)) {
-                $needles = ApplicationAdmissionScheduleModel::reExamPreferenceNeedles($schedule);
-                $courseBit = $needles !== []
-                    ? 'Automobile / Automotive applicants marked absent on the previous exam'
+                $courseLabel = ApplicationAdmissionScheduleModel::reExamPreferenceLabel($schedule);
+                $courseBit = $courseLabel !== ''
+                    ? ($courseLabel . ' applicants marked absent on the previous exam')
                     : 'students marked absent on a previous entrance exam';
 
-                return 'Re-exam: listing ' . $courseBit . ' from all provinces. Use Filter by NIC or name to find a candidate. Students who already sat (have marks) are not listed.';
+                return 'Re-exam: listing ' . $courseBit . ', grouped by course, from all provinces. Absent students (previous exam) are highlighted red; new students who have not sat yet are highlighted green. Use Filter by NIC or name to find a candidate. Students who already sat (have marks) are not listed.';
             }
             $courseId = $this->scheduleCourseIdOrNull($schedule);
             $level = trim((string) ($schedule['application_level'] ?? ''));

@@ -22,6 +22,10 @@ $provinceIsSelected = static function (string $name) use ($filterProvinces): boo
 $provinceOptions = is_array($province_options ?? null) ? $province_options : [];
 $pickerCount = is_array($picker ?? null) ? count($picker) : 0;
 $pickerUnfilteredCount = (int) ($picker_unfiltered_count ?? $pickerCount);
+$pickerCourseGroups = $isReExam
+    ? ApplicationAdmissionScheduleModel::groupRowsByCourse(is_array($picker ?? null) ? $picker : [])
+    : [];
+$pickerColspan = $isInterview ? 11 : 8;
 $entriesUrl = rtrim(APP_URL, '/') . '/application-admission/entries?id=' . (int) ($sch['schedule_id'] ?? 0);
 $entriesUrlWithProvinces = static function (array $provinces) use ($entriesUrl): string {
     $url = $entriesUrl;
@@ -89,6 +93,28 @@ $choiceCell = static function (array $row) use ($e): string {
     $cls = $choice === 1 ? 'aa-choice-1' : ($choice === 2 ? 'aa-choice-2' : 'aa-choice-3');
 
     return '<span class="' . $cls . '">' . $e($label) . '</span>';
+};
+$reexamRowClass = static function (array $row): string {
+    $kind = (string) ($row['reexam_kind'] ?? '');
+    if ($kind === 'absent') {
+        return 'admission-row-absent';
+    }
+    if ($kind === 'new') {
+        return 'admission-row-new';
+    }
+
+    return '';
+};
+$reexamKindBadge = static function (array $row) use ($e): string {
+    $kind = (string) ($row['reexam_kind'] ?? '');
+    if ($kind === 'absent') {
+        return ' <span class="admission-kind-badge admission-kind-absent">Absent</span>';
+    }
+    if ($kind === 'new') {
+        return ' <span class="admission-kind-badge admission-kind-new">New</span>';
+    }
+
+    return '';
 };
 $entryColspan = $isInterview ? 13 : 11;
 ?>
@@ -370,6 +396,35 @@ $entryColspan = $isInterview ? 13 : 11;
     display: none !important;
 }
 
+.admission-picker-course-head td {
+    background: #1e3a5f;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    padding: 0.45rem 0.75rem;
+    border-top: 1px solid #1e3a5f;
+}
+
+.admission-picker-course-head label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.admission-picker-course-head .form-check-input {
+    float: none;
+    margin: 0;
+    vertical-align: middle;
+}
+
+.admission-picker-course-count {
+    font-weight: 600;
+    opacity: 0.9;
+}
+
 .admission-province-filter {
     display: flex;
     flex-direction: column;
@@ -452,6 +507,77 @@ $entryColspan = $isInterview ? 13 : 11;
 .admission-entries-table tbody tr:last-child td,
 .admission-picker-table tbody tr:last-child td {
     border-bottom: none;
+}
+
+.admission-row-absent td {
+    background-color: #fde8e8 !important;
+}
+
+.admission-row-new td {
+    background-color: #e7f6ec !important;
+}
+
+.admission-entries-table tbody tr.admission-row-absent:hover td:not(.admission-wa-sent-cell),
+.admission-picker-table tbody tr.admission-row-absent:hover td {
+    background-color: #f8d0d0 !important;
+}
+
+.admission-entries-table tbody tr.admission-row-new:hover td:not(.admission-wa-sent-cell),
+.admission-picker-table tbody tr.admission-row-new:hover td {
+    background-color: #d5efdd !important;
+}
+
+.admission-kind-badge {
+    display: inline-block;
+    margin-left: 0.35rem;
+    padding: 0.08rem 0.4rem;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    vertical-align: middle;
+}
+
+.admission-kind-absent {
+    background: #f5c2c7;
+    color: #842029;
+}
+
+.admission-kind-new {
+    background: #a3cfbb;
+    color: #0f5132;
+}
+
+.admission-kind-legend {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.admission-kind-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.admission-kind-swatch {
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 0.2rem;
+    display: inline-block;
+}
+
+.admission-kind-swatch.is-absent {
+    background: #fde8e8;
+    border: 1px solid #f5c2c7;
+}
+
+.admission-kind-swatch.is-new {
+    background: #e7f6ec;
+    border: 1px solid #a3cfbb;
 }
 
 .admission-entries-table tbody tr:hover td:not(.admission-wa-sent-cell),
@@ -779,7 +905,7 @@ $entryColspan = $isInterview ? 13 : 11;
             <div class="card-header">
                 <span><?php
                     if ($isReExam) {
-                        echo 'Add exam-absent candidates (re-exam, all provinces)';
+                        echo 'Add exam-absent (red) and new (green) candidates by course';
                     } elseif ($isInterview) {
                         echo 'Add cutoff-eligible candidates (by marks)';
                     } else {
@@ -787,6 +913,12 @@ $entryColspan = $isInterview ? 13 : 11;
                     }
                 ?></span>
                 <label class="small"><input type="checkbox" id="picker-select-all" class="form-check-input"> Select all</label>
+                <?php if ($isReExam): ?>
+                <span class="admission-kind-legend">
+                    <span><i class="admission-kind-swatch is-absent"></i> Absent</span>
+                    <span><i class="admission-kind-swatch is-new"></i> New</span>
+                </span>
+                <?php endif; ?>
             </div>
             <div class="admission-picker-scroll">
                 <table class="table admission-picker-table mb-0">
@@ -812,14 +944,17 @@ $entryColspan = $isInterview ? 13 : 11;
                         </tr>
                     </thead>
                     <tbody>
-                    <?php $pickNo = 0; foreach ($picker as $p): $pickNo++;
+                    <?php
+                    $pickNo = 0;
+                    $renderPickerRow = static function (array $p, int $pickNo, string $courseKey) use ($e, $isInterview, $fmtMarks, $choiceCell, $applicationStatusLabel, $reexamRowClass, $reexamKindBadge): void {
                         $pDept = ApplicationAdmissionScheduleModel::departmentCodeFromEntry($p);
                         $pCourse = ApplicationAdmissionScheduleModel::courseNameFromEntry($p);
-                    ?>
-                    <tr class="admission-filter-row" data-name="<?php echo $e(mb_strtolower((string) ($p['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(preg_replace('/[\s\-]/', '', mb_strtolower((string) ($p['student_nic'] ?? ''), 'UTF-8'))); ?>">
-                        <td class="col-pick"><input type="checkbox" class="form-check-input picker-row-cb" name="add_application_ids[]" value="<?php echo (int) $p['application_id']; ?>"></td>
+                        $rowCls = trim('admission-filter-row ' . $reexamRowClass($p));
+                        ?>
+                    <tr class="<?php echo $e($rowCls); ?>" data-course="<?php echo $e($courseKey); ?>" data-name="<?php echo $e(mb_strtolower((string) ($p['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(preg_replace('/[\s\-]/', '', mb_strtolower((string) ($p['student_nic'] ?? ''), 'UTF-8'))); ?>">
+                        <td class="col-pick"><input type="checkbox" class="form-check-input picker-row-cb" name="add_application_ids[]" value="<?php echo (int) $p['application_id']; ?>" data-course="<?php echo $e($courseKey); ?>"></td>
                         <td class="col-no"><?php echo $pickNo; ?></td>
-                        <td class="col-name"><?php echo $e($p['student_full_name'] ?? ''); ?></td>
+                        <td class="col-name"><?php echo $e($p['student_full_name'] ?? ''); ?><?php echo $reexamKindBadge($p); ?></td>
                         <td class="col-nic"><?php echo $e($p['student_nic'] ?? ''); ?></td>
                         <td class="col-province"><?php echo $e($p['student_province'] ?? '—'); ?></td>
                         <td class="col-status"><?php
@@ -834,7 +969,45 @@ $entryColspan = $isInterview ? 13 : 11;
                         <td class="col-choice"><?php echo $choiceCell($p); ?></td>
                         <?php endif; ?>
                     </tr>
-                    <?php endforeach; ?>
+                        <?php
+                    };
+                    if ($isReExam && $pickerCourseGroups !== []):
+                        foreach ($pickerCourseGroups as $courseGroup):
+                            $courseName = (string) ($courseGroup['course'] ?? 'Other');
+                            $courseRows = is_array($courseGroup['rows'] ?? null) ? $courseGroup['rows'] : [];
+                            $courseKey = preg_replace('/[^A-Za-z0-9]+/', '_', $courseName) ?: 'other';
+                            $courseAbsent = 0;
+                            $courseNew = 0;
+                            foreach ($courseRows as $courseRow) {
+                                if (($courseRow['reexam_kind'] ?? '') === 'absent') {
+                                    $courseAbsent++;
+                                } else {
+                                    $courseNew++;
+                                }
+                            }
+                    ?>
+                    <tr class="admission-picker-course-head" data-course-head="<?php echo $e($courseKey); ?>">
+                        <td colspan="<?php echo (int) $pickerColspan; ?>">
+                            <label>
+                                <input type="checkbox" class="form-check-input picker-course-cb" data-course="<?php echo $e($courseKey); ?>">
+                                <?php echo $e($courseName); ?>
+                                <span class="admission-picker-course-count"> — <?php echo (int) $courseAbsent; ?> absent · <?php echo (int) $courseNew; ?> new</span>
+                            </label>
+                        </td>
+                    </tr>
+                    <?php
+                            foreach ($courseRows as $p) {
+                                $pickNo++;
+                                $renderPickerRow($p, $pickNo, $courseKey);
+                            }
+                        endforeach;
+                    else:
+                        foreach ($picker as $p) {
+                            $pickNo++;
+                            $renderPickerRow($p, $pickNo, '');
+                        }
+                    endif;
+                    ?>
                     </tbody>
                 </table>
             </div>
@@ -922,9 +1095,9 @@ $entryColspan = $isInterview ? 13 : 11;
                         $waSent = !empty($row['whatsapp_sent']);
                         $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvinces);
                     ?>
-                    <tr class="admission-filter-row <?php echo trim(($waSent ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-dept-key="<?php echo $e($deptKey); ?>" data-enrollment="<?php echo $e($rollDisplay); ?>" data-name="<?php echo $e(mb_strtolower((string) ($row['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(preg_replace('/[\s\-]/', '', mb_strtolower((string) ($row['student_nic'] ?? ''), 'UTF-8'))); ?>">
+                    <tr class="admission-filter-row <?php echo trim($reexamRowClass($row) . ' ' . ($waSent ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-dept-key="<?php echo $e($deptKey); ?>" data-enrollment="<?php echo $e($rollDisplay); ?>" data-name="<?php echo $e(mb_strtolower((string) ($row['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(preg_replace('/[\s\-]/', '', mb_strtolower((string) ($row['student_nic'] ?? ''), 'UTF-8'))); ?>">
                         <td class="col-no"><?php echo $i; ?></td>
-                        <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
+                        <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?><?php echo $reexamKindBadge($row); ?></td>
                         <td class="col-nic"><?php echo $e($row['student_nic'] ?? ''); ?></td>
                         <td class="col-province"><?php echo $e($row['student_province'] ?? '—'); ?></td>
                         <td class="col-status"><?php
@@ -1085,9 +1258,9 @@ $entryColspan = $isInterview ? 13 : 11;
                     }
                     $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvinces);
                 ?>
-                <tr class="admission-filter-row <?php echo trim((!empty($row['whatsapp_sent']) ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-enrollment="<?php echo $e($rollOut); ?>" data-name="<?php echo $e(mb_strtolower((string) ($row['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(preg_replace('/[\s\-]/', '', mb_strtolower((string) ($row['student_nic'] ?? ''), 'UTF-8'))); ?>">
+                <tr class="admission-filter-row <?php echo trim($reexamRowClass($row) . ' ' . (!empty($row['whatsapp_sent']) ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-enrollment="<?php echo $e($rollOut); ?>" data-name="<?php echo $e(mb_strtolower((string) ($row['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(preg_replace('/[\s\-]/', '', mb_strtolower((string) ($row['student_nic'] ?? ''), 'UTF-8'))); ?>">
                     <td class="col-no"><?php echo $i; ?></td>
-                    <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
+                    <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?><?php echo $reexamKindBadge($row); ?></td>
                     <td class="col-nic"><?php echo $e($row['student_nic'] ?? ''); ?></td>
                     <td class="col-province"><?php echo $e($row['student_province'] ?? '—'); ?></td>
                     <td class="col-status"><?php
@@ -1206,8 +1379,32 @@ $entryColspan = $isInterview ? 13 : 11;
                 }
                 cb.checked = selectAll.checked;
             });
+            document.querySelectorAll('.picker-course-cb').forEach(function (cb) {
+                var head = cb.closest('tr');
+                if (head && head.classList.contains('admission-text-hidden')) {
+                    cb.checked = false;
+                    return;
+                }
+                cb.checked = selectAll.checked;
+            });
         });
     }
+    document.querySelectorAll('.picker-course-cb').forEach(function (courseCb) {
+        courseCb.addEventListener('change', function () {
+            var key = courseCb.getAttribute('data-course') || '';
+            document.querySelectorAll('.picker-row-cb').forEach(function (cb) {
+                if ((cb.getAttribute('data-course') || '') !== key) {
+                    return;
+                }
+                var tr = cb.closest('tr');
+                if (tr && tr.classList.contains('admission-text-hidden')) {
+                    cb.checked = false;
+                    return;
+                }
+                cb.checked = courseCb.checked;
+            });
+        });
+    });
     var renumberBtn = document.getElementById('btn-renumber-rolls');
     if (renumberBtn) {
         renumberBtn.addEventListener('click', function () {
@@ -1339,6 +1536,16 @@ $entryColspan = $isInterview ? 13 : 11;
             var match = (!nameQ || name.indexOf(nameQ) !== -1)
                 && (!nicQ || nic.indexOf(nicQ) !== -1);
             tr.classList.toggle('admission-text-hidden', !match);
+        });
+        document.querySelectorAll('tr.admission-picker-course-head').forEach(function (head) {
+            var key = head.getAttribute('data-course-head') || '';
+            var anyVisible = false;
+            document.querySelectorAll('tr.admission-filter-row[data-course="' + key + '"]').forEach(function (tr) {
+                if (!tr.classList.contains('admission-text-hidden')) {
+                    anyVisible = true;
+                }
+            });
+            head.classList.toggle('admission-text-hidden', !anyVisible);
         });
         var selectAll = document.getElementById('picker-select-all');
         if (selectAll) {
