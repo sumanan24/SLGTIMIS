@@ -2,6 +2,7 @@
 $e = static fn (?string $s): string => htmlspecialchars((string) ($s ?? ''), ENT_QUOTES, 'UTF-8');
 $sch = $schedule ?? [];
 $isInterview = ($sch['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_INTERVIEW;
+$isReExam = ApplicationAdmissionScheduleModel::isReExamSchedule($sch);
 $rollCourseCode = $rollCourseCode ?? ApplicationAdmissionScheduleModel::rollIndexCourseCodeFromSchedule($sch);
 $rollFormatPrefix = $rollFormatPrefix ?? ApplicationAdmissionScheduleModel::rollNumberPrefixFromSchedule($sch);
 $rollFormatSample = $rollFormatSample ?? ApplicationAdmissionScheduleModel::rollNumberFormatSampleFromSchedule($sch);
@@ -720,9 +721,9 @@ $entryColspan = $isInterview ? 13 : 11;
         <?php endif; ?>
     </div>
 
-    <?php if ($pickerCount > 0 || $entryCount > 0 || $provinceOptions !== []): ?>
+    <?php if (!empty($canManage) || $pickerCount > 0 || $entryCount > 0 || $provinceOptions !== []): ?>
     <div class="admission-filters">
-        <?php if ($pickerCount > 0 || $entryCount > 0): ?>
+        <?php if (!empty($canManage) || $pickerCount > 0 || $entryCount > 0): ?>
         <div class="admission-text-filter" id="admission-text-filter">
             <div class="filter-field">
                 <label for="admission_filter_name">Filter by name</label>
@@ -776,7 +777,15 @@ $entryColspan = $isInterview ? 13 : 11;
         <?php if (!empty($picker)): ?>
         <div class="admission-picker-card">
             <div class="card-header">
-                <span><?php echo $isInterview ? 'Add cutoff-eligible candidates (by marks)' : 'Add applicants (approved or rejected)'; ?></span>
+                <span><?php
+                    if ($isReExam) {
+                        echo 'Add exam-absent candidates (re-exam, all provinces)';
+                    } elseif ($isInterview) {
+                        echo 'Add cutoff-eligible candidates (by marks)';
+                    } else {
+                        echo 'Add applicants (approved or rejected)';
+                    }
+                ?></span>
                 <label class="small"><input type="checkbox" id="picker-select-all" class="form-check-input"> Select all</label>
             </div>
             <div class="admission-picker-scroll">
@@ -807,7 +816,7 @@ $entryColspan = $isInterview ? 13 : 11;
                         $pDept = ApplicationAdmissionScheduleModel::departmentCodeFromEntry($p);
                         $pCourse = ApplicationAdmissionScheduleModel::courseNameFromEntry($p);
                     ?>
-                    <tr class="admission-filter-row" data-name="<?php echo $e(mb_strtolower((string) ($p['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(mb_strtolower((string) ($p['student_nic'] ?? ''), 'UTF-8')); ?>">
+                    <tr class="admission-filter-row" data-name="<?php echo $e(mb_strtolower((string) ($p['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(preg_replace('/[\s\-]/', '', mb_strtolower((string) ($p['student_nic'] ?? ''), 'UTF-8'))); ?>">
                         <td class="col-pick"><input type="checkbox" class="form-check-input picker-row-cb" name="add_application_ids[]" value="<?php echo (int) $p['application_id']; ?>"></td>
                         <td class="col-no"><?php echo $pickNo; ?></td>
                         <td class="col-name"><?php echo $e($p['student_full_name'] ?? ''); ?></td>
@@ -834,6 +843,8 @@ $entryColspan = $isInterview ? 13 : 11;
         <p class="text-muted small mb-3"><?php
             if ($provinceFilterActive) {
                 echo 'No eligible applicants to add for ' . (count($filterProvinces) === 1 ? 'province ' : 'provinces ') . $e($provinceFilterLabel) . '.';
+            } elseif ($isReExam) {
+                echo 'No exam-absent applicants left to add for this re-exam.';
             } elseif ($isInterview && empty($has_entrance_schedule)) {
                 echo 'No entrance exam found for this level yet. Create an entrance exam, enter marks, and set cutoffs first.';
             } elseif ($isInterview && (int) ($entrance_selected_count ?? 0) === 0) {
@@ -911,7 +922,7 @@ $entryColspan = $isInterview ? 13 : 11;
                         $waSent = !empty($row['whatsapp_sent']);
                         $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvinces);
                     ?>
-                    <tr class="admission-filter-row <?php echo trim(($waSent ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-dept-key="<?php echo $e($deptKey); ?>" data-enrollment="<?php echo $e($rollDisplay); ?>" data-name="<?php echo $e(mb_strtolower((string) ($row['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(mb_strtolower((string) ($row['student_nic'] ?? ''), 'UTF-8')); ?>">
+                    <tr class="admission-filter-row <?php echo trim(($waSent ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-dept-key="<?php echo $e($deptKey); ?>" data-enrollment="<?php echo $e($rollDisplay); ?>" data-name="<?php echo $e(mb_strtolower((string) ($row['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(preg_replace('/[\s\-]/', '', mb_strtolower((string) ($row['student_nic'] ?? ''), 'UTF-8'))); ?>">
                         <td class="col-no"><?php echo $i; ?></td>
                         <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
                         <td class="col-nic"><?php echo $e($row['student_nic'] ?? ''); ?></td>
@@ -1074,7 +1085,7 @@ $entryColspan = $isInterview ? 13 : 11;
                     }
                     $hideByProvince = !ApplicationAdmissionScheduleModel::rowMatchesProvinceFilter($row, $filterProvinces);
                 ?>
-                <tr class="admission-filter-row <?php echo trim((!empty($row['whatsapp_sent']) ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-enrollment="<?php echo $e($rollOut); ?>" data-name="<?php echo $e(mb_strtolower((string) ($row['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(mb_strtolower((string) ($row['student_nic'] ?? ''), 'UTF-8')); ?>">
+                <tr class="admission-filter-row <?php echo trim((!empty($row['whatsapp_sent']) ? 'admission-wa-sent ' : '') . ($hideByProvince ? 'd-none' : '')); ?>" data-enrollment="<?php echo $e($rollOut); ?>" data-name="<?php echo $e(mb_strtolower((string) ($row['student_full_name'] ?? ''), 'UTF-8')); ?>" data-nic="<?php echo $e(preg_replace('/[\s\-]/', '', mb_strtolower((string) ($row['student_nic'] ?? ''), 'UTF-8'))); ?>">
                     <td class="col-no"><?php echo $i; ?></td>
                     <td class="col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
                     <td class="col-nic"><?php echo $e($row['student_nic'] ?? ''); ?></td>
@@ -1302,7 +1313,7 @@ $entryColspan = $isInterview ? 13 : 11;
 })();
 </script>
 <?php endif; ?>
-<?php if ($pickerCount > 0 || $entryCount > 0): ?>
+<?php if (!empty($canManage) || $pickerCount > 0 || $entryCount > 0): ?>
 <script>
 (function () {
     var nameInput = document.getElementById('admission_filter_name');
@@ -1315,12 +1326,16 @@ $entryColspan = $isInterview ? 13 : 11;
         return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
     }
 
+    function normalizeNic(value) {
+        return String(value || '').toLowerCase().replace(/[\s\-]/g, '');
+    }
+
     function applyTextFilter() {
         var nameQ = normalize(nameInput ? nameInput.value : '');
-        var nicQ = normalize(nicInput ? nicInput.value : '');
+        var nicQ = normalizeNic(nicInput ? nicInput.value : '');
         document.querySelectorAll('tr.admission-filter-row').forEach(function (tr) {
             var name = tr.getAttribute('data-name') || '';
-            var nic = tr.getAttribute('data-nic') || '';
+            var nic = normalizeNic(tr.getAttribute('data-nic') || '');
             var match = (!nameQ || name.indexOf(nameQ) !== -1)
                 && (!nicQ || nic.indexOf(nicQ) !== -1);
             tr.classList.toggle('admission-text-hidden', !match);

@@ -483,6 +483,34 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
+     * Re-exam schedules load students marked absent on a previous entrance exam.
+     */
+    public static function isReExamSchedule(array $schedule): bool {
+        $title = mb_strtolower(trim((string) ($schedule['title'] ?? '')), 'UTF-8');
+        if ($title === '') {
+            return false;
+        }
+
+        return (bool) preg_match('/\bre[\s\-]?exam\b/', $title);
+    }
+
+    /**
+     * Course-name fragments used to limit a re-exam picker (from the schedule title).
+     *
+     * @return list<string>
+     */
+    public static function reExamPreferenceNeedles(array $schedule): array {
+        $title = mb_strtolower((string) ($schedule['title'] ?? ''), 'UTF-8');
+        $needles = [];
+        if (preg_match('/auto(motive|mobile)/', $title)) {
+            $needles[] = 'automobile';
+            $needles[] = 'automotive';
+        }
+
+        return $needles;
+    }
+
+    /**
      * Level 05 entrance exams (and all interview schedules) include every applicant language.
      */
     public static function scheduleIgnoresApplicantLanguage(array $schedule): bool {
@@ -768,6 +796,66 @@ class ApplicationAdmissionScheduleModel extends Model {
         }
 
         return $ids;
+    }
+
+    /**
+     * Applicants marked absent on a previous entrance exam (no numeric marks yet).
+     *
+     * @return array<int, true> application_id => true
+     */
+    public function entranceAbsentApplicationIds(string $level, ?int $exceptScheduleId = null): array {
+        $this->ensureTables();
+        if (!in_array($level, ['04', '05'], true)) {
+            return [];
+        }
+        $sql = 'SELECT e.`application_id`, e.`exam_marks` '
+            . 'FROM `application_admission_schedule_entry` e '
+            . 'INNER JOIN `application_admission_schedule` s ON s.`schedule_id` = e.`schedule_id` '
+            . 'WHERE s.`schedule_type` = ? AND s.`application_level` = ? '
+            . 'AND e.`exam_marks` IS NOT NULL AND TRIM(e.`exam_marks`) <> \'\'';
+        $types = 'ss';
+        $params = [self::TYPE_ENTRANCE, $level];
+        if ($exceptScheduleId !== null && $exceptScheduleId > 0) {
+            $sql .= ' AND s.`schedule_id` <> ?';
+            $types .= 'i';
+            $params[] = $exceptScheduleId;
+        }
+        $sat = [];
+        $absent = [];
+        foreach ($this->fetchAllPrepared($sql, $types, $params) as $row) {
+            $aid = (int) ($row['application_id'] ?? 0);
+            if ($aid < 1) {
+                continue;
+            }
+            $raw = (string) ($row['exam_marks'] ?? '');
+            if (self::numericMarksValue($raw) !== null) {
+                $sat[$aid] = true;
+                continue;
+            }
+            if (self::isAbsentMarks($raw)) {
+                $absent[$aid] = true;
+            }
+        }
+        foreach ($sat as $aid => $_true) {
+            unset($absent[$aid]);
+        }
+
+        return $absent;
+    }
+
+    /**
+     * @return float|null
+     */
+    private static function numericMarksValue(?string $raw): ?float {
+        if (self::isAbsentMarks($raw)) {
+            return null;
+        }
+        $raw = trim((string) $raw);
+        if ($raw === '' || !is_numeric($raw)) {
+            return null;
+        }
+
+        return (float) $raw;
     }
 
     /**
@@ -1364,16 +1452,42 @@ class ApplicationAdmissionScheduleModel extends Model {
         }
 
         if (($scheduleType ?? '') === self::TYPE_ENTRANCE) {
-            $excludeSet = $this->entranceScheduledApplicationIds(
-                $level,
-                $scheduleId > 0 ? $scheduleId : null
-            );
-            if ($excludeSet !== []) {
-                $rows = array_values(array_filter($rows, function (array $row) use ($excludeSet): bool {
+            $scheduleRow = $scheduleId > 0 ? $this->findSchedule($scheduleId) : null;
+            if ($scheduleRow && self::isReExamSchedule($scheduleRow)) {
+                $absentSet = $this->entranceAbsentApplicationIds(
+                    $level,
+                    $scheduleId > 0 ? $scheduleId : null
+                );
+                $rows = array_values(array_filter($rows, static function (array $row) use ($absentSet): bool {
                     $appId = (int) ($row['application_id'] ?? 0);
 
-                    return $appId <= 0 || !isset($excludeSet[$appId]);
+                    return $appId > 0 && isset($absentSet[$appId]);
                 }));
+                $needles = self::reExamPreferenceNeedles($scheduleRow);
+                if ($needles !== []) {
+                    $rows = array_values(array_filter($rows, static function (array $row) use ($needles): bool {
+                        $pref = mb_strtolower((string) ($row['course_priority_1'] ?? ''), 'UTF-8');
+                        foreach ($needles as $needle) {
+                            if ($needle !== '' && mb_strpos($pref, $needle) !== false) {
+                                return true;
+                            }
+                        }
+
+                        return false;
+                    }));
+                }
+            } else {
+                $excludeSet = $this->entranceScheduledApplicationIds(
+                    $level,
+                    $scheduleId > 0 ? $scheduleId : null
+                );
+                if ($excludeSet !== []) {
+                    $rows = array_values(array_filter($rows, function (array $row) use ($excludeSet): bool {
+                        $appId = (int) ($row['application_id'] ?? 0);
+
+                        return $appId <= 0 || !isset($excludeSet[$appId]);
+                    }));
+                }
             }
         }
 
@@ -1542,11 +1656,43 @@ class ApplicationAdmissionScheduleModel extends Model {
         ) {
             $level = (string) ($schedule['application_level'] ?? '');
             if (in_array($level, ['04', '05'], true)) {
-                $exclude = $this->entranceScheduledApplicationIds($level, $scheduleId);
-                if ($exclude !== []) {
-                    $applicationIds = array_values(array_filter($applicationIds, function ($id) use ($exclude): bool {
-                        return !isset($exclude[(int) $id]);
-                    }));
+                if (self::isReExamSchedule($schedule)) {
+                    $allowed = $this->entranceAbsentApplicationIds($level, $scheduleId);
+                    $needles = self::reExamPreferenceNeedles($schedule);
+                    if ($needles !== [] && $applicationIds !== []) {
+                        $prefRows = $this->fetchAllPrepared(
+                            'SELECT `application_id`, `course_priority_1` FROM `student_applications` '
+                            . 'WHERE `application_id` IN (' . implode(',', array_fill(0, count($applicationIds), '?')) . ')',
+                            str_repeat('i', count($applicationIds)),
+                            $applicationIds
+                        );
+                        $prefOk = [];
+                        foreach ($prefRows as $prefRow) {
+                            $pref = mb_strtolower((string) ($prefRow['course_priority_1'] ?? ''), 'UTF-8');
+                            foreach ($needles as $needle) {
+                                if ($needle !== '' && mb_strpos($pref, $needle) !== false) {
+                                    $prefOk[(int) ($prefRow['application_id'] ?? 0)] = true;
+                                    break;
+                                }
+                            }
+                        }
+                        $applicationIds = array_values(array_filter($applicationIds, static function ($id) use ($allowed, $prefOk): bool {
+                            $id = (int) $id;
+
+                            return isset($allowed[$id]) && isset($prefOk[$id]);
+                        }));
+                    } else {
+                        $applicationIds = array_values(array_filter($applicationIds, static function ($id) use ($allowed): bool {
+                            return isset($allowed[(int) $id]);
+                        }));
+                    }
+                } else {
+                    $exclude = $this->entranceScheduledApplicationIds($level, $scheduleId);
+                    if ($exclude !== []) {
+                        $applicationIds = array_values(array_filter($applicationIds, function ($id) use ($exclude): bool {
+                            return !isset($exclude[(int) $id]);
+                        }));
+                    }
                 }
             }
         }

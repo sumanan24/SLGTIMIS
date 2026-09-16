@@ -3677,6 +3677,14 @@ class ApplicationAdmissionController extends Controller {
      */
     private function schedulePickerHint(array $schedule): string {
         if (($schedule['schedule_type'] ?? '') === ApplicationAdmissionScheduleModel::TYPE_ENTRANCE) {
+            if (ApplicationAdmissionScheduleModel::isReExamSchedule($schedule)) {
+                $needles = ApplicationAdmissionScheduleModel::reExamPreferenceNeedles($schedule);
+                $courseBit = $needles !== []
+                    ? 'Automobile / Automotive applicants marked absent on the previous exam'
+                    : 'students marked absent on a previous entrance exam';
+
+                return 'Re-exam: listing ' . $courseBit . ' from all provinces. Use Filter by NIC or name to find a candidate. Students who already sat (have marks) are not listed.';
+            }
             $courseId = $this->scheduleCourseIdOrNull($schedule);
             $level = trim((string) ($schedule['application_level'] ?? ''));
             $alreadyAssigned = 'Applicants already assigned to an entrance exam are not listed.';
