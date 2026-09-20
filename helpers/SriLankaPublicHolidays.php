@@ -63,6 +63,96 @@ class SriLankaPublicHolidays {
     }
 
     /**
+     * Display name for a gazette holiday (Poya preferred).
+     */
+    public static function label($ymd) {
+        $ymd = (string) $ymd;
+        if (!self::isPublicHoliday($ymd)) {
+            return '';
+        }
+        $names = self::names();
+        return $names[$ymd] ?? 'Poya / Public holiday';
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private static function names() {
+        return [
+            '2024-01-25' => 'Duruthu Poya',
+            '2024-02-24' => 'Navam Poya',
+            '2024-03-08' => 'Mahasivarathri',
+            '2024-03-29' => 'Good Friday',
+            '2024-04-12' => 'Sinhala & Tamil New Year Eve',
+            '2024-04-13' => 'Sinhala & Tamil New Year',
+            '2024-05-01' => 'May Day',
+            '2024-05-23' => 'Vesak Poya',
+            '2024-05-24' => 'Day after Vesak Poya',
+            '2024-06-17' => 'Idul Adha',
+            '2024-06-21' => 'Poson Poya',
+            '2024-07-20' => 'Esala Poya',
+            '2024-08-19' => 'Nikini Poya',
+            '2024-09-16' => 'Milad-un-Nabi',
+            '2024-09-17' => 'Binara Poya',
+            '2024-10-17' => 'Vap Poya',
+            '2024-10-31' => 'Deepavali',
+            '2024-11-14' => 'Il Poya',
+            '2024-12-13' => 'Unduvap Poya',
+            '2024-12-25' => 'Christmas Day',
+            '2024-02-04' => 'Independence Day',
+            '2024-01-15' => 'Tamil Thai Pongal',
+            '2025-01-13' => 'Duruthu Poya',
+            '2025-01-14' => 'Tamil Thai Pongal',
+            '2025-02-04' => 'Independence Day',
+            '2025-02-12' => 'Navam Poya',
+            '2025-02-26' => 'Mahasivarathri',
+            '2025-03-13' => 'Medin Poya',
+            '2025-03-31' => 'Idul-Fitr',
+            '2025-04-12' => 'Bak Poya',
+            '2025-04-13' => 'Sinhala & Tamil New Year Eve',
+            '2025-04-14' => 'Sinhala & Tamil New Year',
+            '2025-04-18' => 'Good Friday',
+            '2025-05-01' => 'May Day',
+            '2025-05-12' => 'Vesak Poya',
+            '2025-05-13' => 'Day after Vesak Poya',
+            '2025-06-07' => 'Poson Poya',
+            '2025-06-10' => 'Idul Adha',
+            '2025-07-10' => 'Esala Poya',
+            '2025-08-08' => 'Nikini Poya',
+            '2025-09-05' => 'Milad-un-Nabi',
+            '2025-09-07' => 'Binara Poya',
+            '2025-10-06' => 'Vap Poya',
+            '2025-10-20' => 'Deepavali',
+            '2025-11-05' => 'Il Poya',
+            '2025-12-04' => 'Unduvap Poya',
+            '2025-12-25' => 'Christmas Day',
+            '2026-01-03' => 'Duruthu Poya',
+            '2026-01-15' => 'Tamil Thai Pongal',
+            '2026-02-04' => 'Independence Day',
+            '2026-03-02' => 'Mahasivarathri',
+            '2026-03-21' => 'Medin Poya',
+            '2026-04-01' => 'Idul-Fitr',
+            '2026-04-03' => 'Good Friday',
+            '2026-04-13' => 'Sinhala & Tamil New Year Eve',
+            '2026-04-14' => 'Sinhala & Tamil New Year',
+            '2026-05-01' => 'May Day',
+            '2026-05-28' => 'Bak Poya',
+            '2026-05-30' => 'Vesak Poya',
+            '2026-05-31' => 'Day after Vesak Poya',
+            '2026-06-29' => 'Poson Poya',
+            '2026-07-29' => 'Esala Poya',
+            '2026-08-26' => 'Nikini Poya',
+            '2026-08-27' => 'Day after Nikini Poya',
+            '2026-09-26' => 'Binara Poya',
+            '2026-10-25' => 'Vap Poya',
+            '2026-11-08' => 'Deepavali',
+            '2026-11-24' => 'Il Poya',
+            '2026-12-23' => 'Unduvap Poya',
+            '2026-12-25' => 'Christmas Day',
+        ];
+    }
+
+    /**
      * Monday–Friday dates in the given calendar month that are not Sri Lanka public holidays.
      *
      * @param string $monthY First day of month as Y-m (e.g. 2025-05)

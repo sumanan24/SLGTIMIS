@@ -168,17 +168,17 @@ class StaffAttendanceModel extends Model {
     private function findStaffByEmployeeNo($employeeNo, $cardNo = '') {
         // Check if staff table has employee_no or card_no fields
         $sql = "SELECT `staff_id` FROM `staff` 
-                WHERE (`staff_id` = ? OR `staff_nic` = ?)";
+                WHERE (`staff_id` = ? OR `staff_nic` = ? OR `finger_machine_no` = ?)";
         
-        $params = [$employeeNo, $employeeNo];
-        $types = 'ss';
+        $params = [$employeeNo, $employeeNo, $employeeNo];
+        $types = 'sss';
         
-        // If card_no is provided, also search by it
         if (!empty($cardNo)) {
-            $sql .= " OR `staff_id` = ? OR `staff_nic` = ?";
+            $sql .= " OR `staff_id` = ? OR `staff_nic` = ? OR `finger_machine_no` = ?";
             $params[] = $cardNo;
             $params[] = $cardNo;
-            $types .= 'ss';
+            $params[] = $cardNo;
+            $types .= 'sss';
         }
         
         $sql .= " LIMIT 1";

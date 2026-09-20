@@ -129,6 +129,25 @@
                                 $canStudentAttendanceSaoDashboard = $userModel->canViewStudentAttendanceSaoDashboard((int) $_SESSION['user_id']);
                                 $canStudentFingerprintImport = $userModel->canAccessStudentFingerprintImport((int) $_SESSION['user_id']);
                             }
+                            $canMenuStaff = $canMenuStudents = $canMenuStaffAttendance = $canMenuPersonalFiles = true;
+                            $canMenuDepartments = $canMenuCourses = true;
+                            $canMenuStaffRoles = $isAdminOrADM;
+                            if (isset($_SESSION['user_id'])) {
+                                require_once BASE_PATH . '/core/AccessControl.php';
+                                $uidMenu = (int) $_SESSION['user_id'];
+                                $canMenuStaff = AccessControl::can($uidMenu, 'staff', 'view');
+                                $canMenuStudents = AccessControl::can($uidMenu, 'students', 'view');
+                                $canMenuStaffAttendance = AccessControl::can($uidMenu, 'staff_attendance', 'view');
+                                $canMenuPersonalFiles = AccessControl::can($uidMenu, 'personal_files', 'view');
+                                $canMenuStaffRoles = AccessControl::can($uidMenu, 'staff_roles', 'view');
+                                $canMenuDepartments = AccessControl::can($uidMenu, 'departments', 'view');
+                                $canMenuCourses = AccessControl::can($uidMenu, 'courses', 'view');
+                                $hasGroupAccess = AccessControl::can($uidMenu, 'groups', 'view');
+                                $canAccessExamsModule = AccessControl::can($uidMenu, 'exams', 'view');
+                                $canViewPaymentsMenu = AccessControl::can($uidMenu, 'payments', 'view');
+                                $canViewDevices = AccessControl::can($uidMenu, 'devices', 'view');
+                                $canStaffDeviceAttendanceMenu = $canMenuStaffAttendance;
+                            }
                             $devicePages = ['devices'];
                             $busSeasonPages = ['bus-season-requests-sao', 'bus-season-payments'];
                             $paymentsPages = ['payments', 'payments-create', 'payments-edit', 'payments-delete'];
@@ -205,31 +224,35 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                     }
                                     echo (isset($page) && in_array($page, $educationPages)) ? 'display: block;' : ''; 
                                 ?>">
+                                    <?php if (!empty($canMenuDepartments)): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/departments" class="<?php echo (isset($page) && $page === 'departments') ? 'active' : ''; ?>">
                                             <i class="fas fa-building"></i>
                                             <span>Departments</span>
                                         </a>
                                     </li>
+                                    <?php endif; ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/academic-years" class="<?php echo (isset($page) && $page === 'academic-years') ? 'active' : ''; ?>">
                                             <i class="fas fa-calendar-alt"></i>
                                             <span>Academic Years</span>
                                         </a>
                                     </li>
+                                    <?php if (!empty($canMenuCourses)): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/courses" class="<?php echo (isset($page) && $page === 'courses') ? 'active' : ''; ?>">
                                             <i class="fas fa-book"></i>
                                             <span>Courses</span>
                                         </a>
                                     </li>
+                                    <?php endif; ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/modules" class="<?php echo (isset($page) && $page === 'modules') ? 'active' : ''; ?>">
                                             <i class="fas fa-cubes"></i>
                                             <span>Modules</span>
                                         </a>
                                     </li>
-                                    <?php if ($isAdminOrADM): ?>
+                                    <?php if (!empty($canMenuStaffRoles)): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/staff-roles" class="<?php echo (isset($page) && $page === 'staff-roles') ? 'active' : ''; ?>">
                                             <i class="fas fa-user-tag"></i>
@@ -237,12 +260,14 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                         </a>
                                     </li>
                                     <?php endif; ?>
+                                    <?php if (!empty($canMenuStaff)): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/staff" class="<?php echo (isset($page) && $page === 'staff') ? 'active' : ''; ?>">
                                             <i class="fas fa-chalkboard-teacher"></i>
                                             <span>Staff</span>
                                         </a>
                                     </li>
+                                    <?php endif; ?>
                                     <?php if ($isHOD): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/hod/staff-module-enroll" class="<?php echo (isset($page) && $page === 'hod-staff-module-enroll') ? 'active' : ''; ?>">
@@ -252,6 +277,15 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                     </li>
                                     <?php endif; ?>
                                 </ul>
+                            </li>
+                            <?php endif; ?>
+
+                            <?php if (!empty($isSAO) && !empty($canMenuStaff)): ?>
+                            <li data-nav="staff">
+                                <a href="<?php echo APP_URL; ?>/staff" class="<?php echo (isset($page) && $page === 'staff') ? 'active' : ''; ?>">
+                                    <i class="fas fa-chalkboard-teacher"></i>
+                                    <span>Staff</span>
+                                </a>
                             </li>
                             <?php endif; ?>
                             
@@ -324,12 +358,14 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
                                 <ul class="submenu" style="<?php echo $studentInfoOpen ? 'display: block;' : ''; ?>">
+                                    <?php if (!empty($canMenuStudents)): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/students" class="<?php echo (isset($page) && $page === 'students') ? 'active' : ''; ?>">
                                             <i class="fas fa-user-graduate"></i>
                                             <span>Students</span>
                                         </a>
                                     </li>
+                                    <?php endif; ?>
                                     <?php if ($hasGroupAccess): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/groups" class="<?php echo (isset($page) && $page === 'groups') ? 'active' : ''; ?>">

@@ -1,0 +1,301 @@
+/* Staff Roles module — list + create */
+
+.sr-page {
+    --sr-navy: #001f3f;
+    --sr-navy-2: #003366;
+    --sr-border: #d9e1ea;
+    --sr-muted: #64748b;
+    --sr-label: #334155;
+    --sr-bg: #f7f9fc;
+    --sr-input-h: 38px;
+    --sr-gap: 0.75rem;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.sr-page .card,
+.sr-page .card:hover {
+    border: 1px solid var(--sr-border);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    transform: none;
+}
+
+.sr-page .card-header {
+    background: linear-gradient(135deg, var(--sr-navy) 0%, var(--sr-navy-2) 100%);
+    color: #fff;
+    padding: 0.85rem 1.15rem;
+}
+
+.sr-page .card-header h5 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.sr-page .card-body {
+    padding: 1.1rem 1.15rem 1.2rem;
+}
+
+.sr-page .form-label {
+    margin-bottom: 0.28rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--sr-label);
+}
+
+.sr-page .form-control {
+    min-height: var(--sr-input-h);
+    height: var(--sr-input-h);
+    font-size: 0.875rem;
+    border-radius: 8px;
+    padding: 0.35rem 0.7rem;
+}
+
+.sr-page .form-text {
+    margin-top: 0.25rem;
+    font-size: 0.72rem;
+    color: var(--sr-muted);
+}
+
+.sr-page input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.sr-page input[type="number"]::-webkit-outer-spin-button,
+.sr-page input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.sr-page .btn-primary,
+.sr-page .btn-light,
+.sr-page .btn-outline-secondary,
+.sr-page .btn-outline-primary,
+.sr-page .btn-outline-danger {
+    transform: none;
+}
+
+.sr-page .btn-primary:hover,
+.sr-page .btn-light:hover,
+.sr-page .btn-outline-secondary:hover,
+.sr-page .btn-outline-primary:hover,
+.sr-page .btn-outline-danger:hover {
+    transform: none;
+}
+
+.sr-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.sr-count {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.82);
+    white-space: nowrap;
+}
+
+.sr-page .btn-light {
+    height: 34px;
+    min-height: 34px;
+    padding: 0 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.sr-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.sr-toolbar .text-muted {
+    font-size: 0.8rem;
+}
+
+.sr-table-wrap {
+    border: 1px solid var(--sr-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.sr-table {
+    table-layout: fixed;
+    width: 100%;
+    margin-bottom: 0;
+}
+
+.sr-table col.col-no { width: 64px; }
+.sr-table col.col-id { width: 140px; }
+.sr-table col.col-name { width: auto; }
+.sr-table col.col-level { width: 120px; }
+.sr-table col.col-actions { width: 108px; }
+
+.sr-table thead th {
+    background: #f8f9fa !important;
+    color: var(--sr-muted) !important;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--sr-border);
+    vertical-align: middle;
+}
+
+.sr-table tbody td {
+    padding: 0.55rem 0.75rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #eef1f4;
+    color: #212529;
+}
+
+.sr-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.sr-table tbody tr:hover td {
+    background: #f8fafc;
+}
+
+.sr-table th.col-no,
+.sr-table td.col-no,
+.sr-table th.col-level,
+.sr-table td.col-level {
+    text-align: center;
+}
+
+.sr-table th.col-id,
+.sr-table td.col-id,
+.sr-table th.col-name,
+.sr-table td.col-name {
+    text-align: left;
+}
+
+.sr-table th.col-actions,
+.sr-table td.col-actions {
+    text-align: right;
+}
+
+.sr-id {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    background: #eef2f6;
+    color: var(--sr-navy);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.sr-name {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.sr-level {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    height: 24px;
+    padding: 0 0.55rem;
+    border-radius: 999px;
+    background: #eef2f6;
+    color: var(--sr-label);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.sr-actions {
+    display: inline-flex;
+    justify-content: flex-end;
+    gap: 0.3rem;
+}
+
+.sr-actions .btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 0.78rem;
+}
+
+.sr-empty {
+    text-align: center;
+    padding: 2.5rem 1rem;
+}
+
+.sr-empty i {
+    color: #94a3b8;
+    margin-bottom: 0.75rem;
+}
+
+.sr-create-grid {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr) 140px;
+    gap: var(--sr-gap);
+    align-items: start;
+    margin-bottom: 1.1rem;
+}
+
+.sr-form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.sr-form-actions .btn {
+    min-height: var(--sr-input-h);
+    height: var(--sr-input-h);
+    padding: 0 1rem;
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.sr-create-note {
+    font-size: 0.8rem;
+    color: var(--sr-muted);
+    margin: 0 0 1rem;
+}
+
+@media (max-width: 767.98px) {
+    .sr-create-grid {
+        grid-template-columns: 1fr;
+    }
+    .sr-head-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    .sr-page .btn-light {
+        width: auto;
+    }
+    .sr-form-actions {
+        justify-content: stretch;
+    }
+    .sr-form-actions .btn {
+        flex: 1;
+        justify-content: center;
+    }
+    .sr-table {
+        min-width: 640px;
+    }
+}

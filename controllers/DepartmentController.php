@@ -12,8 +12,7 @@ class DepartmentController extends Controller {
             return;
         }
         
-        // Restrict SAO users
-        if (!$this->checkNotSAO()) {
+        if (!$this->requireModule('departments', 'view')) {
             return;
         }
         
@@ -77,8 +76,7 @@ class DepartmentController extends Controller {
             return;
         }
         
-        // Only ADM can create departments
-        if (!$this->checkAdminOrADM()) {
+        if (!$this->requireModule('departments', 'add')) {
             return;
         }
         
@@ -154,7 +152,7 @@ class DepartmentController extends Controller {
         }
         
         // Only ADM can edit departments
-        if (!$this->checkAdminOrADM()) {
+        if (!$this->requireModule('departments', 'edit')) {
             return;
         }
         
@@ -230,7 +228,7 @@ class DepartmentController extends Controller {
         }
         
         // Only ADM can delete departments
-        if (!$this->checkAdminOrADM()) {
+        if (!$this->requireModule('departments', 'delete')) {
             return;
         }
         

@@ -181,6 +181,10 @@ class StudentController extends Controller {
             $this->redirect('student/dashboard');
             return;
         }
+
+        if (!$this->requireModule('students', 'view')) {
+            return;
+        }
         
         $studentModel = $this->model('StudentModel');
         $departmentModel = $this->model('DepartmentModel');
@@ -242,13 +246,17 @@ class StudentController extends Controller {
         
         // Check if user is ADM or SAO for export and edit features
         require_once BASE_PATH . '/models/UserModel.php';
+        require_once BASE_PATH . '/core/AccessControl.php';
         $userModel = new UserModel();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isSAO = $userModel->isSAO($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM');
         $isHOD = $this->isHOD();
         $canExport = $isADM || $isSAO || $isHOD;
-        $canEdit = $isADM || $isSAO; // Only SAO and ADM can add, edit, delete students
+        $uid = (int) $_SESSION['user_id'];
+        $canEdit = AccessControl::can($uid, 'students', 'add')
+            || AccessControl::can($uid, 'students', 'edit')
+            || AccessControl::can($uid, 'students', 'delete');
         
         $data = [
             'title' => 'Students',
@@ -339,11 +347,10 @@ class StudentController extends Controller {
         
         // Check if user is SAO or ADM for edit/reset access
         require_once BASE_PATH . '/models/UserModel.php';
+        require_once BASE_PATH . '/core/AccessControl.php';
         $userModel = new UserModel();
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isSAO = $userModel->isSAO($_SESSION['user_id']);
-        $isADM = ($userRole === 'ADM');
-        $canEdit = $isSAO || $isADM;
+        $isADM = $userModel->isAdminOrADM((int) $_SESSION['user_id']);
+        $canEdit = AccessControl::can((int) $_SESSION['user_id'], 'students', 'edit');
         
         $data = [
             'title' => 'Student Details',
@@ -876,18 +883,8 @@ class StudentController extends Controller {
             $this->redirect('student/dashboard');
             return;
         }
-        
-        // Only allow SAO and ADM users
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isSAO = $userModel->isSAO($_SESSION['user_id']);
-        $isADM = ($userRole === 'ADM');
-        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-        
-        if (!$isSAO && !$isADM && !$isAdmin) {
-            $_SESSION['error'] = 'Access denied. Only Student Affairs Office (SAO) and Administrators (ADM) can create students.';
-            $this->redirect('students');
+
+        if (!$this->requireModule('students', 'add')) {
             return;
         }
         
@@ -1050,11 +1047,8 @@ class StudentController extends Controller {
             $this->redirect('student/dashboard');
             return;
         }
-        
-        // Restrict HOD users
-        if ($this->isHOD()) {
-            $_SESSION['error'] = 'Access denied. Head of Department can only view student details.';
-            $this->redirect('students');
+
+        if (!$this->requireModule('students', 'edit')) {
             return;
         }
         
@@ -1488,11 +1482,8 @@ class StudentController extends Controller {
             $this->redirect('student/dashboard');
             return;
         }
-        
-        // Restrict HOD users
-        if ($this->isHOD()) {
-            $_SESSION['error'] = 'Access denied. Head of Department cannot delete students.';
-            $this->redirect('students');
+
+        if (!$this->requireModule('students', 'delete')) {
             return;
         }
         

@@ -28,6 +28,12 @@ function initSecurityTables() {
         require_once BASE_PATH . '/models/StaffNavAssignmentModel.php';
         (new StaffNavAssignmentModel())->ensureTable();
 
+        require_once BASE_PATH . '/models/StaffModulePermissionModel.php';
+        (new StaffModulePermissionModel())->ensureTable();
+
+        require_once BASE_PATH . '/models/StaffPersonalFileModel.php';
+        (new StaffPersonalFileModel())->ensureSchema();
+
         return true;
     } catch (Exception $e) {
         error_log('Error initializing security tables: ' . $e->getMessage());

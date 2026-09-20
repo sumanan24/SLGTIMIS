@@ -1697,42 +1697,14 @@ class AttendanceController extends Controller {
      * Full staff device module (daily report, device sync): Admin / ADM / HRO.
      */
     private function checkStaffDeviceAccess(): bool {
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return false;
-        }
-        if (!$this->checkNotSAO()) {
-            return false;
-        }
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        if (!$userModel->canManageStaffDeviceSyncDaily($_SESSION['user_id'])) {
-            $_SESSION['error'] = 'Access denied. Daily report and device sync are available to ADM, HRO, or Administrators.';
-            $this->redirect('dashboard');
-            return false;
-        }
-        return true;
+        return $this->requireModule('staff_attendance', 'edit');
     }
 
     /**
-     * Dashboard + month report: Admin/ADM, or DIR, REG, FIN, ACC, HOD.
+     * Dashboard + month report: role default or staff-specific override.
      */
     private function checkStaffDeviceDashboardMonthAccess(): bool {
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return false;
-        }
-        if (!$this->checkNotSAO()) {
-            return false;
-        }
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        if ($userModel->canViewStaffDeviceDashboardMonth($_SESSION['user_id'])) {
-            return true;
-        }
-        $_SESSION['error'] = 'Access denied. Staff device attendance is available to HRO, DIR, REG, FIN, ACC, HOD, ADM, or Administrators.';
-        $this->redirect('dashboard');
-        return false;
+        return $this->requireModule('staff_attendance', 'view');
     }
 
     /**

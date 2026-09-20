@@ -13,10 +13,8 @@ class CourseController extends Controller {
             exit;
         }
         
-        // Restrict SAO users
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        if ($userModel->isSAO($_SESSION['user_id'])) {
+        require_once BASE_PATH . '/core/AccessControl.php';
+        if (!AccessControl::can((int) $_SESSION['user_id'], 'courses', 'view')) {
             header('Content-Type: application/json');
             echo json_encode(['success' => false, 'error' => 'Access denied. This section is not available for your role.']);
             exit;
@@ -51,7 +49,7 @@ class CourseController extends Controller {
         }
         
         // Restrict SAO users
-        if (!$this->checkNotSAO()) {
+        if (!$this->requireModule('courses', 'view')) {
             return;
         }
         
@@ -93,13 +91,15 @@ class CourseController extends Controller {
         
         // Check if user is department-restricted or ADM for edit permissions
         require_once BASE_PATH . '/models/UserModel.php';
+        require_once BASE_PATH . '/core/AccessControl.php';
         $userModel = new UserModel();
         $isDepartmentRestricted = $this->isDepartmentRestricted();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
         $isHOD = $this->isHOD();
-        $canEdit = $isDepartmentRestricted || $isADM;
-        $canCreate = $isHOD || $isADM; // Only HOD and ADM can create courses
+        $uid = (int) $_SESSION['user_id'];
+        $canEdit = AccessControl::can($uid, 'courses', 'edit');
+        $canCreate = AccessControl::can($uid, 'courses', 'add');
         
         $data = [
             'title' => 'Courses',
@@ -134,16 +134,7 @@ class CourseController extends Controller {
             return;
         }
         
-        // Only HOD and ADM can create courses
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $isHOD = $this->isHOD();
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
-        
-        if (!$isHOD && !$isADM) {
-            $_SESSION['error'] = 'Access denied. Only Head of Department (HOD) and Administrators (ADM) can create courses.';
-            $this->redirect('courses');
+        if (!$this->requireModule('courses', 'add')) {
             return;
         }
         
@@ -258,16 +249,7 @@ class CourseController extends Controller {
             return;
         }
         
-        // Only HOD and ADM can edit courses
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $isHOD = $this->isHOD();
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
-        
-        if (!$isHOD && !$isADM) {
-            $_SESSION['error'] = 'Access denied. Only Head of Department (HOD) and Administrators (ADM) can edit courses.';
-            $this->redirect('courses');
+        if (!$this->requireModule('courses', 'edit')) {
             return;
         }
         
@@ -473,16 +455,7 @@ class CourseController extends Controller {
             return;
         }
         
-        // Only HOD and ADM can delete courses
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $isHOD = $this->isHOD();
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
-        
-        if (!$isHOD && !$isADM) {
-            $_SESSION['error'] = 'Access denied. Only Head of Department (HOD) and Administrators (ADM) can delete courses.';
-            $this->redirect('courses');
+        if (!$this->requireModule('courses', 'delete')) {
             return;
         }
         

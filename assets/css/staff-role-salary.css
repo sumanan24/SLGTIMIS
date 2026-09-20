@@ -1,0 +1,421 @@
+/* Staff role salary — aligned compact admin UI */
+
+.srs-page {
+    --srs-navy: #001f3f;
+    --srs-navy-2: #003366;
+    --srs-border: #d9e1ea;
+    --srs-muted: #64748b;
+    --srs-label: #334155;
+    --srs-bg: #f7f9fc;
+    --srs-green: #0f766e;
+    --srs-input-h: 38px;
+    --srs-gap: 0.75rem;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.srs-page .card,
+.srs-page .card:hover {
+    border: 1px solid var(--srs-border);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    transform: none;
+}
+
+.srs-page .card-header {
+    background: linear-gradient(135deg, var(--srs-navy) 0%, var(--srs-navy-2) 100%);
+    color: #fff;
+    padding: 0.85rem 1.15rem;
+}
+
+.srs-page .card-header h5 {
+    font-size: 1.05rem;
+}
+
+.srs-page .card-body {
+    padding: 1.1rem 1.15rem 1.2rem;
+}
+
+.srs-page .form-label {
+    margin-bottom: 0.28rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--srs-label);
+    white-space: nowrap;
+}
+
+.srs-page .form-control,
+.srs-page .form-select {
+    min-height: var(--srs-input-h);
+    height: var(--srs-input-h);
+    font-size: 0.875rem;
+    border-radius: 8px;
+    padding: 0.35rem 0.7rem;
+}
+
+.srs-page .form-control-sm,
+.srs-page .form-select-sm {
+    min-height: 34px;
+    height: 34px;
+    font-size: 0.8125rem;
+}
+
+.srs-page input[type="number"] {
+    text-align: left;
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.srs-page input[type="number"]::-webkit-outer-spin-button,
+.srs-page input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.srs-page .srs-basic,
+.srs-page .srs-max,
+.srs-page .srs-allow-amt,
+.srs-page .srs-slab-amount {
+    text-align: right;
+}
+
+.srs-page .srs-role-grid .btn {
+    height: var(--srs-input-h);
+    min-height: var(--srs-input-h);
+    padding-top: 0;
+    padding-bottom: 0;
+    white-space: nowrap;
+    transform: none;
+}
+
+.srs-role-grid {
+    display: grid;
+    grid-template-columns: 140px minmax(0, 1fr) 110px auto;
+    gap: var(--srs-gap);
+    align-items: end;
+}
+
+.srs-divider {
+    height: 1px;
+    background: var(--srs-border);
+    margin: 1rem 0;
+}
+
+.srs-section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--srs-muted);
+    margin-bottom: 0.5rem;
+}
+
+.srs-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0 0 1rem;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--srs-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #eef2f6;
+}
+
+.srs-tabs a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 40px;
+    text-decoration: none;
+    color: var(--srs-label);
+    font-size: 0.875rem;
+    font-weight: 600;
+    background: #eef2f6;
+    border-right: 1px solid var(--srs-border);
+}
+
+.srs-tabs a:last-child {
+    border-right: 0;
+}
+
+.srs-tabs a:hover {
+    background: #e3eaf2;
+    color: var(--srs-navy);
+}
+
+.srs-tabs a.active {
+    background: var(--srs-navy);
+    color: #fff;
+}
+
+.srs-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--srs-gap);
+    margin-bottom: var(--srs-gap);
+}
+
+.srs-meta {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: var(--srs-gap);
+    margin-bottom: 1rem;
+}
+
+.srs-readonly {
+    min-height: var(--srs-input-h);
+    height: var(--srs-input-h);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 0.7rem;
+    border: 1px solid #cde8df;
+    border-radius: 8px;
+    background: #eefaf4;
+    font-weight: 700;
+    color: var(--srs-green);
+    font-size: 0.875rem;
+}
+
+.srs-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--srs-gap);
+    margin-bottom: 0.85rem;
+}
+
+.srs-panel {
+    border: 1px solid var(--srs-border);
+    border-radius: 8px;
+    padding: 0.7rem 0.8rem 0.8rem;
+    background: var(--srs-bg);
+    min-height: 100%;
+}
+
+.srs-panel-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--srs-muted);
+    margin-bottom: 0.5rem;
+}
+
+.srs-grid-head {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--srs-muted);
+    margin-bottom: 0.3rem;
+}
+
+.srs-grid-head > span {
+    display: block;
+    width: 100%;
+}
+
+.srs-allow-grid.srs-grid-head > span:last-child,
+.srs-slab-grid.srs-grid-head > span:nth-child(2) {
+    text-align: right;
+}
+
+.srs-allow-grid,
+.srs-slab-grid {
+    display: grid;
+    gap: 0.4rem 0.6rem;
+    align-items: center;
+}
+
+.srs-allow-grid {
+    grid-template-columns: minmax(0, 1fr) 132px;
+}
+
+.srs-slab-grid {
+    grid-template-columns: 110px 132px minmax(0, 1fr);
+}
+
+.srs-allow-grid + .srs-allow-grid,
+.srs-slab-grid + .srs-slab-grid {
+    margin-top: 0.4rem;
+}
+
+.srs-range {
+    min-height: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    padding: 0 0.65rem;
+    border: 1px solid var(--srs-border);
+    border-radius: 8px;
+    background: #fff;
+    color: #475569;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.srs-slab-note {
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: #475569;
+}
+
+.srs-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.srs-actions .btn,
+.srs-page .btn-primary,
+.srs-page .btn-success,
+.srs-page .btn-light {
+    transform: none;
+}
+
+.srs-actions .btn:hover,
+.srs-page .btn-primary:hover,
+.srs-page .btn-success:hover,
+.srs-page .btn-light:hover {
+    transform: none;
+}
+
+.srs-details-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+}
+
+.srs-details {
+    border: 1px solid var(--srs-border);
+    border-radius: 8px;
+    padding: 0.45rem 0.7rem;
+    background: #fff;
+}
+
+.srs-details > summary {
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--srs-label);
+    list-style: none;
+}
+
+.srs-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.srs-details > summary::before {
+    content: "▸";
+    display: inline-block;
+    margin-right: 0.35rem;
+    color: var(--srs-muted);
+}
+
+.srs-details[open] > summary::before {
+    content: "▾";
+}
+
+.srs-details[open] > summary {
+    margin-bottom: 0.45rem;
+}
+
+.srs-table {
+    margin-bottom: 0;
+}
+
+.srs-table thead th {
+    background: #f8f9fa !important;
+    color: var(--srs-muted) !important;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    padding: 0.4rem 0.55rem;
+    border-bottom: 1px solid var(--srs-border);
+}
+
+.srs-table td,
+.srs-table th {
+    vertical-align: middle;
+    padding: 0.4rem 0.55rem;
+}
+
+.srs-staff-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.65rem;
+}
+
+.srs-staff-head h6 {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.srs-staff-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.srs-staff-table .col-staff { width: 32%; }
+.srs-staff-table .col-join { width: 16%; }
+.srs-staff-table .col-year { width: 10%; }
+.srs-staff-table .col-grade { width: 16%; }
+.srs-staff-table .col-money { width: 13%; }
+
+.srs-staff-table td.col-staff {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.srs-grade-select {
+    max-width: 118px;
+}
+
+@media (max-width: 991.98px) {
+    .srs-role-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .srs-metrics,
+    .srs-split,
+    .srs-details-row {
+        grid-template-columns: 1fr 1fr;
+    }
+    .srs-meta {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .srs-tabs,
+    .srs-role-grid,
+    .srs-metrics,
+    .srs-meta,
+    .srs-split,
+    .srs-details-row,
+    .srs-allow-grid,
+    .srs-slab-grid {
+        grid-template-columns: 1fr;
+    }
+    .srs-tabs a {
+        border-right: 0;
+        border-bottom: 1px solid var(--srs-border);
+        height: 38px;
+    }
+    .srs-tabs a:last-child {
+        border-bottom: 0;
+    }
+    .srs-actions {
+        justify-content: stretch;
+    }
+    .srs-actions .btn {
+        width: 100%;
+    }
+}

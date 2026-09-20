@@ -386,5 +386,22 @@ class Controller {
             return false;
         }
     }
+
+    /**
+     * Staff Member → Module → Action. Role RBAC is the default; staff overrides win.
+     */
+    protected function requireModule($moduleKey, $action = 'view') {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        require_once BASE_PATH . '/core/AccessControl.php';
+        if (!AccessControl::can((int) $_SESSION['user_id'], $moduleKey, $action)) {
+            $_SESSION['error'] = 'You do not have permission to access this module.';
+            $this->redirect('dashboard');
+            return false;
+        }
+        return true;
+    }
 }
 

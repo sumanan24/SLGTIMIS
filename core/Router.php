@@ -77,6 +77,11 @@ class Router {
         if (!class_exists($controller)) {
             throw new Exception("Controller class not found: $controller");
         }
+
+        require_once BASE_PATH . '/core/AccessControl.php';
+        if (!AccessControl::allowCurrentRequest()) {
+            AccessControl::denyAndRedirect();
+        }
         
         $controllerInstance = new $controller();
         
