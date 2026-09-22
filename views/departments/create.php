@@ -174,7 +174,7 @@
                     <div class="dept-actions">
                         <a href="<?php echo APP_URL; ?>/departments" class="btn btn-outline-secondary">Cancel</a>
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save me-1"></i>Create department
+                            <i class="fas fa-save me-1"></i>Save department
                         </button>
                     </div>
                 </form>
