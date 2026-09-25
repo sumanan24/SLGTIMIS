@@ -14,7 +14,7 @@ class StudentDeviceAttendanceController extends Controller {
     }
 
     /**
-     * Student Information Excel export: ADM / system admin only (not SAO).
+     * Student Information Excel export: SAO / ADM / system admin.
      */
     private function requireFingerprintImportAccess(): bool {
         if (!isset($_SESSION['user_id'])) {
@@ -25,7 +25,7 @@ class StudentDeviceAttendanceController extends Controller {
         $userModel = new UserModel();
         if (!$userModel->canAccessStudentFingerprintImport((int) $_SESSION['user_id'])) {
             http_response_code(403);
-            echo 'Access denied. Student Excel Export is available for ADM only.';
+            echo 'Access denied. You do not have permission to export Student Information.';
             exit;
         }
         $this->autoPurgeStaleCaches();
@@ -2511,7 +2511,7 @@ class StudentDeviceAttendanceController extends Controller {
     }
 
     /**
-     * Student Information Excel export — ADM / system admin only (not SAO).
+     * Student Information Excel export — SAO / ADM / system admin.
      */
     public function fingerprintImport() {
         if (!$this->requireFingerprintImportAccess()) {

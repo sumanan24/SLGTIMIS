@@ -284,6 +284,14 @@ class AccessControl {
         if (self::isPublicUri($uri)) {
             return true;
         }
+        $norm = strtolower(trim((string) $uri, '/'));
+        if ($norm === 'attendance/student-device' || strpos($norm, 'attendance/student-device/') === 0) {
+            require_once BASE_PATH . '/models/UserModel.php';
+            $userModel = new UserModel();
+            if ($userModel->canManageStudentFingerprintAttendance((int) $_SESSION['user_id'])) {
+                return true;
+            }
+        }
         $mapped = self::mapUri($uri);
         if ($mapped === null) {
             return true;
@@ -310,34 +318,40 @@ class AccessControl {
             return null;
         }
         $action = 'view';
-        if (preg_match('#/(download)$#', $uri) || strpos($uri, '/download') !== false) {
-            $action = 'download';
-        } elseif (preg_match('#/(upload|photo)$#', $uri) || strpos($uri, '/upload') !== false) {
-            $action = 'upload';
-        } elseif (strpos($uri, '/approve') !== false) {
-            $action = 'approve';
-        } elseif (preg_match('#/(create|store)$#', $uri) || strpos($uri, '/create') !== false) {
-            $action = 'add';
-        } elseif (preg_match('#/(delete|remove)$#', $uri) || strpos($uri, '/delete') !== false) {
-            $action = 'delete';
-        } elseif (preg_match('#/(edit|update|save)#', $uri)) {
-            $action = 'edit';
-        }
-        $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-        if ($uri === 'staff/edit' && $method === 'GET') {
-            $action = 'view';
-        }
-        if ($uri === 'staff/file/photo' && $method === 'GET') {
-            $action = 'view';
-        }
-        if ($uri === 'staff/file/save') {
-            $action = 'add';
-        }
-        if ($uri === 'staff/file/document/download') {
-            $action = 'download';
-        }
-        if ($method === 'POST' && $action === 'view') {
-            $action = 'edit';
+        $isStudentDevice = $uri === 'attendance/student-device'
+            || strpos($uri, 'attendance/student-device/') === 0;
+        // Student fingerprint is gated in StudentDeviceAttendanceController (SAO/ADM).
+        // Keep it as view here so Add / Face ID / save-credentials are not treated as classroom attendance edit.
+        if (!$isStudentDevice) {
+            if (preg_match('#/(download)$#', $uri) || strpos($uri, '/download') !== false) {
+                $action = 'download';
+            } elseif (preg_match('#/(upload|photo)$#', $uri) || strpos($uri, '/upload') !== false) {
+                $action = 'upload';
+            } elseif (strpos($uri, '/approve') !== false) {
+                $action = 'approve';
+            } elseif (preg_match('#/(create|store)$#', $uri) || strpos($uri, '/create') !== false) {
+                $action = 'add';
+            } elseif (preg_match('#/(delete|remove)$#', $uri) || strpos($uri, '/delete') !== false) {
+                $action = 'delete';
+            } elseif (preg_match('#/(edit|update|save)#', $uri)) {
+                $action = 'edit';
+            }
+            $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+            if ($uri === 'staff/edit' && $method === 'GET') {
+                $action = 'view';
+            }
+            if ($uri === 'staff/file/photo' && $method === 'GET') {
+                $action = 'view';
+            }
+            if ($uri === 'staff/file/save') {
+                $action = 'add';
+            }
+            if ($uri === 'staff/file/document/download') {
+                $action = 'download';
+            }
+            if ($method === 'POST' && $action === 'view') {
+                $action = 'edit';
+            }
         }
 
         $best = null;

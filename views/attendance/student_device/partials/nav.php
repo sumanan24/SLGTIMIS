@@ -16,7 +16,7 @@ $items = [
     ['key' => 'holidays', 'href' => $urls['holidays'] ?? '#', 'icon' => 'fa-umbrella-beach', 'label' => 'Holidays / leave', 'manage_only' => true],
     ['key' => 'users', 'href' => $urls['users'] ?? '#', 'icon' => 'fa-users', 'label' => 'Users', 'manage_only' => true],
     ['key' => 'devices', 'href' => $urls['devices'] ?? '#', 'icon' => 'fa-network-wired', 'label' => 'Device sync', 'manage_only' => true],
-    ['key' => 'fingerprint-import', 'href' => $urls['fingerprint_import'] ?? '#', 'icon' => 'fa-file-excel', 'label' => 'Excel Export', 'manage_only' => false, 'adm_only' => true],
+    ['key' => 'fingerprint-import', 'href' => $urls['fingerprint_import'] ?? '#', 'icon' => 'fa-file-excel', 'label' => 'Excel Export', 'manage_only' => false, 'import_only' => true],
     ['key' => 'logs', 'href' => $urls['logs'] ?? '#', 'icon' => 'fa-history', 'label' => 'Sync logs', 'manage_only' => true],
 ];
 
@@ -33,7 +33,7 @@ if (!$canFingerprintImport && isset($_SESSION['user_id'])) {
         <?php if (!empty($item['manage_only']) && !$canManageDevice) {
             continue;
         } ?>
-        <?php if (!empty($item['adm_only']) && !$canFingerprintImport) {
+        <?php if (!empty($item['import_only']) && !$canFingerprintImport) {
             continue;
         } ?>
         <a class="sd-top-nav-link <?php echo $sec === $item['key'] ? 'is-active' : ''; ?>"

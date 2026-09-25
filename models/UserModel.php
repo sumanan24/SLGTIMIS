@@ -272,17 +272,14 @@ class UserModel extends Model {
      * Student fingerprint device attendance: SAO and ADM (or system Admin) only.
      */
     public function canManageStudentFingerprintAttendance($userId): bool {
-        if ($this->isAdminOrADM($userId)) {
-            return true;
-        }
-        return $this->getUserRole($userId) === 'SAO';
+        return $this->isAdminOrADM($userId) || $this->isSAO($userId);
     }
 
     /**
-     * Student Information Excel export (fingerprint-import): ADM / system admin only (not SAO).
+     * Student Information Excel export (fingerprint-import): SAO and ADM / system admin.
      */
     public function canAccessStudentFingerprintImport($userId): bool {
-        return $this->isAdminOrADM($userId);
+        return $this->canManageStudentFingerprintAttendance($userId);
     }
 
     /**
