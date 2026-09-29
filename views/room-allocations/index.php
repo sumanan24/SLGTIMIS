@@ -4,6 +4,9 @@
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <h5 class="mb-0 fw-bold"><i class="fas fa-user-check me-2"></i>Room Allocations</h5>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <a href="<?php echo APP_URL; ?>/hostel-report" class="btn btn-outline-light btn-sm mt-2 mt-md-0">
+                        <i class="fas fa-chart-pie me-1"></i>Hostel Report
+                    </a>
                     <a href="<?php echo APP_URL; ?>/room-allocations/export-excel?<?php 
                         echo http_build_query(array_filter([
                             'hostel_id' => $hostel_id ?? '',

@@ -316,6 +316,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             }
                             if ($showRoomAllocationsMenu) {
                                 $hostelPages[] = 'room-allocations';
+                                $hostelPages[] = 'hostel-report';
                             }
                             if ($canViewHostelInfo) {
                                 $studentAffairsPages[] = 'students'; // Ensure students page is in array
@@ -500,6 +501,12 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                         <a href="<?php echo APP_URL; ?>/room-allocations" class="<?php echo (isset($page) && $page === 'room-allocations') ? 'active' : ''; ?>">
                                             <i class="fas fa-user-check"></i>
                                             <span>Room Allocations</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/hostel-report" class="<?php echo (isset($page) && $page === 'hostel-report') ? 'active' : ''; ?>">
+                                            <i class="fas fa-chart-pie"></i>
+                                            <span>Hostel Report</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>

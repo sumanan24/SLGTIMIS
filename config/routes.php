@@ -167,6 +167,8 @@ return [
     'room-allocations/deallocate' => 'RoomAllocationController@deallocate',
     'room-allocations/get-available-rooms' => 'RoomAllocationController@getAvailableRooms',
     'room-allocations/export-excel' => 'RoomAllocationController@exportExcel',
+    'hostel-report' => 'RoomAllocationController@hostelReport',
+    'hostel-report/export' => 'RoomAllocationController@exportHostelReport',
     // On-Peak/Off-Peak Requests
     'on-peak-requests' => 'OnPeakRequestController@index',
     'on-peak-requests/create' => 'OnPeakRequestController@create',

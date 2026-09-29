@@ -615,6 +615,198 @@ class RoomAllocationController extends Controller {
     }
     
     /**
+     * Hostel allocated and available beds report.
+     */
+    public function hostelReport() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+
+        if (!$this->checkRoomAllocationViewAccess()) {
+            return;
+        }
+
+        $filters = $this->hostelReportFilters();
+        $rows = $this->hostelReportRows($filters);
+        $summary = $this->hostelReportSummary($rows);
+
+        $hostelModel = $this->model('HostelModel');
+
+        $data = [
+            'title' => 'Hostel Report',
+            'page' => 'hostel-report',
+            'rows' => $rows,
+            'hostelSummary' => $summary['hostels'],
+            'totals' => $summary['totals'],
+            'hostels' => $hostelModel->getAll(),
+            'genders' => ['Male', 'Female', 'Mixed'],
+            'hostel_id' => $filters['hostel_id'],
+            'gender' => $filters['gender'],
+            'availability' => $filters['availability'],
+            'search' => $filters['search'],
+            'message' => $_SESSION['message'] ?? null,
+            'error' => $_SESSION['error'] ?? null
+        ];
+
+        unset($_SESSION['message'], $_SESSION['error']);
+        return $this->view('room-allocations/hostel-report', $data);
+    }
+
+    /**
+     * Download the hostel allocated / available report using the current filters.
+     */
+    public function exportHostelReport() {
+        if (!$this->checkRoomAllocationViewAccess()) {
+            return;
+        }
+
+        $filters = $this->hostelReportFilters();
+        $rows = $this->hostelReportRows($filters);
+
+        $filename = 'hostel_allocated_available_' . date('Y-m-d_His') . '.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+        header('Pragma: public');
+
+        echo "\xEF\xBB\xBF";
+
+        $output = fopen('php://output', 'w');
+
+        fputcsv($output, [
+            'Hostel',
+            'Gender',
+            'Location',
+            'Block',
+            'Room',
+            'Capacity',
+            'Allocated',
+            'Available',
+            'Occupancy %',
+            'Bed Status'
+        ]);
+
+        foreach ($rows as $row) {
+            $capacity = (int) ($row['capacity'] ?? 0);
+            $allocated = (int) ($row['allocated'] ?? 0);
+            $available = (int) ($row['available'] ?? 0);
+            $percent = $capacity > 0 ? round(($allocated / $capacity) * 100, 1) : 0;
+
+            fputcsv($output, [
+                $row['hostel_name'] ?? '',
+                $row['hostel_gender'] ?? '',
+                $row['location'] ?? '',
+                $row['block_name'] ?? '',
+                $row['room_no'] ?? '',
+                $capacity,
+                $allocated,
+                $available,
+                $percent,
+                $this->hostelBedStatus($allocated, $available)
+            ]);
+        }
+
+        fclose($output);
+        exit;
+    }
+
+    private function hostelReportFilters() {
+        return [
+            'hostel_id' => trim((string) $this->get('hostel_id', '')),
+            'gender' => trim((string) $this->get('gender', '')),
+            'availability' => trim((string) $this->get('availability', '')),
+            'search' => trim((string) $this->get('search', ''))
+        ];
+    }
+
+    private function hostelReportRows($filters) {
+        $roomModel = $this->model('RoomModel');
+        $queryFilters = [];
+        if ($filters['hostel_id'] !== '') {
+            $queryFilters['hostel_id'] = $filters['hostel_id'];
+        }
+        if ($filters['gender'] !== '') {
+            $queryFilters['gender'] = $filters['gender'];
+        }
+        if ($filters['search'] !== '') {
+            $queryFilters['search'] = $filters['search'];
+        }
+
+        $rows = $roomModel->getOccupancyReport($queryFilters);
+        $availability = $filters['availability'];
+        if ($availability === '' || $availability === 'all') {
+            return $rows;
+        }
+
+        return array_values(array_filter($rows, function ($row) use ($availability) {
+            $allocated = (int) ($row['allocated'] ?? 0);
+            $available = (int) ($row['available'] ?? 0);
+            if ($availability === 'available') {
+                return $available > 0;
+            }
+            if ($availability === 'full') {
+                return $available <= 0 && $allocated > 0;
+            }
+            if ($availability === 'empty') {
+                return $allocated === 0;
+            }
+            return true;
+        }));
+    }
+
+    private function hostelReportSummary($rows) {
+        $totals = [
+            'rooms' => count($rows),
+            'capacity' => 0,
+            'allocated' => 0,
+            'available' => 0
+        ];
+        $hostels = [];
+
+        foreach ($rows as $row) {
+            $capacity = (int) ($row['capacity'] ?? 0);
+            $allocated = (int) ($row['allocated'] ?? 0);
+            $available = (int) ($row['available'] ?? 0);
+            $totals['capacity'] += $capacity;
+            $totals['allocated'] += $allocated;
+            $totals['available'] += $available;
+
+            $key = (string) ($row['hostel_id'] ?? $row['hostel_name'] ?? '');
+            if (!isset($hostels[$key])) {
+                $hostels[$key] = [
+                    'hostel_name' => $row['hostel_name'] ?? 'N/A',
+                    'hostel_gender' => $row['hostel_gender'] ?? '',
+                    'location' => $row['location'] ?? '',
+                    'rooms' => 0,
+                    'capacity' => 0,
+                    'allocated' => 0,
+                    'available' => 0
+                ];
+            }
+            $hostels[$key]['rooms']++;
+            $hostels[$key]['capacity'] += $capacity;
+            $hostels[$key]['allocated'] += $allocated;
+            $hostels[$key]['available'] += $available;
+        }
+
+        return [
+            'totals' => $totals,
+            'hostels' => array_values($hostels)
+        ];
+    }
+
+    private function hostelBedStatus($allocated, $available) {
+        if ((int) $allocated === 0) {
+            return 'Empty';
+        }
+        if ((int) $available <= 0) {
+            return 'Full';
+        }
+        return 'Available';
+    }
+
+    /**
      * AJAX endpoint to get rooms by hostel.
      *
      * Used in two contexts:

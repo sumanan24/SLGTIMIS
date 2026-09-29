@@ -256,5 +256,69 @@ class RoomModel extends Model {
         
         return $this->delete($id);
     }
+
+    /**
+     * Room occupancy for the hostel allocated / available report.
+     * Occupancy filter is applied by the caller after available beds are calculated.
+     */
+    public function getOccupancyReport($filters = []) {
+        $sql = "SELECT r.id, r.room_no, r.capacity,
+                b.name as block_name,
+                h.id as hostel_id, h.name as hostel_name, h.gender as hostel_gender, h.address as location,
+                (SELECT COUNT(*) FROM hostel_allocations ha WHERE ha.room_id = r.id AND ha.status = 'active') as allocated
+                FROM `{$this->table}` r
+                LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
+                LEFT JOIN `hostels` h ON b.hostel_id = h.id
+                WHERE 1=1";
+
+        $params = [];
+        $types = '';
+
+        if (!empty($filters['hostel_id'])) {
+            $sql .= " AND b.hostel_id = ?";
+            $params[] = $filters['hostel_id'];
+            $types .= 's';
+        }
+
+        if (!empty($filters['gender'])) {
+            $sql .= " AND h.gender = ?";
+            $params[] = $filters['gender'];
+            $types .= 's';
+        }
+
+        if (!empty($filters['search'])) {
+            $searchTerm = '%' . $filters['search'] . '%';
+            $sql .= " AND (r.room_no LIKE ? OR h.name LIKE ? OR b.name LIKE ?)";
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $types .= 'sss';
+        }
+
+        $sql .= " ORDER BY h.name ASC, b.name ASC, r.room_no ASC";
+
+        if (!empty($params)) {
+            $stmt = $this->db->prepare($sql);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+        } else {
+            $result = $this->db->query($sql);
+        }
+
+        $data = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $capacity = (int) ($row['capacity'] ?? 0);
+                $allocated = (int) ($row['allocated'] ?? 0);
+                $row['capacity'] = $capacity;
+                $row['allocated'] = $allocated;
+                $row['available'] = $capacity - $allocated;
+                $data[] = $row;
+            }
+        }
+
+        return $data;
+    }
 }
 
