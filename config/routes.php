@@ -120,6 +120,7 @@ return [
     'attendance/student-device/fingerprint-import' => 'StudentDeviceAttendanceController@fingerprintImport',
     'attendance/student-device/sync' => 'StudentDeviceAttendanceController@sync',
     'attendance/student-device/sync/quick-chunk' => 'StudentDeviceAttendanceController@quickSyncChunk',
+    'attendance/student-device/sync/range-chunk' => 'StudentDeviceAttendanceController@rangeSyncChunk',
     'attendance/student-device/search' => 'StudentDeviceAttendanceController@search',
     'attendance/student-device/filter' => 'StudentDeviceAttendanceController@filter',
     'attendance/student-device/export/excel' => 'StudentDeviceAttendanceController@exportExcel',

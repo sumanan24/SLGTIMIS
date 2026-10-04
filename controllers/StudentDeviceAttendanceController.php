@@ -106,6 +106,7 @@ class StudentDeviceAttendanceController extends Controller {
             'face_photo' => $root . '/users/face-photo',
             'sync' => $root . '/sync',
             'quick_sync_chunk' => $root . '/sync/quick-chunk',
+            'range_sync_chunk' => $root . '/sync/range-chunk',
             'search' => $root . '/events',
             'export_excel' => $root . '/export/excel',
             'export_csv' => $root . '/export/csv',
@@ -738,6 +739,29 @@ class StudentDeviceAttendanceController extends Controller {
         $autoSync = (string) $this->get('nosync', '') !== '1'
             && ((time() - $lastQuick) >= 90 || (string) $this->get('force_sync', '') === '1');
 
+        $tz = new DateTimeZone('Asia/Colombo');
+        $today = new DateTimeImmutable('today', $tz);
+        $rangePresets = [
+            [
+                'key' => 'week',
+                'label' => 'Last 1 week',
+                'from' => $today->modify('-6 days')->format('Y-m-d'),
+                'to' => $today->format('Y-m-d'),
+            ],
+            [
+                'key' => 'month',
+                'label' => 'Last 1 month',
+                'from' => $today->modify('-1 month')->format('Y-m-d'),
+                'to' => $today->format('Y-m-d'),
+            ],
+            [
+                'key' => '2month',
+                'label' => 'Last 2 months',
+                'from' => $today->modify('-2 months')->format('Y-m-d'),
+                'to' => $today->format('Y-m-d'),
+            ],
+        ];
+
         return $this->view('attendance/student_device/events', [
             'title' => 'Attendance',
             'page' => 'student-device-attendance-events',
@@ -749,6 +773,8 @@ class StudentDeviceAttendanceController extends Controller {
             'perPage' => 50,
             'autoQuickSync' => $autoSync,
             'quickSyncUrl' => $this->urls()['quick_sync_chunk'],
+            'rangeSyncUrl' => $this->urls()['range_sync_chunk'],
+            'rangePresets' => $rangePresets,
         ]);
     }
 
@@ -818,6 +844,154 @@ class StudentDeviceAttendanceController extends Controller {
 
             echo json_encode(['success' => true] + $row);
         } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'ok' => false,
+                'done' => true,
+                'message' => $e->getMessage(),
+            ]);
+        }
+        exit;
+    }
+
+    /**
+     * JSON: pull finger and face punches for a date range, one machine and one week per request.
+     * Call chunk=0, then next_chunk, until done=true. Range is capped at 62 days.
+     */
+    public function rangeSyncChunk() {
+        if (!$this->requireAccess()) {
+            return;
+        }
+        header('Content-Type: application/json; charset=UTF-8');
+        header('Cache-Control: no-store');
+
+        $from = trim((string) $this->get('date_from', $this->post('date_from', '')));
+        $to = trim((string) $this->get('date_to', $this->post('date_to', '')));
+        $chunk = max(0, min(400, (int) $this->get('chunk', $this->post('chunk', 0))));
+
+        $fail = static function (string $message, int $code = 400): void {
+            http_response_code($code);
+            echo json_encode([
+                'success' => false,
+                'ok' => false,
+                'done' => true,
+                'message' => $message,
+            ]);
+            exit;
+        };
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+            $fail('Select a valid start date and end date.');
+        }
+        $tz = new DateTimeZone('Asia/Colombo');
+        $start = new DateTimeImmutable($from . ' 00:00:00', $tz);
+        $end = new DateTimeImmutable($to . ' 23:59:59', $tz);
+        if ($start > $end) {
+            $fail('Start date must be on or before the end date.');
+        }
+        $days = (int) $start->setTime(0, 0, 0)->diff($end->setTime(0, 0, 0))->days + 1;
+        if ($days > 62) {
+            $fail('That range is ' . $days . ' days. Sync up to 2 months (62 days) at a time.');
+        }
+
+        @set_time_limit(90);
+        try {
+            $svc = $this->syncService();
+            $row = $svc->syncRangeChunk($start, $end, $chunk, 7, 45);
+
+            $blankRun = [
+                'date_from' => $from,
+                'date_to' => $to,
+                'log_id' => 0,
+                'saved' => 0,
+                'retrieved' => 0,
+                'hosts_ok' => [],
+                'hosts_seen' => [],
+                'valid_student' => 0,
+                'duplicates' => 0,
+                'failed' => 0,
+                'finger_ids_linked' => 0,
+                'staff_ignored' => 0,
+                'unmatched' => 0,
+            ];
+            if ($chunk === 0) {
+                $logId = $svc->logModel()->startLog(
+                    (int) ($_SESSION['user_id'] ?? 0),
+                    (string) ($_SESSION['user_name'] ?? ''),
+                    $from,
+                    $to,
+                    'range'
+                );
+                $_SESSION['student_att_range_run'] = $blankRun;
+                $_SESSION['student_att_range_run']['log_id'] = $logId;
+            }
+
+            $run = $_SESSION['student_att_range_run'] ?? null;
+            if (!is_array($run) || ($run['date_from'] ?? '') !== $from || ($run['date_to'] ?? '') !== $to) {
+                $fail('This sync was interrupted. Start the date range again.');
+            }
+
+            if (empty($row['skipped'])) {
+                $host = (string) ($row['host'] ?? '');
+                $firstSee = $host !== '' && empty($run['hosts_seen'][$host]);
+                $run['saved'] += (int) ($row['saved'] ?? 0);
+                $run['retrieved'] += (int) ($row['records_retrieved'] ?? 0);
+                $run['valid_student'] += (int) ($row['valid_student'] ?? 0);
+                $run['duplicates'] += (int) ($row['duplicates'] ?? 0);
+                $run['failed'] += (int) ($row['failed'] ?? 0);
+                $run['staff_ignored'] += (int) ($row['staff_ignored'] ?? 0);
+                $run['unmatched'] += (int) ($row['unmatched'] ?? 0);
+                if ($firstSee) {
+                    $run['finger_ids_linked'] += (int) ($row['finger_ids_linked'] ?? 0);
+                }
+                if ($host !== '') {
+                    $run['hosts_seen'][$host] = true;
+                    if (!empty($row['ok'])) {
+                        $run['hosts_ok'][$host] = true;
+                    }
+                }
+            }
+            $_SESSION['student_att_range_run'] = $run;
+
+            if (!empty($row['done'])) {
+                $online = count($run['hosts_ok'] ?? []);
+                $seen = count($run['hosts_seen'] ?? []);
+                $summary = sprintf(
+                    'Attendance sync %s to %s — %d/%d machine(s) OK, retrieved %d, saved %d, duplicates %d',
+                    $from,
+                    $to,
+                    $online,
+                    max($seen, $online),
+                    (int) $run['retrieved'],
+                    (int) $run['saved'],
+                    (int) $run['duplicates']
+                );
+                $svc->logModel()->finishLog((int) ($run['log_id'] ?? 0), [
+                    'status' => $online > 0 ? 'ok' : 'error',
+                    'error_message' => $online > 0 ? '' : 'No machines responded.',
+                    'records_retrieved' => (int) $run['retrieved'],
+                    'valid_student' => (int) $run['valid_student'],
+                    'staff_ignored' => (int) $run['staff_ignored'],
+                    'empty_person_id' => 0,
+                    'unmatched' => (int) $run['unmatched'],
+                    'duplicates' => (int) $run['duplicates'],
+                    'saved' => (int) $run['saved'],
+                    'failed' => (int) $run['failed'],
+                ]);
+                unset($_SESSION['student_att_range_run']);
+                $row['summary'] = $summary;
+                $row['run'] = [
+                    'saved' => (int) $run['saved'],
+                    'retrieved' => (int) $run['retrieved'],
+                    'duplicates' => (int) $run['duplicates'],
+                    'online' => $online,
+                ];
+            }
+
+            echo json_encode(['success' => true] + $row);
+        } catch (Throwable $e) {
+            error_log('[StudentDevice rangeSync] ' . $e->getMessage());
             http_response_code(500);
             echo json_encode([
                 'success' => false,

@@ -93,6 +93,43 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
             </div>
         </div>
 
+        <?php
+        $rangePresets = $rangePresets ?? [];
+        $rangeDefault = $rangePresets[0] ?? ['from' => date('Y-m-d', strtotime('-6 days')), 'to' => date('Y-m-d')];
+        ?>
+        <div class="card sd-card mb-3">
+            <div class="card-header">
+                <div class="fw-semibold">Sync finger and face attendance</div>
+                <div class="small text-muted">Pull student punches from all machines for the last week, month, or 2 months.</div>
+            </div>
+            <div class="card-body">
+                <div class="sd-range-sync-actions">
+                    <?php foreach ($rangePresets as $preset): ?>
+                        <button type="button" class="btn btn-outline-primary btn-sm sd-range-sync-btn"
+                                data-from="<?php echo $e($preset['from'] ?? ''); ?>"
+                                data-to="<?php echo $e($preset['to'] ?? ''); ?>"
+                                data-label="<?php echo $e($preset['label'] ?? 'Sync'); ?>">
+                            <?php echo $e($preset['label'] ?? 'Sync'); ?>
+                        </button>
+                    <?php endforeach; ?>
+                    <div class="sd-field">
+                        <label class="form-label" for="sdRangeFrom">Start date</label>
+                        <input type="date" id="sdRangeFrom" class="form-control form-control-sm"
+                               value="<?php echo $e($rangeDefault['from'] ?? ''); ?>">
+                    </div>
+                    <div class="sd-field">
+                        <label class="form-label" for="sdRangeTo">End date</label>
+                        <input type="date" id="sdRangeTo" class="form-control form-control-sm"
+                               value="<?php echo $e($rangeDefault['to'] ?? ''); ?>">
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" id="sdRangeCustomBtn">
+                        <i class="fas fa-fingerprint me-1"></i>Sync selected dates
+                    </button>
+                </div>
+                <p class="small text-muted mb-0 mt-2">Finger and face punches are read one week at a time. The longest range is 2 months. This list reloads when the sync finishes.</p>
+            </div>
+        </div>
+
         <div id="sdQuickSyncBar" class="alert alert-info d-none mb-3" role="status" aria-live="polite">
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <div class="spinner-border spinner-border-sm text-primary" role="presentation" id="sdQuickSyncSpin"></div>
@@ -319,12 +356,14 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
 <?php
 $autoQuickSync = !empty($autoQuickSync);
 $quickSyncUrl = (string) ($quickSyncUrl ?? ($urls['quick_sync_chunk'] ?? ''));
+$rangeSyncUrl = (string) ($rangeSyncUrl ?? ($urls['range_sync_chunk'] ?? ''));
 ?>
 <script>
 (function () {
     var autoRun = <?php echo $autoQuickSync ? 'true' : 'false'; ?>;
     var baseUrl = <?php echo json_encode($quickSyncUrl, JSON_UNESCAPED_SLASHES); ?>;
-    if (!baseUrl) return;
+    var rangeUrl = <?php echo json_encode($rangeSyncUrl, JSON_UNESCAPED_SLASHES); ?>;
+    if (!baseUrl && !rangeUrl) return;
 
     var bar = document.getElementById('sdQuickSyncBar');
     var titleEl = document.getElementById('sdQuickSyncTitle');
@@ -332,8 +371,22 @@ $quickSyncUrl = (string) ($quickSyncUrl ?? ($urls['quick_sync_chunk'] ?? ''));
     var prog = document.getElementById('sdQuickSyncProgress');
     var spin = document.getElementById('sdQuickSyncSpin');
     var btn = document.getElementById('sdQuickSyncBtn');
+    var rangeBtns = Array.prototype.slice.call(document.querySelectorAll('.sd-range-sync-btn'));
+    var customBtn = document.getElementById('sdRangeCustomBtn');
+    var fromInput = document.getElementById('sdRangeFrom');
+    var toInput = document.getElementById('sdRangeTo');
     var running = false;
     var savedTotal = 0;
+
+    function setBusy(on) {
+        running = on;
+        window.sdDeviceSyncLock = on;
+        if (btn) btn.disabled = on;
+        rangeBtns.forEach(function (b) { b.disabled = on; });
+        if (customBtn) customBtn.disabled = on;
+        if (fromInput) fromInput.disabled = on;
+        if (toInput) toInput.disabled = on;
+    }
 
     function setProgress(chunk, total) {
         var pct = total > 0 ? Math.round(((chunk + 1) / total) * 100) : 0;
@@ -343,17 +396,28 @@ $quickSyncUrl = (string) ($quickSyncUrl ?? ($urls['quick_sync_chunk'] ?? ''));
         }
     }
 
-    function finish(ok, summary, reload) {
-        running = false;
-        if (btn) btn.disabled = false;
+    function showBar(title) {
+        if (bar) {
+            bar.classList.remove('d-none', 'alert-success', 'alert-danger');
+            bar.classList.add('alert-info');
+        }
+        if (spin) spin.classList.remove('d-none');
+        if (titleEl) titleEl.textContent = title;
+        if (prog) prog.style.width = '0%';
+    }
+
+    function finish(ok, summary, reload, titles) {
+        setBusy(false);
         if (spin) spin.classList.add('d-none');
         if (bar) {
             bar.classList.remove('alert-info', 'alert-danger', 'alert-success');
             bar.classList.add(ok ? 'alert-success' : 'alert-danger');
         }
-        if (titleEl) titleEl.textContent = ok ? 'Quick sync complete' : 'Quick sync issue';
+        if (titleEl) titleEl.textContent = ok ? titles.ok : titles.bad;
         if (msgEl) msgEl.textContent = summary || (ok ? 'Done' : 'Failed');
-        if (reload && savedTotal > 0) {
+        if (typeof reload === 'function' && ok) {
+            setTimeout(reload, 800);
+        } else if (reload === true && savedTotal > 0) {
             setTimeout(function () {
                 var u = new URL(window.location.href);
                 u.searchParams.set('nosync', '1');
@@ -362,15 +426,16 @@ $quickSyncUrl = (string) ($quickSyncUrl ?? ($urls['quick_sync_chunk'] ?? ''));
         }
     }
 
-    function fetchChunk(chunk) {
-        var url = baseUrl + (baseUrl.indexOf('?') >= 0 ? '&' : '?') + 'chunk=' + encodeURIComponent(String(chunk));
+    function fetchJson(url) {
         return fetch(url, {
             method: 'GET',
             credentials: 'same-origin',
             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
         }).then(function (r) {
-            return r.json().then(function (j) {
-                if (!r.ok && (!j || j.success === undefined)) {
+            return r.text().then(function (text) {
+                var j = null;
+                try { j = JSON.parse(text); } catch (e) { j = null; }
+                if (!j || j.success === undefined) {
                     throw new Error((j && j.message) || ('HTTP ' + r.status));
                 }
                 return j;
@@ -379,22 +444,16 @@ $quickSyncUrl = (string) ($quickSyncUrl ?? ($urls['quick_sync_chunk'] ?? ''));
     }
 
     function runQuickSync() {
-        if (running || !baseUrl) return;
-        running = true;
+        if (running || window.sdDeviceSyncLock || !baseUrl) return;
+        setBusy(true);
         savedTotal = 0;
-        if (btn) btn.disabled = true;
-        if (bar) {
-            bar.classList.remove('d-none', 'alert-success', 'alert-danger');
-            bar.classList.add('alert-info');
-        }
-        if (spin) spin.classList.remove('d-none');
-        if (titleEl) titleEl.textContent = 'Quick sync (today)';
+        showBar('Quick sync (today)');
         if (msgEl) msgEl.textContent = 'Syncing machines one by one…';
-        if (prog) prog.style.width = '0%';
 
         function step(chunk) {
             if (msgEl) msgEl.textContent = 'Machine ' + (chunk + 1) + '…';
-            return fetchChunk(chunk).then(function (data) {
+            var url = baseUrl + (baseUrl.indexOf('?') >= 0 ? '&' : '?') + 'chunk=' + encodeURIComponent(String(chunk));
+            return fetchJson(url).then(function (data) {
                 if (!data || data.success === false) {
                     throw new Error((data && data.message) || 'Chunk failed');
                 }
@@ -407,7 +466,10 @@ $quickSyncUrl = (string) ($quickSyncUrl ?? ($urls['quick_sync_chunk'] ?? ''));
                         + (total ? (' (' + (chunk + 1) + '/' + total + ')') : '');
                 }
                 if (data.done) {
-                    finish(true, data.summary || ('Saved ' + savedTotal + ' new punch(es)'), true);
+                    finish(true, data.summary || ('Saved ' + savedTotal + ' new punch(es)'), true, {
+                        ok: 'Quick sync complete',
+                        bad: 'Quick sync issue'
+                    });
                     return;
                 }
                 return step(parseInt(data.next_chunk, 10) || (chunk + 1));
@@ -415,7 +477,110 @@ $quickSyncUrl = (string) ($quickSyncUrl ?? ($urls['quick_sync_chunk'] ?? ''));
         }
 
         step(0).catch(function (err) {
-            finish(false, (err && err.message) ? err.message : 'Quick sync failed', false);
+            finish(false, (err && err.message) ? err.message : 'Quick sync failed', false, {
+                ok: 'Quick sync complete',
+                bad: 'Quick sync issue'
+            });
+        });
+    }
+
+    function dayCount(from, to) {
+        var a = new Date(from + 'T00:00:00');
+        var b = new Date(to + 'T00:00:00');
+        if (isNaN(a.getTime()) || isNaN(b.getTime())) return -1;
+        return Math.round((b.getTime() - a.getTime()) / 86400000) + 1;
+    }
+
+    function runRangeSync(from, to, label) {
+        if (!rangeUrl) return;
+        if (running || window.sdDeviceSyncLock) {
+            alert('A sync is already running.');
+            return;
+        }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+            alert('Select a start date and an end date.');
+            return;
+        }
+        if (from > to) {
+            alert('Start date must be on or before the end date.');
+            return;
+        }
+        var days = dayCount(from, to);
+        if (days > 62) {
+            alert('That range is ' + days + ' days. Sync up to 2 months (62 days) at a time.');
+            return;
+        }
+        var title = label || (from + ' to ' + to);
+        if (!confirm('Sync student finger and face attendance from all machines for ' + title + ' (' + from + ' to ' + to + ')?')) {
+            return;
+        }
+        setBusy(true);
+        savedTotal = 0;
+        showBar(title);
+        if (msgEl) msgEl.textContent = 'Reading punches week by week…';
+
+        function step(chunk) {
+            var url = rangeUrl + (rangeUrl.indexOf('?') >= 0 ? '&' : '?')
+                + 'chunk=' + encodeURIComponent(String(chunk))
+                + '&date_from=' + encodeURIComponent(from)
+                + '&date_to=' + encodeURIComponent(to);
+            return fetchJson(url).then(function (data) {
+                if (!data || data.success === false) {
+                    throw new Error((data && data.message) || 'Chunk failed');
+                }
+                var total = parseInt(data.total, 10) || 0;
+                var machine = data.label || data.host || ('#' + (chunk + 1));
+                var windowLabel = (data.window_from && data.window_to) ? (data.window_from + '–' + data.window_to) : '';
+                savedTotal += parseInt(data.saved, 10) || 0;
+                setProgress(parseInt(data.chunk, 10) || chunk, total);
+                if (msgEl) {
+                    msgEl.textContent = machine + (windowLabel ? (' · ' + windowLabel) : '') + ': '
+                        + (data.message || (data.ok ? 'OK' : 'Failed'))
+                        + (total ? (' (' + (chunk + 1) + '/' + total + ')') : '');
+                }
+                if (data.done) {
+                    finish(true, data.summary || ('Saved ' + savedTotal + ' new punch(es)'), function () {
+                        var u = new URL(window.location.href);
+                        u.searchParams.set('nosync', '1');
+                        u.searchParams.set('date_from', from);
+                        u.searchParams.set('date_to', to);
+                        u.searchParams.delete('date');
+                        u.searchParams.delete('page');
+                        window.location.href = u.toString();
+                    }, {
+                        ok: 'Attendance sync complete',
+                        bad: 'Attendance sync issue'
+                    });
+                    return;
+                }
+                return step(parseInt(data.next_chunk, 10) || (chunk + 1));
+            });
+        }
+
+        step(0).catch(function (err) {
+            finish(false, (err && err.message) ? err.message : 'Attendance sync failed', false, {
+                ok: 'Attendance sync complete',
+                bad: 'Attendance sync issue'
+            });
+        });
+    }
+
+    rangeBtns.forEach(function (b) {
+        b.addEventListener('click', function () {
+            var from = b.getAttribute('data-from') || '';
+            var to = b.getAttribute('data-to') || '';
+            if (fromInput) fromInput.value = from;
+            if (toInput) toInput.value = to;
+            runRangeSync(from, to, b.getAttribute('data-label') || '');
+        });
+    });
+    if (customBtn) {
+        customBtn.addEventListener('click', function () {
+            runRangeSync(
+                fromInput ? fromInput.value : '',
+                toInput ? toInput.value : '',
+                'Selected dates'
+            );
         });
     }
 
@@ -424,7 +589,7 @@ $quickSyncUrl = (string) ($quickSyncUrl ?? ($urls['quick_sync_chunk'] ?? ''));
             runQuickSync();
         });
     }
-    if (autoRun) {
+    if (autoRun && baseUrl) {
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', runQuickSync);
         } else {

@@ -409,9 +409,154 @@ class StudentDeviceAttendanceSyncService {
             'saved' => (int) ($part['saved'] ?? 0),
             'duplicates' => (int) ($part['duplicates'] ?? 0),
             'finger_ids_linked' => (int) ($part['finger_ids_linked'] ?? 0),
+            'valid_student' => (int) ($part['valid_student'] ?? 0),
+            'staff_ignored' => (int) ($part['staff_ignored'] ?? 0),
+            'unmatched' => (int) ($part['unmatched'] ?? 0),
+            'failed' => (int) ($part['failed'] ?? 0),
             'message' => (string) ($part['message'] ?? ''),
             'skipped' => false,
         ];
+    }
+
+    /**
+     * One machine and one week-sized window per request, so a 1-week, 1-month,
+     * or 2-month finger/face pull does not hit the PHP time limit.
+     *
+     * @return array{
+     *   ok:bool,done:bool,chunk:int,next_chunk:int,total:int,
+     *   host:string,label:string,role:string,
+     *   window_from:string,window_to:string,
+     *   records_retrieved:int,saved:int,duplicates:int,finger_ids_linked:int,
+     *   valid_student:int,staff_ignored:int,unmatched:int,failed:int,
+     *   message:string,skipped?:bool
+     * }
+     */
+    public function syncRangeChunk(
+        DateTimeInterface $start,
+        DateTimeInterface $end,
+        int $chunkIndex,
+        int $windowDays = 7,
+        int $deviceTimeoutSec = 45
+    ): array {
+        $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
+        $tzName = !empty($cfg['timezone']) ? (string) $cfg['timezone'] : 'Asia/Colombo';
+        $tz = new DateTimeZone($tzName);
+        $startDay = $this->toImmutable($start, $tz)->setTime(0, 0, 0);
+        $endDay = $this->toImmutable($end, $tz)->setTime(0, 0, 0);
+        if ($endDay < $startDay) {
+            $swap = $startDay;
+            $startDay = $endDay;
+            $endDay = $swap;
+        }
+
+        $devices = $this->configuredDevices($cfg);
+        if ($devices === []) {
+            $devices = [[
+                'host' => $this->machine->getHost(),
+                'role' => 'main',
+                'label' => 'Main',
+                'username' => (string) ($cfg['username'] ?? 'admin'),
+                'password' => (string) ($cfg['password'] ?? ''),
+                'ssl' => !empty($cfg['ssl']),
+                'port' => (int) ($cfg['port'] ?? 0),
+                'timeout' => (int) ($cfg['timeout'] ?? 60),
+            ]];
+        }
+
+        $jobs = $this->rangeJobs($devices, $startDay, $endDay, $windowDays);
+        $total = count($jobs);
+        $empty = [
+            'ok' => $total === 0,
+            'done' => true,
+            'chunk' => $chunkIndex,
+            'next_chunk' => $total,
+            'total' => $total,
+            'host' => '',
+            'label' => '',
+            'role' => '',
+            'window_from' => $startDay->format('Y-m-d'),
+            'window_to' => $endDay->format('Y-m-d'),
+            'records_retrieved' => 0,
+            'saved' => 0,
+            'duplicates' => 0,
+            'finger_ids_linked' => 0,
+            'valid_student' => 0,
+            'staff_ignored' => 0,
+            'unmatched' => 0,
+            'failed' => 0,
+            'message' => $total === 0 ? 'No devices configured' : 'All chunks complete',
+            'skipped' => true,
+        ];
+        if ($total === 0 || $chunkIndex < 0 || $chunkIndex >= $total) {
+            return $empty;
+        }
+
+        $job = $jobs[$chunkIndex];
+        $device = $job['device'];
+        $winStart = $job['start'];
+        $winEnd = $job['end'];
+        $part = $this->syncOneDevice(
+            $device,
+            $cfg,
+            $winStart,
+            $winEnd,
+            max(20, min(55, $deviceTimeoutSec))
+        );
+        $next = $chunkIndex + 1;
+        $windowLabel = $winStart->format('Y-m-d') . ' to ' . $winEnd->format('Y-m-d');
+
+        return [
+            'ok' => !empty($part['ok']),
+            'done' => $next >= $total,
+            'chunk' => $chunkIndex,
+            'next_chunk' => $next,
+            'total' => $total,
+            'host' => (string) ($part['host'] ?? ''),
+            'label' => (string) ($part['label'] ?? ''),
+            'role' => (string) ($part['role'] ?? ''),
+            'window_from' => $winStart->format('Y-m-d'),
+            'window_to' => $winEnd->format('Y-m-d'),
+            'records_retrieved' => (int) ($part['records_retrieved'] ?? 0),
+            'saved' => (int) ($part['saved'] ?? 0),
+            'duplicates' => (int) ($part['duplicates'] ?? 0),
+            'finger_ids_linked' => (int) ($part['finger_ids_linked'] ?? 0),
+            'valid_student' => (int) ($part['valid_student'] ?? 0),
+            'staff_ignored' => (int) ($part['staff_ignored'] ?? 0),
+            'unmatched' => (int) ($part['unmatched'] ?? 0),
+            'failed' => (int) ($part['failed'] ?? 0),
+            'message' => trim((string) ($part['message'] ?? '') . ' · ' . $windowLabel),
+            'skipped' => false,
+        ];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $devices
+     * @return list<array{device:array<string,mixed>,start:DateTimeImmutable,end:DateTimeImmutable}>
+     */
+    private function rangeJobs(
+        array $devices,
+        DateTimeImmutable $startDay,
+        DateTimeImmutable $endDay,
+        int $windowDays
+    ): array {
+        $windowDays = max(1, min(14, $windowDays));
+        $jobs = [];
+        $cursor = $startDay;
+        while ($cursor <= $endDay) {
+            $winEnd = $cursor->modify('+' . ($windowDays - 1) . ' days');
+            if ($winEnd > $endDay) {
+                $winEnd = $endDay;
+            }
+            foreach ($devices as $device) {
+                $jobs[] = [
+                    'device' => $device,
+                    'start' => $cursor,
+                    'end' => $winEnd,
+                ];
+            }
+            $cursor = $winEnd->modify('+1 day');
+        }
+        return $jobs;
     }
 
     /**

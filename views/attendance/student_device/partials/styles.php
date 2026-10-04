@@ -1294,6 +1294,19 @@ $GLOBALS['__student_device_styles_loaded'] = true;
     border-top: 1px solid var(--sd-border);
     background: #fafbfc;
 }
+.student-device-page .sd-range-sync-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.55rem 0.75rem;
+}
+.student-device-page .sd-range-sync-actions .sd-field {
+    width: auto;
+    min-width: 150px;
+}
+.student-device-page .sd-range-sync-actions .btn {
+    white-space: nowrap;
+}
 .student-device-page .sd-att-sync-form {
     display: flex;
     flex-wrap: wrap;
@@ -1429,9 +1442,13 @@ $GLOBALS['__student_device_styles_loaded'] = true;
     .student-device-page .sd-att-sync-form .btn {
         width: 100%;
     }
-    .student-device-page .sd-att-sync-form .sd-field {
+    .student-device-page .sd-att-sync-form .sd-field,
+    .student-device-page .sd-range-sync-actions .sd-field {
         width: 100%;
         min-width: 0;
+    }
+    .student-device-page .sd-range-sync-actions .btn {
+        width: 100%;
     }
     .student-device-page .sd-devices-sync-user {
         flex-direction: column;
