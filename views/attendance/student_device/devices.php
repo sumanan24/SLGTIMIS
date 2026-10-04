@@ -310,7 +310,7 @@ ob_start();
             </div>
         </div>
 
-    <?php elseif ($deviceTab === 'tools'): ?>
+        <?php elseif ($deviceTab === 'tools'): ?>
         <?php
         $toolsRows = $toolsRows ?? [];
         $toolsQ = (string) ($toolsQ ?? '');
@@ -318,6 +318,9 @@ ob_start();
         $toolsPages = max(1, (int) ($toolsPages ?? 1));
         $toolsTotal = (int) ($toolsTotal ?? 0);
         $toolsScope = (string) ($toolsScope ?? 'synced');
+        $attendanceSyncSummary = $attendanceSyncSummary ?? null;
+        $syncDateFrom = (string) ($syncDateFrom ?? date('Y-m-d'));
+        $syncDateTo = (string) ($syncDateTo ?? date('Y-m-d'));
         $readerOptions = [];
         foreach ($deviceRows as $row) {
             if (($row['role'] ?? '') === 'reader') {
@@ -325,6 +328,63 @@ ob_start();
             }
         }
         ?>
+        <div class="sd-devices-panel mb-3">
+            <div class="sd-devices-panel-head">Attendance sync from fingerprint machines</div>
+            <?php if (is_array($attendanceSyncSummary)): ?>
+                <div class="alert <?php echo !empty($attendanceSyncSummary['ok']) ? 'alert-info' : 'alert-warning'; ?> sd-att-sync-result mb-0">
+                    <div class="fw-semibold mb-2"><?php echo $e($attendanceSyncSummary['message'] ?? 'Synchronization finished'); ?></div>
+                    <div class="row g-2 small">
+                        <div class="col-6 col-md-3">Machines: <strong><?php echo (int) ($attendanceSyncSummary['devices_online'] ?? 0); ?>/<?php echo (int) ($attendanceSyncSummary['devices_total'] ?? 0); ?></strong></div>
+                        <div class="col-6 col-md-3">Retrieved: <strong><?php echo (int) ($attendanceSyncSummary['records_retrieved'] ?? 0); ?></strong></div>
+                        <div class="col-6 col-md-3">Saved: <strong><?php echo (int) ($attendanceSyncSummary['saved'] ?? 0); ?></strong></div>
+                        <div class="col-6 col-md-3">Duplicates: <strong><?php echo (int) ($attendanceSyncSummary['duplicates'] ?? 0); ?></strong></div>
+                        <div class="col-6 col-md-3">Valid students: <strong><?php echo (int) ($attendanceSyncSummary['valid_student'] ?? 0); ?></strong></div>
+                        <div class="col-6 col-md-3">Finger IDs: <strong><?php echo (int) ($attendanceSyncSummary['finger_ids_linked'] ?? 0); ?></strong></div>
+                        <div class="col-6 col-md-3">Staff ignored: <strong><?php echo (int) ($attendanceSyncSummary['staff_ignored'] ?? 0); ?></strong></div>
+                        <div class="col-6 col-md-3">Unmatched: <strong><?php echo (int) ($attendanceSyncSummary['unmatched'] ?? 0); ?></strong></div>
+                    </div>
+                    <?php if (!empty($attendanceSyncSummary['devices']) && is_array($attendanceSyncSummary['devices'])): ?>
+                        <ul class="mb-0 mt-2 small">
+                            <?php foreach ($attendanceSyncSummary['devices'] as $sd): ?>
+                                <li>
+                                    <code><?php echo $e($sd['host'] ?? ''); ?></code>
+                                    (<?php echo $e($sd['label'] ?? $sd['role'] ?? ''); ?>) —
+                                    <?php echo !empty($sd['ok']) ? 'OK' : 'FAIL'; ?> —
+                                    records <?php echo (int) ($sd['records_retrieved'] ?? 0); ?>,
+                                    saved <?php echo (int) ($sd['saved'] ?? 0); ?>
+                                    <?php if (!empty($sd['message'])): ?>
+                                        — <?php echo $e($sd['message']); ?>
+                                    <?php endif; ?>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+            <form method="post" action="<?php echo $e($devicesAction); ?>" class="sd-att-sync-form"
+                  onsubmit="return confirm('Pull student finger attendance from all machines for ' + this.date_from.value + ' to ' + this.date_to.value + '? This can take a minute.');">
+                <input type="hidden" name="return_tab" value="tools">
+                <input type="hidden" name="action" value="sync_attendance">
+                <div class="sd-field">
+                    <label class="form-label" for="sdAttFrom">Start date</label>
+                    <input type="date" id="sdAttFrom" name="date_from" class="form-control form-control-sm" required
+                           value="<?php echo $e($syncDateFrom); ?>">
+                </div>
+                <div class="sd-field">
+                    <label class="form-label" for="sdAttTo">End date</label>
+                    <input type="date" id="sdAttTo" name="date_to" class="form-control form-control-sm" required
+                           value="<?php echo $e($syncDateTo); ?>">
+                </div>
+                <div class="sd-field sd-field-actions">
+                    <label class="form-label" aria-hidden="true">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-fingerprint me-1"></i>Sync attendance
+                    </button>
+                </div>
+            </form>
+            <p class="sd-tools-help">Reads finger punches from MAIN and all readers for the selected dates and saves student In/Out attendance. Up to 31 days at a time.</p>
+        </div>
+
         <div class="sd-devices-toolbar">
             <form method="get" action="<?php echo $e($devicesAction); ?>" class="sd-devices-filter">
                 <input type="hidden" name="tab" value="tools">

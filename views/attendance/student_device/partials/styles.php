@@ -1294,6 +1294,20 @@ $GLOBALS['__student_device_styles_loaded'] = true;
     border-top: 1px solid var(--sd-border);
     background: #fafbfc;
 }
+.student-device-page .sd-att-sync-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.55rem 0.75rem;
+    padding: 0.9rem 1.1rem 0.15rem;
+}
+.student-device-page .sd-att-sync-form .sd-field {
+    width: auto;
+    min-width: 160px;
+}
+.student-device-page .sd-att-sync-result {
+    margin: 0.85rem 1.1rem 0;
+}
 .student-device-page .sd-tools-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1411,8 +1425,13 @@ $GLOBALS['__student_device_styles_loaded'] = true;
         min-width: 0;
     }
     .student-device-page .sd-devices-toolbar .btn,
-    .student-device-page .sd-tools-form .btn {
+    .student-device-page .sd-tools-form .btn,
+    .student-device-page .sd-att-sync-form .btn {
         width: 100%;
+    }
+    .student-device-page .sd-att-sync-form .sd-field {
+        width: 100%;
+        min-width: 0;
     }
     .student-device-page .sd-devices-sync-user {
         flex-direction: column;

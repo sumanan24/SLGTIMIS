@@ -1560,6 +1560,64 @@ class StudentDeviceAttendanceController extends Controller {
                     return;
                 }
 
+                if ($action === 'sync_attendance') {
+                    @set_time_limit(200);
+                    $from = trim((string) $this->post('date_from', ''));
+                    $to = trim((string) $this->post('date_to', ''));
+                    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+                        $_SESSION['flash_error'] = 'Select a valid start date and end date.';
+                        $go('tools');
+                        return;
+                    }
+                    $tz = new DateTimeZone('Asia/Colombo');
+                    $start = new DateTimeImmutable($from . ' 00:00:00', $tz);
+                    $end = new DateTimeImmutable($to . ' 23:59:59', $tz);
+                    if ($start > $end) {
+                        $_SESSION['flash_error'] = 'Start date must be on or before the end date.';
+                        $go('tools', ['df' => $from, 'dt' => $to]);
+                        return;
+                    }
+                    $days = (int) $start->diff($end)->days + 1;
+                    if ($days > 31) {
+                        $_SESSION['flash_error'] = 'That range is ' . $days . ' days. Sync 31 days or fewer at a time so the fingerprint machines can finish.';
+                        $go('tools', ['df' => $from, 'dt' => $to]);
+                        return;
+                    }
+                    $svc = $this->syncService();
+                    $summary = $svc->syncRange(
+                        $start,
+                        $end,
+                        (int) ($_SESSION['user_id'] ?? 0),
+                        (string) ($_SESSION['user_name'] ?? ''),
+                        $days <= 1 ? 120 : 180
+                    );
+                    $_SESSION['student_att_sync_summary'] = $summary;
+                    $_SESSION['student_att_sync_context'] = 'tools';
+                    if (!empty($summary['devices']) && is_array($summary['devices'])) {
+                        $probes = [];
+                        foreach ($summary['devices'] as $d) {
+                            $probes[] = [
+                                'host' => $d['host'] ?? '',
+                                'role' => $d['role'] ?? '',
+                                'label' => $d['label'] ?? '',
+                                'online' => !empty($d['ok']),
+                                'message' => $d['message'] ?? '',
+                            ];
+                        }
+                        $_SESSION['student_att_device_status'] = [
+                            'devices' => $probes,
+                            'tested_at' => date('Y-m-d H:i:s'),
+                        ];
+                    }
+                    if (!empty($summary['ok'])) {
+                        $_SESSION['flash_success'] = $summary['message'] ?: 'Student attendance synchronized.';
+                    } else {
+                        $_SESSION['flash_error'] = $summary['message'] ?: 'Attendance sync failed.';
+                    }
+                    $go('tools', ['df' => $from, 'dt' => $to]);
+                    return;
+                }
+
                 $_SESSION['flash_error'] = 'Unknown action.';
             } catch (Throwable $e) {
                 error_log('[StudentDevice devices] ' . $e->getMessage());
@@ -1803,6 +1861,21 @@ class StudentDeviceAttendanceController extends Controller {
         }
         $logs = array_slice($allLogs, ($logsPage - 1) * $logsPerPage, $logsPerPage);
 
+        $attendanceSyncSummary = null;
+        if ($tab === 'tools' && (($_SESSION['student_att_sync_context'] ?? '') === 'tools')) {
+            $stored = $_SESSION['student_att_sync_summary'] ?? null;
+            $attendanceSyncSummary = is_array($stored) ? $stored : null;
+            unset($_SESSION['student_att_sync_summary'], $_SESSION['student_att_sync_context']);
+        }
+        $syncDateFrom = trim((string) $this->get('df', date('Y-m-d')));
+        $syncDateTo = trim((string) $this->get('dt', date('Y-m-d')));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $syncDateFrom)) {
+            $syncDateFrom = date('Y-m-d');
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $syncDateTo)) {
+            $syncDateTo = date('Y-m-d');
+        }
+
         return $this->view('attendance/student_device/devices', [
             'title' => 'Hikvision device sync',
             'page' => 'student-device-attendance-devices',
@@ -1830,6 +1903,9 @@ class StudentDeviceAttendanceController extends Controller {
             'toolsPages' => $toolsPages,
             'toolsTotal' => $toolsTotal,
             'toolsScope' => $toolsScope,
+            'attendanceSyncSummary' => $attendanceSyncSummary,
+            'syncDateFrom' => $syncDateFrom,
+            'syncDateTo' => $syncDateTo,
             'queueStatus' => $queueStatus,
             'queueTotal' => $queueTotal,
             'logsPage' => $logsPage,
