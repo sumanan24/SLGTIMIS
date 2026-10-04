@@ -358,6 +358,9 @@ class StudentDeviceAttendanceController extends Controller {
         if ($dateTo !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
             $filters['date_to'] = $dateTo;
         }
+        if ((string) $this->get('first_last', '') === '1') {
+            $filters['first_last'] = '1';
+        }
         return $filters;
     }
 
@@ -3401,19 +3404,25 @@ class StudentDeviceAttendanceController extends Controller {
         $filters = $this->filtersFromRequest();
         $rowsRaw = $svc->attendanceModel()->exportDailyGrouped($filters);
 
-        $headers = ['Student ID', 'Employee No', 'Student Name', 'Date', 'In', 'Out', 'Others', 'Machine ID'];
+        $firstLast = !empty($filters['first_last']);
+        $headers = $firstLast
+            ? ['Student ID', 'Employee No', 'Student Name', 'Date', 'Check-In', 'Check-Out', 'Machine ID']
+            : ['Student ID', 'Employee No', 'Student Name', 'Date', 'In', 'Out', 'Others', 'Machine ID'];
         $rows = [];
         foreach ($rowsRaw as $row) {
-            $rows[] = [
+            $line = [
                 (string) ($row['student_id'] ?? ''),
                 (string) ($row['employee_no'] ?? ''),
                 (string) ($row['student_name'] ?? ''),
                 (string) ($row['attendance_date'] ?? ''),
                 (string) ($row['time_in'] ?? ''),
                 (string) ($row['time_out'] ?? ''),
-                (string) ($row['time_others'] ?? ''),
-                (string) ($row['machine_id'] ?? ''),
             ];
+            if (!$firstLast) {
+                $line[] = (string) ($row['time_others'] ?? '');
+            }
+            $line[] = (string) ($row['machine_id'] ?? '');
+            $rows[] = $line;
         }
 
         require_once BASE_PATH . '/helpers/SimpleTableXlsx.php';
@@ -3433,18 +3442,24 @@ class StudentDeviceAttendanceController extends Controller {
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         $out = fopen('php://output', 'w');
         fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-        fputcsv($out, ['Student ID', 'Employee No', 'Student Name', 'Date', 'In', 'Out', 'Others', 'Machine ID']);
+        $firstLast = !empty($filters['first_last']);
+        fputcsv($out, $firstLast
+            ? ['Student ID', 'Employee No', 'Student Name', 'Date', 'Check-In', 'Check-Out', 'Machine ID']
+            : ['Student ID', 'Employee No', 'Student Name', 'Date', 'In', 'Out', 'Others', 'Machine ID']);
         foreach ($rows as $row) {
-            fputcsv($out, [
+            $line = [
                 $row['student_id'] ?? '',
                 $row['employee_no'] ?? '',
                 $row['student_name'] ?? '',
                 $row['attendance_date'] ?? '',
                 $row['time_in'] ?? '',
                 $row['time_out'] ?? '',
-                $row['time_others'] ?? '',
-                $row['machine_id'] ?? '',
-            ]);
+            ];
+            if (!$firstLast) {
+                $line[] = $row['time_others'] ?? '';
+            }
+            $line[] = $row['machine_id'] ?? '';
+            fputcsv($out, $line);
         }
         fclose($out);
         exit;

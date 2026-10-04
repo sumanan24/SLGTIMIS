@@ -1837,6 +1837,10 @@ class StudentDeviceAttendanceModel extends Model {
             while ($r = $res->fetch_assoc()) {
                 $times = array_map('trim', explode(',', (string) ($r['times_csv'] ?? '')));
                 $split = self::splitDayTimes($times);
+                if (!empty($filters['first_last'])) {
+                    $split['others'] = '';
+                    $split['others_list'] = [];
+                }
                 $rows[] = [
                     'student_id' => (string) ($r['student_id'] ?? ''),
                     'employee_no' => (string) ($r['employee_no'] ?? ''),

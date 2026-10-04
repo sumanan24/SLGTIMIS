@@ -18,15 +18,24 @@ $totalPages = max(1, (int) ceil($total / $perPage));
 $rows = $rows ?? [];
 $filters = $filters ?? [];
 
+$firstLastOn = !empty($filters['first_last']);
 $filterParams = array_filter([
     'person_id' => $filters['person_id'] ?? null,
     'student_name' => $filters['student_name'] ?? null,
     'date' => $filters['date'] ?? null,
     'date_from' => $filters['date_from'] ?? null,
     'date_to' => $filters['date_to'] ?? null,
+    'first_last' => $firstLastOn ? '1' : null,
 ], static function ($v) {
     return $v !== null && $v !== '';
 });
+$toggleParams = $filterParams;
+if ($firstLastOn) {
+    unset($toggleParams['first_last']);
+} else {
+    $toggleParams['first_last'] = '1';
+}
+$firstLastHref = $urls['events'] . ($toggleParams !== [] ? '?' . http_build_query($toggleParams) : '');
 $hasFilters = $filterParams !== [];
 $queryBase = $urls['events'];
 if ($filterParams !== []) {
@@ -50,7 +59,9 @@ if (($endPage - $startPage) < ($window * 2)) {
 
 $studentDeviceSection = 'events';
 $pageTitle = 'Attendance';
-$pageSubtitle = 'One row per student per day — In (first), Out (last), Others (middle punches). Auto quick-sync pulls today from each machine in chunks.';
+$pageSubtitle = $firstLastOn
+    ? 'First punch is Check-In and last punch is Check-Out for each student and date. Middle punches stay stored on the device record and are hidden here.'
+    : 'One row per student per day — In (first), Out (last), Others (middle punches). Auto quick-sync pulls today from each machine in chunks.';
 $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
 ?>
 <div class="student-device-page sd-fullpage">
@@ -78,6 +89,12 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
                 <p class="sd-page-lead"><?php echo $e($pageSubtitle); ?></p>
             </div>
             <div class="sd-header-actions">
+                <a class="btn <?php echo $firstLastOn ? 'btn-primary' : 'btn-outline-primary'; ?>"
+                   href="<?php echo $e($firstLastHref); ?>"
+                   aria-pressed="<?php echo $firstLastOn ? 'true' : 'false'; ?>"
+                   title="Show only the first punch as Check-In and the last punch as Check-Out. Device records are not deleted.">
+                    <i class="fas fa-user-check me-1"></i>First &amp; Last Attendance Per Day
+                </a>
                 <button type="button" class="btn btn-primary" id="sdQuickSyncBtn" title="Pull today's punches from all machines (one device per request)">
                     <i class="fas fa-bolt me-1"></i>Quick sync
                 </button>
@@ -155,6 +172,9 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
                 <?php endif; ?>
             </div>
             <div class="card-body">
+                <?php if ($firstLastOn): ?>
+                    <input type="hidden" name="first_last" value="1">
+                <?php endif; ?>
                 <div class="sd-filter-grid">
                     <div class="sd-field">
                         <label class="form-label" for="sdPersonId">Student ID / Emp No</label>
@@ -201,9 +221,14 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
                     <div>
                         <div class="fw-semibold">Daily attendance</div>
                         <div class="sd-legend mt-1">
-                            <span><i class="dot in"></i>In — first</span>
-                            <span><i class="dot out"></i>Out — last</span>
-                            <span><i class="dot other"></i>Others — middle</span>
+                            <?php if ($firstLastOn): ?>
+                                <span><i class="dot in"></i>Check-In — first</span>
+                                <span><i class="dot out"></i>Check-Out — last</span>
+                            <?php else: ?>
+                                <span><i class="dot in"></i>In — first</span>
+                                <span><i class="dot out"></i>Out — last</span>
+                                <span><i class="dot other"></i>Others — middle</span>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <div class="sd-summary-chip">
@@ -232,7 +257,9 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
                             <col class="col-date">
                             <col class="col-time">
                             <col class="col-time">
+                            <?php if (!$firstLastOn): ?>
                             <col class="col-others">
+                            <?php endif; ?>
                             <col class="col-machine">
                         </colgroup>
                         <thead>
@@ -241,9 +268,11 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
                             <th class="col-emp">Employee No</th>
                             <th class="col-name">Student Name</th>
                             <th class="col-date">Date</th>
-                            <th class="col-time text-center">In</th>
-                            <th class="col-time text-center">Out</th>
+                            <th class="col-time text-center"><?php echo $firstLastOn ? 'Check-In' : 'In'; ?></th>
+                            <th class="col-time text-center"><?php echo $firstLastOn ? 'Check-Out' : 'Out'; ?></th>
+                            <?php if (!$firstLastOn): ?>
                             <th class="col-others">Others</th>
+                            <?php endif; ?>
                             <th class="col-machine">Machine</th>
                         </tr>
                         </thead>
@@ -268,7 +297,9 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
                                         <span class="sd-time-empty">—</span>
                                     <?php endif; ?>
                                 </td>
+                                <?php if (!$firstLastOn): ?>
                                 <td class="col-others"><?php echo ($row['time_others'] ?? '') !== '' ? $e($row['time_others']) : '—'; ?></td>
+                                <?php endif; ?>
                                 <td class="col-machine"><?php echo $e($row['machine_id'] ?? ''); ?></td>
                             </tr>
                         <?php endforeach; ?>
@@ -288,7 +319,7 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
                             </div>
                             <div class="sd-day-times">
                                 <div>
-                                    <span class="sd-mini-label">In</span>
+                                    <span class="sd-mini-label"><?php echo $firstLastOn ? 'Check-In' : 'In'; ?></span>
                                     <?php if (!empty($row['time_in'])): ?>
                                         <span class="sd-time-in"><?php echo $e($row['time_in']); ?></span>
                                     <?php else: ?>
@@ -296,7 +327,7 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
                                     <?php endif; ?>
                                 </div>
                                 <div>
-                                    <span class="sd-mini-label">Out</span>
+                                    <span class="sd-mini-label"><?php echo $firstLastOn ? 'Check-Out' : 'Out'; ?></span>
                                     <?php if (!empty($row['time_out'])): ?>
                                         <span class="sd-time-out"><?php echo $e($row['time_out']); ?></span>
                                     <?php else: ?>
