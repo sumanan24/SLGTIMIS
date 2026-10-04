@@ -96,11 +96,15 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
         <?php
         $rangePresets = $rangePresets ?? [];
         $rangeDefault = $rangePresets[0] ?? ['from' => date('Y-m-d', strtotime('-6 days')), 'to' => date('Y-m-d')];
+        $rangeSyncReport = $rangeSyncReport ?? null;
         ?>
+        <?php if (is_array($rangeSyncReport) && !empty($rangeSyncReport['text'])): ?>
+            <pre class="sd-range-sync-report"><?php echo $e($rangeSyncReport['text']); ?></pre>
+        <?php endif; ?>
         <div class="card sd-card mb-3">
             <div class="card-header">
-                <div class="fw-semibold">Sync finger and face attendance</div>
-                <div class="small text-muted">Pull student punches from all machines for the last week, month, or 2 months.</div>
+                <div class="fw-semibold">Sync attendance for selected dates</div>
+                <div class="small text-muted">Pull every finger and face punch from Reader 1 (172.16.0.29), Reader 2 (172.16.0.28) and Reader 3 (172.16.0.27).</div>
             </div>
             <div class="card-body">
                 <div class="sd-range-sync-actions">
@@ -123,10 +127,10 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
                                value="<?php echo $e($rangeDefault['to'] ?? ''); ?>">
                     </div>
                     <button type="button" class="btn btn-primary btn-sm" id="sdRangeCustomBtn">
-                        <i class="fas fa-fingerprint me-1"></i>Sync selected dates
+                        <i class="fas fa-fingerprint me-1"></i>Sync attendance
                     </button>
                 </div>
-                <p class="small text-muted mb-0 mt-2">Finger and face punches are read one week at a time. The longest range is 2 months. This list reloads when the sync finishes.</p>
+                <p class="small text-muted mb-0 mt-2">Uses the dates you select, from 00:00:00 through the next day 00:00:00 (Asia/Colombo), including morning and evening punches. Each reader is read in full, page by page. Running the same dates again does not duplicate records.</p>
             </div>
         </div>
 
@@ -528,15 +532,18 @@ $rangeSyncUrl = (string) ($rangeSyncUrl ?? ($urls['range_sync_chunk'] ?? ''));
                 if (!data || data.success === false) {
                     throw new Error((data && data.message) || 'Chunk failed');
                 }
-                var total = parseInt(data.total, 10) || 0;
-                var machine = data.label || data.host || ('#' + (chunk + 1));
-                var windowLabel = (data.window_from && data.window_to) ? (data.window_from + '–' + data.window_to) : '';
+                var readersTotal = parseInt(data.readers_total, 10) || 3;
+                var readersDone = parseInt(data.readers_finished, 10) || 0;
                 savedTotal += parseInt(data.saved, 10) || 0;
-                setProgress(parseInt(data.chunk, 10) || chunk, total);
+                if (prog && readersTotal > 0) {
+                    var pct = data.done ? 100 : Math.max(8, Math.round((readersDone / readersTotal) * 100));
+                    prog.style.width = pct + '%';
+                    prog.setAttribute('aria-valuenow', String(pct));
+                }
                 if (msgEl) {
-                    msgEl.textContent = machine + (windowLabel ? (' · ' + windowLabel) : '') + ': '
-                        + (data.message || (data.ok ? 'OK' : 'Failed'))
-                        + (total ? (' (' + (chunk + 1) + '/' + total + ')') : '');
+                    var shown = Math.min(readersTotal, readersDone + (data.done ? 0 : 1));
+                    msgEl.textContent = (data.message || (data.ok ? 'OK' : 'Failed'))
+                        + ' (' + shown + '/' + readersTotal + ' readers)';
                 }
                 if (data.done) {
                     finish(true, data.summary || ('Saved ' + savedTotal + ' new punch(es)'), function () {

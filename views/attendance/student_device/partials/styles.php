@@ -1294,6 +1294,16 @@ $GLOBALS['__student_device_styles_loaded'] = true;
     border-top: 1px solid var(--sd-border);
     background: #fafbfc;
 }
+.student-device-page .sd-range-sync-report {
+    white-space: pre-wrap;
+    background: #f8fafc;
+    border: 1px solid var(--sd-border);
+    border-radius: 0.65rem;
+    padding: 0.9rem 1rem;
+    margin: 0 0 1rem;
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
 .student-device-page .sd-range-sync-actions {
     display: flex;
     flex-wrap: wrap;

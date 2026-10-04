@@ -1509,6 +1509,21 @@ class StudentDeviceAttendanceModel extends Model {
     /**
      * @return array{inserted: bool, duplicate: bool}
      */
+    public function countByMachineAndDates(string $machineId, string $dateFrom, string $dateTo): int {
+        $this->ensureTable();
+        $sql = "SELECT COUNT(*) AS c FROM `{$this->table}`
+            WHERE `machine_id` = ? AND `attendance_date` >= ? AND `attendance_date` <= ?";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return 0;
+        }
+        $stmt->bind_param('sss', $machineId, $dateFrom, $dateTo);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return (int) ($row['c'] ?? 0);
+    }
+
     public function insertEvent(array $row): array {
         $this->ensureAttendanceExtraColumns();
         $employeeNo = (string) ($row['employee_no'] ?? $row['person_id'] ?? '');

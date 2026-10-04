@@ -216,16 +216,15 @@ class StudentDeviceAttendanceSyncService {
 
         try {
             $machine = new MachineAttendanceService($cfg);
-            $fetch = $machine->fetchEvents(
-                $startImm->setTime(0, 0, 0),
-                $endImm->setTime(23, 59, 59)
-            );
-            if (empty($fetch['ok'])) {
+            $bounds = $this->readerQueryBounds($startImm, $endImm);
+            $fetch = $machine->fetchEvents($bounds['start'], $bounds['end_exclusive']);
+            $events = is_array($fetch['events'] ?? null) ? $fetch['events'] : [];
+            if ($events === [] && empty($fetch['ok'])) {
                 $out['message'] = (string) ($fetch['message'] ?? 'Fetch failed');
                 return $out;
             }
 
-            $out['ok'] = true;
+            $out['ok'] = !empty($fetch['ok']);
             $out['records_retrieved'] = (int) ($fetch['retrieved'] ?? 0);
             $users = $fetch['users'] ?? [];
             if (is_array($users) && $users !== []) {
@@ -244,69 +243,18 @@ class StudentDeviceAttendanceSyncService {
                 $typeByEmp[trim((string) ($mu['employee_no'] ?? ''))] = (string) ($mu['user_type'] ?? 'normal');
             }
 
-            foreach ($fetch['events'] as $ev) {
-                try {
-                    $employeeNo = trim((string) ($ev['person_id'] ?? ''));
-                    if ($employeeNo === '') {
-                        $out['empty_person_id']++;
-                        continue;
-                    }
-
-                    $userType = strtolower((string) ($ev['user_type'] ?? ''));
-                    if ($userType === '' && isset($typeByEmp[$employeeNo])) {
-                        $userType = strtolower($typeByEmp[$employeeNo]);
-                    }
-
-                    if (StudentDeviceAttendanceModel::isStaffUserType($userType)) {
-                        $out['staff_ignored']++;
-                        continue;
-                    }
-                    if ($this->attendance->isStaffPersonId($employeeNo)) {
-                        $out['staff_ignored']++;
-                        continue;
-                    }
-                    if ($userType !== '' && !StudentDeviceAttendanceModel::isStudentUserType($userType)) {
-                        $out['staff_ignored']++;
-                        continue;
-                    }
-
-                    $student = $this->attendance->findStudentByFingerId($employeeNo);
-                    if ($student === null) {
-                        $out['unmatched']++;
-                        continue;
-                    }
-
-                    $out['valid_student']++;
-                    $name = $student['student_name'] !== ''
-                        ? $student['student_name']
-                        : trim((string) ($ev['machine_name'] ?? ''));
-
-                    $ins = $this->attendance->insertEvent([
-                        'student_id' => $student['student_id'],
-                        'employee_no' => $employeeNo,
-                        'person_id' => $employeeNo,
-                        'student_name' => $name,
-                        'attendance_date' => $ev['attendance_date'],
-                        'attendance_time' => $ev['attendance_time'],
-                        'attendance_datetime' => $ev['attendance_datetime'],
-                        'machine_id' => $ev['machine_id'] !== '' ? $ev['machine_id'] : $host,
-                        'event_id' => $ev['event_id'],
-                        'source' => 'hikvision',
-                    ]);
-                    if ($ins['inserted']) {
-                        $out['saved']++;
-                    } elseif ($ins['duplicate']) {
-                        $out['duplicates']++;
-                    } else {
-                        $out['failed']++;
-                    }
-                } catch (Throwable $e) {
-                    $out['failed']++;
-                    error_log('[StudentDeviceAttendanceSync] row failed: ' . $e->getMessage());
+            $imported = $this->importEvents($events, $host, $typeByEmp);
+            foreach ($imported as $key => $value) {
+                if (isset($out[$key]) && is_int($value)) {
+                    $out[$key] += $value;
                 }
             }
 
-            $out['message'] = 'OK — ' . $out['records_retrieved'] . ' event(s), saved ' . $out['saved'];
+            if (empty($fetch['ok'])) {
+                $out['message'] = (string) ($fetch['message'] ?? 'Fetch failed');
+            } else {
+                $out['message'] = 'OK — ' . $out['records_retrieved'] . ' event(s), saved ' . $out['saved'];
+            }
         } catch (Throwable $e) {
             $out['message'] = $e->getMessage();
             error_log('[StudentDeviceAttendanceSync] device ' . $host . ': ' . $e->getMessage());
@@ -419,144 +367,274 @@ class StudentDeviceAttendanceSyncService {
     }
 
     /**
-     * One machine and one week-sized window per request, so a 1-week, 1-month,
-     * or 2-month finger/face pull does not hit the PHP time limit.
+     * Pull one page-batch from one of the three readers for the selected dates.
+     * A failed reader is marked finished so the other readers still run.
+     * The selected range is queried on the device; this does not use last_sync_at.
      *
-     * @return array{
-     *   ok:bool,done:bool,chunk:int,next_chunk:int,total:int,
-     *   host:string,label:string,role:string,
-     *   window_from:string,window_to:string,
-     *   records_retrieved:int,saved:int,duplicates:int,finger_ids_linked:int,
-     *   valid_student:int,staff_ignored:int,unmatched:int,failed:int,
-     *   message:string,skipped?:bool
-     * }
+     * @param array{reader?:int,minor_index?:int,position?:int,search_id?:string} $cursor
+     * @return array<string,mixed>
      */
-    public function syncRangeChunk(
+    public function syncReaderRangeSlice(
         DateTimeInterface $start,
         DateTimeInterface $end,
-        int $chunkIndex,
-        int $windowDays = 7,
-        int $deviceTimeoutSec = 45
+        array $cursor,
+        int $pageBudget = 6,
+        int $deviceTimeoutSec = 18
     ): array {
         $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
         $tzName = !empty($cfg['timezone']) ? (string) $cfg['timezone'] : 'Asia/Colombo';
         $tz = new DateTimeZone($tzName);
-        $startDay = $this->toImmutable($start, $tz)->setTime(0, 0, 0);
-        $endDay = $this->toImmutable($end, $tz)->setTime(0, 0, 0);
-        if ($endDay < $startDay) {
-            $swap = $startDay;
-            $startDay = $endDay;
-            $endDay = $swap;
+        $bounds = $this->readerQueryBounds($this->toImmutable($start, $tz), $this->toImmutable($end, $tz));
+        $readers = $this->attendanceReaders($cfg);
+        $readerIndex = max(0, (int) ($cursor['reader'] ?? 0));
+        $total = count($readers);
+        $base = [
+            'ok' => false,
+            'done' => true,
+            'reader_done' => true,
+            'readers_total' => $total,
+            'reader_index' => $readerIndex,
+            'readers_finished' => $total,
+            'host' => '',
+            'label' => '',
+            'role' => 'reader',
+            'window_from' => $bounds['start']->format('Y-m-d H:i:s'),
+            'window_to' => $bounds['end_exclusive']->format('Y-m-d H:i:s'),
+            'records_retrieved' => 0,
+            'saved' => 0,
+            'duplicates' => 0,
+            'failed' => 0,
+            'valid_student' => 0,
+            'staff_ignored' => 0,
+            'unmatched' => 0,
+            'finger_ids_linked' => 0,
+            'device_total' => null,
+            'pages_fetched' => 0,
+            'cursor' => ['reader' => $total, 'minor_index' => 0, 'position' => 0, 'search_id' => ''],
+            'message' => $total === 0 ? 'No readers configured' : 'All readers complete',
+            'skipped' => true,
+        ];
+        if ($readerIndex >= $total) {
+            return $base;
         }
 
-        $devices = $this->configuredDevices($cfg);
-        if ($devices === []) {
-            $devices = [[
-                'host' => $this->machine->getHost(),
-                'role' => 'main',
-                'label' => 'Main',
+        $device = $readers[$readerIndex];
+        $host = (string) ($device['host'] ?? '');
+        $label = (string) ($device['label'] ?? $host);
+        $slice = $base;
+        $slice['done'] = false;
+        $slice['reader_done'] = false;
+        $slice['readers_finished'] = $readerIndex;
+        $slice['host'] = $host;
+        $slice['label'] = $label;
+        $slice['skipped'] = false;
+        $slice['cursor'] = [
+            'reader' => $readerIndex,
+            'minor_index' => max(0, (int) ($cursor['minor_index'] ?? 0)),
+            'position' => max(0, (int) ($cursor['position'] ?? 0)),
+            'search_id' => trim((string) ($cursor['search_id'] ?? '')),
+        ];
+
+        try {
+            $machineCfg = array_merge($cfg, [
+                'host' => $host,
+                'username' => (string) ($device['username'] ?? $cfg['username'] ?? 'admin'),
+                'password' => (string) ($device['password'] ?? $cfg['password'] ?? ''),
+                'ssl' => !empty($device['ssl']),
+                'port' => (int) ($device['port'] ?? $cfg['port'] ?? 0),
+                'timeout' => max(12, min(25, $deviceTimeoutSec)),
+            ]);
+            $machine = new MachineAttendanceService($machineCfg);
+            $fetch = $machine->fetchEvents(
+                $bounds['start'],
+                $bounds['end_exclusive'],
+                false,
+                max(1, $pageBudget),
+                [
+                    'minor_index' => (int) $slice['cursor']['minor_index'],
+                    'position' => (int) $slice['cursor']['position'],
+                    'search_id' => (string) $slice['cursor']['search_id'],
+                ]
+            );
+            $imported = $this->importEvents(is_array($fetch['events'] ?? null) ? $fetch['events'] : [], $host, []);
+            $slice['records_retrieved'] = (int) ($fetch['retrieved'] ?? 0);
+            $slice['saved'] = (int) ($imported['saved'] ?? 0);
+            $slice['duplicates'] = (int) ($imported['duplicates'] ?? 0);
+            $slice['failed'] = (int) ($imported['failed'] ?? 0);
+            $slice['valid_student'] = (int) ($imported['valid_student'] ?? 0);
+            $slice['staff_ignored'] = (int) ($imported['staff_ignored'] ?? 0);
+            $slice['unmatched'] = (int) ($imported['unmatched'] ?? 0);
+            $slice['device_total'] = $fetch['device_total'] ?? null;
+            $slice['pages_fetched'] = (int) ($fetch['pages_fetched'] ?? 0);
+            $slice['ok'] = !empty($fetch['ok']);
+            $slice['message'] = $label . ' ' . $host . ' · ' . ($fetch['message'] ?? '');
+
+            if (empty($fetch['ok'])) {
+                $slice['reader_done'] = true;
+                $slice['message'] = $label . ' ' . $host . ' connection failed — ' . ($fetch['message'] ?? 'unavailable');
+                error_log('[AttendanceSync] Reader ' . $host . ' FAILED: ' . $slice['message']);
+            } elseif (!empty($fetch['complete'])) {
+                $slice['reader_done'] = true;
+                $slice['message'] = $label . ' ' . $host . ' range complete';
+            } else {
+                $next = is_array($fetch['resume'] ?? null) ? $fetch['resume'] : [];
+                $slice['cursor'] = [
+                    'reader' => $readerIndex,
+                    'minor_index' => (int) ($next['minor_index'] ?? 0),
+                    'position' => (int) ($next['position'] ?? 0),
+                    'search_id' => (string) ($next['search_id'] ?? ''),
+                ];
+                $slice['message'] = $label . ' ' . $host
+                    . ' · pages ' . $slice['pages_fetched']
+                    . ' · position ' . (int) $slice['cursor']['position'];
+            }
+        } catch (Throwable $e) {
+            $slice['ok'] = false;
+            $slice['reader_done'] = true;
+            $slice['failed']++;
+            $slice['message'] = $label . ' ' . $host . ' failed — ' . $e->getMessage();
+            error_log('[AttendanceSync] Reader ' . $host . ' exception: ' . $e->getMessage());
+        }
+
+        if (!empty($slice['reader_done'])) {
+            $slice['cursor'] = [
+                'reader' => $readerIndex + 1,
+                'minor_index' => 0,
+                'position' => 0,
+                'search_id' => '',
+            ];
+            $slice['readers_finished'] = $readerIndex + 1;
+            $slice['done'] = ($readerIndex + 1) >= $total;
+        }
+
+        return $slice;
+    }
+
+    /**
+     * @return array{start: DateTimeImmutable, end_exclusive: DateTimeImmutable}
+     */
+    private function readerQueryBounds(DateTimeImmutable $start, DateTimeImmutable $end): array {
+        $tz = $start->getTimezone();
+        $from = $start->format('Y-m-d');
+        $to = $end->format('Y-m-d');
+        if ($to < $from) {
+            $swap = $from;
+            $from = $to;
+            $to = $swap;
+        }
+        return MachineAttendanceService::inclusiveRangeToExclusive($from, $to, $tz->getName());
+    }
+
+    /**
+     * The three student biometric readers, in a fixed order.
+     *
+     * @param array<string,mixed> $cfg
+     * @return list<array<string,mixed>>
+     */
+    private function attendanceReaders(array $cfg): array {
+        $order = [
+            '172.16.0.29' => 'Reader 1',
+            '172.16.0.28' => 'Reader 2',
+            '172.16.0.27' => 'Reader 3',
+        ];
+        $byHost = [];
+        foreach ($this->configuredDevices($cfg) as $device) {
+            $byHost[(string) ($device['host'] ?? '')] = $device;
+        }
+        $out = [];
+        foreach ($order as $ip => $label) {
+            $device = $byHost[$ip] ?? [
+                'host' => $ip,
+                'role' => 'reader',
+                'label' => $label,
                 'username' => (string) ($cfg['username'] ?? 'admin'),
                 'password' => (string) ($cfg['password'] ?? ''),
                 'ssl' => !empty($cfg['ssl']),
                 'port' => (int) ($cfg['port'] ?? 0),
-                'timeout' => (int) ($cfg['timeout'] ?? 60),
-            ]];
+                'timeout' => (int) ($cfg['timeout'] ?? 20),
+            ];
+            $device['host'] = $ip;
+            $device['role'] = 'reader';
+            $device['label'] = $label;
+            $out[] = $device;
         }
-
-        $jobs = $this->rangeJobs($devices, $startDay, $endDay, $windowDays);
-        $total = count($jobs);
-        $empty = [
-            'ok' => $total === 0,
-            'done' => true,
-            'chunk' => $chunkIndex,
-            'next_chunk' => $total,
-            'total' => $total,
-            'host' => '',
-            'label' => '',
-            'role' => '',
-            'window_from' => $startDay->format('Y-m-d'),
-            'window_to' => $endDay->format('Y-m-d'),
-            'records_retrieved' => 0,
-            'saved' => 0,
-            'duplicates' => 0,
-            'finger_ids_linked' => 0,
-            'valid_student' => 0,
-            'staff_ignored' => 0,
-            'unmatched' => 0,
-            'failed' => 0,
-            'message' => $total === 0 ? 'No devices configured' : 'All chunks complete',
-            'skipped' => true,
-        ];
-        if ($total === 0 || $chunkIndex < 0 || $chunkIndex >= $total) {
-            return $empty;
-        }
-
-        $job = $jobs[$chunkIndex];
-        $device = $job['device'];
-        $winStart = $job['start'];
-        $winEnd = $job['end'];
-        $part = $this->syncOneDevice(
-            $device,
-            $cfg,
-            $winStart,
-            $winEnd,
-            max(20, min(55, $deviceTimeoutSec))
-        );
-        $next = $chunkIndex + 1;
-        $windowLabel = $winStart->format('Y-m-d') . ' to ' . $winEnd->format('Y-m-d');
-
-        return [
-            'ok' => !empty($part['ok']),
-            'done' => $next >= $total,
-            'chunk' => $chunkIndex,
-            'next_chunk' => $next,
-            'total' => $total,
-            'host' => (string) ($part['host'] ?? ''),
-            'label' => (string) ($part['label'] ?? ''),
-            'role' => (string) ($part['role'] ?? ''),
-            'window_from' => $winStart->format('Y-m-d'),
-            'window_to' => $winEnd->format('Y-m-d'),
-            'records_retrieved' => (int) ($part['records_retrieved'] ?? 0),
-            'saved' => (int) ($part['saved'] ?? 0),
-            'duplicates' => (int) ($part['duplicates'] ?? 0),
-            'finger_ids_linked' => (int) ($part['finger_ids_linked'] ?? 0),
-            'valid_student' => (int) ($part['valid_student'] ?? 0),
-            'staff_ignored' => (int) ($part['staff_ignored'] ?? 0),
-            'unmatched' => (int) ($part['unmatched'] ?? 0),
-            'failed' => (int) ($part['failed'] ?? 0),
-            'message' => trim((string) ($part['message'] ?? '') . ' · ' . $windowLabel),
-            'skipped' => false,
-        ];
+        return $out;
     }
 
     /**
-     * @param list<array<string,mixed>> $devices
-     * @return list<array{device:array<string,mixed>,start:DateTimeImmutable,end:DateTimeImmutable}>
+     * Insert missing punches. Existing device_id + event_id rows stay as duplicates.
+     *
+     * @param list<array<string,mixed>> $events
+     * @param array<string,string> $typeByEmp
+     * @return array{saved:int,duplicates:int,failed:int,valid_student:int,staff_ignored:int,unmatched:int,empty_person_id:int}
      */
-    private function rangeJobs(
-        array $devices,
-        DateTimeImmutable $startDay,
-        DateTimeImmutable $endDay,
-        int $windowDays
-    ): array {
-        $windowDays = max(1, min(14, $windowDays));
-        $jobs = [];
-        $cursor = $startDay;
-        while ($cursor <= $endDay) {
-            $winEnd = $cursor->modify('+' . ($windowDays - 1) . ' days');
-            if ($winEnd > $endDay) {
-                $winEnd = $endDay;
+    private function importEvents(array $events, string $host, array $typeByEmp): array {
+        $out = [
+            'saved' => 0,
+            'duplicates' => 0,
+            'failed' => 0,
+            'valid_student' => 0,
+            'staff_ignored' => 0,
+            'unmatched' => 0,
+            'empty_person_id' => 0,
+        ];
+        foreach ($events as $ev) {
+            try {
+                $employeeNo = trim((string) ($ev['person_id'] ?? ''));
+                if ($employeeNo === '') {
+                    $out['empty_person_id']++;
+                    continue;
+                }
+                $userType = strtolower((string) ($ev['user_type'] ?? ''));
+                if ($userType === '' && isset($typeByEmp[$employeeNo])) {
+                    $userType = strtolower($typeByEmp[$employeeNo]);
+                }
+                if (StudentDeviceAttendanceModel::isStaffUserType($userType)) {
+                    $out['staff_ignored']++;
+                    continue;
+                }
+                if ($this->attendance->isStaffPersonId($employeeNo)) {
+                    $out['staff_ignored']++;
+                    continue;
+                }
+                if ($userType !== '' && !StudentDeviceAttendanceModel::isStudentUserType($userType)) {
+                    $out['staff_ignored']++;
+                    continue;
+                }
+                $student = $this->attendance->findStudentByFingerId($employeeNo);
+                if ($student === null) {
+                    $out['unmatched']++;
+                    continue;
+                }
+                $out['valid_student']++;
+                $name = $student['student_name'] !== ''
+                    ? $student['student_name']
+                    : trim((string) ($ev['machine_name'] ?? ''));
+                $ins = $this->attendance->insertEvent([
+                    'student_id' => $student['student_id'],
+                    'employee_no' => $employeeNo,
+                    'person_id' => $employeeNo,
+                    'student_name' => $name,
+                    'attendance_date' => $ev['attendance_date'],
+                    'attendance_time' => $ev['attendance_time'],
+                    'attendance_datetime' => $ev['attendance_datetime'],
+                    'machine_id' => ($ev['machine_id'] ?? '') !== '' ? $ev['machine_id'] : $host,
+                    'event_id' => $ev['event_id'],
+                    'source' => 'hikvision',
+                ]);
+                if ($ins['inserted']) {
+                    $out['saved']++;
+                } elseif ($ins['duplicate']) {
+                    $out['duplicates']++;
+                } else {
+                    $out['failed']++;
+                }
+            } catch (Throwable $e) {
+                $out['failed']++;
+                error_log('[StudentDeviceAttendanceSync] row failed: ' . $e->getMessage());
             }
-            foreach ($devices as $device) {
-                $jobs[] = [
-                    'device' => $device,
-                    'start' => $cursor,
-                    'end' => $winEnd,
-                ];
-            }
-            $cursor = $winEnd->modify('+1 day');
         }
-        return $jobs;
+        return $out;
     }
 
     /**

@@ -100,7 +100,51 @@ class MachineAttendanceService {
      *   retrieved: int
      * }
      */
-    public function fetchEvents(DateTimeInterface $start, DateTimeInterface $end): array {
+    /**
+     * Inclusive calendar dates in Asia/Colombo become [start 00:00:00, next day 00:00:00).
+     *
+     * @return array{start: DateTimeImmutable, end_exclusive: DateTimeImmutable}
+     */
+    public static function inclusiveRangeToExclusive(string $dateFrom, string $dateTo, string $tzName = 'Asia/Colombo'): array {
+        $tz = new DateTimeZone($tzName);
+        $start = new DateTimeImmutable($dateFrom . ' 00:00:00', $tz);
+        $endExclusive = (new DateTimeImmutable($dateTo . ' 00:00:00', $tz))->modify('+1 day');
+        return ['start' => $start, 'end_exclusive' => $endExclusive];
+    }
+
+    /**
+     * Hikvision often returns a short page (for example 30) while totalMatches is much larger.
+     * Keep requesting until the device reports no further rows.
+     */
+    public static function acsSearchShouldContinue(int $returned, int $positionAfter, ?int $totalMatches, string $status = ''): bool {
+        if ($returned <= 0) {
+            return false;
+        }
+        $status = strtoupper(trim($status));
+        if ($status === 'MORE') {
+            return true;
+        }
+        if ($totalMatches !== null) {
+            return $positionAfter < $totalMatches;
+        }
+        return true;
+    }
+
+    /**
+     * @param array{minor_index?:int,position?:int,search_id?:string} $resume
+     * @return array{
+     *   ok: bool, message: string, events: list<array<string,mixed>>, users: list<array<string,mixed>>,
+     *   retrieved: int, complete: bool, resume: array{minor_index:int,position:int,search_id:string}|null,
+     *   device_total: ?int, pages_fetched: int
+     * }
+     */
+    public function fetchEvents(
+        DateTimeInterface $start,
+        DateTimeInterface $end,
+        bool $loadUsers = true,
+        int $pageBudget = 0,
+        array $resume = []
+    ): array {
         if ($this->host === '' || $this->password === '') {
             return [
                 'ok' => false,
@@ -108,13 +152,20 @@ class MachineAttendanceService {
                 'events' => [],
                 'users' => [],
                 'retrieved' => 0,
+                'complete' => true,
+                'resume' => null,
+                'device_total' => null,
+                'pages_fetched' => 0,
             ];
         }
 
-        $userDir = $this->fetchUserDirectory();
+        $userDir = ['ok' => true, 'message' => 'skipped', 'users' => []];
         $userMap = [];
-        foreach ($userDir['users'] as $u) {
-            $userMap[$u['employee_no']] = $u;
+        if ($loadUsers) {
+            $userDir = $this->fetchUserDirectory();
+            foreach ($userDir['users'] as $u) {
+                $userMap[$u['employee_no']] = $u;
+            }
         }
 
         $tz = new DateTimeZone($this->timezone);
@@ -122,15 +173,33 @@ class MachineAttendanceService {
         $endImm = $this->toImmutable($end)->setTimezone($tz);
         $startIso = $startImm->format('Y-m-d\TH:i:s');
         $endIso = $endImm->format('Y-m-d\TH:i:s');
+        $startBound = $startImm->format('Y-m-d H:i:s');
+        $endBound = $endImm->format('Y-m-d H:i:s');
         $url = rtrim($this->getBaseUrl(), '/') . '/ISAPI/AccessControl/AcsEvent?format=json';
 
         $byKey = [];
         $errors = [];
+        $deviceTotal = null;
+        $pagesFetched = 0;
+        $lastPageSig = '';
+        $minorIndex = max(0, (int) ($resume['minor_index'] ?? 0));
+        $position = max(0, (int) ($resume['position'] ?? 0));
+        $searchId = trim((string) ($resume['search_id'] ?? ''));
+        $minorCount = count($this->acsMinors);
+        $complete = true;
 
-        foreach ($this->acsMinors as $minor) {
-            $position = 0;
-            $searchId = bin2hex(random_bytes(8));
+        for (; $minorIndex < $minorCount; $minorIndex++) {
+            $minor = $this->acsMinors[$minorIndex];
+            $lastPageSig = '';
+            if ($searchId === '') {
+                $searchId = bin2hex(random_bytes(8));
+            }
+            $minorTotal = null;
             for ($page = 0; $page < $this->maxPages; $page++) {
+                if ($pageBudget > 0 && $pagesFetched >= $pageBudget) {
+                    $complete = false;
+                    break 2;
+                }
                 $payload = json_encode([
                     'AcsEventCond' => [
                         'searchID' => $searchId,
@@ -146,23 +215,33 @@ class MachineAttendanceService {
                 $res = $this->request('POST', $url, $payload, 'application/json', $this->timeout);
                 if ($res['error'] !== null) {
                     $errors[] = $this->networkHint($res['error']);
+                    $complete = false;
                     break 2;
                 }
                 if ($res['http_code'] === 401) {
                     $errors[] = $this->formatUnauthorized($res['body']);
+                    $complete = false;
                     break 2;
                 }
                 if ($res['http_code'] < 200 || $res['http_code'] >= 300) {
-                    if ($page === 0) {
-                        $errors[] = 'HTTP ' . $res['http_code'] . ' for ACS minor ' . $minor;
-                    }
-                    break;
+                    $errors[] = 'HTTP ' . $res['http_code'] . ' for ACS minor ' . $minor;
+                    $complete = false;
+                    break 2;
                 }
 
                 $data = json_decode($res['body'], true);
                 if (!is_array($data)) {
                     $errors[] = 'Invalid JSON from machine AcsEvent.';
+                    $complete = false;
                     break 2;
+                }
+
+                $pagesFetched++;
+                $status = (string) ($data['AcsEvent']['responseStatusStrg'] ?? $data['AcsEvent']['responseStatusString'] ?? '');
+                $reportedTotal = self::acsEventTotal($data);
+                if ($reportedTotal !== null) {
+                    $minorTotal = $reportedTotal;
+                    $deviceTotal = $reportedTotal;
                 }
 
                 $list = $this->extractInfoList($data);
@@ -170,6 +249,11 @@ class MachineAttendanceService {
                     break;
                 }
 
+                $pageSig = md5((string) json_encode($list));
+                if ($pageSig === $lastPageSig) {
+                    break;
+                }
+                $lastPageSig = $pageSig;
                 foreach ($list as $item) {
                     if (!is_array($item)) {
                         continue;
@@ -178,7 +262,10 @@ class MachineAttendanceService {
                     if ($normalized === null) {
                         continue;
                     }
-                    // Fill name / type from UserInfo when AcsEvent has empty name
+                    $when = (string) $normalized['attendance_datetime'];
+                    if ($when < $startBound || $when >= $endBound) {
+                        continue;
+                    }
                     $pid = $normalized['person_id'];
                     if (isset($userMap[$pid])) {
                         if ($normalized['machine_name'] === '') {
@@ -194,10 +281,13 @@ class MachineAttendanceService {
 
                 $count = count($list);
                 $position += $count;
-                if ($count < $this->maxResults) {
+                if (!self::acsSearchShouldContinue($count, $position, $minorTotal, $status)) {
                     break;
                 }
             }
+            $position = 0;
+            $searchId = '';
+            $minorTotal = null;
         }
 
         $events = array_values($byKey);
@@ -205,23 +295,41 @@ class MachineAttendanceService {
             return strcmp($b['attendance_datetime'], $a['attendance_datetime']);
         });
 
-        if ($events === [] && $errors !== [] && empty($userDir['ok'])) {
-            return [
-                'ok' => false,
-                'message' => $errors[0],
-                'events' => [],
-                'users' => $userDir['users'],
-                'retrieved' => 0,
+        $failed = $errors !== [];
+        $resumeOut = null;
+        if (!$failed && !$complete) {
+            $resumeOut = [
+                'minor_index' => $minorIndex,
+                'position' => $position,
+                'search_id' => $searchId,
             ];
         }
 
         return [
-            'ok' => true,
-            'message' => 'OK',
+            'ok' => !$failed,
+            'message' => $failed ? (string) $errors[0] : 'OK',
             'events' => $events,
             'users' => $userDir['users'],
             'retrieved' => count($events),
+            'complete' => $failed ? false : $complete,
+            'resume' => $resumeOut,
+            'device_total' => $deviceTotal,
+            'pages_fetched' => $pagesFetched,
         ];
+    }
+
+    /** @param array<string,mixed> $data */
+    private static function acsEventTotal(array $data): ?int {
+        $acs = $data['AcsEvent'] ?? null;
+        if (!is_array($acs)) {
+            return null;
+        }
+        foreach (['totalMatches', 'TotalMatches'] as $key) {
+            if (isset($acs[$key]) && $acs[$key] !== '' && is_numeric($acs[$key])) {
+                return (int) $acs[$key];
+            }
+        }
+        return null;
     }
 
     /**
@@ -365,18 +473,21 @@ class MachineAttendanceService {
             return null;
         }
         $tz = new DateTimeZone($this->timezone);
+        $hasZone = (bool) preg_match('/(?:Z|[+-]\d{2}:\d{2}|[+-]\d{4})$/', $raw);
+        if (!$hasZone) {
+            $normalized = str_replace('T', ' ', $raw);
+            $normalized = preg_replace('/\.\d+/', '', $normalized) ?? $normalized;
+            $wall = substr($normalized, 0, 19);
+            $dt = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $wall, $tz);
+            if ($dt !== false) {
+                return $dt;
+            }
+        }
         try {
             return (new DateTimeImmutable($raw))->setTimezone($tz);
         } catch (Exception $e) {
-            // fall through
+            return null;
         }
-        foreach (['Y-m-d\TH:i:s', 'Y-m-d\TH:i:sP', 'Y-m-d H:i:s', 'Y/m/d H:i:s'] as $f) {
-            $dt = DateTimeImmutable::createFromFormat($f, $raw, $tz);
-            if ($dt !== false) {
-                return $dt->setTimezone($tz);
-            }
-        }
-        return null;
     }
 
     /** @return list<array<string, mixed>> */

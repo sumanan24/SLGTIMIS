@@ -762,6 +762,12 @@ class StudentDeviceAttendanceController extends Controller {
             ],
         ];
 
+        $rangeSyncReport = null;
+        if (is_array($_SESSION['student_att_range_report'] ?? null)) {
+            $rangeSyncReport = $_SESSION['student_att_range_report'];
+            unset($_SESSION['student_att_range_report']);
+        }
+
         return $this->view('attendance/student_device/events', [
             'title' => 'Attendance',
             'page' => 'student-device-attendance-events',
@@ -775,6 +781,7 @@ class StudentDeviceAttendanceController extends Controller {
             'quickSyncUrl' => $this->urls()['quick_sync_chunk'],
             'rangeSyncUrl' => $this->urls()['range_sync_chunk'],
             'rangePresets' => $rangePresets,
+            'rangeSyncReport' => $rangeSyncReport,
         ]);
     }
 
@@ -898,95 +905,151 @@ class StudentDeviceAttendanceController extends Controller {
         @set_time_limit(90);
         try {
             $svc = $this->syncService();
-            $row = $svc->syncRangeChunk($start, $end, $chunk, 7, 45);
-
-            $blankRun = [
-                'date_from' => $from,
-                'date_to' => $to,
-                'log_id' => 0,
-                'saved' => 0,
-                'retrieved' => 0,
-                'hosts_ok' => [],
-                'hosts_seen' => [],
-                'valid_student' => 0,
-                'duplicates' => 0,
-                'failed' => 0,
-                'finger_ids_linked' => 0,
-                'staff_ignored' => 0,
-                'unmatched' => 0,
-            ];
             if ($chunk === 0) {
+                error_log("Attendance Sync Started\nDate From: {$from}\nDate To: {$to}");
                 $logId = $svc->logModel()->startLog(
                     (int) ($_SESSION['user_id'] ?? 0),
                     (string) ($_SESSION['user_name'] ?? ''),
                     $from,
                     $to,
-                    'range'
+                    '172.16.0.29,172.16.0.28,172.16.0.27'
                 );
-                $_SESSION['student_att_range_run'] = $blankRun;
-                $_SESSION['student_att_range_run']['log_id'] = $logId;
+                $_SESSION['student_att_range_run'] = [
+                    'date_from' => $from,
+                    'date_to' => $to,
+                    'log_id' => $logId,
+                    'readers' => [],
+                ];
+                $_SESSION['student_att_range_cursor'] = [
+                    'reader' => 0,
+                    'minor_index' => 0,
+                    'position' => 0,
+                    'search_id' => '',
+                ];
             }
 
             $run = $_SESSION['student_att_range_run'] ?? null;
             if (!is_array($run) || ($run['date_from'] ?? '') !== $from || ($run['date_to'] ?? '') !== $to) {
                 $fail('This sync was interrupted. Start the date range again.');
             }
+            $cursor = $_SESSION['student_att_range_cursor'] ?? [
+                'reader' => 0,
+                'minor_index' => 0,
+                'position' => 0,
+                'search_id' => '',
+            ];
+            $row = $svc->syncReaderRangeSlice($start, $end, is_array($cursor) ? $cursor : [], 6, 18);
+            if (!empty($row['cursor']) && is_array($row['cursor'])) {
+                $_SESSION['student_att_range_cursor'] = $row['cursor'];
+            }
 
-            if (empty($row['skipped'])) {
-                $host = (string) ($row['host'] ?? '');
-                $firstSee = $host !== '' && empty($run['hosts_seen'][$host]);
-                $run['saved'] += (int) ($row['saved'] ?? 0);
-                $run['retrieved'] += (int) ($row['records_retrieved'] ?? 0);
-                $run['valid_student'] += (int) ($row['valid_student'] ?? 0);
-                $run['duplicates'] += (int) ($row['duplicates'] ?? 0);
-                $run['failed'] += (int) ($row['failed'] ?? 0);
-                $run['staff_ignored'] += (int) ($row['staff_ignored'] ?? 0);
-                $run['unmatched'] += (int) ($row['unmatched'] ?? 0);
-                if ($firstSee) {
-                    $run['finger_ids_linked'] += (int) ($row['finger_ids_linked'] ?? 0);
+            $host = (string) ($row['host'] ?? '');
+            if ($host !== '') {
+                $slot = $run['readers'][$host] ?? [
+                    'host' => $host,
+                    'label' => (string) ($row['label'] ?? $host),
+                    'retrieved' => 0,
+                    'saved' => 0,
+                    'duplicates' => 0,
+                    'failed' => 0,
+                    'connection' => 'FAILED',
+                    'sis' => 0,
+                    'device_total' => null,
+                ];
+                $slot['label'] = (string) ($row['label'] ?? $slot['label']);
+                $slot['retrieved'] += (int) ($row['records_retrieved'] ?? 0);
+                $slot['saved'] += (int) ($row['saved'] ?? 0);
+                $slot['duplicates'] += (int) ($row['duplicates'] ?? 0);
+                $slot['failed'] += (int) ($row['failed'] ?? 0);
+                if ($slot['device_total'] === null && isset($row['device_total']) && $row['device_total'] !== null) {
+                    $slot['device_total'] = (int) $row['device_total'];
                 }
-                if ($host !== '') {
-                    $run['hosts_seen'][$host] = true;
-                    if (!empty($row['ok'])) {
-                        $run['hosts_ok'][$host] = true;
-                    }
+                if (!empty($row['ok']) || $slot['retrieved'] > 0) {
+                    $slot['connection'] = 'SUCCESS';
                 }
+                if (!empty($row['reader_done'])) {
+                    $slot['sis'] = $svc->attendanceModel()->countByMachineAndDates($host, $from, $to);
+                    $missing = max(0, (int) $slot['retrieved'] - (int) $slot['sis']);
+                    error_log(
+                        "Reader: {$host}\n"
+                        . 'Connection: ' . $slot['connection'] . "\n"
+                        . 'Events Found: ' . (int) $slot['retrieved'] . "\n"
+                        . 'Events Imported: ' . (int) $slot['saved'] . "\n"
+                        . 'Duplicates: ' . (int) $slot['duplicates'] . "\n"
+                        . 'Errors: ' . (int) $slot['failed'] . "\n"
+                        . 'SIS records: ' . (int) $slot['sis'] . "\n"
+                        . 'Not yet in SIS: ' . $missing
+                    );
+                }
+                $run['readers'][$host] = $slot;
             }
             $_SESSION['student_att_range_run'] = $run;
 
+            $totals = ['retrieved' => 0, 'saved' => 0, 'duplicates' => 0, 'failed' => 0];
+            foreach ($run['readers'] as $slot) {
+                $totals['retrieved'] += (int) ($slot['retrieved'] ?? 0);
+                $totals['saved'] += (int) ($slot['saved'] ?? 0);
+                $totals['duplicates'] += (int) ($slot['duplicates'] ?? 0);
+                $totals['failed'] += (int) ($slot['failed'] ?? 0);
+            }
+            $row['saved'] = (int) ($row['saved'] ?? 0);
+            $row['records_retrieved'] = (int) ($row['records_retrieved'] ?? 0);
+
             if (!empty($row['done'])) {
-                $online = count($run['hosts_ok'] ?? []);
-                $seen = count($run['hosts_seen'] ?? []);
-                $summary = sprintf(
-                    'Attendance sync %s to %s — %d/%d machine(s) OK, retrieved %d, saved %d, duplicates %d',
-                    $from,
-                    $to,
-                    $online,
-                    max($seen, $online),
-                    (int) $run['retrieved'],
-                    (int) $run['saved'],
-                    (int) $run['duplicates']
-                );
+                $lines = [
+                    'ATTENDANCE SYNCHRONIZATION',
+                    'Date Range: ' . $from . ' → ' . $to,
+                    'Window: ' . $from . ' 00:00:00 to ' . (new DateTimeImmutable($to . ' 00:00:00', $tz))->modify('+1 day')->format('Y-m-d') . ' 00:00:00 (Asia/Colombo, end exclusive)',
+                ];
+                $order = ['172.16.0.29' => 'Reader 1', '172.16.0.28' => 'Reader 2', '172.16.0.27' => 'Reader 3'];
+                foreach ($order as $ip => $label) {
+                    $slot = $run['readers'][$ip] ?? null;
+                    $lines[] = '';
+                    $lines[] = $label . ' - ' . $ip;
+                    $lines[] = 'Retrieved: ' . (int) ($slot['retrieved'] ?? 0);
+                    $lines[] = 'Imported: ' . (int) ($slot['saved'] ?? 0);
+                    $lines[] = 'Already Exists: ' . (int) ($slot['duplicates'] ?? 0);
+                    $lines[] = 'Failed: ' . (int) ($slot['failed'] ?? 0);
+                    $lines[] = 'SIS records: ' . (int) ($slot['sis'] ?? 0);
+                    $lines[] = 'Connection: ' . (string) ($slot['connection'] ?? 'FAILED');
+                }
+                $lines[] = '';
+                $lines[] = 'TOTAL';
+                $lines[] = 'Retrieved: ' . $totals['retrieved'];
+                $lines[] = 'Imported: ' . $totals['saved'];
+                $lines[] = 'Already Exists: ' . $totals['duplicates'];
+                $lines[] = 'Failed: ' . $totals['failed'];
+                $online = 0;
+                foreach ($run['readers'] as $slot) {
+                    if (($slot['connection'] ?? '') === 'SUCCESS') {
+                        $online++;
+                    }
+                }
+                $lines[] = 'Sync Status: ' . ($online > 0 ? 'COMPLETED' : 'COMPLETED WITH ERRORS');
+                $summary = implode("\n", $lines);
+                error_log("Attendance Sync Completed\n" . $summary);
                 $svc->logModel()->finishLog((int) ($run['log_id'] ?? 0), [
                     'status' => $online > 0 ? 'ok' : 'error',
-                    'error_message' => $online > 0 ? '' : 'No machines responded.',
-                    'records_retrieved' => (int) $run['retrieved'],
-                    'valid_student' => (int) $run['valid_student'],
-                    'staff_ignored' => (int) $run['staff_ignored'],
+                    'error_message' => $online > 0 ? '' : 'No readers responded.',
+                    'records_retrieved' => $totals['retrieved'],
+                    'valid_student' => $totals['saved'] + $totals['duplicates'],
+                    'staff_ignored' => 0,
                     'empty_person_id' => 0,
-                    'unmatched' => (int) $run['unmatched'],
-                    'duplicates' => (int) $run['duplicates'],
-                    'saved' => (int) $run['saved'],
-                    'failed' => (int) $run['failed'],
+                    'unmatched' => 0,
+                    'duplicates' => $totals['duplicates'],
+                    'saved' => $totals['saved'],
+                    'failed' => $totals['failed'],
                 ]);
-                unset($_SESSION['student_att_range_run']);
-                $row['summary'] = $summary;
-                $row['run'] = [
-                    'saved' => (int) $run['saved'],
-                    'retrieved' => (int) $run['retrieved'],
-                    'duplicates' => (int) $run['duplicates'],
-                    'online' => $online,
+                $_SESSION['student_att_range_report'] = [
+                    'text' => $summary,
+                    'from' => $from,
+                    'to' => $to,
+                    'readers' => $run['readers'],
+                    'totals' => $totals,
+                    'status' => $online > 0 ? 'COMPLETED' : 'COMPLETED WITH ERRORS',
                 ];
+                unset($_SESSION['student_att_range_run'], $_SESSION['student_att_range_cursor']);
+                $row['summary'] = $summary;
             }
 
             echo json_encode(['success' => true] + $row);
