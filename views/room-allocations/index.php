@@ -1,22 +1,74 @@
+<?php
+$allocationFilters = [
+    'hostel_id' => $hostel_id ?? '',
+    'room_id' => $room_id ?? '',
+    'department_id' => $department_id ?? '',
+    'gender' => $gender ?? '',
+    'status' => $status ?? '',
+    'search' => $search ?? ''
+];
+$allocationQuery = http_build_query(array_filter($allocationFilters, function ($value) {
+    return $value !== '' && $value !== null;
+}));
+$leftFilters = $allocationFilters;
+$leftFilters['status'] = 'left';
+$leftQuery = http_build_query(array_filter($leftFilters, function ($value) {
+    return $value !== '' && $value !== null;
+}));
+$currentFilters = $allocationFilters;
+unset($currentFilters['status']);
+$currentQuery = http_build_query(array_filter($currentFilters, function ($value) {
+    return $value !== '' && $value !== null;
+}));
+
+if (!function_exists('allocationStatusBadge')) {
+    function allocationStatusBadge($status) {
+        $status = $status ?: 'active';
+        $class = 'bg-secondary';
+        if ($status === 'active') {
+            $class = 'bg-success';
+        } elseif ($status === 'left') {
+            $class = 'bg-warning text-dark';
+        } elseif ($status === 'cancelled') {
+            $class = 'bg-danger';
+        }
+        return '<span class="badge ' . $class . '">' . htmlspecialchars(ucfirst($status)) . '</span>';
+    }
+}
+
+if (!function_exists('allocationDateLabel')) {
+    function allocationDateLabel($value) {
+        if (empty($value)) {
+            return '';
+        }
+        if (is_numeric($value)) {
+            return date('Y-m-d', (int) $value);
+        }
+        $timestamp = strtotime($value);
+        return $timestamp ? date('Y-m-d', $timestamp) : $value;
+    }
+}
+?>
 <div class="container-fluid px-4 py-3">
     <div class="card shadow-sm border-0">
         <div class="card-header bg-primary text-white">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <h5 class="mb-0 fw-bold"><i class="fas fa-user-check me-2"></i>Room Allocations</h5>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <a href="<?php echo APP_URL; ?>/room-allocations?<?php echo $leftQuery; ?>"
+                       class="btn btn-sm mt-2 mt-md-0 <?php echo ($status ?? '') === 'left' ? 'btn-warning' : 'btn-outline-light'; ?>">
+                        <i class="fas fa-sign-out-alt me-1"></i>Students Left
+                        <span class="badge <?php echo ($status ?? '') === 'left' ? 'bg-dark' : 'bg-light text-dark'; ?> ms-1"><?php echo number_format($left_count ?? 0); ?></span>
+                    </a>
+                    <?php if (($status ?? '') === 'left'): ?>
+                    <a href="<?php echo APP_URL; ?>/room-allocations<?php echo $currentQuery !== '' ? '?' . $currentQuery : ''; ?>" class="btn btn-outline-light btn-sm mt-2 mt-md-0">
+                        <i class="fas fa-bed me-1"></i>Current Students
+                    </a>
+                    <?php endif; ?>
                     <a href="<?php echo APP_URL; ?>/hostel-report" class="btn btn-outline-light btn-sm mt-2 mt-md-0">
                         <i class="fas fa-chart-pie me-1"></i>Hostel Report
                     </a>
-                    <a href="<?php echo APP_URL; ?>/room-allocations/export-excel?<?php 
-                        echo http_build_query(array_filter([
-                            'hostel_id' => $hostel_id ?? '',
-                            'room_id' => $room_id ?? '',
-                            'status' => $status ?? '',
-                            'department_id' => $department_id ?? '',
-                            'gender' => $gender ?? '',
-                            'search' => $search ?? ''
-                        ])); 
-                    ?>" class="btn btn-outline-light btn-sm mt-2 mt-md-0">
+                    <a href="<?php echo APP_URL; ?>/room-allocations/export-excel<?php echo $allocationQuery !== '' ? '?' . $allocationQuery : ''; ?>" class="btn btn-outline-light btn-sm mt-2 mt-md-0">
                         <i class="fas fa-file-excel me-1"></i>Export Excel
                     </a>
                     <?php if (isset($canManage) && $canManage): ?>
@@ -102,7 +154,8 @@
                             <select name="status" id="filter_status" class="form-select form-select-sm">
                                 <option value="">All Status</option>
                                 <option value="active" <?php echo ($status ?? '') === 'active' ? 'selected' : ''; ?>>Active</option>
-                                <option value="inactive" <?php echo ($status ?? '') === 'inactive' ? 'selected' : ''; ?>>Inactive</option>
+                                <option value="left" <?php echo ($status ?? '') === 'left' ? 'selected' : ''; ?>>Left</option>
+                                <option value="cancelled" <?php echo ($status ?? '') === 'cancelled' ? 'selected' : ''; ?>>Cancelled</option>
                             </select>
                         </div>
                         <div class="col-md-12 col-lg-8">
@@ -137,11 +190,18 @@
                 </div>
 
                 <?php if (!empty($roomAllocations)): ?>
+                    <?php $shownRooms = 0; ?>
                     <div class="row g-4">
                         <?php foreach ($roomAllocations as $roomData): 
                             $room = $roomData['room'];
                             $roomAllocs = $roomData['allocations'];
-                            $occupied = count(array_filter($roomAllocs, function($a) { return ($a['status'] ?? '') === 'active'; }));
+                            if (!empty($status) && empty($roomAllocs)) {
+                                continue;
+                            }
+                            $shownRooms++;
+                            $occupied = isset($room['occupied_beds'])
+                                ? (int) $room['occupied_beds']
+                                : count(array_filter($roomAllocs, function($a) { return ($a['status'] ?? '') === 'active'; }));
                             $capacity = $room['capacity'] ?? 0;
                             $available = $capacity - $occupied;
                             $occupancyPercent = $capacity > 0 ? ($occupied / $capacity) * 100 : 0;
@@ -213,15 +273,27 @@
                                                                     </div>
                                                                 </div>
                                                                 <div class="ms-3 d-flex align-items-center gap-2">
-                                                                    <span class="badge <?php echo (($alloc['status'] ?? 'active') === 'active') ? 'bg-success' : 'bg-secondary'; ?>">
-                                                                        <?php echo htmlspecialchars(ucfirst($alloc['status'] ?? 'active')); ?>
-                                                                    </span>
+                                                                    <?php echo allocationStatusBadge($alloc['status'] ?? 'active'); ?>
+                                                                    <?php if (($alloc['status'] ?? '') === 'left' && !empty($alloc['leaving_at'])): ?>
+                                                                        <span class="small text-muted"><?php echo htmlspecialchars(allocationDateLabel($alloc['leaving_at'])); ?></span>
+                                                                    <?php endif; ?>
                                                                     <button type="button" class="btn btn-sm btn-outline-info" 
                                                                             data-bs-toggle="modal" 
                                                                             data-bs-target="#studentModal<?php echo $alloc['id'] ?? ''; ?>"
                                                                             title="View Full Details">
                                                                         <i class="fas fa-eye"></i>
                                                                     </button>
+                                                                    <?php if (!empty($canManage) && ($alloc['status'] ?? '') === 'active'): ?>
+                                                                    <form method="POST" action="<?php echo APP_URL; ?>/room-allocations/deallocate?id=<?php echo urlencode($alloc['id'] ?? ''); ?>" class="d-inline" onsubmit="return confirm('Mark this student as left the hostel? The bed will become available.');">
+                                                                        <?php foreach ($allocationFilters as $filterKey => $filterValue): ?>
+                                                                            <input type="hidden" name="<?php echo htmlspecialchars($filterKey); ?>" value="<?php echo htmlspecialchars($filterValue); ?>">
+                                                                        <?php endforeach; ?>
+                                                                        <input type="hidden" name="leaving_at" value="<?php echo date('Y-m-d'); ?>">
+                                                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Mark student as left">
+                                                                            <i class="fas fa-sign-out-alt"></i>
+                                                                        </button>
+                                                                    </form>
+                                                                    <?php endif; ?>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -299,11 +371,18 @@
                                                                             <div class="col-md-6">
                                                                                 <label class="form-label fw-bold text-muted">Status</label>
                                                                                 <div class="form-control-plaintext">
-                                                                                    <span class="badge <?php echo (($alloc['status'] ?? 'active') === 'active') ? 'bg-success' : 'bg-secondary'; ?>">
-                                                                                        <?php echo htmlspecialchars(ucfirst($alloc['status'] ?? 'active')); ?>
-                                                                                    </span>
+                                                                                    <?php echo allocationStatusBadge($alloc['status'] ?? 'active'); ?>
                                                                                 </div>
                                                                             </div>
+                                                                            <?php if (!empty($alloc['leaving_at'])): ?>
+                                                                            <div class="col-md-6">
+                                                                                <label class="form-label fw-bold text-muted">Leaving Date</label>
+                                                                                <div class="form-control-plaintext">
+                                                                                    <i class="fas fa-calendar-times me-1 text-muted"></i>
+                                                                                    <?php echo htmlspecialchars(allocationDateLabel($alloc['leaving_at'])); ?>
+                                                                                </div>
+                                                                            </div>
+                                                                            <?php endif; ?>
                                                                             <?php if (!empty($alloc['allocated_at'])): ?>
                                                                             <div class="col-md-6">
                                                                                 <label class="form-label fw-bold text-muted">Allocated Date</label>
@@ -324,6 +403,18 @@
                                                                         </div>
                                                                     </div>
                                                                     <div class="modal-footer">
+                                                                        <?php if (!empty($canManage) && ($alloc['status'] ?? '') === 'active'): ?>
+                                                                        <form method="POST" action="<?php echo APP_URL; ?>/room-allocations/deallocate?id=<?php echo urlencode($alloc['id'] ?? ''); ?>" class="d-flex align-items-center gap-2 me-auto" onsubmit="return confirm('Mark this student as left the hostel? The bed will become available.');">
+                                                                            <?php foreach ($allocationFilters as $filterKey => $filterValue): ?>
+                                                                                <input type="hidden" name="<?php echo htmlspecialchars($filterKey); ?>" value="<?php echo htmlspecialchars($filterValue); ?>">
+                                                                            <?php endforeach; ?>
+                                                                            <label class="small text-muted mb-0" for="leaving_at_<?php echo htmlspecialchars($alloc['id'] ?? ''); ?>">Leaving date</label>
+                                                                            <input type="date" class="form-control form-control-sm" style="width: auto;" id="leaving_at_<?php echo htmlspecialchars($alloc['id'] ?? ''); ?>" name="leaving_at" value="<?php echo date('Y-m-d'); ?>" required>
+                                                                            <button type="submit" class="btn btn-warning btn-sm">
+                                                                                <i class="fas fa-sign-out-alt me-1"></i>Mark as Left
+                                                                            </button>
+                                                                        </form>
+                                                                        <?php endif; ?>
                                                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                                                     </div>
                                                                 </div>
@@ -343,6 +434,12 @@
                             </div>
                         <?php endforeach; ?>
                     </div>
+                    <?php if ($shownRooms === 0): ?>
+                        <div class="text-center py-5">
+                            <i class="fas fa-sign-out-alt fa-3x text-muted mb-3"></i>
+                            <p class="text-muted mb-0">No <?php echo htmlspecialchars($status); ?> students found for this hostel.</p>
+                        </div>
+                    <?php endif; ?>
                 <?php else: ?>
                     <div class="text-center py-5">
                         <i class="fas fa-door-open fa-3x text-muted mb-3"></i>
@@ -369,6 +466,7 @@
                                 <th class="fw-bold">Block</th>
                                 <th class="fw-bold">Room</th>
                                 <th class="fw-bold">Allocated Date</th>
+                                <th class="fw-bold">Leaving Date</th>
                                 <th class="fw-bold">Status</th>
                                 <th class="fw-bold text-end">Actions</th>
                             </tr>
@@ -385,27 +483,9 @@
                                             <?php echo htmlspecialchars($allocation['room_no'] ?? 'N/A'); ?>
                                         </span>
                                     </td>
-                                    <td>
-                                        <?php 
-                                        if (!empty($allocation['allocated_at'])) {
-                                            // Check if it's a timestamp (integer) or date string
-                                            if (is_numeric($allocation['allocated_at'])) {
-                                                echo date('Y-m-d', (int)$allocation['allocated_at']);
-                                            } else {
-                                                // Already a date string, just format it
-                                                $date = strtotime($allocation['allocated_at']);
-                                                echo $date ? date('Y-m-d', $date) : htmlspecialchars($allocation['allocated_at']);
-                                            }
-                                        } else {
-                                            echo 'N/A';
-                                        }
-                                        ?>
-                                    </td>
-                                    <td>
-                                        <span class="badge <?php echo (($allocation['status'] ?? 'active') === 'active') ? 'bg-success' : 'bg-secondary'; ?>">
-                                            <?php echo htmlspecialchars(ucfirst($allocation['status'] ?? 'active')); ?>
-                                        </span>
-                                    </td>
+                                    <td><?php echo htmlspecialchars(allocationDateLabel($allocation['allocated_at'] ?? '') ?: 'N/A'); ?></td>
+                                    <td><?php echo htmlspecialchars(allocationDateLabel($allocation['leaving_at'] ?? '') ?: '—'); ?></td>
+                                    <td><?php echo allocationStatusBadge($allocation['status'] ?? 'active'); ?></td>
                                     <td class="text-end">
                                         <?php if (isset($canManage) && $canManage): ?>
                                         <div class="btn-group" role="group">
@@ -414,11 +494,15 @@
                                                 <i class="fas fa-edit"></i>
                                             </a>
                                             <?php if (($allocation['status'] ?? '') === 'active'): ?>
-                                                <a href="<?php echo APP_URL; ?>/room-allocations/deallocate?id=<?php echo urlencode($allocation['id'] ?? ''); ?>" 
-                                                   class="btn btn-sm btn-outline-warning" title="Deallocate" 
-                                                   onclick="return confirm('Are you sure you want to deallocate this room?');">
-                                                    <i class="fas fa-sign-out-alt"></i>
-                                                </a>
+                                                <form method="POST" action="<?php echo APP_URL; ?>/room-allocations/deallocate?id=<?php echo urlencode($allocation['id'] ?? ''); ?>" class="d-inline" onsubmit="return confirm('Mark this student as left the hostel? The bed will become available.');">
+                                                    <?php foreach ($allocationFilters as $filterKey => $filterValue): ?>
+                                                        <input type="hidden" name="<?php echo htmlspecialchars($filterKey); ?>" value="<?php echo htmlspecialchars($filterValue); ?>">
+                                                    <?php endforeach; ?>
+                                                    <input type="hidden" name="leaving_at" value="<?php echo date('Y-m-d'); ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Mark student as left">
+                                                        <i class="fas fa-sign-out-alt"></i>
+                                                    </button>
+                                                </form>
                                             <?php endif; ?>
                                             <a href="<?php echo APP_URL; ?>/room-allocations/delete?id=<?php echo urlencode($allocation['id'] ?? ''); ?>" 
                                                class="btn btn-sm btn-outline-danger" title="Delete">

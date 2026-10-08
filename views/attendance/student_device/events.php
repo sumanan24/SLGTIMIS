@@ -58,10 +58,13 @@ if (($endPage - $startPage) < ($window * 2)) {
 }
 
 $studentDeviceSection = 'events';
+$canManageDevice = !empty($canManageDevice);
+$userRole = strtoupper(trim((string) ($userRole ?? '')));
+$roleLabel = $userRole !== '' ? $userRole : ($canManageDevice ? 'ADM' : 'VIEW');
 $pageTitle = 'Attendance';
 $pageSubtitle = $firstLastOn
-    ? 'First punch is Check-In and last punch is Check-Out for each student and date. Middle punches stay stored on the device record and are hidden here.'
-    : 'One row per student per day — In (first), Out (last), Others (middle punches). Auto quick-sync pulls today from each machine in chunks.';
+    ? 'Check-in is the first punch. Check-out is the last punch. Other punches stay saved and are hidden.'
+    : 'One row per student per day. In is the first punch. Out is the last punch.';
 $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
 ?>
 <div class="student-device-page sd-fullpage">
@@ -89,24 +92,19 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
                 <p class="sd-page-lead"><?php echo $e($pageSubtitle); ?></p>
             </div>
             <div class="sd-header-actions">
+                <span class="sd-role-chip"><?php echo $e($roleLabel); ?></span>
                 <a class="btn <?php echo $firstLastOn ? 'btn-primary' : 'btn-outline-primary'; ?>"
                    href="<?php echo $e($firstLastHref); ?>"
-                   aria-pressed="<?php echo $firstLastOn ? 'true' : 'false'; ?>"
-                   title="Show only the first punch as Check-In and the last punch as Check-Out. Device records are not deleted.">
-                    <i class="fas fa-user-check me-1"></i>First &amp; Last Attendance Per Day
+                   aria-pressed="<?php echo $firstLastOn ? 'true' : 'false'; ?>">
+                    <i class="fas fa-user-check me-1"></i><?php echo $firstLastOn ? 'Showing first & last' : 'First & last'; ?>
                 </a>
-                <button type="button" class="btn btn-primary" id="sdQuickSyncBtn" title="Pull today's punches from all machines (one device per request)">
-                    <i class="fas fa-bolt me-1"></i>Quick sync
+                <?php if ($canManageDevice): ?>
+                <button type="button" class="btn btn-primary" id="sdQuickSyncBtn">
+                    <i class="fas fa-bolt me-1"></i>Today
                 </button>
-                <a class="btn btn-outline-success" href="<?php echo $e($urls['month']); ?>">
-                    <i class="fas fa-calendar-alt me-1"></i>Month report
-                </a>
-                <a class="btn btn-outline-success" href="<?php echo $e($urls['export_excel'] . $exportQs); ?>">
-                    <i class="fas fa-file-excel me-1"></i>Excel
-                </a>
-                <a class="btn btn-outline-success" href="<?php echo $e($urls['export_csv'] . $exportQs); ?>">
-                    <i class="fas fa-file-csv me-1"></i>CSV
-                </a>
+                <?php endif; ?>
+                <a class="btn btn-outline-success" href="<?php echo $e($urls['export_excel'] . $exportQs); ?>">Excel</a>
+                <a class="btn btn-outline-success" href="<?php echo $e($urls['export_csv'] . $exportQs); ?>">CSV</a>
             </div>
         </div>
 
@@ -118,10 +116,11 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
         <?php if (is_array($rangeSyncReport) && !empty($rangeSyncReport['text'])): ?>
             <pre class="sd-range-sync-report"><?php echo $e($rangeSyncReport['text']); ?></pre>
         <?php endif; ?>
+        <?php if ($canManageDevice): ?>
         <div class="card sd-card mb-3">
             <div class="card-header">
-                <div class="fw-semibold">Sync attendance for selected dates</div>
-                <div class="small text-muted">Pull every finger and face punch from Reader 1 (172.16.0.29), Reader 2 (172.16.0.28) and Reader 3 (172.16.0.27).</div>
+                <div class="fw-semibold">Sync readers</div>
+                <div class="small text-muted">Readers 172.16.0.29, 172.16.0.28 and 172.16.0.27. Morning and evening included.</div>
             </div>
             <div class="card-body">
                 <div class="sd-range-sync-actions">
@@ -144,12 +143,12 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
                                value="<?php echo $e($rangeDefault['to'] ?? ''); ?>">
                     </div>
                     <button type="button" class="btn btn-primary btn-sm" id="sdRangeCustomBtn">
-                        <i class="fas fa-fingerprint me-1"></i>Sync attendance
+                        <i class="fas fa-fingerprint me-1"></i>Sync
                     </button>
                 </div>
-                <p class="small text-muted mb-0 mt-2">Uses the dates you select, from 00:00:00 through the next day 00:00:00 (Asia/Colombo), including morning and evening punches. Each reader is read in full, page by page. Running the same dates again does not duplicate records.</p>
             </div>
         </div>
+        <?php endif; ?>
 
         <div id="sdQuickSyncBar" class="alert alert-info d-none mb-3" role="status" aria-live="polite">
             <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -219,7 +218,7 @@ $exportQs = $filterParams ? '?' . http_build_query($filterParams) : '';
             <div class="card-header">
                 <div class="sd-panel-head">
                     <div>
-                        <div class="fw-semibold">Daily attendance</div>
+                        <div class="fw-semibold"><?php echo $firstLastOn ? 'Check-in and check-out' : 'Daily attendance'; ?></div>
                         <div class="sd-legend mt-1">
                             <?php if ($firstLastOn): ?>
                                 <span><i class="dot in"></i>Check-In — first</span>
@@ -546,7 +545,7 @@ $rangeSyncUrl = (string) ($rangeSyncUrl ?? ($urls['range_sync_chunk'] ?? ''));
             return;
         }
         var title = label || (from + ' to ' + to);
-        if (!confirm('Sync student finger and face attendance from all machines for ' + title + ' (' + from + ' to ' + to + ')?')) {
+        if (!confirm('Sync ' + from + ' to ' + to + ' from all readers?')) {
             return;
         }
         setBusy(true);

@@ -106,11 +106,25 @@ $GLOBALS['__student_device_styles_loaded'] = true;
     color: var(--sd-muted);
     max-width: 46rem;
 }
+.student-device-page .sd-role-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 38px;
+    padding: 0 0.75rem;
+    border-radius: 0.5rem;
+    background: #e8eef7;
+    color: var(--sd-navy);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
 .student-device-page .sd-header-actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.45rem;
-    flex: 0 0 auto;
+    flex: 1 1 18rem;
+    justify-content: flex-end;
 }
 .student-device-page .sd-header-actions .btn {
     min-height: 38px;
@@ -550,7 +564,7 @@ $GLOBALS['__student_device_styles_loaded'] = true;
 }
 .student-device-page .sd-sao-filters-grid {
     display: grid;
-    grid-template-columns: 130px minmax(120px, 1fr) minmax(130px, 1.1fr) minmax(110px, 0.9fr) minmax(110px, 0.9fr) minmax(130px, 1.1fr) 120px 100px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 0.65rem 0.75rem;
     align-items: end;
 }

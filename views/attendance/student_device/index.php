@@ -2,13 +2,13 @@
 declare(strict_types=1);
 /** Dashboard shell for student fingerprint attendance */
 $studentDeviceSection = 'dashboard';
-$pageTitle = 'Dashboard';
-$pageSubtitle = 'Machine status, sync controls, and recent In / Out / Others';
+$pageTitle = 'Home';
+$pageSubtitle = 'Machine status, today’s attendance, and sync.';
 ob_start();
 ?>
-<div class="d-flex flex-wrap gap-2">
-    <a class="btn btn-sm btn-outline-success" href="<?php echo htmlspecialchars($urls['export_excel'], ENT_QUOTES, 'UTF-8'); ?>">Excel</a>
-    <a class="btn btn-sm btn-outline-success" href="<?php echo htmlspecialchars($urls['export_csv'], ENT_QUOTES, 'UTF-8'); ?>">CSV</a>
+<div class="sd-header-actions">
+    <a class="btn btn-outline-primary" href="<?php echo htmlspecialchars($urls['events'], ENT_QUOTES, 'UTF-8'); ?>">Attendance</a>
+    <a class="btn btn-outline-secondary" href="<?php echo htmlspecialchars($urls['sao'], ENT_QUOTES, 'UTF-8'); ?>">Summary</a>
 </div>
 <?php
 $headerActions = ob_get_clean();

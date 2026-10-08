@@ -21,7 +21,7 @@ $connLabel = $connOk === true ? 'CONNECTED' : ($connOk === false ? 'DISCONNECTED
 
 <?php if (!empty($syncSummary)): ?>
     <div class="alert alert-info mb-3">
-        <div class="fw-semibold mb-2"><?php echo $e($syncSummary['message'] ?? 'Synchronization Completed'); ?></div>
+        <div class="fw-semibold mb-2"><?php echo $e($syncSummary['message'] ?? 'Sync finished'); ?></div>
         <div class="row g-2 small">
             <div class="col-6 col-md-3">Machines: <strong><?php echo (int) ($syncSummary['devices_online'] ?? 0); ?>/<?php echo (int) ($syncSummary['devices_total'] ?? 0); ?></strong></div>
             <div class="col-6 col-md-3">Retrieved: <strong><?php echo (int) ($syncSummary['records_retrieved'] ?? 0); ?></strong></div>
@@ -80,19 +80,16 @@ $deviceCards = $deviceCards ?? [];
 <?php if ($deviceCards !== []): ?>
 <div class="card sd-card mb-3">
     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <span class="fw-semibold">Hikvision machines (MAIN + readers)</span>
+        <span class="fw-semibold">Readers</span>
         <div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-sm btn-outline-primary" href="<?php echo $e($urls['test'] ?? '#'); ?>">
-                <i class="fas fa-plug me-1"></i>Test all
-            </a>
+            <a class="btn btn-sm btn-outline-primary" href="<?php echo $e($urls['test'] ?? '#'); ?>">Test</a>
             <form method="post" action="<?php echo $e($urls['refresh_users'] ?? '#'); ?>" class="d-inline">
                 <button type="submit" class="btn btn-sm btn-primary"
-                        onclick="return confirm('Pull student/user lists from MAIN and all readers into the database?');">
-                    <i class="fas fa-users me-1"></i>Get users from all machines
+                        onclick="return confirm('Load users from all readers?');">
+                    Load users
                 </button>
             </form>
-            <a class="btn btn-sm btn-outline-secondary" href="<?php echo $e($urls['devices'] ?? '#'); ?>">Device sync</a>
-            <a class="btn btn-sm btn-outline-dark" href="<?php echo $e(rtrim(APP_URL, '/') . '/hikvision'); ?>">Hikvision LAN test</a>
+            <a class="btn btn-sm btn-outline-secondary" href="<?php echo $e($urls['devices'] ?? '#'); ?>">Devices</a>
         </div>
     </div>
     <div class="card-body">
@@ -140,7 +137,7 @@ $deviceCards = $deviceCards ?? [];
                             if (stripos($msg, 'Password OK') !== false || stripos($msg, 'LAN check') !== false) {
                                 $msg = '';
                             } elseif (stripos($msg, 'locked') !== false) {
-                                $msg = 'Admin locked — wait ~15–20 min or reboot this terminal, then Test once.';
+                                $msg = 'Locked. Wait or reboot, then Test.';
                             } elseif (strlen($msg) > 120) {
                                 $msg = substr($msg, 0, 117) . '…';
                             }
@@ -160,19 +157,19 @@ $deviceCards = $deviceCards ?? [];
 <div class="row g-3 mb-3">
     <div class="col-6 col-xl-3">
         <div class="sd-stat">
-            <div class="sd-label">Today's punches</div>
+            <div class="sd-label">Punches today</div>
             <div class="sd-value"><?php echo (int) $todayCount; ?></div>
         </div>
     </div>
     <div class="col-6 col-xl-3">
         <div class="sd-stat">
-            <div class="sd-label">Unique students today</div>
+            <div class="sd-label">Students today</div>
             <div class="sd-value"><?php echo (int) $uniqueToday; ?></div>
         </div>
     </div>
     <div class="col-6 col-xl-3">
         <div class="sd-stat">
-            <div class="sd-label">Total punch records</div>
+            <div class="sd-label">All punches</div>
             <div class="sd-value"><?php echo (int) $totalRecords; ?></div>
         </div>
     </div>
@@ -193,30 +190,23 @@ $deviceCards = $deviceCards ?? [];
 <div class="card sd-card mb-3">
     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
-            <span class="fw-semibold">Synchronize punches from all 4 machines</span>
-            <div class="small text-muted">Collects finger attendance (AcsEvent) from MAIN + readers, updates finger IDs, saves In/Out.</div>
+            <span class="fw-semibold">Sync punches</span>
+            <div class="small text-muted">All readers. Same dates can be synced again without duplicates.</div>
         </div>
-        <a class="btn btn-sm btn-outline-primary" href="<?php echo $e($urls['test']); ?>">
-            <i class="fas fa-plug me-1"></i>Test all machines
-        </a>
     </div>
     <div class="card-body">
         <div class="row g-3 sd-sync-grid align-items-end">
             <div class="col-sm-6 col-lg-3">
                 <form method="post" action="<?php echo $e($urls['sync']); ?>">
                     <input type="hidden" name="sync_mode" value="today">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-calendar-day me-1"></i>Sync today (all)
-                    </button>
+                    <button type="submit" class="btn btn-primary w-100">Today</button>
                 </form>
             </div>
             <div class="col-sm-6 col-lg-3">
                 <form method="post" action="<?php echo $e($urls['sync']); ?>"
-                      onsubmit="return confirm('Pull full history from MAIN + all readers. This may take several minutes. Continue?');">
+                      onsubmit="return confirm('Sync full history? This can take several minutes.');">
                     <input type="hidden" name="sync_mode" value="full">
-                    <button type="submit" class="btn btn-dark w-100">
-                        <i class="fas fa-database me-1"></i>Sync full history (all)
-                    </button>
+                    <button type="submit" class="btn btn-dark w-100">Full history</button>
                 </form>
             </div>
             <div class="col-12 col-lg-6">
@@ -231,7 +221,7 @@ $deviceCards = $deviceCards ?? [];
                         <input type="date" name="date_to" class="form-control" required value="<?php echo $e(date('Y-m-d')); ?>">
                     </div>
                     <div class="col-12 col-md-4">
-                        <button type="submit" class="btn btn-outline-primary w-100">Sync range (all)</button>
+                        <button type="submit" class="btn btn-outline-primary w-100">Sync dates</button>
                     </div>
                 </form>
             </div>
@@ -242,14 +232,13 @@ $deviceCards = $deviceCards ?? [];
 <div class="card sd-card">
     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
-            <span class="fw-semibold">Recent attendance</span>
+            <span class="fw-semibold">Latest</span>
             <div class="sd-legend mt-1">
                 <span><i class="dot in"></i>In</span>
                 <span><i class="dot out"></i>Out</span>
-                <span><i class="dot other"></i>Others</span>
             </div>
         </div>
-        <a class="btn btn-sm btn-outline-secondary" href="<?php echo $e($urls['events']); ?>">View all attendance</a>
+        <a class="btn btn-sm btn-outline-secondary" href="<?php echo $e($urls['events']); ?>">Open list</a>
     </div>
     <div class="table-responsive">
         <table class="table table-hover sd-events-table mb-0">
@@ -265,7 +254,7 @@ $deviceCards = $deviceCards ?? [];
             </thead>
             <tbody>
             <?php if (empty($recentRows)): ?>
-                <tr><td colspan="6" class="text-center text-muted py-4">No attendance yet. Run a sync to pull records.</td></tr>
+                <tr><td colspan="6" class="text-center text-muted py-4">No punches yet. Use Sync punches above.</td></tr>
             <?php else: ?>
                 <?php foreach ($recentRows as $row): ?>
                     <tr>

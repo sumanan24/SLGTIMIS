@@ -45,20 +45,19 @@ $monthDisplay = (string) ($monthDisplay ?? '');
 $reportRun = !empty($reportRun);
 
 $studentDeviceSection = 'sao';
-$pageTitle = 'SAO dashboard';
-$pageSubtitle = '';
+$roleLabel = strtoupper(trim((string) ($userRole ?? '')));
+if ($roleLabel === '') {
+    $roleLabel = $canManageDevice ? 'ADM' : ($isHodScoped ? 'HOD' : 'DIR');
+}
+$pageTitle = 'Summary';
+$pageSubtitle = 'Monthly attendance for your role. Filter, then Apply.';
 
 ob_start();
 ?>
 <div class="sd-header-actions">
-    <a class="btn btn-outline-secondary" href="<?php echo $e($urls['month']); ?>">
-        <i class="fas fa-calendar-alt me-1"></i>Month report
-    </a>
-    <?php if ($canManageDevice): ?>
-        <a class="btn btn-outline-secondary" href="<?php echo $e($urls['holidays']); ?>">
-            <i class="fas fa-umbrella-beach me-1"></i>Leave
-        </a>
-    <?php endif; ?>
+    <span class="sd-role-chip"><?php echo $e($roleLabel); ?></span>
+    <a class="btn btn-outline-primary" href="<?php echo $e($urls['events']); ?>">Attendance</a>
+    <a class="btn btn-outline-secondary" href="<?php echo $e($urls['month']); ?>">Month</a>
 </div>
 <?php
 $headerActions = ob_get_clean();
@@ -160,7 +159,7 @@ ob_start();
     </form>
 
     <?php if (!$reportRun): ?>
-        <div class="sd-sao-empty">Select filters and click Apply.</div>
+        <div class="sd-sao-empty">Choose a month and department, then Apply.</div>
     <?php else: ?>
         <div class="sd-sao-summary">
             <div class="sd-sao-summary-main">

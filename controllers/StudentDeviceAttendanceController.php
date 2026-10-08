@@ -727,9 +727,10 @@ class StudentDeviceAttendanceController extends Controller {
         ]);
     }
 
-    /** Attendance events (In / Out / Others) */
+    /** Attendance events (In / Out / Others). ADM/SAO can sync; DIR/HOD/DPA view the list. */
     public function events() {
-        if (!$this->requireAccess()) {
+        $ctx = $this->requireDashboardAccess();
+        if ($ctx === null) {
             return;
         }
         $svc = $this->syncService();
@@ -739,7 +740,8 @@ class StudentDeviceAttendanceController extends Controller {
         $result = $att->searchDailyGrouped($filters, $page, 50);
 
         $lastQuick = (int) ($_SESSION['student_att_last_quick_sync'] ?? 0);
-        $autoSync = (string) $this->get('nosync', '') !== '1'
+        $autoSync = !empty($ctx['can_manage'])
+            && (string) $this->get('nosync', '') !== '1'
             && ((time() - $lastQuick) >= 90 || (string) $this->get('force_sync', '') === '1');
 
         $tz = new DateTimeZone('Asia/Colombo');
@@ -747,19 +749,19 @@ class StudentDeviceAttendanceController extends Controller {
         $rangePresets = [
             [
                 'key' => 'week',
-                'label' => 'Last 1 week',
+                'label' => '1 week',
                 'from' => $today->modify('-6 days')->format('Y-m-d'),
                 'to' => $today->format('Y-m-d'),
             ],
             [
                 'key' => 'month',
-                'label' => 'Last 1 month',
+                'label' => '1 month',
                 'from' => $today->modify('-1 month')->format('Y-m-d'),
                 'to' => $today->format('Y-m-d'),
             ],
             [
                 'key' => '2month',
-                'label' => 'Last 2 months',
+                'label' => '2 months',
                 'from' => $today->modify('-2 months')->format('Y-m-d'),
                 'to' => $today->format('Y-m-d'),
             ],
@@ -775,6 +777,8 @@ class StudentDeviceAttendanceController extends Controller {
             'title' => 'Attendance',
             'page' => 'student-device-attendance-events',
             'urls' => $this->urls(),
+            'canManageDevice' => !empty($ctx['can_manage']),
+            'userRole' => (string) ($ctx['role'] ?? ''),
             'filters' => $filters,
             'rows' => $result['rows'],
             'total' => $result['total'],
@@ -3397,7 +3401,7 @@ class StudentDeviceAttendanceController extends Controller {
     }
 
     public function exportExcel() {
-        if (!$this->requireAccess()) {
+        if ($this->requireDashboardAccess() === null) {
             return;
         }
         $svc = $this->syncService();
@@ -3431,7 +3435,7 @@ class StudentDeviceAttendanceController extends Controller {
     }
 
     public function exportCsv() {
-        if (!$this->requireAccess()) {
+        if ($this->requireDashboardAccess() === null) {
             return;
         }
         $svc = $this->syncService();

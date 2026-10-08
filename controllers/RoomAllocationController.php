@@ -54,6 +54,9 @@ class RoomAllocationController extends Controller {
         $departments = $departmentModel->getAll();
         $genders = ['Male', 'Female'];
         $roomModel = $this->model('RoomModel');
+        $leftCountFilters = $filters;
+        $leftCountFilters['status'] = 'left';
+        $leftCount = $allocationModel->getTotalAllocations($leftCountFilters);
         
         // Check if user can manage (create/edit/delete) room allocations
         require_once BASE_PATH . '/models/UserModel.php';
@@ -100,6 +103,7 @@ class RoomAllocationController extends Controller {
                 'genders' => $genders,
                 'rooms' => $rooms,
                 'canManage' => $canManage,
+                'left_count' => $leftCount,
                 'message' => $_SESSION['message'] ?? null,
                 'error' => $_SESSION['error'] ?? null
             ];
@@ -134,6 +138,7 @@ class RoomAllocationController extends Controller {
                 'genders' => $genders,
                 'rooms' => $rooms,
                 'canManage' => $canManage,
+                'left_count' => $leftCount,
                 'message' => $_SESSION['message'] ?? null,
                 'error' => $_SESSION['error'] ?? null
             ];
@@ -357,6 +362,13 @@ class RoomAllocationController extends Controller {
                 return;
             }
             
+            $allowedStatuses = ['active', 'left', 'cancelled'];
+            if (!in_array($status, $allowedStatuses, true)) {
+                $_SESSION['error'] = 'Select a valid status.';
+                $this->redirect('room-allocations/edit?id=' . urlencode($id));
+                return;
+            }
+
             $data = [
                 'room_id' => $newRoomId,
                 'status' => $status
@@ -370,10 +382,15 @@ class RoomAllocationController extends Controller {
                     return;
                 }
             }
-            
-            // If deallocating, set deallocated_at
-            if ($status === 'inactive' && $allocation['status'] === 'active') {
-                $data['deallocated_at'] = time();
+
+            if ($status === 'active') {
+                $data['leaving_at'] = null;
+            } else {
+                $leavingAt = trim($this->post('leaving_at', ''));
+                if ($leavingAt === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $leavingAt)) {
+                    $leavingAt = !empty($allocation['leaving_at']) ? $allocation['leaving_at'] : date('Y-m-d');
+                }
+                $data['leaving_at'] = $leavingAt;
             }
             
             // Update allocation
@@ -462,7 +479,7 @@ class RoomAllocationController extends Controller {
     }
     
     /**
-     * Deallocate (set status to inactive)
+     * Mark a student as left and free the bed.
      */
     public function deallocate() {
         // Check authentication
@@ -471,15 +488,16 @@ class RoomAllocationController extends Controller {
             return;
         }
         
-        // Only SAO and ADM can deallocate rooms
+        // Only SAO and ADM can mark students as left
         if (!$this->checkRoomAllocationAccess()) {
             return;
         }
         
         $id = $this->get('id', '');
+        $returnQuery = $this->allocationListQuery();
         if (empty($id)) {
             $_SESSION['error'] = 'Allocation ID is required.';
-            $this->redirect('room-allocations');
+            $this->redirect('room-allocations' . $returnQuery);
             return;
         }
         
@@ -488,14 +506,25 @@ class RoomAllocationController extends Controller {
         
         if (!$allocation) {
             $_SESSION['error'] = 'Allocation not found.';
-            $this->redirect('room-allocations');
+            $this->redirect('room-allocations' . $returnQuery);
             return;
+        }
+
+        if (($allocation['status'] ?? '') !== 'active') {
+            $_SESSION['error'] = 'Only an active allocation can be marked as left.';
+            $this->redirect('room-allocations' . $returnQuery);
+            return;
+        }
+
+        $leavingAt = trim((string) ($this->post('leaving_at', $this->get('leaving_at', ''))));
+        if ($leavingAt === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $leavingAt)) {
+            $leavingAt = date('Y-m-d');
         }
         
         // Store old values for logging
         $oldValues = $allocation;
         
-        $result = $allocationModel->deallocate($id);
+        $result = $allocationModel->deallocate($id, $leavingAt);
         
         if ($result) {
             // Log activity
@@ -503,17 +532,32 @@ class RoomAllocationController extends Controller {
                 'UPDATE',
                 'room_allocation',
                 (string)$id,
-                "Room deallocated: Allocation ID {$id} - Student {$allocation['student_id']}",
+                "Student left hostel: Allocation ID {$id} - Student {$allocation['student_id']}",
                 $oldValues,
-                ['status' => 'inactive', 'deallocated_at' => time()]
+                ['status' => 'left', 'leaving_at' => $leavingAt]
             );
             
-            $_SESSION['message'] = 'Room deallocated successfully.';
+            $_SESSION['message'] = 'Student marked as left. The bed is now available.';
         } else {
-            $_SESSION['error'] = 'Failed to deallocate room.';
+            $_SESSION['error'] = 'Failed to mark the student as left.';
         }
         
-        $this->redirect('room-allocations');
+        $this->redirect('room-allocations' . $returnQuery);
+    }
+
+    /**
+     * Keep the current allocation filters after an action.
+     */
+    private function allocationListQuery() {
+        $params = [];
+        foreach (['hostel_id', 'room_id', 'department_id', 'gender', 'status', 'search'] as $key) {
+            $value = trim((string) $this->post($key, $this->get($key, '')));
+            if ($value !== '') {
+                $params[$key] = $value;
+            }
+        }
+
+        return $params ? '?' . http_build_query($params) : '';
     }
     
     /**
@@ -580,6 +624,7 @@ class RoomAllocationController extends Controller {
             'Block',
             'Room',
             'Allocated Date',
+            'Leaving Date',
             'Status'
         ]);
         
@@ -596,6 +641,12 @@ class RoomAllocationController extends Controller {
                 }
             }
             
+            $leavingAt = '';
+            if (!empty($a['leaving_at'])) {
+                $leaveTs = strtotime($a['leaving_at']);
+                $leavingAt = $leaveTs ? date('Y-m-d', $leaveTs) : $a['leaving_at'];
+            }
+
             fputcsv($output, [
                 $a['student_id'] ?? '',
                 $a['student_fullname'] ?? '',
@@ -606,6 +657,7 @@ class RoomAllocationController extends Controller {
                 $a['block_name'] ?? '',
                 $a['room_no'] ?? '',
                 $allocatedAt,
+                $leavingAt,
                 ucfirst($a['status'] ?? '')
             ]);
         }

@@ -33,9 +33,17 @@
                                 <label for="status" class="form-label fw-semibold">Status</label>
                                 <select class="form-select" id="status" name="status">
                                     <option value="active" <?php echo ($allocation['status'] ?? 'active') === 'active' ? 'selected' : ''; ?>>Active</option>
-                                    <option value="inactive" <?php echo ($allocation['status'] ?? '') === 'inactive' ? 'selected' : ''; ?>>Inactive</option>
+                                    <option value="left" <?php echo ($allocation['status'] ?? '') === 'left' ? 'selected' : ''; ?>>Left</option>
+                                    <option value="cancelled" <?php echo ($allocation['status'] ?? '') === 'cancelled' ? 'selected' : ''; ?>>Cancelled</option>
                                 </select>
                             </div>
+                        </div>
+
+                        <div class="mb-3" id="leaving_at_group">
+                            <label for="leaving_at" class="form-label fw-semibold">Leaving Date</label>
+                            <input type="date" class="form-control" id="leaving_at" name="leaving_at"
+                                   value="<?php echo htmlspecialchars(!empty($allocation['leaving_at']) ? date('Y-m-d', strtotime($allocation['leaving_at'])) : date('Y-m-d')); ?>">
+                            <div class="form-text">Used when the student status is Left or Cancelled. The bed is freed once the student is no longer Active.</div>
                         </div>
                         
                         <div class="mb-3">
@@ -71,4 +79,18 @@
         </div>
     </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const statusSelect = document.getElementById('status');
+    const leavingGroup = document.getElementById('leaving_at_group');
+    function toggleLeavingDate() {
+        if (!statusSelect || !leavingGroup) return;
+        leavingGroup.style.display = statusSelect.value === 'active' ? 'none' : '';
+    }
+    if (statusSelect) {
+        statusSelect.addEventListener('change', toggleLeavingDate);
+        toggleLeavingDate();
+    }
+});
+</script>
 

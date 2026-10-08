@@ -9,15 +9,15 @@ $canManageDevice = array_key_exists('canManageDevice', get_defined_vars())
     : true;
 
 $items = [
-    ['key' => 'sao', 'href' => $urls['sao'] ?? '#', 'icon' => 'fa-chart-pie', 'label' => 'SAO Dashboard', 'manage_only' => false],
-    ['key' => 'dashboard', 'href' => $urls['index'] ?? '#', 'icon' => 'fa-th-large', 'label' => 'Device', 'manage_only' => true],
-    ['key' => 'events', 'href' => $urls['events'] ?? '#', 'icon' => 'fa-clock', 'label' => 'Attendance', 'manage_only' => true],
-    ['key' => 'month', 'href' => $urls['month'] ?? '#', 'icon' => 'fa-calendar-alt', 'label' => 'Month report', 'manage_only' => false],
-    ['key' => 'holidays', 'href' => $urls['holidays'] ?? '#', 'icon' => 'fa-umbrella-beach', 'label' => 'Holidays / leave', 'manage_only' => true],
+    ['key' => 'sao', 'href' => $urls['sao'] ?? '#', 'icon' => 'fa-chart-pie', 'label' => 'Summary', 'manage_only' => false],
+    ['key' => 'dashboard', 'href' => $urls['index'] ?? '#', 'icon' => 'fa-th-large', 'label' => 'Home', 'manage_only' => true],
+    ['key' => 'events', 'href' => $urls['events'] ?? '#', 'icon' => 'fa-clock', 'label' => 'Attendance', 'manage_only' => false],
+    ['key' => 'month', 'href' => $urls['month'] ?? '#', 'icon' => 'fa-calendar-alt', 'label' => 'Month', 'manage_only' => false],
+    ['key' => 'holidays', 'href' => $urls['holidays'] ?? '#', 'icon' => 'fa-umbrella-beach', 'label' => 'Leave', 'manage_only' => true],
     ['key' => 'users', 'href' => $urls['users'] ?? '#', 'icon' => 'fa-users', 'label' => 'Users', 'manage_only' => true],
-    ['key' => 'devices', 'href' => $urls['devices'] ?? '#', 'icon' => 'fa-network-wired', 'label' => 'Device sync', 'manage_only' => true],
-    ['key' => 'fingerprint-import', 'href' => $urls['fingerprint_import'] ?? '#', 'icon' => 'fa-file-excel', 'label' => 'Excel Export', 'manage_only' => false, 'import_only' => true],
-    ['key' => 'logs', 'href' => $urls['logs'] ?? '#', 'icon' => 'fa-history', 'label' => 'Sync logs', 'manage_only' => true],
+    ['key' => 'devices', 'href' => $urls['devices'] ?? '#', 'icon' => 'fa-network-wired', 'label' => 'Devices', 'manage_only' => true],
+    ['key' => 'fingerprint-import', 'href' => $urls['fingerprint_import'] ?? '#', 'icon' => 'fa-file-excel', 'label' => 'Export', 'manage_only' => false, 'import_only' => true],
+    ['key' => 'logs', 'href' => $urls['logs'] ?? '#', 'icon' => 'fa-history', 'label' => 'Logs', 'manage_only' => true],
 ];
 
 $canFingerprintImport = array_key_exists('canFingerprintImport', get_defined_vars())

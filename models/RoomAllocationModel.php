@@ -387,7 +387,7 @@ class RoomAllocationModel extends Model {
     }
     
     /**
-     * Deallocate (set status to inactive)
+     * Mark the allocation as left and record the leaving date.
      */
     public function deallocate($id, $leavingAt = null) {
         $data = [

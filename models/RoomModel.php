@@ -117,7 +117,8 @@ class RoomModel extends Model {
      * Get rooms by hostel ID
      */
     public function getByHostelId($hostelId) {
-        $sql = "SELECT r.*, b.name as block_name 
+        $sql = "SELECT r.*, b.name as block_name,
+                (SELECT COUNT(*) FROM hostel_allocations WHERE room_id = r.id AND status = 'active') as occupied_beds
                 FROM `{$this->table}` r
                 LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
                 WHERE b.hostel_id = ?
