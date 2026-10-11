@@ -1,858 +1,515 @@
 <?php
+$e = static fn (?string $s): string => htmlspecialchars((string) ($s ?? ''), ENT_QUOTES, 'UTF-8');
+$dash = static function (?string $s): string {
+    $s = trim((string) $s);
+    return $s === '' ? '—' : htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+};
 $recentPayments = $recentPayments ?? [];
 $busSeasonPayments = $busSeasonPayments ?? [];
-?>
+$currentGroup = $currentGroup ?? null;
+$student = $student ?? [];
+$currentEnrollment = $currentEnrollment ?? null;
+$hostelAllocation = $hostelAllocation ?? null;
+$roommates = $roommates ?? [];
+$hasAcceptedConduct = !empty($hasAcceptedConduct);
 
+require_once BASE_PATH . '/models/StudentModel.php';
+$studentModelHelper = new StudentModel();
+$profileImageUrl = $studentModelHelper->getProfileImagePath($student);
+
+$modeRaw = (string) ($currentEnrollment['course_mode'] ?? '');
+$modeLabel = $modeRaw === 'Part' || strcasecmp($modeRaw, 'Part Time') === 0
+    ? 'Part Time'
+    : ($modeRaw === 'Full' || strcasecmp($modeRaw, 'Full Time') === 0 ? 'Full Time' : ($modeRaw !== '' ? $modeRaw : '—'));
+$status = (string) ($student['student_status'] ?? 'Active');
+$statusClass = strcasecmp($status, 'Active') === 0 ? 'success' : 'warning';
+$enrollStatus = (string) ($currentEnrollment['student_enroll_status'] ?? '');
+$phone = $student['student_phone'] ?? '';
+$phone = ($phone === '' || $phone === '0') ? '' : (string) $phone;
+$addressParts = array_filter([
+    trim((string) ($student['student_address'] ?? '')),
+    trim((string) ($student['student_district'] ?? '')),
+    trim((string) ($student['student_provice'] ?? '')),
+]);
+$address = $addressParts !== [] ? implode(', ', $addressParts) : '';
+?>
 <style>
-    .student-dashboard-card {
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        transition: all 0.3s ease;
-        height: 100%;
-        border-left: 4px solid var(--student-primary);
+.sd-page { width: 100%; max-width: 100%; overflow-x: hidden; }
+.sd-id {
+    background: linear-gradient(135deg, #001f3f 0%, #003366 100%);
+    color: #fff;
+    border-radius: 14px;
+    padding: 1rem 1.15rem;
+}
+.sd-id-row { display: flex; align-items: center; gap: .85rem; min-width: 0; }
+.sd-photo {
+    width: 64px; height: 64px; object-fit: cover; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.85); background: rgba(255,255,255,.15); flex-shrink: 0;
+}
+.sd-photo-fallback { display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
+.sd-id h1 { font-size: 1.05rem; font-weight: 700; margin: 0 0 .15rem; overflow-wrap: anywhere; line-height: 1.25; }
+.sd-id .sd-idno { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .8rem; opacity: .9; overflow-wrap: anywhere; }
+.sd-chips { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .65rem; }
+.sd-chip {
+    display: inline-flex; align-items: center; gap: .3rem;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.2);
+    border-radius: 999px; padding: .2rem .6rem; font-size: .7rem; max-width: 100%;
+}
+.sd-notice {
+    display: flex; gap: .75rem; align-items: flex-start;
+    background: #fff; border: 1px solid #e6eaf0; border-radius: 12px; padding: .85rem 1rem;
+}
+.sd-notice .ic { color: #001f3f; font-size: 1.1rem; margin-top: .1rem; flex-shrink: 0; }
+.sd-notice p { margin: 0; font-size: .8rem; color: #5c6570; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sd-card {
+    background: #fff; border: 1px solid #e6eaf0; border-radius: 12px;
+    box-shadow: 0 1px 4px rgba(0,31,63,.06); height: 100%;
+}
+.sd-card h2 {
+    font-size: .9rem; font-weight: 700; color: #001f3f; margin: 0 0 .75rem;
+    padding-bottom: .5rem; border-bottom: 1px solid #eef1f4;
+}
+.sd-dl { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem 1.25rem; align-items: start; }
+.sd-dl dt { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: #6c757d; margin: 0 0 .1rem; font-weight: 600; }
+.sd-dl dd { margin: 0; font-size: .88rem; font-weight: 600; color: #212529; overflow-wrap: anywhere; word-break: break-word; }
+.sd-stat { text-align: center; padding: .85rem .5rem; display: flex; flex-direction: column; justify-content: center; }
+.sd-stat .n { font-size: 1.45rem; font-weight: 700; color: #001f3f; line-height: 1.1; }
+.sd-stat .l { font-size: .65rem; text-transform: uppercase; letter-spacing: .03em; color: #6c757d; margin-top: .3rem; }
+.sd-dock {
+    display: flex; flex-wrap: wrap; gap: .5rem;
+}
+.sd-dock a {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: .35rem; padding: .7rem .3rem; min-height: 76px;
+    flex: 1 1 calc(25% - .5rem);
+    border: 1px solid #e6eaf0; border-radius: 12px; text-decoration: none;
+    color: #212529; background: #fff;
+}
+.sd-dock a:hover, .sd-dock a:focus-visible { border-color: #001f3f; color: #001f3f; }
+.sd-dock .ic {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    background: #001f3f; color: #fff; font-size: .95rem; flex-shrink: 0;
+}
+.sd-dock a > span:not(.ic) { font-size: .7rem; font-weight: 600; text-align: center; line-height: 1.2; }
+.sd-dl .grid-span { grid-column: 1 / -1; }
+.sd-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; width: 100%; }
+.sd-cal-hd { text-align: center; font-size: .7rem; font-weight: 700; color: #6c757d; padding-bottom: .25rem; }
+.attendance-calendar-day {
+    width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; font-weight: 600; font-size: clamp(.65rem, 2.6vw, .85rem); min-height: 0;
+}
+.sd-pay td { vertical-align: middle; white-space: nowrap; }
+.sd-pay td:nth-child(2) { white-space: normal; word-break: break-word; }
+.attendance-present { background: #d4edda; color: #155724; }
+.attendance-absent { background: #f8d7da; color: #721c24; }
+.attendance-holiday { background: #fff3cd; color: #856404; }
+.attendance-empty { background: #e9ecef; color: #6c757d; }
+.attendance-weekend { background: #f8f9fa; color: #adb5bd; }
+@media (min-width: 768px) {
+    .sd-id {
+        display: flex; align-items: center; justify-content: space-between; gap: 1.25rem;
+        padding: 1.25rem 1.5rem;
     }
-    
-    .student-dashboard-card:hover {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        transform: translateY(-2px);
+    .sd-id-row { flex: 1 1 auto; }
+    .sd-chips { margin-top: 0; justify-content: flex-end; max-width: 52%; }
+    .sd-photo { width: 84px; height: 84px; }
+    .sd-id h1 { font-size: 1.35rem; }
+    .sd-dock a { flex: 1 1 calc(14.28% - .5rem); min-height: 92px; }
+}
+@media (max-width: 767.98px) {
+    .sd-dl { grid-template-columns: 1fr; gap: 0; }
+    .sd-dl .grid-span { grid-column: auto; }
+    .sd-dl > div {
+        display: grid; grid-template-columns: 38% minmax(0, 1fr); gap: .5rem; align-items: center;
+        padding: .5rem 0; border-bottom: 1px solid #f1f3f6;
     }
-    
-    .stat-value {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: var(--student-primary);
-        line-height: 1.2;
-    }
-    
-    .stat-label {
-        color: #6c757d;
-        font-size: 0.875rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-top: 0.5rem;
-    }
-    
-    .attendance-calendar-day {
-        width: 40px;
-        height: 40px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 8px;
-        margin: 2px;
-        font-weight: 600;
-        font-size: 0.875rem;
-        flex-shrink: 0;
-    }
-    
-    .attendance-present {
-        background-color: #d4edda;
-        color: #155724;
-    }
-    
-    .attendance-absent {
-        background-color: #f8d7da;
-        color: #721c24;
-    }
-    
-    .attendance-holiday {
-        background-color: #fff3cd;
-        color: #856404;
-    }
-    
-    .attendance-empty {
-        background-color: #e9ecef;
-        color: #6c757d;
-    }
-    
-    .attendance-weekend {
-        background-color: #f8f9fa;
-        color: #adb5bd;
-    }
-    
-    .calendar-container {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-    
-    .hover-lift {
-        transition: all 0.3s ease;
-    }
-    
-    .hover-lift:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        border-color: var(--student-primary) !important;
-    }
-    
-    /* Utility classes */
-    .min-w-0 {
-        min-width: 0;
-    }
-    
-    /* Quick link card base styles */
-    .quick-link-card {
-        transition: all 0.3s ease;
-    }
-    
-    .quick-link-icon {
-        flex-shrink: 0;
-    }
-    
-    .quick-link-text,
-    .quick-link-subtext {
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-    }
-    
-    /* Mobile Responsive Styles */
-    @media (max-width: 768px) {
-        .stat-value {
-            font-size: 2rem;
-        }
-        
-        .attendance-calendar-day {
-            width: 35px;
-            height: 35px;
-            font-size: 0.75rem;
-            margin: 1px;
-        }
-        
-        .student-welcome-card .row {
-            flex-direction: column;
-            text-align: center;
-        }
-        
-        .student-welcome-card .col-md-4 {
-            margin-top: 1rem;
-        }
-        
-        .student-welcome-card .col-md-4.text-md-end {
-            text-align: center !important;
-        }
-        
-        /* Quick Links Mobile */
-        .quick-link-card {
-            padding: 0.75rem !important;
-            gap: 0.75rem !important;
-        }
-        
-        .quick-link-icon {
-            padding: 0.5rem !important;
-            min-width: 45px;
-            width: 45px;
-            height: 45px;
-        }
-        
-        .quick-link-icon i {
-            font-size: 1.25rem !important;
-        }
-        
-        .quick-link-text {
-            font-size: 0.875rem;
-        }
-        
-        .quick-link-subtext {
-            font-size: 0.75rem;
-        }
-        
-        /* Statistics Cards Mobile */
-        .stat-value {
-            font-size: 1.75rem;
-        }
-        
-        .stat-label {
-            font-size: 0.8rem;
-        }
-        
-        /* Dashboard Cards Mobile */
-        .student-dashboard-card {
-            padding: 1rem !important;
-        }
-        
-        /* Quick Info Mobile */
-        .quick-info-row .col-6 {
-            margin-bottom: 0.75rem;
-        }
-    }
-    
-    @media (max-width: 576px) {
-        .stat-value {
-            font-size: 1.5rem;
-        }
-        
-        .stat-label {
-            font-size: 0.75rem;
-        }
-        
-        .attendance-calendar-day {
-            width: 30px;
-            height: 30px;
-            font-size: 0.7rem;
-        }
-        
-        .student-dashboard-card {
-            margin-bottom: 1rem;
-            padding: 0.875rem !important;
-        }
-        
-        /* Quick Links Small Mobile */
-        .quick-link-card {
-            padding: 0.625rem !important;
-            gap: 0.5rem !important;
-            flex-direction: column;
-            text-align: center;
-            align-items: center !important;
-        }
-        
-        .quick-link-icon {
-            padding: 0.5rem !important;
-            min-width: 40px;
-            width: 40px;
-            height: 40px;
-        }
-        
-        .quick-link-icon i {
-            font-size: 1.1rem !important;
-        }
-        
-        .quick-link-text {
-            font-size: 0.8rem;
-            text-align: center;
-        }
-        
-        .quick-link-subtext {
-            font-size: 0.7rem;
-            text-align: center;
-        }
-        
-        /* Container padding */
-        .container-fluid {
-            padding-left: 0.75rem !important;
-            padding-right: 0.75rem !important;
-        }
-        
-        /* Welcome card mobile */
-        .student-welcome-card {
-            padding: 1rem !important;
-        }
-        
-        .student-welcome-card h2 {
-            font-size: 1.25rem;
-        }
-        
-        /* Calendar header mobile */
-        .calendar-header {
-            flex-direction: column;
-            align-items: flex-start !important;
-            gap: 0.75rem;
-        }
-    }
+    .sd-dl > div:last-child { border-bottom: 0; }
+    .sd-dl dt { margin: 0; }
+    .sd-dl dd { font-size: .82rem; }
+    .sd-card:not(.sd-stat) { padding: .9rem !important; }
+    .sd-cal .attendance-calendar-day i { display: none; }
+    .sd-stat .n { font-size: 1.25rem; }
+    .sd-dock a { min-width: calc(25% - .5rem); }
+}
+@media (max-width: 575.98px) {
+    .sd-id { padding: .9rem 1rem; border-radius: 12px; }
+    .sd-photo { width: 56px; height: 56px; }
+    .sd-chip { font-size: .65rem; }
+}
 </style>
 
-<div class="container-fluid px-2 px-md-3 px-lg-4">
-    <!-- Welcome Card -->
-    <div class="student-welcome-card mb-3 mb-md-4">
-        <div class="row align-items-center g-3">
-            <div class="col-12 col-md-8">
-                <h2 class="mb-2 mb-md-3">
-                    <i class="fas fa-user-graduate me-2"></i>
-                    Welcome, <?php echo htmlspecialchars($student['student_fullname'] ?? $student['student_id']); ?>!
-                </h2>
-                <p class="mb-0 opacity-75 small">
-                    <?php if ($currentEnrollment): ?>
-                        <i class="fas fa-graduation-cap me-1"></i>
-                        <?php echo htmlspecialchars($currentEnrollment['course_name'] ?? ''); ?>
-                        <?php if ($currentEnrollment['department_name']): ?>
-                            - <?php echo htmlspecialchars($currentEnrollment['department_name']); ?>
-                        <?php endif; ?>
-                    <?php else: ?>
-                        Student Portal
-                    <?php endif; ?>
-                </p>
+<div class="sd-page">
+    <div class="sd-id mb-3">
+        <div class="sd-id-row">
+            <?php if ($profileImageUrl): ?>
+                <img src="<?php echo $e($profileImageUrl); ?>" alt="Student photo" class="sd-photo">
+            <?php else: ?>
+                <div class="sd-photo sd-photo-fallback"><i class="fas fa-user-graduate"></i></div>
+            <?php endif; ?>
+            <div class="min-w-0">
+                <h1><?php echo $dash($student['student_fullname'] ?? ''); ?></h1>
+                <div class="sd-idno"><?php echo $dash($student['student_id'] ?? ''); ?></div>
             </div>
-            <div class="col-12 col-md-4 text-center text-md-end">
-                <?php
-                require_once BASE_PATH . '/models/StudentModel.php';
-                $studentModelHelper = new StudentModel();
-                $profileImageUrl = $studentModelHelper->getProfileImagePath($student);
-                ?>
-                <?php if ($profileImageUrl): ?>
-                    <img src="<?php echo htmlspecialchars($profileImageUrl); ?>" 
-                         alt="Profile" 
-                         class="rounded-circle border border-3 border-white"
-                         style="width: 80px; height: 80px; object-fit: cover; max-width: 100%;">
-                <?php else: ?>
-                    <div class="rounded-circle border border-3 border-white bg-white bg-opacity-25 d-inline-flex align-items-center justify-content-center"
-                         style="width: 80px; height: 80px; max-width: 100%;">
-                        <i class="fas fa-user fa-2x"></i>
+        </div>
+        <div class="sd-chips">
+            <span class="sd-chip"><?php echo $dash($status); ?></span>
+            <span class="sd-chip">NIC <?php echo $dash($student['student_nic'] ?? ''); ?></span>
+            <?php if ($currentEnrollment): ?>
+                <span class="sd-chip d-none d-sm-inline-flex"><?php echo $dash($currentEnrollment['course_name'] ?? $currentEnrollment['course_id'] ?? ''); ?></span>
+                <span class="sd-chip"><?php echo $dash($currentEnrollment['academic_year'] ?? ''); ?></span>
+                <span class="sd-chip"><?php echo $e($modeLabel); ?></span>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3 align-items-stretch">
+        <div class="col-lg-6">
+            <div class="sd-card p-3 p-md-4">
+                <h2><i class="fas fa-id-badge me-2"></i>Student information</h2>
+                <dl class="sd-dl mb-0">
+                    <div>
+                        <dt>Full name</dt>
+                        <dd><?php echo $dash($student['student_fullname'] ?? ''); ?></dd>
                     </div>
+                    <div>
+                        <dt>Student ID</dt>
+                        <dd><?php echo $dash($student['student_id'] ?? ''); ?></dd>
+                    </div>
+                    <div>
+                        <dt>NIC</dt>
+                        <dd><?php echo $dash($student['student_nic'] ?? ''); ?></dd>
+                    </div>
+                    <div>
+                        <dt>Status</dt>
+                        <dd><span class="badge bg-<?php echo $statusClass; ?>"><?php echo $dash($status); ?></span></dd>
+                    </div>
+                    <div>
+                        <dt>Gender</dt>
+                        <dd><?php echo $dash($student['student_gender'] ?? ''); ?></dd>
+                    </div>
+                    <div>
+                        <dt>Date of birth</dt>
+                        <dd><?php echo $dash($student['student_dob'] ?? ''); ?></dd>
+                    </div>
+                    <div>
+                        <dt>Email</dt>
+                        <dd><?php echo $dash($student['student_email'] ?? ''); ?></dd>
+                    </div>
+                    <div>
+                        <dt>Phone</dt>
+                        <dd><?php echo $dash($phone); ?></dd>
+                    </div>
+                    <div>
+                        <dt>WhatsApp</dt>
+                        <dd><?php echo $dash($student['student_whatsapp'] ?? ''); ?></dd>
+                    </div>
+                    <div class="grid-span">
+                        <dt>Address</dt>
+                        <dd><?php echo $dash($address); ?></dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="sd-card p-3 p-md-4">
+                <h2><i class="fas fa-university me-2"></i>Academic enrollment</h2>
+                <?php if ($currentEnrollment): ?>
+                <dl class="sd-dl mb-0">
+                    <div>
+                        <dt>Course / programme</dt>
+                        <dd><?php echo $dash($currentEnrollment['course_name'] ?? $currentEnrollment['course_id'] ?? ''); ?></dd>
+                    </div>
+                    <div>
+                        <dt>Department</dt>
+                        <dd><?php echo $dash($currentEnrollment['department_name'] ?? ''); ?></dd>
+                    </div>
+                    <div>
+                        <dt>Academic year</dt>
+                        <dd><?php echo $dash($currentEnrollment['academic_year'] ?? ''); ?></dd>
+                    </div>
+                    <div>
+                        <dt>Shift / mode</dt>
+                        <dd><?php echo $e($modeLabel); ?></dd>
+                    </div>
+                    <div>
+                        <dt>Group / batch</dt>
+                        <dd><?php echo $dash($currentGroup['name'] ?? ''); ?></dd>
+                    </div>
+                    <div>
+                        <dt>Enrollment status</dt>
+                        <dd><?php echo $dash($enrollStatus); ?></dd>
+                    </div>
+                    <div>
+                        <dt>Enrolled on</dt>
+                        <dd><?php echo $dash($currentEnrollment['student_enroll_date'] ?? ''); ?></dd>
+                    </div>
+                    <div>
+                        <dt>NVQ level</dt>
+                        <dd><?php echo $dash($currentEnrollment['course_nvq_level'] ?? ''); ?></dd>
+                    </div>
+                </dl>
+                <?php else: ?>
+                    <p class="text-muted mb-0">No current enrollment is linked to this account.</p>
                 <?php endif; ?>
             </div>
         </div>
     </div>
-    
-    <!-- Quick Links Row -->
-    <div class="row g-3 g-md-4 mb-3 mb-md-4">
-        <div class="col-12">
-            <div class="student-dashboard-card p-3 p-md-4">
-                <h5 class="fw-bold mb-3">
-                    <i class="fas fa-link me-2" style="color: var(--student-primary);"></i>Quick Links
-                </h5>
-                <div class="row g-2 g-md-3">
-                    <div class="col-6 col-md-4 col-lg-3">
-                        <a href="<?php echo APP_URL; ?>/student/profile" class="text-decoration-none">
-                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-primary border-opacity-25 hover-lift quick-link-card">
-                                <div class="flex-shrink-0">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
-                                        <i class="fas fa-user text-primary"></i>
-                                    </div>
-                                </div>
-                                <div class="flex-grow-1 min-w-0">
-                                    <div class="fw-bold text-dark quick-link-text">Edit Profile</div>
-                                    <div class="small text-muted quick-link-subtext">View & Edit</div>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="col-6 col-md-4 col-lg-3">
-                        <a href="<?php echo APP_URL; ?>/student/attendance" class="text-decoration-none">
-                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-primary border-opacity-25 hover-lift quick-link-card">
-                                <div class="flex-shrink-0">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
-                                        <i class="fas fa-calendar-check text-primary"></i>
-                                    </div>
-                                </div>
-                                <div class="flex-grow-1 min-w-0">
-                                    <div class="fw-bold text-dark quick-link-text">Attendance</div>
-                                    <div class="small text-muted quick-link-subtext">View Calendar</div>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="col-6 col-md-4 col-lg-3">
-                        <a href="<?php echo APP_URL; ?>/student/payments" class="text-decoration-none">
-                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-warning border-opacity-50 hover-lift quick-link-card">
-                                <div class="flex-shrink-0">
-                                    <div class="bg-warning bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
-                                        <i class="fas fa-money-bill-wave text-warning"></i>
-                                    </div>
-                                </div>
-                                <div class="flex-grow-1 min-w-0">
-                                    <div class="fw-bold text-dark quick-link-text">Payments</div>
-                                    <div class="small text-muted quick-link-subtext">View All</div>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="col-6 col-md-4 col-lg-3">
-                        <a href="<?php echo APP_URL; ?>/student/forms" class="text-decoration-none">
-                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-success border-opacity-25 hover-lift quick-link-card">
-                                <div class="flex-shrink-0">
-                                    <div class="bg-success bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
-                                        <i class="fas fa-file-alt text-success"></i>
-                                    </div>
-                                </div>
-                                <div class="flex-grow-1 min-w-0">
-                                    <div class="fw-bold text-dark quick-link-text">Forms</div>
-                                    <div class="small text-muted quick-link-subtext">Sample downloads</div>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="col-6 col-md-4 col-lg-3">
-                        <a href="#" class="text-decoration-none" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
-                            <div class="d-flex align-items-center gap-2 p-3 bg-light rounded border border-2 border-danger border-opacity-25 hover-lift quick-link-card">
-                                <div class="flex-shrink-0">
-                                    <div class="bg-danger bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center quick-link-icon">
-                                        <i class="fas fa-key text-danger"></i>
-                                    </div>
-                                </div>
-                                <div class="flex-grow-1 min-w-0">
-                                    <div class="fw-bold text-dark quick-link-text">Change Password</div>
-                                    <div class="small text-muted quick-link-subtext">Update Login</div>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                </div>
-            </div>
+
+    <nav class="sd-dock mb-3" aria-label="Student shortcuts">
+        <a href="<?php echo APP_URL; ?>/student/profile"><span class="ic"><i class="fas fa-user"></i></span><span>Profile</span></a>
+        <a href="<?php echo APP_URL; ?>/student/attendance"><span class="ic"><i class="fas fa-calendar-check"></i></span><span>Attendance</span></a>
+        <a href="<?php echo APP_URL; ?>/student/payments"><span class="ic"><i class="fas fa-money-bill-wave"></i></span><span>Payments</span></a>
+        <a href="<?php echo APP_URL; ?>/student/notices"><span class="ic"><i class="fas fa-bullhorn"></i></span><span>Notices</span></a>
+        <a href="<?php echo APP_URL; ?>/student/documents-pdf" target="_blank" rel="noopener"><span class="ic"><i class="fas fa-file-pdf"></i></span><span>Documents</span></a>
+        <a href="<?php echo APP_URL; ?>/student/forms"><span class="ic"><i class="fas fa-file-alt"></i></span><span>Forms</span></a>
+        <a href="#" data-bs-toggle="modal" data-bs-target="#changePasswordModal"><span class="ic"><i class="fas fa-key"></i></span><span>Password</span></a>
+    </nav>
+
+    <?php $studentNotices = is_array($studentNotices ?? null) ? $studentNotices : []; $firstNotice = $studentNotices[0] ?? null; ?>
+    <?php if ($firstNotice): ?>
+    <a href="<?php echo APP_URL; ?>/student/notices" class="sd-notice mb-3 text-decoration-none">
+        <span class="ic"><i class="fas fa-bullhorn"></i></span>
+        <div class="min-w-0">
+            <div class="fw-semibold text-dark small mb-1"><?php echo $e($firstNotice['title'] ?? 'SLGTI notice'); ?></div>
+            <p><?php echo $e($firstNotice['body'] ?? ''); ?></p>
+            <div class="small mt-1" style="color:#001f3f;">View notices, code of conduct &amp; rules</div>
         </div>
+    </a>
+    <?php endif; ?>
+
+    <div class="row g-2 g-md-3 mb-3 mb-md-4">
+        <div class="col-6 col-md-3"><div class="sd-card sd-stat"><div class="n"><?php echo (int) ($attendancePercentage ?? 0); ?>%</div><div class="l">Attendance this month</div></div></div>
+        <div class="col-6 col-md-3"><div class="sd-card sd-stat"><div class="n text-success"><?php echo (int) ($presentDays ?? 0); ?></div><div class="l">Present / <?php echo (int) ($totalDays ?? 0); ?> days</div></div></div>
+        <div class="col-6 col-md-3"><div class="sd-card sd-stat"><div class="n text-danger"><?php echo (int) ($absentDays ?? 0); ?></div><div class="l">Absent days</div></div></div>
+        <div class="col-6 col-md-3"><div class="sd-card sd-stat"><div class="n text-warning"><?php echo (int) ($holidayDays ?? 0); ?></div><div class="l">Holidays</div></div></div>
     </div>
 
-    <!-- Change Password Modal -->
-    <div class="modal fade" id="changePasswordModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <form method="POST" action="<?php echo APP_URL; ?>/student/change-password" id="changePasswordForm" novalidate>
-                    <div class="modal-header">
-                        <h5 class="modal-title fw-bold">
-                            <i class="fas fa-key me-2 text-danger"></i>Change Password
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="old_password" class="form-label fw-semibold">Old Password</label>
-                            <input type="password" class="form-control" id="old_password" name="old_password" required>
-                            <div class="invalid-feedback">Please enter old password.</div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="new_password" class="form-label fw-semibold">New Password</label>
-                            <input type="password" class="form-control" id="new_password" name="new_password"
-                                   minlength="8"
-                                   pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$"
-                                   required>
-                            <div class="form-text">Minimum 8 characters, must include 1 capital, 1 small, and 1 number.</div>
-                            <div class="invalid-feedback">Password must be at least 8 characters and include 1 capital, 1 small, and 1 number.</div>
-                        </div>
-
-                        <div class="mb-0">
-                            <label for="confirm_password" class="form-label fw-semibold">Confirm Password</label>
-                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
-                            <div class="invalid-feedback">Please confirm the new password.</div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger">
-                            <i class="fas fa-save me-1"></i>Change Password
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Statistics Cards -->
-    <div class="row g-2 g-md-3 g-lg-4 mb-3 mb-md-4">
-        <div class="col-6 col-md-3">
-            <div class="student-dashboard-card p-3 p-md-4">
-                <div class="text-center">
-                    <div class="stat-value"><?php echo $attendancePercentage; ?>%</div>
-                    <div class="stat-label mt-2">Attendance Rate</div>
-                    <div class="small text-muted mt-1">This Month</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="student-dashboard-card p-3 p-md-4">
-                <div class="text-center">
-                    <div class="stat-value text-success"><?php echo $presentDays; ?></div>
-                    <div class="stat-label mt-2">Present Days</div>
-                    <div class="small text-muted mt-1">Out of <?php echo $totalDays; ?> days</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="student-dashboard-card p-3 p-md-4">
-                <div class="text-center">
-                    <div class="stat-value text-danger"><?php echo $absentDays; ?></div>
-                    <div class="stat-label mt-2">Absent Days</div>
-                    <div class="small text-muted mt-1">This Month</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="student-dashboard-card p-3 p-md-4">
-                <div class="text-center">
-                    <div class="stat-value text-warning"><?php echo $holidayDays; ?></div>
-                    <div class="stat-label mt-2">Holidays</div>
-                    <div class="small text-muted mt-1">This Month</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Quick Info Row -->
-    <div class="row g-2 g-md-3 g-lg-4 mb-3 mb-md-4 quick-info-row">
-        <div class="col-12 col-md-6">
-            <div class="student-dashboard-card p-3 p-md-4">
-                <h5 class="fw-bold mb-3">
-                    <i class="fas fa-info-circle me-2" style="color: var(--student-primary);"></i>Quick Information
-                </h5>
-                <div class="row g-2 g-md-3">
-                    <div class="col-6 col-sm-6">
-                        <div class="small text-muted mb-1">Student ID</div>
-                        <div class="fw-semibold"><?php echo htmlspecialchars($student['student_id']); ?></div>
-                    </div>
-                    <div class="col-6 col-sm-6">
-                        <div class="small text-muted mb-1">Email</div>
-                        <div class="fw-semibold small text-break"><?php echo htmlspecialchars($student['student_email'] ?? 'N/A'); ?></div>
-                    </div>
-                    <div class="col-6 col-sm-6">
-                        <div class="small text-muted mb-1">Status</div>
-                        <span class="badge bg-<?php echo $student['student_status'] === 'Active' ? 'success' : 'warning'; ?>">
-                            <?php echo htmlspecialchars($student['student_status'] ?? 'Active'); ?>
-                        </span>
-                    </div>
-                    <?php if ($currentEnrollment): ?>
-                    <div class="col-6 col-sm-6">
-                        <div class="small text-muted mb-1">Academic Year</div>
-                        <div class="fw-semibold"><?php echo htmlspecialchars($currentEnrollment['academic_year'] ?? 'N/A'); ?></div>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-12 col-md-6">
-            <div class="student-dashboard-card p-3 p-md-4">
-                <h5 class="fw-bold mb-3">
-                    <i class="fas fa-bed me-2" style="color: var(--student-primary);"></i>Hostel Information
-                </h5>
+    <div class="row g-3 mb-3 mb-md-4 align-items-stretch">
+        <div class="col-lg-6">
+            <div class="sd-card p-3 p-md-4">
+                <h2><i class="fas fa-bed me-2"></i>Hostel</h2>
                 <?php if ($hostelAllocation): ?>
-                    <div class="row g-2 g-md-3">
-                        <div class="col-6">
-                            <div class="small text-muted mb-1">Hostel</div>
-                            <div class="fw-semibold"><?php echo htmlspecialchars($hostelAllocation['hostel_name'] ?? 'N/A'); ?></div>
-                        </div>
-                        <div class="col-6">
-                            <div class="small text-muted mb-1">Room</div>
-                            <div class="fw-semibold"><?php echo htmlspecialchars($hostelAllocation['room_no'] ?? 'N/A'); ?></div>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-3">
-                        <div class="small text-muted mb-1">Roommates</div>
-                        <?php if (!empty($roommates)): ?>
-                            <div class="list-group list-group-flush border rounded">
-                                <?php foreach ($roommates as $rm): ?>
-                                    <div class="list-group-item d-flex justify-content-between align-items-start">
-                                        <div class="me-3">
-                                            <div class="fw-semibold text-dark">
-                                                <?php echo htmlspecialchars($rm['student_fullname'] ?? 'N/A'); ?>
-                                            </div>
-                                            <div class="small text-muted">
-                                                <?php echo htmlspecialchars($rm['student_id'] ?? ''); ?>
-                                            </div>
-                                        </div>
-                                        <?php if (!empty($rm['student_phone'])): ?>
-                                            <div class="small text-muted text-end">
-                                                <?php echo htmlspecialchars($rm['student_phone']); ?>
-                                            </div>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php else: ?>
-                            <div class="text-muted small">No other active roommates found.</div>
-                        <?php endif; ?>
-                    </div>
+                    <dl class="sd-dl mb-3">
+                        <div><dt>Hostel</dt><dd><?php echo $dash($hostelAllocation['hostel_name'] ?? ''); ?></dd></div>
+                        <div><dt>Room</dt><dd><?php echo $dash($hostelAllocation['room_no'] ?? ''); ?></dd></div>
+                    </dl>
+                    <div class="small text-muted mb-1">Roommates</div>
+                    <?php if (!empty($roommates)): ?>
+                        <ul class="list-unstyled mb-0 small">
+                            <?php foreach ($roommates as $rm): ?>
+                                <li class="mb-1"><?php echo $dash($rm['student_fullname'] ?? ''); ?> <span class="text-muted"><?php echo $dash($rm['student_id'] ?? ''); ?></span></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else: ?>
+                        <p class="text-muted small mb-0">No other active roommates.</p>
+                    <?php endif; ?>
                 <?php else: ?>
-                    <p class="text-muted mb-0 small">No hostel allocation</p>
+                    <p class="text-muted mb-0">No hostel allocation.</p>
                 <?php endif; ?>
             </div>
         </div>
-    </div>
-    
-    <!-- Payments View -->
-    <div class="student-dashboard-card p-3 p-md-4 mb-4">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2">
-            <h5 class="fw-bold mb-0">
-                <i class="fas fa-money-bill-wave me-2" style="color: var(--student-primary);"></i>Payments
-            </h5>
-        </div>
-        
-        <div class="row g-3">
-            <div class="col-12 col-lg-6">
-                <h6 class="fw-bold mb-2">
-                    <i class="fas fa-bus me-1 text-success"></i>Bus Season Payments
-                </h6>
+        <div class="col-lg-6">
+            <div class="sd-card p-3 p-md-4">
+                <h2><i class="fas fa-money-bill-wave me-2"></i>Recent payments</h2>
+                <h3 class="h6 text-muted">Bus season</h3>
                 <?php if (!empty($busSeasonPayments)): ?>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Amount</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm mb-0 sd-pay">
                             <tbody>
-                                <?php foreach (array_slice($busSeasonPayments, 0, 5) as $p): ?>
-                                    <tr>
-                                        <td class="small">
-                                            <?php echo htmlspecialchars(!empty($p['payment_date']) ? date('Y-m-d', strtotime($p['payment_date'])) : 'N/A'); ?>
-                                        </td>
-                                        <td class="small text-success">
-                                            Rs. <?php echo number_format($p['paid_amount'] ?? 0, 2); ?>
-                                        </td>
-                                        <td class="small">
-                                            <span class="badge bg-<?php echo strtolower($p['status'] ?? '') === 'issued' ? 'success' : 'secondary'; ?>">
-                                                <?php echo htmlspecialchars(ucfirst($p['status'] ?? 'N/A')); ?>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
+                            <?php foreach (array_slice($busSeasonPayments, 0, 4) as $p): ?>
+                                <tr>
+                                    <td><?php echo $e(!empty($p['payment_date']) ? date('d M Y', strtotime($p['payment_date'])) : '—'); ?></td>
+                                    <td>Rs. <?php echo number_format($p['paid_amount'] ?? 0, 2); ?></td>
+                                    <td><?php echo $dash($p['status'] ?? ''); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
                 <?php else: ?>
-                    <p class="text-muted small mb-0">No bus season payments recorded.</p>
+                    <p class="text-muted small">No bus season payments.</p>
                 <?php endif; ?>
-            </div>
-            
-            <div class="col-12 col-lg-6">
-                <h6 class="fw-bold mb-2">
-                    <i class="fas fa-receipt me-1 text-primary"></i>Other / Hostel Payments
-                </h6>
+                <h3 class="h6 text-muted">Other / hostel</h3>
                 <?php if (!empty($recentPayments)): ?>
                     <div class="table-responsive">
-                        <table class="table table-sm table-striped mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Reason</th>
-                                    <th>Amount</th>
-                                </tr>
-                            </thead>
+                        <table class="table table-sm mb-0 sd-pay">
                             <tbody>
-                                <?php foreach ($recentPayments as $p): ?>
-                                    <tr>
-                                        <td class="small">
-                                            <?php echo htmlspecialchars(!empty($p['pays_date']) ? date('Y-m-d', strtotime($p['pays_date'])) : 'N/A'); ?>
-                                        </td>
-                                        <td class="small" style="max-width: 180px;" title="<?php echo htmlspecialchars(trim(($p['payment_reason'] ?? '') . (!empty($p['pays_note']) ? ' - ' . $p['pays_note'] : ''))); ?>">
-                                            <div class="text-truncate" style="max-width: 180px;">
-                                                <?php echo htmlspecialchars($p['payment_reason'] ?? ''); ?>
-                                            </div>
-                                            <?php if (!empty($p['pays_note'])): ?>
-                                                <div class="small text-muted text-truncate" style="max-width: 180px;">
-                                                    <?php echo htmlspecialchars($p['pays_note']); ?>
-                                                </div>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="small text-success">
-                                            Rs. <?php echo number_format($p['pays_amount'] ?? 0, 2); ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
+                            <?php foreach ($recentPayments as $p): ?>
+                                <tr>
+                                    <td><?php echo $e(!empty($p['pays_date']) ? date('d M Y', strtotime($p['pays_date'])) : '—'); ?></td>
+                                    <td><?php echo $dash($p['payment_reason'] ?? ''); ?></td>
+                                    <td>Rs. <?php echo number_format($p['pays_amount'] ?? 0, 2); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
                 <?php else: ?>
-                    <p class="text-muted small mb-0">No payments recorded.</p>
+                    <p class="text-muted small mb-0">No other payments recorded.</p>
                 <?php endif; ?>
+                <a href="<?php echo APP_URL; ?>/student/payments" class="small">View all payments</a>
             </div>
         </div>
     </div>
-    
-    <!-- Attendance Calendar View -->
-    <div class="student-dashboard-card p-3 p-md-4 mb-4">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2 calendar-header">
-            <h5 class="fw-bold mb-0">
-                <i class="fas fa-calendar-check me-2" style="color: var(--student-primary);"></i>Attendance Calendar - <?php echo date('F Y', strtotime($currentMonth . '-01')); ?>
-            </h5>
-            <a href="<?php echo APP_URL; ?>/student/attendance" class="btn btn-sm btn-primary">
-                View Full Calendar <i class="fas fa-arrow-right ms-1"></i>
-            </a>
+
+    <div class="sd-card p-3 p-md-4 mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2">
+            <h2 class="mb-0 border-0 pb-0"><i class="fas fa-calendar-check me-2"></i>Attendance — <?php echo date('F Y', strtotime(($currentMonth ?? date('Y-m')) . '-01')); ?></h2>
+            <a href="<?php echo APP_URL; ?>/student/attendance" class="btn btn-sm btn-outline-primary">Full calendar</a>
         </div>
-        
         <div class="calendar-container">
             <?php
-            // Generate calendar days for the month
+            $currentMonth = $currentMonth ?? date('Y-m');
+            $attendanceRecords = $attendanceRecords ?? [];
             $firstDay = strtotime($currentMonth . '-01');
-            $daysInMonth = date('t', $firstDay);
-            $firstDayOfWeek = date('w', $firstDay);
-            
-            // Calendar header
-            $weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            $daysInMonth = (int) date('t', $firstDay);
+            $firstDayOfWeek = (int) date('w', $firstDay);
+            $weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+            $weekDaysFull = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             ?>
-            <div class="row g-1 g-md-2">
-                <?php foreach ($weekDays as $day): ?>
-                    <div class="col text-center fw-bold small text-muted pb-2"><?php echo $day; ?></div>
+            <div class="sd-cal">
+                <?php foreach ($weekDaysFull as $i => $day): ?>
+                    <div class="sd-cal-hd"><span class="d-none d-sm-inline"><?php echo $day; ?></span><span class="d-sm-none"><?php echo $weekDays[$i]; ?></span></div>
                 <?php endforeach; ?>
-                
                 <?php
-                // Empty cells for days before month starts
                 for ($i = 0; $i < $firstDayOfWeek; $i++) {
-                    echo '<div class="col"></div>';
+                    echo '<div></div>';
                 }
-                
-                // Calendar days
                 for ($day = 1; $day <= $daysInMonth; $day++) {
-                    $date = $currentMonth . '-' . str_pad($day, 2, '0', STR_PAD_LEFT);
-                    $dayOfWeek = date('w', strtotime($date));
-                    $isWeekend = ($dayOfWeek == 0 || $dayOfWeek == 6);
-                    
-                    $status = $attendanceRecords[$date] ?? null;
+                    $date = $currentMonth . '-' . str_pad((string) $day, 2, '0', STR_PAD_LEFT);
+                    $dayOfWeek = (int) date('w', strtotime($date));
+                    $isWeekend = ($dayOfWeek === 0 || $dayOfWeek === 6);
+                    $st = $attendanceRecords[$date] ?? null;
                     $class = 'attendance-empty';
                     $icon = '';
-                    
                     if ($isWeekend) {
                         $class = 'attendance-weekend';
-                    } elseif ($status === 1) {
+                    } elseif ($st === 1) {
                         $class = 'attendance-present';
-                        $icon = '<i class="fas fa-check"></i>';
-                    } elseif ($status === 0) {
+                        $icon = '<i class="fas fa-check"></i> ';
+                    } elseif ($st === 0) {
                         $class = 'attendance-absent';
-                        $icon = '<i class="fas fa-times"></i>';
-                    } elseif ($status === -1) {
+                        $icon = '<i class="fas fa-times"></i> ';
+                    } elseif ($st === -1) {
                         $class = 'attendance-holiday';
-                        $icon = '<i class="fas fa-star"></i>';
+                        $icon = '<i class="fas fa-star"></i> ';
                     }
-                    
-                    echo '<div class="col">';
-                    echo '<div class="attendance-calendar-day ' . $class . '" title="' . date('l, F j, Y', strtotime($date)) . '">';
-                    echo $icon . ' ' . $day;
-                    echo '</div>';
-                    echo '</div>';
-                }
-                
-                // Fill remaining cells to complete week
-                $remainingDays = 7 - (($firstDayOfWeek + $daysInMonth) % 7);
-                if ($remainingDays < 7) {
-                    for ($i = 0; $i < $remainingDays; $i++) {
-                        echo '<div class="col"></div>';
-                    }
+                    echo '<div class="attendance-calendar-day ' . $class . '" title="' . $e(date('l, F j, Y', strtotime($date))) . '">' . $icon . $day . '</div>';
                 }
                 ?>
             </div>
         </div>
-        
-        <!-- Legend -->
-        <div class="mt-3 mt-md-4 d-flex flex-wrap gap-2 gap-md-3 justify-content-center">
-            <div class="d-flex align-items-center">
-                <div class="attendance-calendar-day attendance-present me-2">
-                    <i class="fas fa-check"></i>
-                </div>
-                <small>Present</small>
-            </div>
-            <div class="d-flex align-items-center">
-                <div class="attendance-calendar-day attendance-absent me-2">
-                    <i class="fas fa-times"></i>
-                </div>
-                <small>Absent</small>
-            </div>
-            <div class="d-flex align-items-center">
-                <div class="attendance-calendar-day attendance-holiday me-2">
-                    <i class="fas fa-star"></i>
-                </div>
-                <small>Holiday</small>
-            </div>
-            <div class="d-flex align-items-center">
-                <div class="attendance-calendar-day attendance-weekend me-2"></div>
-                <small>Weekend</small>
-            </div>
+        <div class="mt-3 d-flex flex-wrap gap-2 gap-md-3 justify-content-center small text-muted">
+            <span class="d-flex align-items-center gap-1"><span class="attendance-calendar-day attendance-present" style="width:22px;height:22px;aspect-ratio:auto;"><i class="fas fa-check"></i></span> Present</span>
+            <span class="d-flex align-items-center gap-1"><span class="attendance-calendar-day attendance-absent" style="width:22px;height:22px;aspect-ratio:auto;"><i class="fas fa-times"></i></span> Absent</span>
+            <span class="d-flex align-items-center gap-1"><span class="attendance-calendar-day attendance-holiday" style="width:22px;height:22px;aspect-ratio:auto;"><i class="fas fa-star"></i></span> Holiday</span>
+            <span class="d-flex align-items-center gap-1"><span class="attendance-calendar-day attendance-weekend" style="width:22px;height:22px;aspect-ratio:auto;"></span> Weekend</span>
         </div>
     </div>
 </div>
 
-<!-- Code of Conduct Acceptance Modal -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="<?php echo APP_URL; ?>/student/change-password" id="changePasswordForm" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-key me-2 text-danger"></i>Change Password</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="old_password" class="form-label fw-semibold">Old Password</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="old_password" name="old_password" required autocomplete="current-password">
+                            <button type="button" class="btn btn-outline-secondary st-pw-toggle" data-target="old_password" aria-label="Show password" title="Show password"><i class="fas fa-eye"></i></button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label fw-semibold">New Password</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="new_password" name="new_password" minlength="8" pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$" required autocomplete="new-password">
+                            <button type="button" class="btn btn-outline-secondary st-pw-toggle" data-target="new_password" aria-label="Show password" title="Show password"><i class="fas fa-eye"></i></button>
+                        </div>
+                        <div class="form-text">Minimum 8 characters, must include 1 capital, 1 small, and 1 number.</div>
+                    </div>
+                    <div class="mb-0">
+                        <label for="confirm_password" class="form-label fw-semibold">Confirm Password</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required autocomplete="new-password">
+                            <button type="button" class="btn btn-outline-secondary st-pw-toggle" data-target="confirm_password" aria-label="Show password" title="Show password"><i class="fas fa-eye"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger"><i class="fas fa-save me-1"></i>Change Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <?php if (!$hasAcceptedConduct): ?>
 <div class="modal fade" id="conductModal" tabindex="-1" aria-labelledby="conductModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="conductModalLabel">
-                    <i class="fas fa-file-contract me-2"></i>SLGTI STUDENT CODE OF CONDUCT
-                </h5>
+                <h5 class="modal-title" id="conductModalLabel"><i class="fas fa-file-contract me-2"></i>SLGTI STUDENT CODE OF CONDUCT</h5>
             </div>
             <div class="modal-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    <strong>Important:</strong> Please read the following declaration carefully before accepting.
-                </div>
-                
+                <div class="alert alert-info"><i class="fas fa-info-circle me-2"></i><strong>Important:</strong> Please read the following declaration carefully before accepting.</div>
                 <div class="border rounded p-4 mb-3" style="background-color: #f8f9fa; max-height: 400px; overflow-y: auto;">
                     <h6 class="fw-bold mb-3">SLGTI Student Code of Conduct and Honor</h6>
-                    <p class="text-justify">
-                        I hereby confirm that I have read, understood, and agreed to comply with the SLGTI Student Code of Conduct and Honor, including all rules, regulations, policies, and procedures of the Sri Lanka–German Training Institute (SLGTI). I acknowledge my responsibility to maintain discipline, academic integrity, professional conduct, and respect for all members of the SLGTI community and its property. I understand that this Code applies to my conduct on campus, off campus, and during all SLGTI-authorized activities, including industrial training and On-the-Job Training (OJT). I further understand that any violation of this Code may result in disciplinary action in accordance with SLGTI regulations, including warnings, suspension, or expulsion. By submitting this declaration electronically, I confirm that this acceptance is legally binding and equivalent to my handwritten signature.
-                    </p>
+                    <p>I hereby confirm that I have read, understood, and agreed to comply with the SLGTI Student Code of Conduct and Honor, including all rules, regulations, policies, and procedures of the Sri Lanka–German Training Institute (SLGTI). I acknowledge my responsibility to maintain discipline, academic integrity, professional conduct, and respect for all members of the SLGTI community and its property. I understand that this Code applies to my conduct on campus, off campus, and during all SLGTI-authorized activities, including industrial training and On-the-Job Training (OJT). I further understand that any violation of this Code may result in disciplinary action in accordance with SLGTI regulations, including warnings, suspension, or expulsion. By submitting this declaration electronically, I confirm that this acceptance is legally binding and equivalent to my handwritten signature.</p>
                 </div>
-                
                 <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" id="agreeCheckbox" required>
-                    <label class="form-check-label" for="agreeCheckbox">
-                        <strong>I agree to the SLGTI Student Code of Conduct and Honor</strong>
-                    </label>
+                    <label class="form-check-label" for="agreeCheckbox"><strong>I agree to the SLGTI Student Code of Conduct and Honor</strong></label>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" id="acceptConductBtn" disabled>
-                    <i class="fas fa-check me-2"></i>Accept & Continue
-                </button>
+                <button type="button" class="btn btn-primary" id="acceptConductBtn" disabled><i class="fas fa-check me-2"></i>Accept &amp; Continue</button>
             </div>
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
+<?php if (!$hasAcceptedConduct): ?>
 document.addEventListener('DOMContentLoaded', function() {
-    // Show modal on page load
     const conductModal = new bootstrap.Modal(document.getElementById('conductModal'));
     conductModal.show();
-    
-    // Enable/disable accept button based on checkbox
     const agreeCheckbox = document.getElementById('agreeCheckbox');
     const acceptBtn = document.getElementById('acceptConductBtn');
-    
-    agreeCheckbox.addEventListener('change', function() {
-        acceptBtn.disabled = !this.checked;
-    });
-    
-    // Handle acceptance
+    agreeCheckbox.addEventListener('change', function() { acceptBtn.disabled = !this.checked; });
     acceptBtn.addEventListener('click', function() {
-        if (!agreeCheckbox.checked) {
-            alert('Please check the agreement box to continue.');
-            return;
-        }
-        
-        // Disable button and show loading
+        if (!agreeCheckbox.checked) { alert('Please check the agreement box to continue.'); return; }
         acceptBtn.disabled = true;
         const originalText = acceptBtn.innerHTML;
         acceptBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
-        
-        // Send AJAX request (same-origin; relative path avoids APP_URL misconfiguration)
         fetch('<?php echo rtrim(APP_URL, '/'); ?>/student/accept-conduct', {
             method: 'POST',
             credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'Accept': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
             body: JSON.stringify({})
         })
         .then(async response => {
             const text = await response.text();
             let data;
-            try {
-                data = text ? JSON.parse(text) : {};
-            } catch (e) {
-                console.error('Non-JSON response:', text);
-                throw new Error('Server returned an invalid response. Please refresh and try again.');
-            }
-            if (!response.ok && !data.error) {
-                data.error = 'Request failed (' + response.status + ').';
-            }
+            try { data = text ? JSON.parse(text) : {}; } catch (e) { throw new Error('Server returned an invalid response. Please refresh and try again.'); }
+            if (!response.ok && !data.error) { data.error = 'Request failed (' + response.status + ').'; }
             return data;
         })
         .then(data => {
             if (data.success) {
-                // Close modal
                 conductModal.hide();
-                
-                // Show success message
                 const alertDiv = document.createElement('div');
                 alertDiv.className = 'alert alert-success alert-dismissible fade show';
-                alertDiv.innerHTML = `
-                    <i class="fas fa-check-circle me-2"></i>
-                    ${data.message || 'Code of conduct accepted successfully!'}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                `;
-                document.querySelector('.container-fluid').insertBefore(alertDiv, document.querySelector('.container-fluid').firstChild);
-                
-                // Remove modal from DOM after hiding
-                setTimeout(() => {
-                    const modalElement = document.getElementById('conductModal');
-                    if (modalElement) {
-                        modalElement.remove();
-                    }
-                }, 300);
+                alertDiv.innerHTML = '<i class="fas fa-check-circle me-2"></i>' + (data.message || 'Code of conduct accepted successfully!') + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+                const page = document.querySelector('.sd-page');
+                if (page) page.insertBefore(alertDiv, page.firstChild);
             } else {
                 alert('Error: ' + (data.error || 'Failed to accept code of conduct. Please try again.'));
                 acceptBtn.disabled = false;
@@ -860,36 +517,37 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
             alert(error.message || 'An error occurred. Please try again.');
             acceptBtn.disabled = false;
             acceptBtn.innerHTML = originalText;
         });
     });
-    
-    // Prevent closing modal by clicking outside or pressing ESC
-    document.getElementById('conductModal').addEventListener('hide.bs.modal', function(e) {
-        if (!agreeCheckbox.checked || !document.getElementById('acceptConductBtn').disabled) {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
+});
+<?php endif; ?>
+
+document.querySelectorAll('.st-pw-toggle').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        var input = document.getElementById(btn.getAttribute('data-target'));
+        if (!input) return;
+        var show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        var icon = btn.querySelector('i');
+        if (icon) {
+            icon.classList.toggle('fa-eye', !show);
+            icon.classList.toggle('fa-eye-slash', show);
         }
+        btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        btn.setAttribute('title', show ? 'Hide password' : 'Show password');
     });
 });
 
-// Change Password validation
 (function() {
     const form = document.getElementById('changePasswordForm');
     if (!form) return;
     form.addEventListener('submit', function(e) {
         const newPass = document.getElementById('new_password');
         const confirmPass = document.getElementById('confirm_password');
-
-        if (!form.checkValidity()) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
+        if (!form.checkValidity()) { e.preventDefault(); e.stopPropagation(); }
         if (newPass && confirmPass && newPass.value !== confirmPass.value) {
             e.preventDefault();
             e.stopPropagation();
@@ -898,10 +556,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (confirmPass) {
             confirmPass.setCustomValidity('');
         }
-
         form.classList.add('was-validated');
     });
 })();
 </script>
-<?php endif; ?>
-

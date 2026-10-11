@@ -403,6 +403,11 @@ class CourseModel extends Model {
      * Columns: id (PK), course_id, version_no, is_active, created_at.
      */
     public function ensureCourseVersionTable() {
+        $conn = $this->db->getConnection();
+        $exists = $conn->query("SHOW TABLES LIKE '{$this->courseVersionTable}'");
+        if ($exists && $exists->num_rows > 0) {
+            return;
+        }
         $sql = "CREATE TABLE IF NOT EXISTS `{$this->courseVersionTable}` (
                     `id` INT(11) NOT NULL AUTO_INCREMENT,
                     `course_id` VARCHAR(11) NOT NULL,

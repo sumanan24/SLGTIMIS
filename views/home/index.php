@@ -115,7 +115,7 @@
     <!-- Footer -->
     <footer class="home-footer">
         <p class="copyright">&copy; <?php echo date('Y'); ?> Copyright SLGTI</p>
-        <p class="developer">Developed by sicode</p>
+        <p class="developer">Department of Information and Communication Technology</p>
     </footer>
 </div>
 

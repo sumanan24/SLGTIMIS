@@ -1,4 +1,4 @@
-<div class="container-fluid px-4 py-3">
+﻿<div class="container-fluid px-4 py-3">
     <style>
         /* Ensure only active tab content is visible on this page */
         #studentTabsContent > .tab-pane {
@@ -40,7 +40,7 @@
                     
                     <!-- Tabs Navigation -->
                     <?php 
-                    $activeTab = $_SESSION['active_tab'] ?? 'personal';
+                    $activeTab = $_SESSION['active_tab'] ?? ($_GET['tab'] ?? 'personal');
                     if (!in_array($activeTab, ['personal', 'enrollment', 'bank', 'eligibility'], true)) {
                         $activeTab = 'personal';
                     }
@@ -368,7 +368,7 @@
                                 </div>
                             </form>
                         </div>
-                        
+
                         <!-- Enrollment Information Tab -->
                         <div class="tab-pane fade <?php echo $activeTab === 'enrollment' ? 'show active' : ''; ?>" id="enrollment" role="tabpanel">
                             <form method="POST" action="<?php echo APP_URL; ?>/students/edit?id=<?php echo urlencode($student['student_id']); ?>">

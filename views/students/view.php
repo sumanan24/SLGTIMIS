@@ -349,6 +349,25 @@
     opacity: 0.5;
 }
 
+.cv-qual-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+}
+
+.cv-qual-subjects {
+    width: 100%;
+    font-size: 0.8125rem;
+    margin-top: 0.75rem;
+}
+
+.cv-qual-subjects th,
+.cv-qual-subjects td {
+    padding: 0.35rem 0.5rem;
+    border-color: #e9ecef;
+}
+
 @media (max-width: 768px) {
     .cv-profile-header {
         padding: 2rem 1.5rem 1.5rem;
@@ -371,7 +390,7 @@
     .cv-info-grid {
         grid-template-columns: 1fr;
     }
-    
+
     .cv-actions {
         flex-direction: column;
     }
@@ -394,6 +413,9 @@
                     <i class="fas fa-edit"></i>Edit Profile
                 </a>
                 <?php endif; ?>
+                <a href="<?php echo APP_URL; ?>/student/documents-pdf?id=<?php echo urlencode($student['student_id']); ?>" class="cv-btn cv-btn-outline" target="_blank" rel="noopener">
+                    <i class="fas fa-file-pdf"></i>View Student Documents PDF
+                </a>
                 <a href="<?php echo APP_URL; ?>/students" class="cv-btn cv-btn-outline">
                     <i class="fas fa-arrow-left"></i>Back
                 </a>
@@ -403,6 +425,9 @@
         <!-- Student Profile Actions -->
         <div class="d-flex justify-content-end align-items-center mb-4">
             <div class="cv-actions">
+                <a href="<?php echo APP_URL; ?>/student/documents-pdf" class="cv-btn cv-btn-outline" target="_blank" rel="noopener">
+                    <i class="fas fa-file-pdf"></i>Download All Documents
+                </a>
                 <a href="<?php echo APP_URL; ?>/student/profile/edit" class="cv-btn cv-btn-primary">
                     <i class="fas fa-edit"></i>Edit My Profile
                 </a>
@@ -577,12 +602,82 @@
             </div>
         </div>
 
-        <!-- Education & Enrollment Section -->
+        <!-- Education qualifications -->
+        <?php
+        $qualifications = is_array($qualifications ?? null) ? $qualifications : [];
+        ?>
+        <div class="cv-card mb-4">
+            <h3 class="cv-section-title">
+                <i class="fas fa-certificate"></i>
+                Education qualifications
+            </h3>
+            <?php if ($qualifications === []): ?>
+                <p class="text-muted mb-0">No O/L, A/L or NVQ results were found on the linked admission application yet.</p>
+            <?php else: ?>
+                <div class="cv-timeline">
+                    <?php foreach ($qualifications as $qual): ?>
+                        <?php
+                        $subjects = is_array($qual['subjects_list'] ?? null) ? $qual['subjects_list'] : [];
+                        ?>
+                        <div class="cv-timeline-item">
+                            <div class="cv-timeline-content">
+                                <div class="cv-timeline-title"><?php echo htmlspecialchars((string) ($qual['title'] ?? $qual['type_label'] ?? '')); ?></div>
+                                <div class="cv-qual-meta cv-timeline-meta">
+                                    <span class="cv-badge cv-badge-primary"><?php echo htmlspecialchars((string) ($qual['type_label'] ?? '')); ?></span>
+                                    <?php if (!empty($qual['year_completed'])): ?>
+                                        <span class="cv-badge cv-badge-info"><?php echo htmlspecialchars((string) $qual['year_completed']); ?></span>
+                                    <?php endif; ?>
+                                    <?php if (!empty($qual['stream'])): ?>
+                                        <span class="cv-badge cv-badge-secondary"><?php echo htmlspecialchars((string) $qual['stream']); ?></span>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="cv-timeline-description">
+                                    <?php if (!empty($qual['institute'])): ?>
+                                        <p class="mb-1"><strong>Institute:</strong> <?php echo htmlspecialchars((string) $qual['institute']); ?></p>
+                                    <?php endif; ?>
+                                    <?php if (!empty($qual['index_number'])): ?>
+                                        <p class="mb-1"><strong>Index number:</strong> <?php echo htmlspecialchars((string) $qual['index_number']); ?></p>
+                                    <?php endif; ?>
+                                    <?php if (!empty($qual['result'])): ?>
+                                        <p class="mb-1"><strong>Result:</strong> <?php echo htmlspecialchars((string) $qual['result']); ?></p>
+                                    <?php endif; ?>
+                                    <?php if (!empty($qual['notes'])): ?>
+                                        <p class="mb-1"><strong>Notes:</strong> <?php echo htmlspecialchars((string) $qual['notes']); ?></p>
+                                    <?php endif; ?>
+                                    <?php if ($subjects !== []): ?>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm cv-qual-subjects mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Subject</th>
+                                                        <th>Result</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                <?php foreach ($subjects as $subject): ?>
+                                                    <tr>
+                                                        <td><?php echo htmlspecialchars((string) ($subject['name'] ?? '')); ?></td>
+                                                        <td><?php echo htmlspecialchars((string) ($subject['result'] ?? '')); ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- SLGTI Enrollment Section -->
         <?php if (!empty($currentEnrollment) || !empty($enrollments)): ?>
         <div class="cv-card mb-4">
             <h3 class="cv-section-title">
                 <i class="fas fa-graduation-cap"></i>
-                Education & Enrollment
+                SLGTI enrollment
             </h3>
             
             <?php if (!empty($currentEnrollment)): ?>
@@ -628,6 +723,47 @@
             <?php endif; ?>
         </div>
         <?php endif; ?>
+
+        <?php
+        $admissionDocuments = is_array($admissionDocuments ?? null) ? $admissionDocuments : [];
+        $isOwnProfile = isset($page) && $page === 'student-profile';
+        $docStudentId = (string) ($student['student_id'] ?? '');
+        ?>
+        <div class="cv-card mb-4">
+            <h3 class="cv-section-title">
+                <i class="fas fa-folder-open"></i>
+                Admission documents
+            </h3>
+            <?php if ($admissionDocuments === []): ?>
+                <p class="text-muted mb-2">No admission documents are linked to this student yet.</p>
+            <?php else: ?>
+                <ul class="mb-3">
+                    <?php foreach ($admissionDocuments as $doc): ?>
+                        <li>
+                            <?php echo htmlspecialchars((string) ($doc['label'] ?? '')); ?>
+                            <?php if (!empty($doc['available'])): ?>
+                                <?php
+                                $fileUrl = $isOwnProfile
+                                    ? APP_URL . '/student/document?col=' . urlencode((string) $doc['column'])
+                                    : APP_URL . '/students/document?id=' . urlencode($docStudentId) . '&col=' . urlencode((string) $doc['column']);
+                                ?>
+                                — <a href="<?php echo htmlspecialchars($fileUrl); ?>" target="_blank" rel="noopener">Open original</a>
+                            <?php else: ?>
+                                <span class="text-muted">— not uploaded</span>
+                            <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+            <?php
+            $pdfUrl = $isOwnProfile
+                ? APP_URL . '/student/documents-pdf'
+                : APP_URL . '/student/documents-pdf?id=' . urlencode($docStudentId);
+            ?>
+            <a href="<?php echo htmlspecialchars($pdfUrl); ?>" class="cv-btn cv-btn-outline" target="_blank" rel="noopener">
+                <i class="fas fa-file-pdf"></i> View Student Documents PDF
+            </a>
+        </div>
 
         <!-- Additional Information Row -->
         <div class="row g-4">

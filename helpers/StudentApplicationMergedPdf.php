@@ -124,6 +124,112 @@ final class StudentApplicationMergedPdf {
         return $out;
     }
 
+    /**
+     * Combine admission documents into one PDF. Original files are not changed.
+     *
+     * @param list<array{label: string, path: string}> $documents
+     * @param list<string> $skipped Human-readable reasons for files that could not be merged
+     */
+    public static function mergeDocumentsOnly(array $documents, string $title, array &$skipped = []): string {
+        $autoload = defined('BASE_PATH') ? BASE_PATH . '/vendor/autoload.php' : dirname(__DIR__) . '/vendor/autoload.php';
+        if (!is_file($autoload)) {
+            throw new RuntimeException('PDF engine is not installed.');
+        }
+        require_once $autoload;
+        if (!class_exists(\setasign\Fpdi\Fpdi::class)) {
+            throw new RuntimeException('PDF engine is not installed. Run composer install.');
+        }
+
+        $pdf = new \setasign\Fpdi\Fpdi();
+        $pdf->AddPage();
+        $pdf->SetFont('Helvetica', 'B', 14);
+        $pdf->MultiCell(0, 8, self::fpdfText($title));
+        $pdf->SetFont('Helvetica', '', 10);
+        $pdf->Ln(2);
+        $pdf->MultiCell(0, 6, self::fpdfText('Combined admission documents. Original files are unchanged.'));
+        $pdf->Ln(2);
+
+        $temps = [];
+        $merged = 0;
+        try {
+            foreach ($documents as $doc) {
+                $label = (string) ($doc['label'] ?? 'Document');
+                $absPath = (string) ($doc['path'] ?? '');
+                if ($absPath === '' || !is_readable($absPath)) {
+                    $skipped[] = $label . ' — file is missing or not readable.';
+                    continue;
+                }
+                $ext = strtolower(pathinfo($absPath, PATHINFO_EXTENSION));
+                if ($ext === 'pdf') {
+                    try {
+                        $pages = $pdf->setSourceFile($absPath);
+                        for ($p = 1; $p <= $pages; $p++) {
+                            $pdf->AddPage();
+                            $tpl = $pdf->importPage($p);
+                            $pdf->useTemplate($tpl);
+                        }
+                        $merged++;
+                    } catch (Throwable $e) {
+                        $skipped[] = $label . ' — PDF could not be merged. Open the original file instead.';
+                    }
+                    continue;
+                }
+
+                $imgPath = null;
+                if ($ext === 'webp') {
+                    $converted = self::webpToJpegTemp($absPath);
+                    if ($converted !== null) {
+                        $temps[] = $converted;
+                        $imgPath = $converted;
+                    }
+                } elseif (in_array($ext, ['jpg', 'jpeg', 'png', 'gif'], true)) {
+                    $imgPath = $absPath;
+                }
+
+                if ($imgPath === null || !is_readable($imgPath)) {
+                    $skipped[] = $label . ' — this file type cannot be included in the combined PDF. Use the original file.';
+                    continue;
+                }
+
+                $pdf->AddPage();
+                $pdf->SetFont('Helvetica', 'B', 11);
+                $pdf->Cell(0, 8, self::fpdfText($label), 0, 1);
+                try {
+                    $pdf->Image($imgPath, 10, 24, 190, 0);
+                    $merged++;
+                } catch (Throwable $e) {
+                    $skipped[] = $label . ' — image could not be embedded. Use the original file.';
+                }
+            }
+        } finally {
+            foreach ($temps as $t) {
+                @unlink($t);
+            }
+        }
+
+        if ($merged === 0 && $skipped !== []) {
+            $pdf->SetFont('Helvetica', '', 10);
+            $pdf->MultiCell(0, 6, self::fpdfText('No documents could be combined. Reasons:'));
+            foreach ($skipped as $reason) {
+                $pdf->MultiCell(0, 6, self::fpdfText('- ' . $reason));
+            }
+        } elseif ($skipped !== []) {
+            $pdf->AddPage();
+            $pdf->SetFont('Helvetica', 'B', 12);
+            $pdf->Cell(0, 8, self::fpdfText('Documents not included'), 0, 1);
+            $pdf->SetFont('Helvetica', '', 10);
+            foreach ($skipped as $reason) {
+                $pdf->MultiCell(0, 6, self::fpdfText('- ' . $reason));
+            }
+        }
+
+        $out = $pdf->Output('S');
+        if (!is_string($out)) {
+            throw new RuntimeException('PDF output failed');
+        }
+        return $out;
+    }
+
     private static function webpToJpegTemp(string $webpPath): ?string {
         if (!function_exists('imagecreatefromwebp') || !function_exists('imagejpeg')) {
             return null;

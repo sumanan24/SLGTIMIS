@@ -5,7 +5,6 @@
 
 class AuthController extends Controller {
     
-    private $maxLoginAttempts = 3; // Maximum failed login attempts before lock
     private $sessionTimeout = 1800; // 30 minutes in seconds
     
     public function login() {
@@ -42,10 +41,8 @@ class AuthController extends Controller {
             
             // Load required models and logger
             require_once BASE_PATH . '/core/ActivityLogger.php';
-            require_once BASE_PATH . '/models/LoginAttemptModel.php';
             require_once BASE_PATH . '/models/UserModel.php';
             
-            $loginAttemptModel = new LoginAttemptModel();
             $userModel = new UserModel();
             $activityLogger = new ActivityLogger();
             
@@ -58,32 +55,13 @@ class AuthController extends Controller {
                 return $this->view('auth/login', $data);
             }
             
-            // Check if account is locked
             if ($userModel->isAccountLockedByUsername($username)) {
                 $user = $userModel->getUserByUsername($username);
-                $loginAttemptModel->recordAttempt($username, 'failed');
                 $activityLogger->log('login_attempt', 'Login attempt on locked account', 'failed', $user['user_id'] ?? null, $username);
                 
                 $data = [
                     'title' => 'Login',
-                    'error' => 'This account has been locked due to multiple failed login attempts. Please contact the administrator to unlock your account.'
-                ];
-                return $this->view('auth/login', $data);
-            }
-            
-            // Check failed login attempts
-            $failedAttempts = $loginAttemptModel->getFailedAttemptsCount($username, 60);
-            if ($failedAttempts >= $this->maxLoginAttempts) {
-                // Lock the account
-                $user = $userModel->getUserByUsername($username);
-                if ($user) {
-                    $userModel->lockAccountByUsername($username, 'Too many failed login attempts (3 attempts)');
-                    $activityLogger->log('account_locked', "Account locked due to {$failedAttempts} failed login attempts", 'success', $user['user_id'], $username);
-                }
-                
-                $data = [
-                    'title' => 'Login',
-                    'error' => 'This account has been locked due to multiple failed login attempts. Please contact the administrator to unlock your account.'
+                    'error' => 'This account has been locked. Please contact the administrator to unlock your account.'
                 ];
                 return $this->view('auth/login', $data);
             }
@@ -98,25 +76,17 @@ class AuthController extends Controller {
                 $user = $result->fetch_assoc();
                 
                 if (!$user) {
-                    $loginAttemptModel->recordAttempt($username, 'failed');
                     $activityLogger->log('login_attempt', 'Login attempt with invalid username', 'failed', null, $username);
-                    
-                    $remainingAttempts = $this->maxLoginAttempts - $failedAttempts - 1;
-                    $errorMsg = 'Invalid username or password';
-                    if ($remainingAttempts > 0) {
-                        $errorMsg .= ". You have {$remainingAttempts} attempt(s) remaining before your account will be locked.";
-                    }
                     
                     $data = [
                         'title' => 'Login',
-                        'error' => $errorMsg
+                        'error' => 'Invalid username or password'
                     ];
                     return $this->view('auth/login', $data);
                 }
                 
                 // Check if password hash exists
                 if (empty($user['user_password_hash'])) {
-                    $loginAttemptModel->recordAttempt($username, 'failed');
                     $activityLogger->log('login_attempt', 'Login attempt - account not properly configured', 'failed', $user['user_id'], $username);
                     
                     $data = [
@@ -143,9 +113,6 @@ class AuthController extends Controller {
                 }
                 
                 if ($passwordVerified) {
-                    // Clear failed login attempts
-                    $loginAttemptModel->clearFailedAttempts($username);
-                    
                     // Set session variables
                     $_SESSION['user_id'] = $user['user_id'];
                     $_SESSION['user_name'] = $user['user_name'];
@@ -163,8 +130,6 @@ class AuthController extends Controller {
                         // Ignore update errors, login should still work
                     }
                     
-                    // Log successful login
-                    $loginAttemptModel->recordAttempt($username, 'success');
                     $activityLogger->log('login_success', 'User successfully logged in', 'success', $user['user_id'], $username);
                     
                     // Redirect based on user type
@@ -173,7 +138,18 @@ class AuthController extends Controller {
                     $userModelCheck = new UserModel();
                     
                     if ($userTable === 'student') {
-                        header("Location: " . APP_URL . "/student/dashboard");
+                        require_once BASE_PATH . '/helpers/AdmissionRegistrationService.php';
+                        $portalId = (new AdmissionRegistrationService())->resolveStudentPortalId((string) $user['user_name']);
+                        if ($portalId) {
+                            $_SESSION['user_name'] = $portalId;
+                            $_SESSION['student_id'] = $portalId;
+                        }
+                        if ($userModelCheck->mustChangePassword((int) $user['user_id'])) {
+                            header("Location: " . APP_URL . "/student/change-password");
+                            exit();
+                        }
+                        require_once BASE_PATH . '/helpers/StudentPortalGuard.php';
+                        header("Location: " . APP_URL . "/" . StudentPortalGuard::nextAfterPassword());
                     } elseif ($userModelCheck->isHOD($user['user_id'])) {
                         header("Location: " . APP_URL . "/hod/dashboard");
                     } elseif ($userModelCheck->isHRO($user['user_id'])) {
@@ -183,34 +159,11 @@ class AuthController extends Controller {
                     }
                     exit();
                 } else {
-                    // Record failed attempt
-                    $loginAttemptModel->recordAttempt($username, 'failed');
                     $activityLogger->log('login_attempt', 'Login attempt with invalid password', 'failed', $user['user_id'], $username);
-                    
-                    $failedAttempts = $loginAttemptModel->getFailedAttemptsCount($username, 60);
-                    $remainingAttempts = $this->maxLoginAttempts - $failedAttempts;
-                    
-                    // Check if we should lock the account now
-                    if ($failedAttempts >= $this->maxLoginAttempts) {
-                        $userModel->lockAccountByUsername($username, 'Too many failed login attempts (3 attempts)');
-                        $activityLogger->log('account_locked', "Account locked due to {$failedAttempts} failed login attempts", 'success', $user['user_id'], $username);
-                        
-                        $data = [
-                            'title' => 'Login',
-                            'error' => 'This account has been locked due to multiple failed login attempts. Please contact the administrator to unlock your account.'
-                        ];
-                    } else {
-                        $errorMsg = 'Invalid username or password';
-                        if ($remainingAttempts > 0) {
-                            $errorMsg .= ". You have {$remainingAttempts} attempt(s) remaining before your account will be locked.";
-                        }
-                        
-                        $data = [
-                            'title' => 'Login',
-                            'error' => $errorMsg
-                        ];
-                    }
-                    
+                    $data = [
+                        'title' => 'Login',
+                        'error' => 'Invalid username or password'
+                    ];
                     return $this->view('auth/login', $data);
                 }
             } catch (Exception $e) {

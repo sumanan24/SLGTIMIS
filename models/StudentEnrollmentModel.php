@@ -24,7 +24,7 @@ class StudentEnrollmentModel extends Model {
      * Ensure course_version column exists on student_enroll table.
      * Stores the version number of the course when the student enrolled.
      */
-    protected function ensureCourseVersionColumn() {
+    public function ensureCourseVersionColumn() {
         $sql = "SHOW COLUMNS FROM `{$this->table}` LIKE 'course_version'";
         $result = $this->db->query($sql);
         if ($result && $result->num_rows === 0) {
@@ -101,6 +101,15 @@ class StudentEnrollmentModel extends Model {
         return $result->fetch_assoc();
     }
     
+    public function findEnrollment(string $studentId, string $courseId, string $academicYear): ?array {
+        $sql = "SELECT * FROM `{$this->table}` WHERE `student_id` = ? AND `course_id` = ? AND `academic_year` = ? LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param('sss', $studentId, $courseId, $academicYear);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
+    }
+
     /**
      * Create new enrollment
      */
@@ -120,6 +129,11 @@ class StudentEnrollmentModel extends Model {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         
         $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            $this->lastSqlError = $this->db->getConnection()->error ?? 'Prepare failed (student_enroll insert)';
+            error_log('createEnrollment prepare: ' . $this->lastSqlError);
+            return false;
+        }
         $stmt->bind_param("ssisssss",
             $data['student_id'],
             $data['course_id'],
@@ -131,7 +145,11 @@ class StudentEnrollmentModel extends Model {
             $data['student_enroll_exit_date']
         );
         
-        return $stmt->execute();
+        if (!$stmt->execute()) {
+            $this->lastSqlError = $stmt->error ?: 'Execute failed (student_enroll insert)';
+            return false;
+        }
+        return true;
     }
     
     /**

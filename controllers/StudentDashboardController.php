@@ -26,14 +26,25 @@ class StudentDashboardController extends Controller {
             return;
         }
         
+        require_once BASE_PATH . '/models/UserModel.php';
+        $dashUserModel = new UserModel();
+        if ($dashUserModel->mustChangePassword((int) $_SESSION['user_id'])) {
+            $this->redirect('student/change-password');
+            return;
+        }
+
         $studentModel = $this->model('StudentModel');
         $attendanceModel = $this->model('AttendanceModel');
         $enrollmentModel = $this->model('StudentEnrollmentModel');
         $roomAllocationModel = $this->model('RoomAllocationModel');
         
         // Get current student
-        $studentId = $_SESSION['user_name']; // Student ID is stored in user_name
-        $student = $studentModel->find($studentId);
+        require_once BASE_PATH . '/helpers/AdmissionRegistrationService.php';
+        $studentId = (new AdmissionRegistrationService())->resolveStudentPortalId((string) ($_SESSION['user_name'] ?? ''));
+        if ($studentId) {
+            $_SESSION['user_name'] = $studentId;
+        }
+        $student = $studentId ? $studentModel->find($studentId) : null;
         
         if (!$student) {
             $_SESSION['error'] = 'Student record not found.';
@@ -43,6 +54,23 @@ class StudentDashboardController extends Controller {
         
         // Get current enrollment
         $currentEnrollment = $enrollmentModel->getCurrentEnrollment($studentId);
+
+        $currentGroup = null;
+        try {
+            $db = Database::getInstance();
+            $gStmt = $db->prepare("SELECT g.`name`, g.`academic_year`, g.`course_id`
+                FROM `group_students` gs
+                INNER JOIN `groups` g ON g.`id` = gs.`group_id`
+                WHERE gs.`student_id` = ? AND gs.`status` = 'active'
+                ORDER BY gs.`enrolled_at` DESC LIMIT 1");
+            if ($gStmt) {
+                $gStmt->bind_param('s', $studentId);
+                $gStmt->execute();
+                $currentGroup = $gStmt->get_result()->fetch_assoc() ?: null;
+            }
+        } catch (Throwable $e) {
+            $currentGroup = null;
+        }
         
         // Get hostel allocation
         $hostelAllocation = $roomAllocationModel->getActiveByStudentId($studentId);
@@ -127,6 +155,7 @@ class StudentDashboardController extends Controller {
             'page' => 'student-dashboard',
             'student' => $student,
             'currentEnrollment' => $currentEnrollment,
+            'currentGroup' => $currentGroup,
             'hostelAllocation' => $hostelAllocation,
             'roommates' => $roommates,
             'attendanceRecords' => $attendanceRecords,
@@ -139,7 +168,8 @@ class StudentDashboardController extends Controller {
             'recentAttendance' => $recentAttendance,
             'recentPayments' => $recentPayments,
             'busSeasonPayments' => $busSeasonPayments,
-            'hasAcceptedConduct' => $hasAcceptedConduct
+            'hasAcceptedConduct' => $hasAcceptedConduct,
+            'studentNotices' => array_slice($this->studentHandbook()['notices'] ?? [], 0, 3),
         ];
         
         return $this->view('student/dashboard', $data);
@@ -207,6 +237,29 @@ class StudentDashboardController extends Controller {
 
         $_SESSION['error'] = 'Requested form was not found.';
         $this->redirect('student/forms');
+    }
+
+    public function notices() {
+        if (!$this->requireStudentAccess()) {
+            return;
+        }
+        $handbook = $this->studentHandbook();
+        return $this->view('student/notices', [
+            'title' => 'SLGTI notices and rules',
+            'page' => 'student-notices',
+            'notices' => $handbook['notices'] ?? [],
+            'codeOfConduct' => $handbook['code_of_conduct'] ?? [],
+            'commonRules' => $handbook['common_rules'] ?? [],
+        ]);
+    }
+
+    private function studentHandbook(): array {
+        $file = BASE_PATH . '/config/slgti_student_notices.php';
+        if (!is_file($file)) {
+            return ['notices' => [], 'code_of_conduct' => [], 'common_rules' => []];
+        }
+        $data = require $file;
+        return is_array($data) ? $data : ['notices' => [], 'code_of_conduct' => [], 'common_rules' => []];
     }
 
     /**

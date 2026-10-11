@@ -4,6 +4,8 @@ $sch = $schedule ?? [];
 $entries = is_array($entries ?? null) ? $entries : [];
 $isEntranceResults = !empty($isEntranceResults);
 $canUpdate = !empty($canUpdateSelection);
+$canRegister = !empty($canRegister);
+$registrationStatuses = is_array($registrationStatuses ?? null) ? $registrationStatuses : [];
 $pageTitle = $isEntranceResults ? 'Entrance exam results' : 'Interview selection list';
 $saveLabel = $isEntranceResults ? 'Save exam results' : 'Save marks';
 $viewOnlyMsg = $isEntranceResults
@@ -155,12 +157,15 @@ $viewOnlyMsg = $isEntranceResults
                         <th class="aa-col-nic">NIC</th>
                         <th class="aa-col-course">Course</th>
                         <th class="aa-col-marks">Marks</th>
+                        <?php if ($canRegister): ?>
+                        <th class="aa-col-reg">Registration</th>
+                        <?php endif; ?>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if ($entries === []): ?>
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-4">No applicants.</td>
+                        <td colspan="<?php echo $canRegister ? 7 : 6; ?>" class="text-center text-muted py-4">No applicants.</td>
                     </tr>
                 <?php else: ?>
                     <?php $n = 0; foreach ($entries as $row): $n++;
@@ -168,6 +173,8 @@ $viewOnlyMsg = $isEntranceResults
                         $roll = trim((string) ($row['roll_number'] ?? ''));
                         $marksVal = trim((string) ($row['exam_marks'] ?? ''));
                         $isAbsent = ApplicationAdmissionScheduleModel::isAbsentMarks($marksVal);
+                        $nicKey = strtoupper(preg_replace('/\s+/', '', trim((string) ($row['student_nic'] ?? ''))));
+                        $regStatus = $registrationStatuses[$nicKey] ?? null;
                     ?>
                     <tr class="<?php echo $isAbsent ? 'is-absent' : ''; ?>">
                         <td class="aa-col-no"><?php echo $n; ?></td>
@@ -193,6 +200,19 @@ $viewOnlyMsg = $isEntranceResults
                                 <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
+                        <?php if ($canRegister): ?>
+                        <td class="aa-col-reg">
+                            <?php if ($isAbsent): ?>
+                                <span class="text-muted">—</span>
+                            <?php elseif (!empty($regStatus['registered'])): ?>
+                                <span class="badge bg-success">Registered</span>
+                                <div class="small text-muted"><?php echo $e($regStatus['student_id'] ?? ''); ?></div>
+                                <a class="btn btn-sm btn-outline-secondary mt-1" href="<?php echo APP_URL; ?>/application-admission/register?schedule_id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>&amp;entry_id=<?php echo $entryId; ?>">View</a>
+                            <?php else: ?>
+                                <a class="btn btn-sm btn-outline-primary" href="<?php echo APP_URL; ?>/application-admission/register?schedule_id=<?php echo (int) ($sch['schedule_id'] ?? 0); ?>&amp;entry_id=<?php echo $entryId; ?>">Register</a>
+                            <?php endif; ?>
+                        </td>
+                        <?php endif; ?>
                     </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>

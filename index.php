@@ -115,6 +115,11 @@ if (!in_array($uri, $publicNoTimeoutUris, true)) {
     }
 }
 
+if (isset($_SESSION['user_id']) && ($_SESSION['user_table'] ?? '') === 'student') {
+    require_once BASE_PATH . '/helpers/StudentPortalGuard.php';
+    StudentPortalGuard::enforce($uri);
+}
+
 // Create router and dispatch
 try {
     // Check if core files exist

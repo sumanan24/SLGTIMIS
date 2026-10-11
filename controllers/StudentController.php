@@ -98,7 +98,18 @@ class StudentController extends Controller {
             $this->redirect('dashboard');
             return;
         }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $mustChange = $userModel->mustChangePassword((int) $_SESSION['user_id']);
+        $failRedirect = $mustChange ? 'student/change-password' : 'student/dashboard';
+
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            if ($mustChange) {
+                return $this->view('student/force-change-password', [
+                    'page' => 'student-change-password',
+                    'title' => 'Change password',
+                ]);
+            }
             $this->redirect('student/dashboard');
             return;
         }
@@ -109,17 +120,17 @@ class StudentController extends Controller {
 
         if (trim($oldPassword) === '' || trim($newPassword) === '' || trim($confirmPassword) === '') {
             $_SESSION['error'] = 'Old password, new password, and confirm password are required.';
-            $this->redirect('student/dashboard');
+            $this->redirect($failRedirect);
             return;
         }
         if ($newPassword !== $confirmPassword) {
             $_SESSION['error'] = 'New password and confirm password do not match.';
-            $this->redirect('student/dashboard');
+            $this->redirect($failRedirect);
             return;
         }
         if (!$this->isValidStrongPassword($newPassword)) {
             $_SESSION['error'] = 'Password must be at least 8 characters and include 1 capital letter, 1 small letter, and 1 number.';
-            $this->redirect('student/dashboard');
+            $this->redirect($failRedirect);
             return;
         }
 
@@ -132,7 +143,7 @@ class StudentController extends Controller {
             $user = $res ? $res->fetch_assoc() : null;
             if (!$user || empty($user['user_password_hash'])) {
                 $_SESSION['error'] = 'User account not properly configured. Please contact administrator.';
-                $this->redirect('student/dashboard');
+                $this->redirect($failRedirect);
                 return;
             }
 
@@ -148,7 +159,7 @@ class StudentController extends Controller {
 
             if (!$passwordVerified) {
                 $_SESSION['error'] = 'Old password is incorrect.';
-                $this->redirect('student/dashboard');
+                $this->redirect($failRedirect);
                 return;
             }
 
@@ -157,15 +168,265 @@ class StudentController extends Controller {
             $update = $db->prepare("UPDATE `user` SET `user_password_hash` = ? WHERE `user_id` = ?");
             $update->bind_param('si', $newHash, $_SESSION['user_id']);
             $update->execute();
+            $userModel->clearMustChangePassword((int) $_SESSION['user_id']);
 
-            $_SESSION['message'] = 'Password changed successfully.';
-            $this->redirect('student/dashboard');
+            $_SESSION['message'] = 'Password changed successfully. Please complete your personal and parent details.';
+            require_once BASE_PATH . '/helpers/StudentPortalGuard.php';
+            $this->redirect(StudentPortalGuard::nextAfterPassword());
             return;
         } catch (Exception $e) {
             $_SESSION['error'] = 'Error changing password. Please try again.';
+            $this->redirect($failRedirect);
+            return;
+        }
+    }
+
+    public function studentDocumentsPdf() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/helpers/AdmissionRegistrationService.php';
+        $service = new AdmissionRegistrationService();
+        $requested = trim((string) $this->get('id', ''));
+        $studentId = '';
+
+        if (($_SESSION['user_table'] ?? '') === 'student') {
+            $studentId = $service->resolveStudentPortalId((string) ($_SESSION['user_name'] ?? ''));
+            if ($studentId && $requested !== '' && strcasecmp($requested, $studentId) !== 0) {
+                $_SESSION['error'] = 'You can only download your own documents.';
+                $this->redirect('student/dashboard');
+                return;
+            }
+        } else {
+            require_once BASE_PATH . '/models/UserModel.php';
+            require_once BASE_PATH . '/core/AccessControl.php';
+            $userModel = new UserModel();
+            $uid = (int) $_SESSION['user_id'];
+            $allowed = $userModel->canViewApplicationAdmissionSchedules($uid)
+                || AccessControl::can($uid, 'students', 'view')
+                || AccessControl::can($uid, 'students', 'download');
+            if (!$allowed) {
+                $_SESSION['error'] = 'You do not have permission to view student documents.';
+                $this->redirect('dashboard');
+                return;
+            }
+            $studentId = $requested;
+        }
+
+        if ($studentId === '') {
+            $_SESSION['error'] = 'Student record not found.';
+            $this->redirect(($_SESSION['user_table'] ?? '') === 'student' ? 'student/dashboard' : 'students');
+            return;
+        }
+
+        $application = $service->findApplicationForStudent($studentId);
+        if (!$application) {
+            $_SESSION['error'] = 'No admission documents are linked to this student.';
+            $this->redirect(($_SESSION['user_table'] ?? '') === 'student' ? 'student/profile' : ('students/view?id=' . urlencode($studentId)));
+            return;
+        }
+
+        $skipped = [];
+        try {
+            $binary = $service->buildCombinedPdfBinary($application, $studentId, $skipped);
+        } catch (RuntimeException $e) {
+            $_SESSION['error'] = $e->getMessage();
+            $this->redirect(($_SESSION['user_table'] ?? '') === 'student' ? 'student/profile' : ('students/view?id=' . urlencode($studentId)));
+            return;
+        }
+
+        $safe = preg_replace('/[^A-Za-z0-9._-]+/', '_', $studentId) ?: 'documents';
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="student-documents-' . $safe . '.pdf"');
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store');
+        echo $binary;
+        exit;
+    }
+
+    /**
+     * First-login personal + parent/guardian details (required before the dashboard).
+     */
+    public function completeFirstLoginProfile() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        if (!isset($_SESSION['user_table']) || $_SESSION['user_table'] !== 'student') {
+            $_SESSION['error'] = 'Access denied.';
+            $this->redirect('dashboard');
+            return;
+        }
+
+        require_once BASE_PATH . '/models/UserModel.php';
+        require_once BASE_PATH . '/helpers/StudentPortalGuard.php';
+        $userModel = new UserModel();
+        if ($userModel->mustChangePassword((int) $_SESSION['user_id'])) {
+            $this->redirect('student/change-password');
+            return;
+        }
+
+        $student = StudentPortalGuard::currentStudent();
+        $studentModel = $this->model('StudentModel');
+        if (!$student) {
+            $_SESSION['error'] = 'Student record not found.';
+            $this->redirect('logout');
+            return;
+        }
+        $studentId = (string) $student['student_id'];
+
+        $formError = null;
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $data = [
+                'student_title' => trim((string) $this->post('student_title', '')),
+                'student_fullname' => trim((string) $this->post('student_fullname', '')),
+                'student_ininame' => trim((string) $this->post('student_ininame', '')),
+                'student_gender' => trim((string) $this->post('student_gender', '')),
+                'student_civil' => trim((string) $this->post('student_civil', '')),
+                'student_email' => trim((string) $this->post('student_email', '')),
+                'student_dob' => trim((string) $this->post('student_dob', '')),
+                'student_phone' => preg_replace('/\D+/', '', (string) $this->post('student_phone', '')),
+                'student_address' => trim((string) $this->post('student_address', '')),
+                'student_zip' => preg_replace('/\D+/', '', (string) $this->post('student_zip', '')),
+                'student_district' => trim((string) $this->post('student_district', '')),
+                'student_divisions' => trim((string) $this->post('student_divisions', '')),
+                'student_provice' => trim((string) $this->post('student_provice', '')),
+                'student_em_name' => trim((string) $this->post('student_em_name', '')),
+                'student_em_address' => trim((string) $this->post('student_em_address', '')),
+                'student_em_phone' => preg_replace('/\D+/', '', (string) $this->post('student_em_phone', '')),
+                'student_em_relation' => trim((string) $this->post('student_em_relation', '')),
+                'student_nationality' => trim((string) $this->post('student_nationality', '')),
+                'student_whatsapp' => preg_replace('/\D+/', '', (string) $this->post('student_whatsapp', '')),
+                'student_religion' => trim((string) $this->post('student_religion', '')),
+            ];
+            $student = array_merge($student, $data);
+
+            foreach ($data as $value) {
+                if ($this->containsNonEnglishChars($value)) {
+                    $formError = 'Please fill all details in English only.';
+                    break;
+                }
+            }
+            if ($formError === null) {
+                foreach ($studentModel->portalProfileRequiredFields() as $field) {
+                    $value = trim((string) ($data[$field] ?? ''));
+                    if ($value === '' || $value === '0') {
+                        $formError = 'Please fill all personal and parent / guardian details.';
+                        break;
+                    }
+                }
+            }
+            if ($formError === null && !filter_var($data['student_email'], FILTER_VALIDATE_EMAIL)) {
+                $formError = 'Please enter a valid email address.';
+            }
+            if ($formError === null && (strlen($data['student_phone']) < 9 || strlen($data['student_phone']) > 10)) {
+                $formError = 'Please enter a valid phone number (9–10 digits).';
+            }
+            if ($formError === null && (strlen($data['student_em_phone']) < 9 || strlen($data['student_em_phone']) > 10)) {
+                $formError = 'Please enter a valid parent / guardian phone number (9–10 digits).';
+            }
+            if ($formError === null && (strlen($data['student_whatsapp']) < 9 || strlen($data['student_whatsapp']) > 12)) {
+                $formError = 'Please enter a valid WhatsApp number.';
+            }
+
+            if ($formError === null) {
+                $result = $studentModel->updateStudent($studentId, $data);
+                if (!$result) {
+                    $sqlErr = $studentModel->getLastSqlError();
+                    $formError = 'Could not save your details.' . ($sqlErr ? ' ' . $sqlErr : '');
+                } else {
+                    $_SESSION['message'] = 'Thank you. Your personal and parent details have been saved.';
+                    $this->redirect('student/dashboard');
+                    return;
+                }
+            }
+        } elseif (!$studentModel->isPortalProfileIncomplete($student)) {
             $this->redirect('student/dashboard');
             return;
         }
+
+        return $this->view('student/complete-profile', [
+            'title' => 'Complete your details',
+            'page' => 'student-complete-profile',
+            'student' => $student,
+            'error' => $formError,
+        ]);
+    }
+
+    public function studentDocumentFile() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        require_once BASE_PATH . '/helpers/AdmissionRegistrationService.php';
+        require_once BASE_PATH . '/models/StudentApplicationModel.php';
+        $service = new AdmissionRegistrationService();
+        $column = trim((string) $this->get('col', ''));
+        if (!in_array($column, StudentApplicationModel::DOCUMENT_PATH_COLUMNS, true)) {
+            $_SESSION['error'] = 'Invalid document type.';
+            $this->redirect(($_SESSION['user_table'] ?? '') === 'student' ? 'student/profile' : 'students');
+            return;
+        }
+
+        $requested = trim((string) $this->get('id', ''));
+        $studentId = '';
+        if (($_SESSION['user_table'] ?? '') === 'student') {
+            $studentId = $service->resolveStudentPortalId((string) ($_SESSION['user_name'] ?? ''));
+        } else {
+            require_once BASE_PATH . '/models/UserModel.php';
+            require_once BASE_PATH . '/core/AccessControl.php';
+            $uid = (int) $_SESSION['user_id'];
+            $userModel = new UserModel();
+            $allowed = $userModel->canViewApplicationAdmissionSchedules($uid)
+                || AccessControl::can($uid, 'students', 'view')
+                || AccessControl::can($uid, 'students', 'download');
+            if (!$allowed) {
+                $_SESSION['error'] = 'You do not have permission to view student documents.';
+                $this->redirect('dashboard');
+                return;
+            }
+            $studentId = $requested;
+        }
+        if ($studentId === '') {
+            $_SESSION['error'] = 'Student record not found.';
+            $this->redirect(($_SESSION['user_table'] ?? '') === 'student' ? 'student/dashboard' : 'students');
+            return;
+        }
+
+        $application = $service->findApplicationForStudent($studentId);
+        $rel = trim((string) ($application[$column] ?? ''));
+        $abs = $rel !== '' ? $service->resolveUploadedFileAbsolutePath($rel) : null;
+        if ($abs === null) {
+            $_SESSION['error'] = 'That document is not available.';
+            $this->redirect(($_SESSION['user_table'] ?? '') === 'student' ? 'student/profile' : ('students/view?id=' . urlencode($studentId)));
+            return;
+        }
+
+        $mime = mime_content_type($abs) ?: 'application/octet-stream';
+        $name = basename($abs);
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . str_replace('"', '', $name) . '"');
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store');
+        header('Content-Length: ' . (string) filesize($abs));
+        readfile($abs);
+        exit;
+    }
+
+    private function admissionDocumentsForStudent(string $studentId): array {
+        require_once BASE_PATH . '/helpers/AdmissionRegistrationService.php';
+        $service = new AdmissionRegistrationService();
+        $application = $service->findApplicationForStudent($studentId);
+        return $application ? $service->applicationDocuments($application) : [];
+    }
+
+    private function qualificationModel() {
+        return $this->model('StudentQualificationModel');
+    }
+
+    private function qualificationsForStudent(string $studentId): array {
+        return $this->qualificationModel()->listForStudent($studentId);
     }
     
     public function index() {
@@ -369,7 +630,9 @@ class StudentController extends Controller {
                 'pendingAmount' => $pendingAmount
             ],
             'canEdit' => $canEdit,
-            'isADM' => $isADM
+            'isADM' => $isADM,
+            'admissionDocuments' => $this->admissionDocumentsForStudent((string) $id),
+            'qualifications' => $this->qualificationsForStudent((string) $id),
         ];
         
         return $this->view('students/view', $data);
@@ -391,9 +654,13 @@ class StudentController extends Controller {
             return;
         }
         
-        $studentId = $_SESSION['user_name'];
+        require_once BASE_PATH . '/helpers/AdmissionRegistrationService.php';
+        $studentId = (new AdmissionRegistrationService())->resolveStudentPortalId((string) ($_SESSION['user_name'] ?? ''));
+        if ($studentId) {
+            $_SESSION['user_name'] = $studentId;
+        }
         $studentModel = $this->model('StudentModel');
-        $student = $studentModel->find($studentId);
+        $student = $studentId ? $studentModel->find($studentId) : null;
         
         if (!$student) {
             $_SESSION['error'] = 'Student record not found.';
@@ -423,7 +690,9 @@ class StudentController extends Controller {
             'enrollments' => $enrollments,
             'currentEnrollment' => $currentEnrollment,
             'hostelAllocation' => $hostelAllocation,
-            'hasHostel' => !empty($hostelAllocation)
+            'hasHostel' => !empty($hostelAllocation),
+            'admissionDocuments' => $this->admissionDocumentsForStudent((string) $studentId),
+            'qualifications' => $this->qualificationsForStudent((string) $studentId),
         ];
         
         return $this->view('students/view', $data);
@@ -447,9 +716,13 @@ class StudentController extends Controller {
             return;
         }
         
-        $studentId = $_SESSION['user_name'];
+        require_once BASE_PATH . '/helpers/AdmissionRegistrationService.php';
+        $studentId = (new AdmissionRegistrationService())->resolveStudentPortalId((string) ($_SESSION['user_name'] ?? ''));
+        if ($studentId) {
+            $_SESSION['user_name'] = $studentId;
+        }
         $studentModel = $this->model('StudentModel');
-        $student = $studentModel->find($studentId);
+        $student = $studentId ? $studentModel->find($studentId) : null;
         
         if (!$student) {
             $_SESSION['error'] = 'Student record not found.';

@@ -55,11 +55,159 @@ class UserModel extends Model {
                 $this->db->query($sql4);
             }
             
+            $this->ensureMustChangePasswordColumn();
             return true;
         } catch (Exception $e) {
             error_log("Error adding lock fields to user table: " . $e->getMessage());
             return false;
         }
+    }
+
+    public function ensureMustChangePasswordColumn(): void {
+        $check = $this->db->query("SHOW COLUMNS FROM `{$this->table}` LIKE 'must_change_password'");
+        if ($check && $check->num_rows === 0) {
+            $this->db->query("ALTER TABLE `{$this->table}` ADD COLUMN `must_change_password` TINYINT(1) NOT NULL DEFAULT 0 AFTER `user_active`");
+        }
+    }
+
+    public function findStudentLogin(string $nic, string $studentId): ?array {
+        $nic = strtoupper(trim($nic));
+        $sql = "SELECT * FROM `{$this->table}` WHERE `user_table` = 'student' AND (`user_name` = ? OR `user_name` = ?) LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            throw new RuntimeException('Could not look up the student login: ' . ($this->db->getConnection()->error ?: 'prepare failed'));
+        }
+        $stmt->bind_param('ss', $nic, $studentId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
+    }
+
+    public function createStudentLogin(string $nic, string $email, string $passwordPlain, bool $mustChange = true) {
+        $this->ensureMustChangePasswordColumn();
+        $nic = strtoupper(trim($nic));
+        $hash = hash('sha256', $passwordPlain);
+        $must = $mustChange ? 1 : 0;
+        $active = 1;
+        $table = 'student';
+        $position = 'STU';
+        $sql = "INSERT INTO `{$this->table}` (`user_table`, `staff_position_type_id`, `user_name`, `user_password_hash`, `user_email`, `user_active`, `must_change_password`, `user_creation_timestamp`)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $this->db->prepare($sql);
+        $now = time();
+        $stmt->bind_param('sssssiii', $table, $position, $nic, $hash, $email, $active, $must, $now);
+        if (!$stmt->execute()) {
+            throw new RuntimeException('Could not create the student login: ' . ($stmt->error ?: 'unknown error'));
+        }
+        return $this->db->lastInsertId();
+    }
+
+    public function findByEmail(string $email): ?array {
+        $email = trim($email);
+        if ($email === '') {
+            return null;
+        }
+        $stmt = $this->db->prepare("SELECT * FROM `{$this->table}` WHERE `user_email` = ? LIMIT 1");
+        $stmt->bind_param('s', $email);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
+    }
+
+    /**
+     * Link the existing student row to a login. Prefer NIC as username.
+     * A DB trigger already inserts user_name = student_id when a student is created.
+     *
+     * @return array{user_id:int, username:string, created:bool, password_reset:bool}
+     */
+    public function linkOrCreateStudentAccount(string $nic, string $studentId, string $email, bool $newStudent): array {
+        $this->ensureMustChangePasswordColumn();
+        $nic = strtoupper(trim($nic));
+        $studentId = trim($studentId);
+        $email = trim($email);
+        $existing = $this->findStudentLogin($nic, $studentId);
+        if ($existing) {
+            $userId = (int) $existing['user_id'];
+            $currentName = (string) $existing['user_name'];
+            $username = $currentName;
+            if (strcasecmp($currentName, $nic) !== 0) {
+                $taken = $this->findByUsername($nic);
+                if (!$taken || (int) $taken['user_id'] === $userId) {
+                    $stmt = $this->db->prepare("UPDATE `{$this->table}` SET `user_name` = ? WHERE `user_id` = ?");
+                    $stmt->bind_param('si', $nic, $userId);
+                    if ($stmt->execute()) {
+                        $username = $nic;
+                    }
+                }
+            }
+            $must = $newStudent ? 1 : (int) ($existing['must_change_password'] ?? 0);
+            $stmt = $this->db->prepare("UPDATE `{$this->table}` SET `user_active` = 1, `must_change_password` = ? WHERE `user_id` = ?");
+            $stmt->bind_param('ii', $must, $userId);
+            $stmt->execute();
+            return [
+                'user_id' => $userId,
+                'username' => $username,
+                'created' => false,
+                'password_reset' => false,
+            ];
+        }
+
+        $uniqueEmail = $this->uniqueStudentEmail($email, $studentId);
+        $id = (int) $this->createStudentLogin($nic, $uniqueEmail, $nic, true);
+        return [
+            'user_id' => $id,
+            'username' => $nic,
+            'created' => true,
+            'password_reset' => true,
+        ];
+    }
+
+    public function findByUsername(string $username): ?array {
+        $username = trim($username);
+        $stmt = $this->db->prepare("SELECT * FROM `{$this->table}` WHERE `user_name` = ? LIMIT 1");
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
+    }
+
+    private function uniqueStudentEmail(string $email, string $studentId): string {
+        $email = trim($email);
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) && !$this->findByEmail($email)) {
+            return $email;
+        }
+        $base = preg_replace('/[^A-Za-z0-9]+/', '', $studentId) ?: 'student';
+        $candidate = strtolower($base) . '@slgtimis.local';
+        $n = 1;
+        while ($this->findByEmail($candidate)) {
+            $n++;
+            $candidate = strtolower($base) . $n . '@slgtimis.local';
+        }
+        return $candidate;
+    }
+
+    public function activateStudentLogin(int $userId, bool $mustChange = false): void {
+        $this->ensureMustChangePasswordColumn();
+        $must = $mustChange ? 1 : 0;
+        $stmt = $this->db->prepare("UPDATE `{$this->table}` SET `user_active` = 1, `must_change_password` = ? WHERE `user_id` = ?");
+        $stmt->bind_param('ii', $must, $userId);
+        $stmt->execute();
+    }
+
+    public function clearMustChangePassword(int $userId): void {
+        $this->ensureMustChangePasswordColumn();
+        $stmt = $this->db->prepare("UPDATE `{$this->table}` SET `must_change_password` = 0 WHERE `user_id` = ?");
+        $stmt->bind_param('i', $userId);
+        $stmt->execute();
+    }
+
+    public function mustChangePassword(int $userId): bool {
+        $this->ensureMustChangePasswordColumn();
+        $stmt = $this->db->prepare("SELECT `must_change_password` FROM `{$this->table}` WHERE `user_id` = ?");
+        $stmt->bind_param('i', $userId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return !empty($row['must_change_password']);
     }
     
     /**
@@ -773,6 +921,26 @@ class UserModel extends Model {
         $role = $this->getUserRole($userId);
 
         return in_array($role, ['REG', 'DIR'], true);
+    }
+
+    /**
+     * Facilities Officer: ADM, FAC, FO, MHF, or system admin.
+     */
+    public function isFacilitiesOfficer($userId): bool {
+        if ($this->isAdminOrADM($userId)) {
+            return true;
+        }
+        return in_array($this->getUserRole($userId), ['FAC', 'FO', 'MHF'], true);
+    }
+
+    /**
+     * Principal / management monitoring: DIR, DPI, DPA, REG.
+     */
+    public function isFacilitiesMonitor($userId): bool {
+        if ($this->isAdminOrADM($userId)) {
+            return true;
+        }
+        return in_array($this->getUserRole($userId), ['DIR', 'DPI', 'DPA', 'REG'], true);
     }
 }
 

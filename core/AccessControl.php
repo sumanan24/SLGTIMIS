@@ -204,6 +204,18 @@ class AccessControl {
                 ];
             case 'circuit_program':
                 return self::withDocFlags(['can_view' => 1, 'can_add' => 1, 'can_edit' => 1, 'can_delete' => 1]);
+            case 'facilities':
+                $officer = $userModel->isFacilitiesOfficer($userId);
+                $monitor = $userModel->isFacilitiesMonitor($userId);
+                return self::withDocFlags([
+                    'can_view' => 1,
+                    'can_add' => 1,
+                    'can_edit' => ($officer || !$monitor) ? 1 : 0,
+                    'can_delete' => $officer ? 1 : 0,
+                    'can_upload' => 1,
+                    'can_download' => 1,
+                    'can_approve' => $officer ? 1 : 0,
+                ]);
             default:
                 return $allFalse;
         }

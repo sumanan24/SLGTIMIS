@@ -2262,6 +2262,12 @@ class ApplicationAdmissionController extends Controller {
         }
         $canUpdateSelection = $isInterview ? $canUpdateInterviewSelection : $canManage;
         $entries = $this->sortEntriesByRollNumber($model->getEntriesWithApplications($id));
+        $registrationStatuses = [];
+        $canRegister = $isInterview && $canUpdateSelection;
+        if ($isInterview) {
+            require_once BASE_PATH . '/helpers/AdmissionRegistrationService.php';
+            $registrationStatuses = (new AdmissionRegistrationService())->statusesForEntries($entries);
+        }
 
         return $this->view('application_admission/selection', [
             'page' => $isInterview ? 'application-admission-interview' : 'application-admission-entrance',
@@ -2269,7 +2275,122 @@ class ApplicationAdmissionController extends Controller {
             'entries' => $entries,
             'canUpdateSelection' => $canUpdateSelection,
             'isEntranceResults' => $isEntrance,
+            'canRegister' => $canRegister,
+            'registrationStatuses' => $registrationStatuses,
         ]);
+    }
+
+    public function register() {
+        $uid = $this->requireLogin();
+        $this->requireSelectionUpdate($uid);
+        $scheduleId = (int) $this->get('schedule_id', $this->get('id', 0));
+        $entryId = (int) $this->get('entry_id', 0);
+        require_once BASE_PATH . '/helpers/AdmissionRegistrationService.php';
+        $service = new AdmissionRegistrationService();
+        try {
+            $ctx = $service->loadContext($scheduleId, $entryId);
+        } catch (RuntimeException $e) {
+            $_SESSION['error'] = $e->getMessage();
+            $this->redirect('application-admission/selection?id=' . $scheduleId);
+        }
+        $suggested = $ctx['options']['suggested_course'] ?? null;
+        $courseId = (string) ($suggested['course_id'] ?? '');
+        $year = (string) ($ctx['options']['default_academic_year'] ?? '');
+        $groups = ($courseId !== '' && $year !== '') ? $service->groupsFor($courseId, $year) : [];
+
+        return $this->view('application_admission/register', [
+            'page' => 'application-admission-interview',
+            'schedule' => $ctx['schedule'],
+            'entry' => $ctx['entry'],
+            'application' => $ctx['application'],
+            'student' => $ctx['student'],
+            'enrollment' => $ctx['enrollment'],
+            'account' => $ctx['account'],
+            'group' => $ctx['group'],
+            'documents' => $ctx['documents'],
+            'options' => $ctx['options'],
+            'groups' => $groups,
+            'summary' => $_SESSION['admission_registration_summary'] ?? null,
+            'formErrors' => $_SESSION['admission_registration_errors'] ?? [],
+            'old' => $_SESSION['admission_registration_old'] ?? [],
+        ]);
+    }
+
+    public function registerSave() {
+        $uid = $this->requireLogin();
+        $this->requireSelectionUpdate($uid);
+        $scheduleId = (int) $this->post('schedule_id', 0);
+        $entryId = (int) $this->post('entry_id', 0);
+        require_once BASE_PATH . '/helpers/AdmissionRegistrationService.php';
+        $service = new AdmissionRegistrationService();
+        $payload = [
+            'schedule_id' => $scheduleId,
+            'entry_id' => $entryId,
+            'academic_year' => $this->post('academic_year', ''),
+            'course_id' => $this->post('course_id', ''),
+            'course_mode' => $this->post('course_mode', ''),
+            'group_id' => $this->post('group_id', 0),
+            'confirm_registration' => $this->post('confirm_registration', ''),
+        ];
+        $result = $service->register($payload);
+        unset($_SESSION['admission_registration_errors'], $_SESSION['admission_registration_old'], $_SESSION['admission_registration_summary']);
+        if (empty($result['ok'])) {
+            $_SESSION['admission_registration_errors'] = $result['errors'];
+            $_SESSION['admission_registration_old'] = $payload;
+            $_SESSION['error'] = implode(' ', $result['errors']);
+            $this->redirect('application-admission/register?schedule_id=' . $scheduleId . '&entry_id=' . $entryId);
+        }
+        $_SESSION['admission_registration_summary'] = $result['summary'];
+        $_SESSION['success'] = 'Student registration completed for ' . ($result['summary']['student_id'] ?? 'the applicant') . '.';
+        $this->redirect('application-admission/register?schedule_id=' . $scheduleId . '&entry_id=' . $entryId);
+    }
+
+    public function registerGroups() {
+        $uid = $this->requireLogin();
+        $this->requireSelectionUpdate($uid);
+        $courseId = trim((string) $this->get('course_id', ''));
+        $year = trim((string) $this->get('academic_year', ''));
+        require_once BASE_PATH . '/helpers/AdmissionRegistrationService.php';
+        $groups = (new AdmissionRegistrationService())->groupsFor($courseId, $year);
+        $out = [];
+        foreach ($groups as $g) {
+            $out[] = [
+                'id' => (int) ($g['id'] ?? 0),
+                'name' => (string) ($g['name'] ?? ''),
+            ];
+        }
+        $this->json(['groups' => $out]);
+    }
+
+    public function documentsPdf() {
+        $uid = $this->requireLogin();
+        $this->requireView($uid);
+        $scheduleId = (int) $this->get('schedule_id', 0);
+        $entryId = (int) $this->get('entry_id', 0);
+        require_once BASE_PATH . '/helpers/AdmissionRegistrationService.php';
+        $service = new AdmissionRegistrationService();
+        try {
+            $ctx = $service->loadContext($scheduleId, $entryId);
+        } catch (RuntimeException $e) {
+            $_SESSION['error'] = $e->getMessage();
+            $this->redirect('application-admission/selection?id=' . $scheduleId);
+        }
+        $app = $ctx['application'];
+        $label = trim((string) (($ctx['student']['student_id'] ?? '') . ' ' . ($app['student_full_name'] ?? $app['student_nic'] ?? 'student')));
+        $skipped = [];
+        try {
+            $binary = $service->buildCombinedPdfBinary($app, $label, $skipped);
+        } catch (RuntimeException $e) {
+            $_SESSION['error'] = $e->getMessage();
+            $this->redirect('application-admission/register?schedule_id=' . $scheduleId . '&entry_id=' . $entryId);
+        }
+        $safe = preg_replace('/[^A-Za-z0-9._-]+/', '_', (string) ($app['student_nic'] ?? 'documents')) ?: 'documents';
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="student-documents-' . $safe . '.pdf"');
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store');
+        echo $binary;
+        exit;
     }
 
     public function selectionSave() {

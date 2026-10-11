@@ -131,6 +131,7 @@
                             }
                             $canMenuStaff = $canMenuStudents = $canMenuStaffAttendance = $canMenuPersonalFiles = true;
                             $canMenuDepartments = $canMenuCourses = true;
+                            $canMenuFacilities = true;
                             $canMenuStaffRoles = $isAdminOrADM;
                             if (isset($_SESSION['user_id'])) {
                                 require_once BASE_PATH . '/core/AccessControl.php';
@@ -146,6 +147,7 @@
                                 $canAccessExamsModule = AccessControl::can($uidMenu, 'exams', 'view');
                                 $canViewPaymentsMenu = AccessControl::can($uidMenu, 'payments', 'view');
                                 $canViewDevices = AccessControl::can($uidMenu, 'devices', 'view');
+                                $canMenuFacilities = AccessControl::can($uidMenu, 'facilities', 'view');
                                 $canStaffDeviceAttendanceMenu = $canMenuStaffAttendance;
                             }
                             $devicePages = ['devices'];
@@ -161,6 +163,42 @@
                                     <span>Dashboard</span>
                                 </a>
                             </li>
+
+                            <?php if (!empty($canMenuFacilities)):
+                                $facilitiesPages = ['facilities'];
+                                $facUnread = 0;
+                                try {
+                                    require_once BASE_PATH . '/models/FacilitiesTicketModel.php';
+                                    $facUnreadModel = new FacilitiesTicketModel();
+                                    $facStaffId = (string) ($_SESSION['user_name'] ?? '');
+                                    if ($facStaffId !== '') {
+                                        $facUnread = $facUnreadModel->unreadCount($facStaffId);
+                                    }
+                                } catch (Throwable $e) {
+                                    $facUnread = 0;
+                                }
+                            ?>
+                            <li data-nav="facilities" class="menu-item-has-children <?php echo (isset($page) && $page === 'facilities') ? 'active' : ''; ?>">
+                                <a href="<?php echo APP_URL; ?>/facilities/dashboard" class="menu-toggle">
+                                    <i class="fas fa-tools"></i>
+                                    <span>Facilities</span>
+                                    <?php if ($facUnread > 0): ?><span class="badge bg-danger ms-1"><?php echo (int) $facUnread; ?></span><?php endif; ?>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="<?php echo (isset($page) && $page === 'facilities') ? 'display: block;' : ''; ?>">
+                                    <li><a href="<?php echo APP_URL; ?>/facilities/dashboard" class="<?php echo (isset($section) && $section === 'dashboard') ? 'active' : ''; ?>"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/facilities" class="<?php echo (isset($section) && $section === 'list') ? 'active' : ''; ?>"><i class="fas fa-ticket-alt"></i><span>All Tickets</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/facilities/create"><i class="fas fa-plus"></i><span>New Ticket</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/facilities/notifications"><i class="fas fa-bell"></i><span>Notifications</span></a></li>
+                                    <?php if (!empty($canMenuFacilities) && AccessControl::can($uidMenu, 'facilities', 'approve')): ?>
+                                    <li><a href="<?php echo APP_URL; ?>/facilities/reports"><i class="fas fa-file-alt"></i><span>Reports</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/facilities/categories"><i class="fas fa-tags"></i><span>Categories</span></a></li>
+                                    <?php elseif (!empty($isAdminOrADM) || (!empty($userRole) && in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'HOD'], true))): ?>
+                                    <li><a href="<?php echo APP_URL; ?>/facilities/reports"><i class="fas fa-file-alt"></i><span>Reports</span></a></li>
+                                    <?php endif; ?>
+                                </ul>
+                            </li>
+                            <?php endif; ?>
 
                             <?php if (!empty($canViewDevices)): ?>
                             <li data-nav="devices" class="menu-item-has-children <?php echo (isset($page) && $page === 'devices') ? 'active' : ''; ?>">

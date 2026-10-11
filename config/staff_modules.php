@@ -84,4 +84,9 @@ return [
         'prefixes' => ['circuit-program'],
         'sort' => 160,
     ],
+    'facilities' => [
+        'label' => 'Facilities Tickets',
+        'prefixes' => ['facilities'],
+        'sort' => 125,
+    ],
 ];

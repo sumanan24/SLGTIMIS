@@ -172,6 +172,14 @@ class GroupModel extends Model {
     /**
      * Add students to group
      */
+    public function addStudentToGroupQuiet(int $groupId, string $studentId): bool {
+        $sql = "INSERT IGNORE INTO `group_students` (`group_id`, `student_id`, `enrolled_at`, `status`)
+                VALUES (?, ?, NOW(), 'active')";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param('is', $groupId, $studentId);
+        return $stmt->execute();
+    }
+
     public function addStudentsToGroup($groupId, $studentIds) {
         $conn = $this->db->getConnection();
         $conn->autocommit(false);

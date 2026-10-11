@@ -35,7 +35,7 @@
         .student-navbar {
             background: linear-gradient(135deg, var(--student-primary) 0%, var(--student-dark) 100%);
             box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-            padding: 0.75rem 1rem;
+            padding: 0.65rem 0;
             position: sticky;
             top: 0;
             z-index: 1000;
@@ -44,11 +44,31 @@
         .student-navbar .navbar-brand {
             color: white !important;
             font-weight: 700;
-            font-size: 1.25rem;
+            font-size: 1.1rem;
             white-space: nowrap;
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            min-width: 0;
+        }
+        .student-navbar .navbar-brand .brand-full { display: inline; }
+        .student-navbar .navbar-brand .brand-short { display: none; }
+        .student-shell {
+            width: 100%;
+            max-width: 1120px;
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        .student-navbar .container-fluid {
+            flex-wrap: nowrap;
+            gap: 0.5rem;
+            max-width: 1120px;
+            margin: 0 auto;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            align-items: center;
         }
         
         .student-navbar .navbar-toggler {
@@ -85,9 +105,10 @@
         .student-profile-section {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            flex-wrap: wrap;
+            gap: 0.5rem;
+            flex-wrap: nowrap;
             margin-top: 0;
+            flex-shrink: 0;
         }
         
         .student-profile-avatar {
@@ -101,8 +122,8 @@
         }
         
         .student-main-content {
-            min-height: calc(100vh - 70px);
-            padding: 1.5rem 1rem;
+            min-height: calc(100vh - 120px);
+            padding: 1.25rem 0 2rem;
             width: 100%;
             max-width: 100%;
             overflow-x: hidden;
@@ -131,19 +152,21 @@
         /* Mobile Responsive Styles */
         @media (max-width: 768px) {
             .student-navbar .navbar-brand {
-                font-size: 1rem;
+                font-size: 0.95rem;
             }
+            .student-navbar .navbar-brand .brand-full { display: none; }
+            .student-navbar .navbar-brand .brand-short { display: inline; }
             
             .student-navbar .navbar-brand .fa-graduation-cap {
                 display: none;
             }
             
             .student-profile-section {
-                width: 100%;
-                justify-content: center;
-                margin-top: 0.5rem;
-                padding-top: 0.5rem;
-                border-top: 1px solid rgba(255, 255, 255, 0.2);
+                width: auto;
+                justify-content: flex-end;
+                margin-top: 0;
+                padding-top: 0;
+                border-top: none;
             }
             
             .student-profile-section span {
@@ -156,7 +179,12 @@
             }
             
             .student-main-content {
-                padding: 1rem 0.75rem;
+                padding: 1rem 0 1.5rem;
+            }
+            .student-shell,
+            .student-navbar .container-fluid {
+                padding-left: 0.85rem;
+                padding-right: 0.85rem;
             }
             
             .student-welcome-card {
@@ -183,7 +211,24 @@
             }
             
             .student-main-content {
-                padding: 0.75rem 0.5rem;
+                padding: 0.75rem 0 calc(1rem + env(safe-area-inset-bottom, 0px));
+            }
+            .student-shell,
+            .student-navbar .container-fluid {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
+            .student-navbar .nav-link {
+                padding: 0.35rem 0.5rem;
+                margin: 0;
+            }
+            .student-profile-avatar {
+                width: 30px;
+                height: 30px;
+            }
+            .student-profile-section .btn {
+                padding: 0.2rem 0.55rem;
+                font-size: 0.75rem;
             }
             
             .student-welcome-card {
@@ -199,19 +244,28 @@
             }
         }
         
-        /* Container adjustments for mobile */
-        @media (max-width: 1200px) {
-            .container-fluid {
+        .student-main-content > .container-fluid {
+            max-width: 1120px;
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        @media (max-width: 768px) {
+            .student-main-content > .container-fluid {
+                padding-left: 0.85rem;
+                padding-right: 0.85rem;
+            }
+        }
+        @media (max-width: 576px) {
+            .student-main-content > .container-fluid {
                 padding-left: 0.75rem;
                 padding-right: 0.75rem;
             }
         }
-        
-        @media (max-width: 576px) {
-            .container-fluid {
-                padding-left: 0.5rem;
-                padding-right: 0.5rem;
-            }
+        .student-site-footer {
+            padding-left: 1rem;
+            padding-right: 1rem;
         }
     </style>
 </head>
@@ -220,9 +274,20 @@
         <!-- Student Navigation Bar -->
         <nav class="navbar navbar-expand-lg student-navbar">
             <div class="container-fluid">
-                <a class="navbar-brand" href="<?php echo APP_URL; ?>/student/dashboard">
-                    <i class="fas fa-graduation-cap me-2"></i>SLGTI - Student Portal
+                <?php
+                $reqPath = strtolower((string) ($_SERVER['REQUEST_URI'] ?? ''));
+                $studentOnboarding = (strpos($reqPath, '/student/change-password') !== false || strpos($reqPath, '/student/complete-profile') !== false);
+                ?>
+                <a class="navbar-brand" href="<?php echo $studentOnboarding ? '#' : APP_URL . '/student/dashboard'; ?>">
+                    <i class="fas fa-graduation-cap me-2"></i>
+                    <span class="brand-full">SLGTI - Student Portal</span>
+                    <span class="brand-short">SLGTI</span>
                 </a>
+                <?php if (!$studentOnboarding): ?>
+                <a class="nav-link py-1 px-2 d-none d-md-inline-flex" href="<?php echo APP_URL; ?>/student/notices" title="Notices and rules">
+                    <i class="fas fa-bullhorn"></i><span class="d-none d-md-inline"> Notices</span>
+                </a>
+                <?php endif; ?>
                 
                 <div class="student-profile-section ms-auto">
                         <?php
@@ -269,9 +334,9 @@
         </main>
     <?php endif; ?>
     
-    <footer class="py-3 text-center text-muted small">
+    <footer class="student-site-footer py-3 text-center text-muted small">
         <div>&copy; <?php echo date('Y'); ?> Sri Lanka German Training Institute</div>
-        <div>Developed by SICODE</div>
+        <div>Department of Information and Communication Technology</div>
     </footer>
 
     <?php if (!empty($_SESSION['error']) || !empty($_SESSION['message'])): ?>

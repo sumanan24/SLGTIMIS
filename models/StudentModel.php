@@ -320,6 +320,19 @@ class StudentModel extends Model {
     /**
      * Get unique academic years for filter dropdown
      */
+    public function findByNic(string $nic): ?array {
+        $nic = strtoupper(trim($nic));
+        if ($nic === '') {
+            return null;
+        }
+        $sql = "SELECT * FROM `{$this->table}` WHERE UPPER(TRIM(`student_nic`)) = ? LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param('s', $nic);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
+    }
+
     public function getAcademicYears() {
         $sql = "SELECT DISTINCT `academic_year` FROM `academic` WHERE `academic_year` IS NOT NULL AND `academic_year` != '' ORDER BY `academic_year` DESC";
         $result = $this->db->query($sql);
@@ -456,6 +469,60 @@ class StudentModel extends Model {
         }
         return $result;
     }
+
+    /**
+     * Fields a first-login student must confirm before using the portal.
+     *
+     * @return list<string>
+     */
+    public function portalProfileRequiredFields(): array
+    {
+        return [
+            'student_title',
+            'student_fullname',
+            'student_ininame',
+            'student_gender',
+            'student_civil',
+            'student_email',
+            'student_dob',
+            'student_phone',
+            'student_address',
+            'student_zip',
+            'student_provice',
+            'student_district',
+            'student_divisions',
+            'student_nationality',
+            'student_religion',
+            'student_whatsapp',
+            'student_em_name',
+            'student_em_relation',
+            'student_em_address',
+            'student_em_phone',
+        ];
+    }
+
+    /**
+     * True when personal or parent/guardian details are still missing.
+     *
+     * @param array<string, mixed>|null $student
+     */
+    public function isPortalProfileIncomplete(?array $student): bool
+    {
+        if (!$student) {
+            return true;
+        }
+        foreach ($this->portalProfileRequiredFields() as $field) {
+            $value = trim((string) ($student[$field] ?? ''));
+            if ($value === '' || $value === '0') {
+                return true;
+            }
+        }
+        $email = strtolower(trim((string) ($student['student_email'] ?? '')));
+        if ($email !== '' && substr($email, -15) === '@slgtimis.local') {
+            return true;
+        }
+        return false;
+    }
     
     /**
      * Update student ID (registration number)
@@ -567,12 +634,13 @@ class StudentModel extends Model {
         if (!$check || $check->num_rows === 0) {
             return false;
         }
-        $sql = "UPDATE `user` SET `user_active` = ? WHERE `user_table` = 'student' AND `user_name` = ?";
+        $nic = strtoupper(trim((string) ($student['student_nic'] ?? '')));
+        $sql = "UPDATE `user` SET `user_active` = ? WHERE `user_table` = 'student' AND (`user_name` = ? OR `user_name` = ?)";
         $stmt = $this->db->prepare($sql);
         if (!$stmt) {
             return false;
         }
-        $stmt->bind_param("is", $userActive, $studentId);
+        $stmt->bind_param("iss", $userActive, $studentId, $nic);
         $result = $stmt->execute();
         $stmt->close();
         return $result;
@@ -608,16 +676,22 @@ class StudentModel extends Model {
             foreach ($tablesToDelete as $table) {
                 $check = $conn->query("SHOW TABLES LIKE '{$table}'");
                 if ($check && $check->num_rows > 0) {
-                    // Check if table has student_id column
+                    $idColumn = 'student_id';
                     $checkColumn = $conn->query("SHOW COLUMNS FROM `{$table}` LIKE 'student_id'");
-                    if ($checkColumn && $checkColumn->num_rows > 0) {
-                        $sql = "DELETE FROM `{$table}` WHERE `student_id` = ?";
-                        $stmt = $conn->prepare($sql);
-                        if ($stmt) {
-                            $stmt->bind_param("s", $id);
-                            $stmt->execute();
-                            $stmt->close();
+                    if (!$checkColumn || $checkColumn->num_rows === 0) {
+                        $checkQual = $conn->query("SHOW COLUMNS FROM `{$table}` LIKE 'qualification_student_id'");
+                        if ($checkQual && $checkQual->num_rows > 0) {
+                            $idColumn = 'qualification_student_id';
+                        } else {
+                            continue;
                         }
+                    }
+                    $sql = "DELETE FROM `{$table}` WHERE `{$idColumn}` = ?";
+                    $stmt = $conn->prepare($sql);
+                    if ($stmt) {
+                        $stmt->bind_param("s", $id);
+                        $stmt->execute();
+                        $stmt->close();
                     }
                 }
             }
@@ -812,23 +886,28 @@ class StudentModel extends Model {
         // Check if Part Time (only PT students have mode in ID)
         $isPartTime = ($courseMode === 'Part Time');
         
-        // Get course code and department code from course table
-        $sql = "SELECT c.`course_code`, c.`course_id`, c.`department_id`, d.`department_id` as dept_code
+        // course.course_id is the programme code in this database (there is no course_code column).
+        $sql = "SELECT c.`course_id`, c.`department_id`, d.`department_id` as dept_code
                 FROM `course` c
-                LEFT JOIN `department` d ON c.department_id = d.department_id
+                LEFT JOIN `department` d ON c.`department_id` = d.`department_id`
                 WHERE c.`course_id` = ?";
         $stmt = $this->db->prepare($sql);
-        $stmt->bind_param("s", $courseId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $course = $result->fetch_assoc();
+        $course = null;
+        if ($stmt) {
+            $stmt->bind_param("s", $courseId);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $course = $result ? $result->fetch_assoc() : null;
+            $stmt->close();
+        } else {
+            error_log('generateNextRegistrationNumber prepare failed: ' . ($this->db->getConnection()->error ?? ''));
+        }
         
         if (!$course) {
-            // Fallback if course not found
-            $courseCode = strtoupper(substr($courseId, 0, 3));
+            $courseCode = strtoupper((string) $courseId);
             $departmentCode = 'GEN';
         } else {
-            $courseCode = !empty($course['course_code']) ? $course['course_code'] : strtoupper(substr($courseId, 0, 3));
+            $courseCode = strtoupper((string) ($course['course_id'] ?: $courseId));
             $departmentCode = !empty($course['department_id']) ? $course['department_id'] : 'GEN';
         }
         
