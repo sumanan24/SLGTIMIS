@@ -152,6 +152,22 @@ class ApplicationAdmissionScheduleModel extends Model {
                     error_log('ApplicationAdmissionScheduleModel::migrateSchema exam_marks: ' . $conn->error);
                 }
             }
+            $colSelWa = $conn->query("SHOW COLUMNS FROM `application_admission_schedule_entry` LIKE 'selection_result_wa_sent'");
+            $hasSelWa = $colSelWa && $colSelWa->num_rows > 0;
+            if ($colSelWa) {
+                $colSelWa->free();
+            }
+            if (!$hasSelWa) {
+                if (!$conn->query(
+                    "ALTER TABLE `application_admission_schedule_entry` "
+                    . "ADD COLUMN `selection_result_wa_sent` TINYINT(1) NOT NULL DEFAULT 0 "
+                    . "COMMENT 'Staff marked selection-result WhatsApp as sent' AFTER `exam_marks`, "
+                    . "ADD COLUMN `selection_result_wa_sent_at` DATETIME DEFAULT NULL AFTER `selection_result_wa_sent`, "
+                    . "ADD COLUMN `selection_result_wa_sent_by` INT DEFAULT NULL AFTER `selection_result_wa_sent_at`"
+                )) {
+                    error_log('ApplicationAdmissionScheduleModel::migrateSchema selection_result_wa_sent: ' . $conn->error);
+                }
+            }
         } catch (Throwable $e) {
             error_log('ApplicationAdmissionScheduleModel::migrateSchema: ' . $e->getMessage());
         }
@@ -1934,6 +1950,72 @@ class ApplicationAdmissionScheduleModel extends Model {
         $this->ensureTables();
         $this->migrateSchema();
         return $this->updateEntry($entryId, $scheduleId, ['whatsapp_sent' => $sent ? 1 : 0]);
+    }
+
+    /**
+     * Record that the selection-result WhatsApp was sent, including who marked it and when.
+     */
+    public function setSelectionResultWhatsAppSent(int $entryId, int $scheduleId, bool $sent, int $userId): bool {
+        $this->ensureTables();
+        $this->migrateSchema();
+        if ($sent) {
+            $sql = 'UPDATE `application_admission_schedule_entry`'
+                . ' SET `selection_result_wa_sent` = 1, `selection_result_wa_sent_at` = NOW(), `selection_result_wa_sent_by` = ?'
+                . ' WHERE `entry_id` = ? AND `schedule_id` = ? LIMIT 1';
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                return false;
+            }
+            $by = $userId > 0 ? $userId : 0;
+            $this->bindParams($stmt, 'iii', [$by, $entryId, $scheduleId]);
+        } else {
+            $sql = 'UPDATE `application_admission_schedule_entry`'
+                . ' SET `selection_result_wa_sent` = 0, `selection_result_wa_sent_at` = NULL, `selection_result_wa_sent_by` = NULL'
+                . ' WHERE `entry_id` = ? AND `schedule_id` = ? LIMIT 1';
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                return false;
+            }
+            $this->bindParams($stmt, 'ii', [$entryId, $scheduleId]);
+        }
+        $ok = $stmt->execute();
+        if (!$ok) {
+            error_log('ApplicationAdmissionScheduleModel::setSelectionResultWhatsAppSent: ' . $stmt->error);
+        }
+        $stmt->close();
+
+        return (bool) $ok;
+    }
+
+    /**
+     * @param list<int> $userIds
+     * @return array<int, string>
+     */
+    public function userDisplayNames(array $userIds): array {
+        $ids = [];
+        foreach ($userIds as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        $ids = array_values($ids);
+        if ($ids === []) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $sql = 'SELECT u.`user_id`, u.`user_name`, s.`staff_name`'
+            . ' FROM `user` u'
+            . ' LEFT JOIN `staff` s ON s.`staff_id` = u.`user_name`'
+            . ' WHERE u.`user_id` IN (' . $placeholders . ')';
+        $rows = $this->fetchAllPrepared($sql, str_repeat('i', count($ids)), $ids);
+        $out = [];
+        foreach ($rows as $row) {
+            $staff = trim((string) ($row['staff_name'] ?? ''));
+            $out[(int) ($row['user_id'] ?? 0)] = $staff !== '' ? $staff : (string) ($row['user_name'] ?? '');
+        }
+
+        return $out;
     }
 
     public function findEntryByNic(int $scheduleId, string $nic): ?array {

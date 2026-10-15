@@ -426,6 +426,10 @@ if ($ctxParts !== []) {
                         </select>
                     </div>
                     <?php if ($active_view === 'table'): ?>
+                    <div class="d-flex flex-column gap-1 sa-apps-filter-field sa-apps-filter-name">
+                        <label for="saNamePhoneFilter" class="form-label small text-secondary text-uppercase mb-0 fw-semibold">Name or phone</label>
+                        <input type="search" id="saNamePhoneFilter" class="form-control form-control-sm" maxlength="80" placeholder="Name or phone number" autocomplete="off" spellcheck="false" aria-label="Search by name or phone number" style="min-width: 12rem;">
+                    </div>
                     <div class="d-flex flex-column gap-1 sa-apps-filter-field sa-apps-filter-nic">
                         <label for="saNicFilter" class="form-label small text-secondary text-uppercase mb-0 fw-semibold">NIC</label>
                         <input type="search" id="saNicFilter" class="form-control form-control-sm" maxlength="20" placeholder="Filter as you type" autocomplete="off" spellcheck="false" aria-label="Filter table by NIC" style="min-width: 9rem;">
@@ -656,6 +660,7 @@ if ($ctxParts !== []) {
       });
       var mount = document.getElementById('saAppsTableMount');
       var nic = document.getElementById('saNicFilter');
+      var namePhone = document.getElementById('saNamePhoneFilter');
       if (!mount || !nic || !mount.getAttribute('data-sa-ajax')) return;
       var ajaxUrl = mount.getAttribute('data-sa-ajax');
       var abort;
@@ -679,6 +684,8 @@ if ($ctxParts !== []) {
         if (lang) p.set('lang', lang);
         var nicVal = nic.value.trim();
         if (nicVal) p.set('nic', nicVal);
+        var namePhoneVal = namePhone ? namePhone.value.trim() : '';
+        if (namePhoneVal) p.set('q', namePhoneVal);
         if (tab === 'new') p.set('pn', mount.getAttribute('data-sa-pn') || '1');
         else if (tab === 'approved') p.set('pa', mount.getAttribute('data-sa-pa') || '1');
         else p.set('pr', mount.getAttribute('data-sa-pr') || '1');
@@ -707,10 +714,12 @@ if ($ctxParts !== []) {
           })
           .catch(function () { mount.setAttribute('aria-busy', 'false'); });
       }
-      nic.addEventListener('input', function () {
+      function queueFetch() {
         clearTimeout(debTimer);
         debTimer = setTimeout(function () { runFetch(true); }, 300);
-      });
+      }
+      nic.addEventListener('input', queueFetch);
+      if (namePhone) namePhone.addEventListener('input', queueFetch);
       mount.addEventListener('click', function (e) {
         var btn = e.target.closest('.sa-nic-ajax-pag');
         if (!btn || !mount.contains(btn) || btn.disabled) return;
@@ -726,12 +735,14 @@ if ($ctxParts !== []) {
       document.querySelectorAll('a.sa-excel-export-item').forEach(function (a) {
         a.addEventListener('click', function (ev) {
           var inp = document.getElementById('saNicFilter');
-          if (!inp) return;
-          var v = inp.value.trim();
-          if (!v) return;
+          var nameInp = document.getElementById('saNamePhoneFilter');
+          var v = inp ? inp.value.trim() : '';
+          var qv = nameInp ? nameInp.value.trim() : '';
+          if (!v && !qv) return;
           ev.preventDefault();
           var u = new URL(this.getAttribute('href'), window.location.href);
-          u.searchParams.set('nic', v);
+          if (v) u.searchParams.set('nic', v);
+          if (qv) u.searchParams.set('q', qv);
           window.location.href = u.pathname + u.search;
         });
       });

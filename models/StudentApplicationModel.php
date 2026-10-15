@@ -853,11 +853,58 @@ class StudentApplicationModel extends Model {
     }
 
     /**
+     * Staff list search: applicant name, or phone / WhatsApp number.
+     *
+     * @return array{sql: string, types: string, params: list<string>}
+     */
+    private function adminNamePhoneFilterPartsFromRaw(?string $raw): array {
+        $q = trim((string) ($raw ?? ''));
+        if ($q === '') {
+            return ['sql' => '', 'types' => '', 'params' => []];
+        }
+        $q = function_exists('mb_substr') ? mb_substr($q, 0, 80) : substr($q, 0, 80);
+        $nameLike = '%' . addcslashes($q, '%_\\') . '%';
+        $digits = preg_replace('/\D+/', '', $q) ?? '';
+        $needles = [];
+        if ($digits !== '') {
+            $needles[$digits] = true;
+            if (isset($digits[0]) && $digits[0] === '0' && strlen($digits) > 1) {
+                $needles[substr($digits, 1)] = true;
+            }
+            if (strncmp($digits, '94', 2) === 0 && strlen($digits) > 9) {
+                $local = substr($digits, 2);
+                $needles[$local] = true;
+                $needles['0' . $local] = true;
+            }
+        }
+        $phoneExpr = static function (string $column): string {
+            return "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(IFNULL({$column},''),' ',''),'-',''),'+',''),'(',''),')','')";
+        };
+        $parts = ['`sa`.`student_full_name` LIKE ?', '`sa`.`student_initial_name` LIKE ?'];
+        $types = 'ss';
+        $params = [$nameLike, $nameLike];
+        foreach (array_keys($needles) as $needle) {
+            $like = '%' . $needle . '%';
+            $parts[] = $phoneExpr('`sa`.`student_phone`') . ' LIKE ?';
+            $parts[] = $phoneExpr('`sa`.`student_whatsapp`') . ' LIKE ?';
+            $types .= 'ss';
+            $params[] = $like;
+            $params[] = $like;
+        }
+
+        return [
+            'sql' => ' AND (' . implode(' OR ', $parts) . ')',
+            'types' => $types,
+            'params' => $params,
+        ];
+    }
+
+    /**
      * Count applications for staff list (optional NVQ level 04 / 05; optional department / course per choice 1–3).
      *
      * @param array<int, array{dept_id?:?string, course_id?:?string}>|null $choiceFilters
      */
-    public function countListForAdmin(string $status, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null, ?array $choiceFilters = null): int {
+    public function countListForAdmin(string $status, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null, ?array $choiceFilters = null, ?string $namePhoneFilterRaw = null): int {
         $this->ensureTable();
         $this->migrateSchema();
         if (!in_array($status, ['new', 'approved', 'rejected'], true)) {
@@ -881,6 +928,12 @@ class StudentApplicationModel extends Model {
         $sql .= $nicFrag['sql'];
         $types .= $nicFrag['types'];
         foreach ($nicFrag['params'] as $p) {
+            $params[] = $p;
+        }
+        $namePhoneFrag = $this->adminNamePhoneFilterPartsFromRaw($namePhoneFilterRaw);
+        $sql .= $namePhoneFrag['sql'];
+        $types .= $namePhoneFrag['types'];
+        foreach ($namePhoneFrag['params'] as $p) {
             $params[] = $p;
         }
         $langFrag = $this->adminLanguageFilterParts($languageFilter);
@@ -916,7 +969,7 @@ class StudentApplicationModel extends Model {
      * @param array<int, array{dept_id?:?string, course_id?:?string}>|null $choiceFilters
      * @return list<array<string, mixed>>
      */
-    public function getListPageForAdmin(string $status, ?string $level, int $page, int $perPage, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null, ?array $choiceFilters = null): array {
+    public function getListPageForAdmin(string $status, ?string $level, int $page, int $perPage, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null, ?array $choiceFilters = null, ?string $namePhoneFilterRaw = null): array {
         $this->ensureTable();
         $this->migrateSchema();
         if (!in_array($status, ['new', 'approved', 'rejected'], true)) {
@@ -944,6 +997,12 @@ class StudentApplicationModel extends Model {
         $sql .= $nicFrag['sql'];
         $types .= $nicFrag['types'];
         foreach ($nicFrag['params'] as $p) {
+            $params[] = $p;
+        }
+        $namePhoneFrag = $this->adminNamePhoneFilterPartsFromRaw($namePhoneFilterRaw);
+        $sql .= $namePhoneFrag['sql'];
+        $types .= $namePhoneFrag['types'];
+        foreach ($namePhoneFrag['params'] as $p) {
             $params[] = $p;
         }
         $langFrag = $this->adminLanguageFilterParts($languageFilter);
@@ -1980,7 +2039,7 @@ class StudentApplicationModel extends Model {
      * @param array<int, array{dept_id?:?string, course_id?:?string}>|null $choiceFilters optional multi-choice AND filters
      * @return list<array<string, mixed>>
      */
-    public function getAllForStaffExport(?string $status = null, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null, ?array $choiceFilters = null): array {
+    public function getAllForStaffExport(?string $status = null, ?string $level = null, ?string $departmentId = null, ?string $courseId = null, bool $onlySubmittedForStaff = false, ?string $nicFilterRaw = null, int $coursePriority = 1, ?string $languageFilter = null, ?array $choiceFilters = null, ?string $namePhoneFilterRaw = null): array {
         $this->ensureTable();
         $this->migrateSchema();
         $conn = $this->db->getConnection();
@@ -2047,6 +2106,12 @@ class StudentApplicationModel extends Model {
         $sql .= $nicFrag['sql'];
         $types .= $nicFrag['types'];
         foreach ($nicFrag['params'] as $p) {
+            $params[] = $p;
+        }
+        $namePhoneFrag = $this->adminNamePhoneFilterPartsFromRaw($namePhoneFilterRaw);
+        $sql .= $namePhoneFrag['sql'];
+        $types .= $namePhoneFrag['types'];
+        foreach ($namePhoneFrag['params'] as $p) {
             $params[] = $p;
         }
         $langFrag = $this->adminLanguageFilterParts($languageFilter);

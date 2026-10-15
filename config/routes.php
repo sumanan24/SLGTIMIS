@@ -297,6 +297,7 @@ return [
     'application-admission/entries' => 'ApplicationAdmissionController@entries',
     'application-admission/entries-save' => 'ApplicationAdmissionController@entriesSave',
     'application-admission/mark-whatsapp-sent' => 'ApplicationAdmissionController@markWhatsappSent',
+    'application-admission/mark-selection-whatsapp-sent' => 'ApplicationAdmissionController@markSelectionWhatsappSent',
     'application-admission/selection' => 'ApplicationAdmissionController@selection',
     'application-admission/selection-save' => 'ApplicationAdmissionController@selectionSave',
     'application-admission/register' => 'ApplicationAdmissionController@register',

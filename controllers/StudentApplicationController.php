@@ -2040,6 +2040,7 @@ class StudentApplicationController extends Controller {
         $choiceFilters = $filters['choice_filters'];
         $activeChoices = $filters['active_choices'];
         $nicRaw = trim((string) $this->get('nic', ''));
+        $namePhoneRaw = trim((string) $this->get('q', ''));
 
         $tabRaw = strtolower(trim((string) $this->get('tab', '')));
         $activeTab = in_array($tabRaw, ['approved', 'rejected'], true) ? $tabRaw : 'new';
@@ -2048,9 +2049,9 @@ class StudentApplicationController extends Controller {
         $excludeNicDrafts = $this->staffStudentAppsExcludeNicDrafts($userModel, $uid);
         $perPage = 20;
 
-        $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters);
-        $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters);
-        $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters);
+        $countNew = $model->countListForAdmin('new', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters, $namePhoneRaw);
+        $countApproved = $model->countListForAdmin('approved', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters, $namePhoneRaw);
+        $countRejected = $model->countListForAdmin('rejected', $filterLevel, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters, $namePhoneRaw);
         $maxPageNew = max(1, (int) ceil($countNew / $perPage));
         $maxPageApproved = max(1, (int) ceil($countApproved / $perPage));
         $maxPageRejected = max(1, (int) ceil($countRejected / $perPage));
@@ -2060,13 +2061,13 @@ class StudentApplicationController extends Controller {
         $pageRejected = max(1, min((int) $this->get('pr', 1), $maxPageRejected));
 
         $applicationsNew = $activeTab === 'new'
-            ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters)
+            ? $model->getListPageForAdmin('new', $filterLevel, $pageNew, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters, $namePhoneRaw)
             : [];
         $applicationsApproved = $activeTab === 'approved'
-            ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters)
+            ? $model->getListPageForAdmin('approved', $filterLevel, $pageApproved, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters, $namePhoneRaw)
             : [];
         $applicationsRejected = $activeTab === 'rejected'
-            ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters)
+            ? $model->getListPageForAdmin('rejected', $filterLevel, $pageRejected, $perPage, $filterDeptId, $filterCourseId, $excludeNicDrafts, $nicRaw, $filterPriority, $filterLanguage, $choiceFilters, $namePhoneRaw)
             : [];
 
         if (defined('BASE_PATH') && is_file(BASE_PATH . '/models/StudentModel.php')) {
@@ -3217,6 +3218,7 @@ class StudentApplicationController extends Controller {
 
         $excludeNicDrafts = $this->staffStudentAppsExcludeNicDrafts($userModel, $uid);
         $exportNicRaw = trim((string) $this->get('nic', ''));
+        $exportNamePhoneRaw = trim((string) $this->get('q', ''));
 
         // PhpSpreadsheet has several PHP extension requirements; if any are missing,
         // export as an Excel-readable HTML table (.xls) instead of failing.
@@ -3251,7 +3253,7 @@ class StudentApplicationController extends Controller {
             error_log('StudentApplicationController::adminExportExcel autoload: ' . $e->getMessage());
             // Autoloader missing → fallback.
             $model = $this->model('StudentApplicationModel');
-            $rows = $model->getAllForStaffExport(null, null, null, null, $excludeNicDrafts, $exportNicRaw);
+            $rows = $model->getAllForStaffExport(null, null, null, null, $excludeNicDrafts, $exportNicRaw, 1, null, null, $exportNamePhoneRaw);
             $xlsFallback($rows, StudentApplicationModel::getStaffExportColumnOrder(), null, StudentApplicationModel::getStaffExportColumnLabels());
         }
 
@@ -3265,7 +3267,7 @@ class StudentApplicationController extends Controller {
         $exportPriority = $filters['priority'];
         $exportLanguage = $filters['language'];
         $choiceFilters = $filters['choice_filters'];
-        $rows = $model->getAllForStaffExport($exportStatus, $exportLevel, $exportDeptId, $exportCourseId, $excludeNicDrafts, $exportNicRaw, $exportPriority, $exportLanguage, $choiceFilters);
+        $rows = $model->getAllForStaffExport($exportStatus, $exportLevel, $exportDeptId, $exportCourseId, $excludeNicDrafts, $exportNicRaw, $exportPriority, $exportLanguage, $choiceFilters, $exportNamePhoneRaw);
         $allCols = StudentApplicationModel::getStaffExportColumnOrder();
         $colLabels = StudentApplicationModel::getStaffExportColumnLabels();
         $colsParam = trim((string) $this->get('cols', ''));
@@ -3338,6 +3340,9 @@ class StudentApplicationController extends Controller {
             }
             if ($exportNicRaw !== '') {
                 $summaryParts[] = 'NIC contains ' . $exportNicRaw;
+            }
+            if ($exportNamePhoneRaw !== '') {
+                $summaryParts[] = 'Name or phone contains ' . $exportNamePhoneRaw;
             }
             $filterSummary = implode(' · ', $summaryParts);
 

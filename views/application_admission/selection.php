@@ -6,7 +6,22 @@ $isEntranceResults = !empty($isEntranceResults);
 $canUpdate = !empty($canUpdateSelection);
 $canRegister = !empty($canRegister);
 $registrationStatuses = is_array($registrationStatuses ?? null) ? $registrationStatuses : [];
+$selectionWhatsApp = is_array($selectionWhatsApp ?? null) ? $selectionWhatsApp : [];
+$showSelectionWa = !$isEntranceResults;
 $pageTitle = $isEntranceResults ? 'Entrance exam results' : 'Interview selection list';
+$qualifiedCount = 0;
+$waSentCount = 0;
+if ($showSelectionWa) {
+    foreach ($selectionWhatsApp as $waRow) {
+        if (!empty($waRow['qualified'])) {
+            $qualifiedCount++;
+        }
+        if (!empty($waRow['sent'])) {
+            $waSentCount++;
+        }
+    }
+}
+$colCount = 6 + ($canRegister ? 1 : 0) + ($showSelectionWa ? 2 : 0);
 $saveLabel = $isEntranceResults ? 'Save exam results' : 'Save marks';
 $viewOnlyMsg = $isEntranceResults
     ? 'View only. <strong>SAO</strong>, <strong>REG</strong>, and <strong>ADM</strong> can enter exam marks.'
@@ -114,6 +129,39 @@ $viewOnlyMsg = $isEntranceResults
     background: #f8d7da;
     color: #842029;
 }
+.aa-sel-table tr.aa-sel-wa-sent td {
+    background: #e8f6ee;
+}
+.aa-sel-table .aa-col-wa,
+.aa-sel-table .aa-col-sent {
+    white-space: nowrap;
+}
+.aa-sel-wa-phone {
+    display: block;
+    font-size: 0.75rem;
+    color: #495057;
+    margin-bottom: 0.15rem;
+}
+.aa-sel-wa-meta {
+    display: block;
+    max-width: 9rem;
+    white-space: normal;
+    line-height: 1.25;
+}
+.btn-wa-outline {
+    color: #128c7e;
+    border-color: #128c7e;
+    padding: 0.2rem 0.45rem;
+    line-height: 1;
+}
+.btn-wa-outline:hover {
+    color: #fff;
+    background: #128c7e;
+    border-color: #128c7e;
+}
+.aa-sent-persons {
+    margin-top: 1.25rem;
+}
 </style>
 
 <div class="container-fluid px-3 px-md-4 aa-sel-page">
@@ -123,6 +171,9 @@ $viewOnlyMsg = $isEntranceResults
             <p class="text-muted small mb-0"><?php echo $e($sch['title'] ?? ''); ?></p>
             <?php if ($canUpdate): ?>
             <p class="small text-muted mb-0 mt-1">Type <strong>marks</strong> for each student. For absent students type <strong>ab</strong> and press Enter to move to the next row.</p>
+            <?php endif; ?>
+            <?php if ($showSelectionWa): ?>
+            <p class="small text-muted mb-0 mt-1">WhatsApp selection results: <strong><?php echo (int) $waSentCount; ?></strong> sent of <strong><?php echo (int) $qualifiedCount; ?></strong> qualified applicants. Absent applicants are not included.</p>
             <?php endif; ?>
         </div>
         <div class="d-flex flex-wrap gap-2">
@@ -157,6 +208,10 @@ $viewOnlyMsg = $isEntranceResults
                         <th class="aa-col-nic">NIC</th>
                         <th class="aa-col-course">Course</th>
                         <th class="aa-col-marks">Marks</th>
+                        <?php if ($showSelectionWa): ?>
+                        <th class="aa-col-wa">WhatsApp</th>
+                        <th class="aa-col-sent">Sent</th>
+                        <?php endif; ?>
                         <?php if ($canRegister): ?>
                         <th class="aa-col-reg">Registration</th>
                         <?php endif; ?>
@@ -165,7 +220,7 @@ $viewOnlyMsg = $isEntranceResults
                 <tbody>
                 <?php if ($entries === []): ?>
                     <tr>
-                        <td colspan="<?php echo $canRegister ? 7 : 6; ?>" class="text-center text-muted py-4">No applicants.</td>
+                        <td colspan="<?php echo (int) $colCount; ?>" class="text-center text-muted py-4">No applicants.</td>
                     </tr>
                 <?php else: ?>
                     <?php $n = 0; foreach ($entries as $row): $n++;
@@ -175,8 +230,16 @@ $viewOnlyMsg = $isEntranceResults
                         $isAbsent = ApplicationAdmissionScheduleModel::isAbsentMarks($marksVal);
                         $nicKey = strtoupper(preg_replace('/\s+/', '', trim((string) ($row['student_nic'] ?? ''))));
                         $regStatus = $registrationStatuses[$nicKey] ?? null;
+                        $wa = $selectionWhatsApp[$entryId] ?? null;
+                        $waSent = !empty($wa['sent']);
                     ?>
-                    <tr class="<?php echo $isAbsent ? 'is-absent' : ''; ?>">
+                    <tr class="<?php echo trim(($isAbsent ? 'is-absent ' : '') . ($waSent ? 'aa-sel-wa-sent' : '')); ?>"
+                        data-entry-id="<?php echo $entryId; ?>"
+                        data-name="<?php echo $e($row['student_full_name'] ?? ''); ?>"
+                        data-nic="<?php echo $e($row['student_nic'] ?? ''); ?>"
+                        data-phone="<?php echo $e($wa['display_phone'] ?? ''); ?>"
+                        data-course="<?php echo $e($row['course_priority_1'] ?? ''); ?>"
+                        data-marks="<?php echo $e($marksVal); ?>">
                         <td class="aa-col-no"><?php echo $n; ?></td>
                         <td class="aa-col-roll"><?php echo $roll !== '' ? $e($roll) : '<span class="text-muted">—</span>'; ?></td>
                         <td class="aa-col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
@@ -200,6 +263,43 @@ $viewOnlyMsg = $isEntranceResults
                                 <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
+                        <?php if ($showSelectionWa): ?>
+                        <td class="aa-col-wa">
+                            <?php if (empty($wa['qualified'])): ?>
+                                <span class="text-muted">—</span>
+                            <?php else: ?>
+                                <?php if (($wa['display_phone'] ?? '') !== ''): ?>
+                                <span class="aa-sel-wa-phone"><?php echo $e($wa['display_phone']); ?></span>
+                                <?php endif; ?>
+                                <?php if (!empty($wa['url']) && $canUpdate): ?>
+                                <a href="<?php echo $e($wa['url']); ?>" class="btn btn-wa-outline btn-sm aa-sel-wa-link" target="_blank" rel="noopener noreferrer" title="Open WhatsApp with the selection result message"><i class="fab fa-whatsapp" aria-hidden="true"></i><span class="visually-hidden"> Send selection result</span></a>
+                                <?php elseif (empty($wa['url'])): ?>
+                                <span class="text-muted small">No number</span>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </td>
+                        <td class="aa-col-sent">
+                            <?php if (empty($wa['qualified'])): ?>
+                                <span class="text-muted">—</span>
+                            <?php elseif ($canUpdate): ?>
+                                <input type="checkbox" class="form-check-input aa-sel-wa-cb" value="1"
+                                       data-entry-id="<?php echo $entryId; ?>"
+                                       data-schedule-id="<?php echo (int) ($sch['schedule_id'] ?? 0); ?>"
+                                       <?php echo $waSent ? 'checked' : ''; ?>
+                                       title="Mark selection WhatsApp as sent">
+                                <span class="aa-sel-wa-meta small text-success" aria-live="polite"><?php
+                                    if ($waSent) {
+                                        echo $e(trim(($wa['sent_at'] ?? '') . (($wa['sent_by'] ?? '') !== '' ? ' · ' . $wa['sent_by'] : '')));
+                                    }
+                                ?></span>
+                            <?php elseif ($waSent): ?>
+                                <i class="fas fa-check text-success" title="Sent"></i>
+                                <span class="aa-sel-wa-meta small text-success"><?php echo $e(trim(($wa['sent_at'] ?? '') . (($wa['sent_by'] ?? '') !== '' ? ' · ' . $wa['sent_by'] : ''))); ?></span>
+                            <?php else: ?>
+                                <span class="text-muted">—</span>
+                            <?php endif; ?>
+                        </td>
+                        <?php endif; ?>
                         <?php if ($canRegister): ?>
                         <td class="aa-col-reg">
                             <?php if ($isAbsent): ?>
@@ -269,4 +369,172 @@ $viewOnlyMsg = $isEntranceResults
     })();
     </script>
     <?php endif; ?>
+
+    <?php if ($showSelectionWa): ?>
+    <div class="aa-sent-persons">
+        <h2 class="h6 mb-2">Sent persons</h2>
+        <p class="aa-sel-hint mb-2">Applicants marked after the selection-result WhatsApp was sent. The message tells them they qualified and that the registration date will be announced soon.</p>
+        <div class="aa-sel-table-wrap">
+            <table class="table aa-sel-table mb-0" id="aa-sent-persons-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>NIC</th>
+                        <th>WhatsApp</th>
+                        <th>Course</th>
+                        <th>Marks</th>
+                        <th>Sent at</th>
+                        <th>Marked by</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php
+                $sentRows = 0;
+                foreach ($entries as $row):
+                    $sentEntryId = (int) ($row['entry_id'] ?? 0);
+                    $sentWa = $selectionWhatsApp[$sentEntryId] ?? null;
+                    if (empty($sentWa['sent'])) {
+                        continue;
+                    }
+                    $sentRows++;
+                ?>
+                    <tr data-entry-id="<?php echo $sentEntryId; ?>">
+                        <td><?php echo $e($row['student_full_name'] ?? ''); ?></td>
+                        <td class="aa-col-nic"><?php echo $e($row['student_nic'] ?? ''); ?></td>
+                        <td><?php echo $e($sentWa['display_phone'] ?? ''); ?></td>
+                        <td><?php echo $e($row['course_priority_1'] ?? ''); ?></td>
+                        <td><?php echo $e($row['exam_marks'] ?? ''); ?></td>
+                        <td class="aa-sent-at"><?php echo $e($sentWa['sent_at'] ?? ''); ?></td>
+                        <td class="aa-sent-by"><?php echo $e($sentWa['sent_by'] ?? ''); ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php if ($sentRows === 0): ?>
+                    <tr class="aa-sent-empty">
+                        <td colspan="7" class="text-center text-muted py-3">No selection messages marked as sent yet.</td>
+                    </tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>
+<?php if ($showSelectionWa && $canUpdate): ?>
+<script>
+(function () {
+    var saveUrl = <?php echo json_encode(rtrim(APP_URL, '/') . '/application-admission/mark-selection-whatsapp-sent'); ?>;
+    var sentBody = document.querySelector('#aa-sent-persons-table tbody');
+
+    function sentMeta(sentAt, sentBy) {
+        var parts = [];
+        if (sentAt) parts.push(sentAt);
+        if (sentBy) parts.push(sentBy);
+        return parts.join(' · ');
+    }
+
+    function upsertSentRow(sourceRow, sentAt, sentBy) {
+        if (!sentBody || !sourceRow) return;
+        var entryId = sourceRow.getAttribute('data-entry-id') || '';
+        var empty = sentBody.querySelector('.aa-sent-empty');
+        if (empty) empty.remove();
+        var existing = sentBody.querySelector('tr[data-entry-id="' + entryId + '"]');
+        if (!existing) {
+            existing = document.createElement('tr');
+            existing.setAttribute('data-entry-id', entryId);
+            existing.innerHTML = '<td></td><td class="aa-col-nic"></td><td></td><td></td><td></td><td class="aa-sent-at"></td><td class="aa-sent-by"></td>';
+            sentBody.appendChild(existing);
+        }
+        var cells = existing.children;
+        cells[0].textContent = sourceRow.getAttribute('data-name') || '';
+        cells[1].textContent = sourceRow.getAttribute('data-nic') || '';
+        cells[2].textContent = sourceRow.getAttribute('data-phone') || '';
+        cells[3].textContent = sourceRow.getAttribute('data-course') || '';
+        cells[4].textContent = sourceRow.getAttribute('data-marks') || '';
+        cells[5].textContent = sentAt || '';
+        cells[6].textContent = sentBy || '';
+    }
+
+    function removeSentRow(entryId) {
+        if (!sentBody) return;
+        var row = sentBody.querySelector('tr[data-entry-id="' + entryId + '"]');
+        if (row) row.remove();
+        if (!sentBody.querySelector('tr')) {
+            var empty = document.createElement('tr');
+            empty.className = 'aa-sent-empty';
+            empty.innerHTML = '<td colspan="7" class="text-center text-muted py-3">No selection messages marked as sent yet.</td>';
+            sentBody.appendChild(empty);
+        }
+    }
+
+    function saveSent(cb) {
+        var tr = cb.closest('tr');
+        var hint = tr ? tr.querySelector('.aa-sel-wa-meta') : null;
+        var entryId = cb.getAttribute('data-entry-id');
+        var scheduleId = cb.getAttribute('data-schedule-id');
+        if (!entryId || !scheduleId) return;
+        if (tr) tr.classList.toggle('aa-sel-wa-sent', cb.checked);
+        if (hint) {
+            hint.textContent = 'Saving…';
+            hint.classList.remove('text-danger');
+        }
+        cb.disabled = true;
+        var body = new URLSearchParams({
+            schedule_id: scheduleId,
+            entry_id: entryId,
+            sent: cb.checked ? '1' : '0'
+        });
+        fetch(saveUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: body.toString()
+        })
+            .then(function (r) {
+                if (r.status === 401) throw new Error('Session expired. Please log in again.');
+                return r.text().then(function (text) {
+                    try { return JSON.parse(text); }
+                    catch (e) { throw new Error('Server error. Could not save sent status.'); }
+                });
+            })
+            .then(function (data) {
+                if (!data || !data.success) {
+                    throw new Error((data && data.error) ? data.error : 'Could not save sent status.');
+                }
+                if (hint) hint.textContent = sentMeta(data.sent_at, data.sent_by);
+                if (cb.checked) upsertSentRow(tr, data.sent_at, data.sent_by);
+                else removeSentRow(entryId);
+            })
+            .catch(function (err) {
+                cb.checked = !cb.checked;
+                if (tr) tr.classList.toggle('aa-sel-wa-sent', cb.checked);
+                if (hint) {
+                    hint.textContent = 'Failed';
+                    hint.classList.add('text-danger');
+                }
+                alert(err.message || 'Could not save sent status.');
+            })
+            .finally(function () {
+                cb.disabled = false;
+            });
+    }
+
+    document.querySelectorAll('.aa-sel-wa-cb').forEach(function (cb) {
+        cb.addEventListener('change', function () { saveSent(cb); });
+    });
+    document.querySelectorAll('.aa-sel-wa-link').forEach(function (link) {
+        link.addEventListener('click', function () {
+            var tr = link.closest('tr');
+            var cb = tr ? tr.querySelector('.aa-sel-wa-cb') : null;
+            if (cb && !cb.checked) {
+                cb.checked = true;
+                saveSent(cb);
+            }
+        });
+    });
+})();
+</script>
+<?php endif; ?>

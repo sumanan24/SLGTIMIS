@@ -2242,6 +2242,49 @@ class ApplicationAdmissionController extends Controller {
         $this->json(['success' => true, 'sent' => $sent ? 1 : 0]);
     }
 
+    public function markSelectionWhatsappSent() {
+        $uid = $this->requireLogin();
+        $userModel = $this->model('UserModel');
+        if (!$userModel->canUpdateApplicationAdmissionSelection($uid)) {
+            $this->json(['success' => false, 'error' => 'Only Student Affairs (SAO) and Administrator (ADM) can mark selection WhatsApp as sent.'], 403);
+        }
+        $scheduleId = (int) $this->post('schedule_id', 0);
+        $entryId = (int) $this->post('entry_id', 0);
+        $sent = (int) $this->post('sent', 0) === 1;
+        $model = $this->scheduleModel();
+        $schedule = $model->findSchedule($scheduleId);
+        if (!$schedule || ($schedule['schedule_type'] ?? '') !== ApplicationAdmissionScheduleModel::TYPE_INTERVIEW) {
+            $this->json(['success' => false, 'error' => 'Interview schedule not found.'], 404);
+        }
+        $entry = null;
+        foreach ($model->getEntriesWithApplications($scheduleId) as $row) {
+            if ((int) ($row['entry_id'] ?? 0) === $entryId) {
+                $entry = $row;
+                break;
+            }
+        }
+        if (!$entry) {
+            $this->json(['success' => false, 'error' => 'Applicant not found on this selection list.'], 404);
+        }
+        $marks = trim((string) ($entry['exam_marks'] ?? ''));
+        if ($marks === '' || ApplicationAdmissionScheduleModel::isAbsentMarks($marks)) {
+            $this->json(['success' => false, 'error' => 'Only applicants with selection marks can be marked as sent.'], 400);
+        }
+        if (!$model->setSelectionResultWhatsAppSent($entryId, $scheduleId, $sent, $uid)) {
+            $this->json([
+                'success' => false,
+                'error' => 'Could not save sent status. If this persists, run database/application_admission_selection_whatsapp_sent.sql on your database.',
+            ], 500);
+        }
+        $names = $model->userDisplayNames([$uid]);
+        $this->json([
+            'success' => true,
+            'sent' => $sent ? 1 : 0,
+            'sent_at' => $sent ? date('Y-m-d H:i') : '',
+            'sent_by' => $sent ? (string) ($names[$uid] ?? '') : '',
+        ]);
+    }
+
     public function selection() {
         $uid = $this->requireLogin();
         $userModel = $this->requireView($uid);
@@ -2262,6 +2305,7 @@ class ApplicationAdmissionController extends Controller {
         }
         $canUpdateSelection = $isInterview ? $canUpdateInterviewSelection : $canManage;
         $entries = $this->sortEntriesByRollNumber($model->getEntriesWithApplications($id));
+        $selectionWhatsApp = $isInterview ? $this->buildSelectionResultWhatsApp($model, $entries) : [];
         $registrationStatuses = [];
         $canRegister = $isInterview && $canUpdateSelection;
         if ($isInterview) {
@@ -2277,6 +2321,7 @@ class ApplicationAdmissionController extends Controller {
             'isEntranceResults' => $isEntrance,
             'canRegister' => $canRegister,
             'registrationStatuses' => $registrationStatuses,
+            'selectionWhatsApp' => $selectionWhatsApp,
         ]);
     }
 
@@ -4096,5 +4141,64 @@ class ApplicationAdmissionController extends Controller {
         $lines[] = '— SLGTI Student Affairs';
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Official selection-result notice. WhatsApp uses a single asterisk for bold.
+     */
+    private function selectionResultWhatsAppMessage(): string {
+        return implode("\n", [
+            '*Selection Interview Results Released – SLGTI, Kilinochchi*',
+            '',
+            'Dear Applicant,',
+            '',
+            'We are pleased to inform you that you have successfully qualified in the selection interview at SLGTI, Kilinochchi.',
+            '',
+            'The registration date will be announced very soon. Further instructions regarding the registration process will be communicated to you.',
+            '',
+            '*SLGTI Management*',
+        ]);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $entries
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildSelectionResultWhatsApp(ApplicationAdmissionScheduleModel $model, array $entries): array {
+        require_once BASE_PATH . '/models/StudentModel.php';
+        $message = $this->selectionResultWhatsAppMessage();
+        $senderIds = [];
+        foreach ($entries as $row) {
+            $senderIds[] = (int) ($row['selection_result_wa_sent_by'] ?? 0);
+        }
+        $senderNames = $model->userDisplayNames($senderIds);
+        $out = [];
+        foreach ($entries as $row) {
+            $entryId = (int) ($row['entry_id'] ?? 0);
+            $marks = trim((string) ($row['exam_marks'] ?? ''));
+            $qualified = $marks !== '' && !ApplicationAdmissionScheduleModel::isAbsentMarks($marks);
+            $digits = StudentModel::digitsForWhatsAppMe($row);
+            $displayPhone = trim((string) ($row['student_whatsapp'] ?? ''));
+            if ($displayPhone === '') {
+                $displayPhone = trim((string) ($row['student_phone'] ?? ''));
+            }
+            $sentAtRaw = trim((string) ($row['selection_result_wa_sent_at'] ?? ''));
+            $sentAt = '';
+            if ($sentAtRaw !== '' && strpos($sentAtRaw, '0000-00-00') !== 0) {
+                $ts = strtotime($sentAtRaw);
+                $sentAt = $ts ? date('Y-m-d H:i', $ts) : $sentAtRaw;
+            }
+            $sentById = (int) ($row['selection_result_wa_sent_by'] ?? 0);
+            $out[$entryId] = [
+                'qualified' => $qualified,
+                'display_phone' => $displayPhone,
+                'url' => ($qualified && $digits !== null) ? ('https://wa.me/' . $digits . '?text=' . rawurlencode($message)) : null,
+                'sent' => !empty($row['selection_result_wa_sent']),
+                'sent_at' => $sentAt,
+                'sent_by' => (string) ($senderNames[$sentById] ?? ''),
+            ];
+        }
+
+        return $out;
     }
 }
