@@ -50,7 +50,7 @@ $e = static function ($v): string {
             <h2 class="mb-1 fw-bold">
                 <i class="fas fa-file-alt me-2" style="color: var(--student-primary);"></i>Forms
             </h2>
-            <p class="text-muted mb-0 small">Download forms filled with your student profile details.</p>
+            <p class="text-muted mb-0 small">Download the application, hostel request, and bus season request forms filled with your student profile.</p>
         </div>
         <a href="<?php echo APP_URL; ?>/student/dashboard" class="btn btn-sm btn-outline-secondary">
             <i class="fas fa-arrow-left me-1"></i>Dashboard

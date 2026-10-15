@@ -20,31 +20,91 @@ class StudentSampleFormsPdfHelper {
         ?array $enrollment = null,
         ?array $application = null
     ): void {
-        if (!ExamPdfHelper::dompdfAvailable()) {
-            http_response_code(503);
-            header('Content-Type: text/plain; charset=utf-8');
-            echo 'PDF download is not available. Please contact the institute.';
-            exit;
-        }
-
         $html = self::renderStudentApplicationBlankHtml($student, $enrollment, $application);
-        ExamPdfHelper::loadDompdf();
-        $options = new \Dompdf\Options();
-        $options->set('isRemoteEnabled', false);
-        $options->set('defaultFont', 'DejaVu Sans');
-        $options->set('isHtml5ParserEnabled', true);
-        if (defined('BASE_PATH')) {
-            $options->setChroot(BASE_PATH);
-        }
-        $dompdf = new \Dompdf\Dompdf($options);
-        $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4', 'portrait');
-        $dompdf->render();
-
         $sid = preg_replace('/[^A-Za-z0-9_\-]/', '_', (string) ($student['student_id'] ?? 'student'));
-        $filename = 'SLGTI_Student_Application_Form_' . $sid . '.pdf';
-        $dompdf->stream($filename, ['Attachment' => $attachment]);
-        exit;
+        self::streamA4Pdf($html, 'SLGTI_Student_Application_Form_' . $sid . '.pdf', $attachment);
+    }
+
+    /**
+     * @param array<string, mixed> $student
+     * @param array<string, mixed>|null $enrollment
+     * @param array<string, mixed>|null $application
+     * @param array<string, mixed>|null $allocation
+     */
+    public static function streamHostelRequestForm(
+        bool $attachment,
+        array $student,
+        ?array $enrollment,
+        ?array $application,
+        ?array $allocation = null
+    ): void {
+        $html = self::renderHostelRequestFormHtml($student, $enrollment, $application, $allocation);
+        $sid = preg_replace('/[^A-Za-z0-9_\-]/', '_', (string) ($student['student_id'] ?? 'student'));
+        self::streamA4Pdf($html, 'SLGTI_Hostel_Request_Form_' . $sid . '.pdf', $attachment);
+    }
+
+    /**
+     * @param array<string, mixed> $student
+     * @param array<string, mixed>|null $enrollment
+     * @param array<string, mixed>|null $application
+     * @param array<string, mixed>|null $request Latest bus season request, if any
+     */
+    public static function streamBusSeasonRequestForm(
+        bool $attachment,
+        array $student,
+        ?array $enrollment,
+        ?array $application,
+        ?array $request = null
+    ): void {
+        $html = self::renderBusSeasonRequestFormHtml($student, $enrollment, $application, $request);
+        $sid = preg_replace('/[^A-Za-z0-9_\-]/', '_', (string) ($student['student_id'] ?? 'student'));
+        self::streamA4Pdf($html, 'SLGTI_Bus_Season_Request_Form_' . $sid . '.pdf', $attachment);
+    }
+
+    /**
+     * @param array<string, mixed> $student
+     * @param array<string, mixed>|null $enrollment
+     * @param array<string, mixed>|null $application
+     * @param array<string, mixed>|null $allocation
+     */
+    public static function renderHostelRequestFormHtml(
+        array $student = [],
+        ?array $enrollment = null,
+        ?array $application = null,
+        ?array $allocation = null
+    ): string {
+        return self::renderFormView(
+            '/views/student/pdf/hostel_request_form.php',
+            $student,
+            $enrollment,
+            $application,
+            static function (array $sample) use ($enrollment, $allocation): array {
+                return self::withHostelRequestFields($sample, $enrollment, $allocation);
+            }
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $student
+     * @param array<string, mixed>|null $enrollment
+     * @param array<string, mixed>|null $application
+     * @param array<string, mixed>|null $request
+     */
+    public static function renderBusSeasonRequestFormHtml(
+        array $student = [],
+        ?array $enrollment = null,
+        ?array $application = null,
+        ?array $request = null
+    ): string {
+        return self::renderFormView(
+            '/views/student/pdf/bus_season_request_form.php',
+            $student,
+            $enrollment,
+            $application,
+            static function (array $sample) use ($enrollment, $request): array {
+                return self::withBusSeasonFields($sample, $enrollment, $request);
+            }
+        );
     }
 
     /**
@@ -345,5 +405,115 @@ class StudentSampleFormsPdfHelper {
             'al_stream' => '',
             'al_results' => '',
         ];
+    }
+
+    /**
+     * @param callable(array<string, mixed>): array<string, mixed> $extend
+     * @param array<string, mixed> $student
+     * @param array<string, mixed>|null $enrollment
+     * @param array<string, mixed>|null $application
+     */
+    private static function renderFormView(
+        string $relativePath,
+        array $student,
+        ?array $enrollment,
+        ?array $application,
+        callable $extend
+    ): string {
+        $path = BASE_PATH . $relativePath;
+        if (!is_file($path)) {
+            throw new RuntimeException('Form PDF template not found.');
+        }
+        $logoSrc = ComplaintLetterPdfHelper::logoDataUri();
+        $institute = ComplaintLetterPdfHelper::institutePostFrom();
+        $year = (new DateTimeImmutable('now', new DateTimeZone('Asia/Colombo')))->format('Y');
+        $sample = $student !== []
+            ? self::formDataFromLoggedInStudent($student, $enrollment, $application, $year)
+            : self::sampleApplicationData($year);
+        $sample = $extend($sample);
+        extract([
+            'logoSrc' => $logoSrc,
+            'institute' => $institute,
+            'year' => $year,
+            'sample' => $sample,
+        ], EXTR_SKIP);
+        ob_start();
+        include $path;
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param array<string, mixed> $sample
+     * @param array<string, mixed>|null $enrollment
+     * @param array<string, mixed>|null $allocation
+     * @return array<string, mixed>
+     */
+    private static function withHostelRequestFields(array $sample, ?array $enrollment, ?array $allocation): array {
+        $t = static function ($v): string {
+            return trim((string) ($v ?? ''));
+        };
+        $sample['academic_year'] = $t($enrollment['academic_year'] ?? '');
+        $sample['nvq_level'] = $t($enrollment['course_nvq_level'] ?? '');
+        $hostel = $t($allocation['hostel_name'] ?? '');
+        $block = $t($allocation['block_name'] ?? '');
+        $room = $t($allocation['room_no'] ?? '');
+        $hasRoom = $hostel !== '' || $block !== '' || $room !== '';
+        $sample['request_new'] = !$hasRoom;
+        $sample['request_renewal'] = $hasRoom;
+        $sample['request_change'] = false;
+        $sample['hostel_name'] = $hostel;
+        $sample['block_name'] = $block;
+        $sample['room_no'] = $room;
+        return $sample;
+    }
+
+    /**
+     * @param array<string, mixed> $sample
+     * @param array<string, mixed>|null $enrollment
+     * @param array<string, mixed>|null $request
+     * @return array<string, mixed>
+     */
+    private static function withBusSeasonFields(array $sample, ?array $enrollment, ?array $request): array {
+        $t = static function ($v): string {
+            return trim((string) ($v ?? ''));
+        };
+        $now = new DateTimeImmutable('now', new DateTimeZone('Asia/Colombo'));
+        $sample['academic_year'] = $t($enrollment['academic_year'] ?? '');
+        $sample['nvq_level'] = $t($enrollment['course_nvq_level'] ?? '');
+        $sample['season_year'] = $t($request['season_year'] ?? '') !== ''
+            ? $t($request['season_year'] ?? '')
+            : $now->format('Y');
+        $sample['season_month'] = $now->format('F Y');
+        $sample['route_from'] = $t($request['route_from'] ?? '');
+        $sample['route_to'] = $t($request['route_to'] ?? '');
+        $sample['change_point'] = $t($request['change_point'] ?? '');
+        $distance = $request['distance_km'] ?? '';
+        $sample['distance_km'] = ($distance === null || $distance === '') ? '' : $t($distance);
+        $sample['depot_name'] = $t($request['depot_name'] ?? '');
+        return $sample;
+    }
+
+    private static function streamA4Pdf(string $html, string $filename, bool $attachment): void {
+        if (!ExamPdfHelper::dompdfAvailable()) {
+            http_response_code(503);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'PDF download is not available. Please contact the institute.';
+            exit;
+        }
+
+        ExamPdfHelper::loadDompdf();
+        $options = new \Dompdf\Options();
+        $options->set('isRemoteEnabled', false);
+        $options->set('defaultFont', 'DejaVu Sans');
+        $options->set('isHtml5ParserEnabled', true);
+        if (defined('BASE_PATH')) {
+            $options->setChroot(BASE_PATH);
+        }
+        $dompdf = new \Dompdf\Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+        $dompdf->stream($filename, ['Attachment' => $attachment]);
+        exit;
     }
 }

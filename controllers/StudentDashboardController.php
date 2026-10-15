@@ -192,6 +192,22 @@ class StudentDashboardController extends Controller {
                 'action_label' => 'Download PDF',
                 'url' => rtrim(APP_URL, '/') . '/student/forms/download?form=student-application',
             ],
+            [
+                'key' => 'hostel-request',
+                'title' => 'Hostel Request Form',
+                'description' => 'Request hostel admission or renewal. Filled with your profile and current room, if you already have one. Print, sign, and submit to the hostel office.',
+                'icon' => 'fa-bed',
+                'action_label' => 'Download PDF',
+                'url' => rtrim(APP_URL, '/') . '/student/forms/download?form=hostel-request',
+            ],
+            [
+                'key' => 'bus-season-request',
+                'title' => 'Bus Season Request Form',
+                'description' => 'Apply for a bus season ticket. Filled with your profile and your latest route, if you already have a request. Print, sign, and submit to the Student Affairs Office.',
+                'icon' => 'fa-bus',
+                'action_label' => 'Download PDF',
+                'url' => rtrim(APP_URL, '/') . '/student/forms/download?form=bus-season-request',
+            ],
         ];
 
         return $this->view('student/forms', [
@@ -210,28 +226,67 @@ class StudentDashboardController extends Controller {
         }
 
         $form = strtolower(trim((string) $this->get('form', '')));
-        if ($form === 'student-application' || $form === 'application') {
-            $studentId = (string) ($_SESSION['user_name'] ?? '');
-            $studentModel = $this->model('StudentModel');
-            $student = $studentModel->find($studentId);
-            if (!$student) {
-                $_SESSION['error'] = 'Student record not found.';
-                $this->redirect('student/forms');
-                return;
-            }
+        $allowed = ['student-application', 'application', 'hostel-request', 'bus-season-request'];
+        if (!in_array($form, $allowed, true)) {
+            $_SESSION['error'] = 'Requested form was not found.';
+            $this->redirect('student/forms');
+            return;
+        }
 
+        $studentId = (string) ($_SESSION['user_name'] ?? '');
+        $studentModel = $this->model('StudentModel');
+        $student = $studentModel->find($studentId);
+        if (!$student) {
+            $_SESSION['error'] = 'Student record not found.';
+            $this->redirect('student/forms');
+            return;
+        }
+
+        $enrollment = null;
+        try {
+            $enrollmentModel = $this->model('StudentEnrollmentModel');
+            $enrollment = $enrollmentModel->getCurrentEnrollment($studentId)
+                ?: $enrollmentModel->getLatestEnrollment($studentId);
+        } catch (Throwable $e) {
             $enrollment = null;
-            try {
-                $enrollmentModel = $this->model('StudentEnrollmentModel');
-                $enrollment = $enrollmentModel->getCurrentEnrollment($studentId)
-                    ?: $enrollmentModel->getLatestEnrollment($studentId);
-            } catch (Throwable $e) {
-                $enrollment = null;
-            }
+        }
+        if ($enrollment === false) {
+            $enrollment = null;
+        }
 
-            require_once BASE_PATH . '/helpers/StudentSampleFormsPdfHelper.php';
-            $application = StudentSampleFormsPdfHelper::findApplicationForStudent($student);
+        require_once BASE_PATH . '/helpers/StudentSampleFormsPdfHelper.php';
+        $application = StudentSampleFormsPdfHelper::findApplicationForStudent($student);
+
+        if ($form === 'student-application' || $form === 'application') {
             StudentSampleFormsPdfHelper::streamStudentApplicationBlank(true, $student, $enrollment, $application);
+            return;
+        }
+
+        if ($form === 'hostel-request') {
+            $allocation = null;
+            try {
+                $roomAllocationModel = $this->model('RoomAllocationModel');
+                $row = $roomAllocationModel->getActiveByStudentId($studentId);
+                $allocation = is_array($row) ? $row : null;
+            } catch (Throwable $e) {
+                $allocation = null;
+            }
+            StudentSampleFormsPdfHelper::streamHostelRequestForm(true, $student, $enrollment, $application, $allocation);
+            return;
+        }
+
+        if ($form === 'bus-season-request') {
+            $latest = null;
+            try {
+                $busSeasonModel = $this->model('BusSeasonRequestModel');
+                $rows = $busSeasonModel->getByStudentId($studentId);
+                if (is_array($rows) && isset($rows[0]) && is_array($rows[0])) {
+                    $latest = $rows[0];
+                }
+            } catch (Throwable $e) {
+                $latest = null;
+            }
+            StudentSampleFormsPdfHelper::streamBusSeasonRequestForm(true, $student, $enrollment, $application, $latest);
             return;
         }
 
