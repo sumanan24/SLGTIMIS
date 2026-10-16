@@ -2304,7 +2304,7 @@ class ApplicationAdmissionController extends Controller {
             $this->redirect('application-admission');
         }
         $canUpdateSelection = $isInterview ? $canUpdateInterviewSelection : $canManage;
-        $entries = $this->sortEntriesByRollNumber($model->getEntriesWithApplications($id));
+        $entries = $this->sortEntriesByMarksHighToLow($model->getEntriesWithApplications($id));
         $selectionWhatsApp = $isInterview ? $this->buildSelectionResultWhatsApp($model, $entries) : [];
         $registrationStatuses = [];
         $canRegister = $isInterview && $canUpdateSelection;
@@ -3360,27 +3360,48 @@ class ApplicationAdmissionController extends Controller {
     }
 
     /**
-     * Sort schedule applicants by roll / index, then name.
+     * Sort schedule applicants by marks (highest first). Blank and absent marks go last.
      *
      * @param list<array<string, mixed>> $entries
      * @return list<array<string, mixed>>
      */
-    private function sortEntriesByRollNumber(array $entries): array {
+    private function sortEntriesByMarksHighToLow(array $entries): array {
         usort($entries, static function (array $a, array $b): int {
+            $score = static function (array $row): ?float {
+                $raw = trim((string) ($row['exam_marks'] ?? ''));
+                if ($raw === '' || ApplicationAdmissionScheduleModel::isAbsentMarks($raw) || !is_numeric($raw)) {
+                    return null;
+                }
+
+                return (float) $raw;
+            };
+            $ma = $score($a);
+            $mb = $score($b);
+            if ($ma !== null || $mb !== null) {
+                if ($ma === null) {
+                    return 1;
+                }
+                if ($mb === null) {
+                    return -1;
+                }
+                $cmp = $mb <=> $ma;
+                if ($cmp !== 0) {
+                    return $cmp;
+                }
+            }
             $rollA = trim((string) ($a['roll_number'] ?? ''));
             $rollB = trim((string) ($b['roll_number'] ?? ''));
-            if ($rollA === '' && $rollB === '') {
-                return strcasecmp((string) ($a['student_full_name'] ?? ''), (string) ($b['student_full_name'] ?? ''));
-            }
-            if ($rollA === '') {
+            if ($rollA === '' && $rollB !== '') {
                 return 1;
             }
-            if ($rollB === '') {
+            if ($rollB === '' && $rollA !== '') {
                 return -1;
             }
-            $cmp = strnatcasecmp($rollA, $rollB);
-            if ($cmp !== 0) {
-                return $cmp;
+            if ($rollA !== '' && $rollB !== '') {
+                $rollCmp = strnatcasecmp($rollA, $rollB);
+                if ($rollCmp !== 0) {
+                    return $rollCmp;
+                }
             }
 
             return strcasecmp((string) ($a['student_full_name'] ?? ''), (string) ($b['student_full_name'] ?? ''));
@@ -3405,7 +3426,7 @@ class ApplicationAdmissionController extends Controller {
             echo 'Not published.';
             exit;
         }
-        $entries = $this->sortEntriesByRollNumber($model->getEntriesWithApplications($scheduleId));
+        $entries = $this->sortEntriesByMarksHighToLow($model->getEntriesWithApplications($scheduleId));
         require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
         $inner = ApplicationAdmissionPdfHelper::renderTemplate('selection_list.php', [
             'schedule' => $schedule,

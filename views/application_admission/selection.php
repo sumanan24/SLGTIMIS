@@ -21,7 +21,7 @@ if ($showSelectionWa) {
         }
     }
 }
-$colCount = 6 + ($canRegister ? 1 : 0) + ($showSelectionWa ? 2 : 0);
+$colCount = 5 + ($canRegister ? 1 : 0) + ($showSelectionWa ? 2 : 0);
 $saveLabel = $isEntranceResults ? 'Save exam results' : 'Save marks';
 $viewOnlyMsg = $isEntranceResults
     ? 'View only. <strong>SAO</strong>, <strong>REG</strong>, and <strong>ADM</strong> can enter exam marks.'
@@ -82,8 +82,7 @@ $viewOnlyMsg = $isEntranceResults
     white-space: normal;
     word-break: break-word;
 }
-.aa-sel-table .aa-col-nic,
-.aa-sel-table .aa-col-roll {
+.aa-sel-table .aa-col-nic {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 0.8125rem;
     white-space: nowrap;
@@ -169,6 +168,7 @@ $viewOnlyMsg = $isEntranceResults
         <div>
             <h1><?php echo $e($pageTitle); ?></h1>
             <p class="text-muted small mb-0"><?php echo $e($sch['title'] ?? ''); ?></p>
+            <p class="small text-muted mb-0 mt-1">Listed by marks, highest first. Absent and blank marks are at the bottom.</p>
             <?php if ($canUpdate): ?>
             <p class="small text-muted mb-0 mt-1">Type <strong>marks</strong> for each student. For absent students type <strong>ab</strong> and press Enter to move to the next row.</p>
             <?php endif; ?>
@@ -203,7 +203,6 @@ $viewOnlyMsg = $isEntranceResults
                 <thead>
                     <tr>
                         <th class="aa-col-no">#</th>
-                        <th class="aa-col-roll">Roll / Index</th>
                         <th class="aa-col-name">Name</th>
                         <th class="aa-col-nic">NIC</th>
                         <th class="aa-col-course">Course</th>
@@ -225,7 +224,6 @@ $viewOnlyMsg = $isEntranceResults
                 <?php else: ?>
                     <?php $n = 0; foreach ($entries as $row): $n++;
                         $entryId = (int) ($row['entry_id'] ?? 0);
-                        $roll = trim((string) ($row['roll_number'] ?? ''));
                         $marksVal = trim((string) ($row['exam_marks'] ?? ''));
                         $isAbsent = ApplicationAdmissionScheduleModel::isAbsentMarks($marksVal);
                         $nicKey = strtoupper(preg_replace('/\s+/', '', trim((string) ($row['student_nic'] ?? ''))));
@@ -241,7 +239,6 @@ $viewOnlyMsg = $isEntranceResults
                         data-course="<?php echo $e($row['course_priority_1'] ?? ''); ?>"
                         data-marks="<?php echo $e($marksVal); ?>">
                         <td class="aa-col-no"><?php echo $n; ?></td>
-                        <td class="aa-col-roll"><?php echo $roll !== '' ? $e($roll) : '<span class="text-muted">—</span>'; ?></td>
                         <td class="aa-col-name"><?php echo $e($row['student_full_name'] ?? ''); ?></td>
                         <td class="aa-col-nic"><?php echo $e($row['student_nic'] ?? ''); ?></td>
                         <td class="aa-col-course"><?php echo $e($row['course_priority_1'] ?? ''); ?></td>
