@@ -2086,23 +2086,67 @@ class ApplicationAdmissionScheduleModel extends Model {
      * @return list<string>
      */
     public function interviewOutcomeCourseOptions(): array {
+        $names = [];
+        foreach ($this->interviewOutcomeCatalog()['courses'] as $course) {
+            $name = trim((string) ($course['course_name'] ?? ''));
+            if ($name !== '' && !in_array($name, $names, true)) {
+                $names[] = $name;
+            }
+        }
+        sort($names, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $names;
+    }
+
+    /**
+     * Departments and 1st-preference courses that appear on interview schedules.
+     * A course is linked to a department through the course table.
+     *
+     * @return array{courses:list<array{course_name:string,department_id:string,department_name:string}>,departments:list<array{department_id:string,department_name:string}>}
+     */
+    public function interviewOutcomeCatalog(): array {
         $this->ensureTables();
-        $sql = 'SELECT DISTINCT TRIM(sa.`course_priority_1`) AS course_name'
+        $sql = 'SELECT DISTINCT TRIM(sa.`course_priority_1`) AS course_name,'
+            . ' TRIM(IFNULL(c.`department_id`, \'\')) AS department_id,'
+            . ' TRIM(IFNULL(d.`department_name`, \'\')) AS department_name'
             . ' FROM `application_admission_schedule_entry` e'
             . ' INNER JOIN `application_admission_schedule` s ON s.`schedule_id` = e.`schedule_id`'
             . ' INNER JOIN `student_applications` sa ON sa.`application_id` = e.`application_id`'
+            . ' LEFT JOIN `course` c ON TRIM(c.`course_name`) = TRIM(sa.`course_priority_1`)'
+            . ' LEFT JOIN `department` d ON d.`department_id` = c.`department_id`'
             . ' WHERE s.`schedule_type` = ? AND TRIM(IFNULL(sa.`course_priority_1`, \'\')) <> \'\''
-            . ' ORDER BY course_name ASC';
+            . ' ORDER BY department_name ASC, course_name ASC';
         $rows = $this->fetchAllPrepared($sql, 's', [self::TYPE_INTERVIEW]);
-        $out = [];
+        $courses = [];
+        $departments = [];
         foreach ($rows as $row) {
             $name = trim((string) ($row['course_name'] ?? ''));
-            if ($name !== '') {
-                $out[] = $name;
+            if ($name === '') {
+                continue;
+            }
+            $departmentId = trim((string) ($row['department_id'] ?? ''));
+            $departmentName = trim((string) ($row['department_name'] ?? ''));
+            $courses[] = [
+                'course_name' => $name,
+                'department_id' => $departmentId,
+                'department_name' => $departmentName,
+            ];
+            if ($departmentId !== '' && !isset($departments[$departmentId])) {
+                $departments[$departmentId] = [
+                    'department_id' => $departmentId,
+                    'department_name' => $departmentName !== '' ? $departmentName : $departmentId,
+                ];
             }
         }
+        $departments = array_values($departments);
+        usort($departments, static function (array $a, array $b): int {
+            return strcasecmp((string) $a['department_name'], (string) $b['department_name']);
+        });
 
-        return $out;
+        return [
+            'courses' => $courses,
+            'departments' => $departments,
+        ];
     }
 
     /**
@@ -2112,7 +2156,7 @@ class ApplicationAdmissionScheduleModel extends Model {
      * date is today or earlier, and the same application was not attended.
      * Selected: selection_status is selected. Blank marks stay out of attended and absent.
      *
-     * @param array{province?:string,district?:string,course?:string,gender?:string,date_from?:string,date_to?:string,q?:string} $filters
+     * @param array{province?:string,provinces?:list<string>,district?:string,department_id?:string,course?:string,gender?:string,date_from?:string,date_to?:string,q?:string} $filters
      * @return array{applicants:int,attended:list<array<string,mixed>>,absent:list<array<string,mixed>>,selected:list<array<string,mixed>>}
      */
     public function interviewOutcomeLists(array $filters): array {
@@ -2184,7 +2228,7 @@ class ApplicationAdmissionScheduleModel extends Model {
     }
 
     /**
-     * @param array{province?:string,district?:string,course?:string,gender?:string,date_from?:string,date_to?:string,q?:string} $filters
+     * @param array{province?:string,provinces?:list<string>,district?:string,department_id?:string,course?:string,gender?:string,date_from?:string,date_to?:string,q?:string} $filters
      * @return list<array<string, mixed>>
      */
     private function interviewOutcomeEntries(array $filters): array {
@@ -2222,6 +2266,16 @@ class ApplicationAdmissionScheduleModel extends Model {
             $sql .= ' AND TRIM(IFNULL(sa.`student_district`, \'\')) = ?';
             $types .= 's';
             $params[] = $district;
+        }
+        $departmentId = trim((string) ($filters['department_id'] ?? ''));
+        if ($departmentId !== '') {
+            $sql .= ' AND EXISTS ('
+                . 'SELECT 1 FROM `course` c'
+                . ' WHERE TRIM(c.`course_name`) = TRIM(IFNULL(sa.`course_priority_1`, \'\'))'
+                . ' AND c.`department_id` = ?'
+                . ')';
+            $types .= 's';
+            $params[] = $departmentId;
         }
         $course = trim((string) ($filters['course'] ?? ''));
         if ($course !== '') {

@@ -5,6 +5,7 @@ $filters = is_array($roster['filters'] ?? null) ? $roster['filters'] : [];
 $summary = is_array($roster['summary'] ?? null) ? $roster['summary'] : [];
 $sections = is_array($roster['sections'] ?? null) ? $roster['sections'] : [];
 $courses = is_array($roster['courses'] ?? null) ? $roster['courses'] : [];
+$departments = is_array($roster['departments'] ?? null) ? $roster['departments'] : [];
 $provinceDistricts = is_array($roster['province_districts'] ?? null) ? $roster['province_districts'] : [];
 $perPage = max(1, (int) ($roster['per_page'] ?? 25));
 $levelFilter = (string) ($levelFilter ?? '');
@@ -17,6 +18,7 @@ $rosterQuery = static function (array $extra = []) use ($filters, $sections, $le
             return trim((string) $name) !== '';
         })),
         'district' => (string) ($filters['district'] ?? ''),
+        'department_id' => (string) ($filters['department_id'] ?? ''),
         'course' => (string) ($filters['course'] ?? ''),
         'gender' => (string) ($filters['gender'] ?? ''),
         'date_from' => (string) ($filters['date_from'] ?? ''),
@@ -353,13 +355,33 @@ a.aa-roster-card:hover { border-color: #b6d4fe; color: inherit; }
                 <?php endforeach; ?>
             </select>
         </div>
+        <div class="aa-span-3">
+            <label for="aa_roster_department">Department</label>
+            <select name="department_id" id="aa_roster_department" class="form-select form-select-sm">
+                <option value="">All departments</option>
+                <?php foreach ($departments as $department):
+                    $departmentId = trim((string) ($department['department_id'] ?? ''));
+                    if ($departmentId === '') {
+                        continue;
+                    }
+                ?>
+                <option value="<?php echo $e($departmentId); ?>" <?php echo strcasecmp((string) ($filters['department_id'] ?? ''), $departmentId) === 0 ? 'selected' : ''; ?>><?php echo $e((string) ($department['department_name'] ?? $departmentId)); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
         <div class="aa-span-4">
             <label for="aa_roster_course_search">Course</label>
             <input type="search" id="aa_roster_course_search" class="form-control form-control-sm mb-1 aa-roster-select-search" data-filter-select="aa_roster_course" placeholder="Search course" autocomplete="off">
             <select name="course" id="aa_roster_course" class="form-select form-select-sm">
                 <option value="">All courses</option>
-                <?php foreach ($courses as $courseName): ?>
-                <option value="<?php echo $e((string) $courseName); ?>" <?php echo ((string) ($filters['course'] ?? '')) === $courseName ? 'selected' : ''; ?>><?php echo $e((string) $courseName); ?></option>
+                <?php foreach ($courses as $course):
+                    $courseName = is_array($course) ? trim((string) ($course['course_name'] ?? '')) : trim((string) $course);
+                    $courseDepartment = is_array($course) ? trim((string) ($course['department_id'] ?? '')) : '';
+                    if ($courseName === '') {
+                        continue;
+                    }
+                ?>
+                <option value="<?php echo $e($courseName); ?>" data-dept="<?php echo $e($courseDepartment); ?>" <?php echo ((string) ($filters['course'] ?? '')) === $courseName ? 'selected' : ''; ?>><?php echo $e($courseName); ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -372,15 +394,15 @@ a.aa-roster-card:hover { border-color: #b6d4fe; color: inherit; }
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="aa-span-3">
+        <div class="aa-span-2">
             <label for="aa_roster_from">Interview from</label>
             <input type="date" name="date_from" id="aa_roster_from" class="form-control form-control-sm" value="<?php echo $e((string) ($filters['date_from'] ?? '')); ?>">
         </div>
-        <div class="aa-span-3">
+        <div class="aa-span-2">
             <label for="aa_roster_to">Interview to</label>
             <input type="date" name="date_to" id="aa_roster_to" class="form-control form-control-sm" value="<?php echo $e((string) ($filters['date_to'] ?? '')); ?>">
         </div>
-        <div class="aa-span-5">
+        <div class="aa-span-4">
             <label for="aa_roster_q">Name, application no., or NIC</label>
             <input type="search" name="q" id="aa_roster_q" class="form-control form-control-sm" value="<?php echo $e((string) ($filters['q'] ?? '')); ?>" maxlength="100" placeholder="Search">
         </div>
@@ -587,7 +609,37 @@ a.aa-roster-card:hover { border-color: #b6d4fe; color: inherit; }
         });
     }
 
+    var department = document.getElementById('aa_roster_department');
+    var course = document.getElementById('aa_roster_course');
+    var courseSearch = document.getElementById('aa_roster_course_search');
+
+    function filterCourses() {
+        if (!course) return;
+        var deptId = department ? department.value : '';
+        var q = courseSearch ? courseSearch.value.trim().toLowerCase() : '';
+        var keep = course.value;
+        var keepVisible = keep === '';
+        Array.prototype.forEach.call(course.options, function (opt) {
+            if (opt.value === '') {
+                opt.hidden = false;
+                opt.disabled = false;
+                return;
+            }
+            var inDept = deptId === '' || opt.getAttribute('data-dept') === deptId;
+            var matchesSearch = q === '' || opt.textContent.toLowerCase().indexOf(q) !== -1;
+            opt.disabled = !inDept;
+            opt.hidden = !inDept || !matchesSearch;
+            if (inDept && opt.value === keep) keepVisible = true;
+        });
+        if (!keepVisible) course.value = '';
+    }
+
+    if (department) department.addEventListener('change', filterCourses);
+    if (courseSearch) courseSearch.addEventListener('input', filterCourses);
+    filterCourses();
+
     document.querySelectorAll('.aa-roster-select-search').forEach(function (input) {
+        if (input === courseSearch) return;
         input.addEventListener('input', function () {
             var select = document.getElementById(input.getAttribute('data-filter-select') || '');
             if (!select) return;

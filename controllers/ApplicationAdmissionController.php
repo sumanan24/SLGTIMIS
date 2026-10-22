@@ -1778,13 +1778,14 @@ class ApplicationAdmissionController extends Controller {
             ],
             'sections' => $sections,
             'per_page' => $perPage,
-            'courses' => $model->interviewOutcomeCourseOptions(),
+            'courses' => $request['courses'],
+            'departments' => $request['departments'],
             'province_districts' => $request['province_districts'],
         ];
     }
 
     /**
-     * @return array{list:string,page:int,date_error:string,filters:array<string,string>,province_districts:array<string,list<string>>}
+     * @return array{list:string,page:int,date_error:string,filters:array<string,mixed>,province_districts:array<string,list<string>>,courses:list<array<string,string>>,departments:list<array<string,string>>}
      */
     private function interviewRosterRequest(): array {
         $map = is_file(BASE_PATH . '/config/sl_provinces_districts.php')
@@ -1817,9 +1818,39 @@ class ApplicationAdmissionController extends Controller {
         if ($district !== '' && !in_array($district, $allowedDistricts, true)) {
             $district = '';
         }
+        $catalog = $this->scheduleModel()->interviewOutcomeCatalog();
+        $catalogCourses = $catalog['courses'];
+        $catalogDepartments = $catalog['departments'];
+        $departmentId = trim((string) $this->get('department_id', ''));
+        $departmentName = '';
+        foreach ($catalogDepartments as $department) {
+            if (strcasecmp((string) ($department['department_id'] ?? ''), $departmentId) === 0) {
+                $departmentId = (string) $department['department_id'];
+                $departmentName = (string) ($department['department_name'] ?? $departmentId);
+                break;
+            }
+        }
+        if ($departmentName === '') {
+            $departmentId = '';
+        }
         $course = trim((string) $this->get('course', ''));
         if (strlen($course) > 150) {
             $course = substr($course, 0, 150);
+        }
+        $courseAllowed = false;
+        foreach ($catalogCourses as $catalogCourse) {
+            if ((string) ($catalogCourse['course_name'] ?? '') !== $course) {
+                continue;
+            }
+            $courseDepartment = (string) ($catalogCourse['department_id'] ?? '');
+            if ($departmentId !== '' && strcasecmp($courseDepartment, $departmentId) !== 0) {
+                continue;
+            }
+            $courseAllowed = true;
+            break;
+        }
+        if (!$courseAllowed) {
+            $course = '';
         }
         $gender = trim((string) $this->get('gender', ''));
         if (!in_array($gender, ['Male', 'Female', 'Other'], true)) {
@@ -1848,9 +1879,13 @@ class ApplicationAdmissionController extends Controller {
             ],
             'date_error' => $dateError,
             'province_districts' => $map,
+            'courses' => $catalogCourses,
+            'departments' => $catalogDepartments,
             'filters' => [
                 'provinces' => $provinces,
                 'district' => $district,
+                'department_id' => $departmentId,
+                'department_name' => $departmentName,
                 'course' => $course,
                 'gender' => $gender,
                 'date_from' => $dateFrom,
@@ -1891,6 +1926,7 @@ class ApplicationAdmissionController extends Controller {
             $title,
             !empty($filters['provinces']) ? ('Province: ' . implode(', ', (array) $filters['provinces'])) : 'All provinces',
             ($filters['district'] ?? '') !== '' ? ('District: ' . $filters['district']) : 'All districts',
+            ($filters['department_id'] ?? '') !== '' ? ('Department: ' . (($filters['department_name'] ?? '') !== '' ? $filters['department_name'] : $filters['department_id'])) : 'All departments',
             ($filters['course'] ?? '') !== '' ? ('Course: ' . $filters['course']) : 'All courses',
             ($filters['gender'] ?? '') !== '' ? ('Gender: ' . $filters['gender']) : '',
             ($filters['date_from'] ?? '') !== '' ? ('From: ' . $filters['date_from']) : '',
