@@ -288,6 +288,8 @@ return [
     // Application entrance exam / interview schedules (SAO, REG, ADM; DIR view)
     'application-admission' => 'ApplicationAdmissionController@index',
     'application-admission/interviews' => 'ApplicationAdmissionController@interviews',
+    'application-admission/candidates' => 'ApplicationAdmissionController@interviewCandidates',
+    'application-admission/interviews-export' => 'ApplicationAdmissionController@interviewsExport',
     'application-admission/create' => 'ApplicationAdmissionController@create',
     'application-admission/edit' => 'ApplicationAdmissionController@edit',
     'application-admission/store' => 'ApplicationAdmissionController@store',

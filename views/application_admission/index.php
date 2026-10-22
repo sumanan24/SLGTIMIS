@@ -226,7 +226,10 @@ $schedules = is_array($schedules ?? null) ? $schedules : [];
             <i class="fas fa-clipboard-list"></i> Entrance exams
         </a>
         <a class="<?php echo $isInterview ? 'is-active' : ''; ?>" href="<?php echo $e($interviewUrl); ?>">
-            <i class="fas fa-comments"></i> Interviews
+            <i class="fas fa-comments"></i> Interview schedules
+        </a>
+        <a href="<?php echo APP_URL; ?>/application-admission/candidates">
+            <i class="fas fa-list-check"></i> Selected candidates
         </a>
         <a href="<?php echo APP_URL; ?>/application-admission/cutoffs">
             <i class="fas fa-filter"></i> Cutoff marks

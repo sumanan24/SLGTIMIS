@@ -373,6 +373,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                 $studentApplicationsPages[] = 'application-admission';
                                 $studentApplicationsPages[] = 'application-admission-entrance';
                                 $studentApplicationsPages[] = 'application-admission-interview';
+                                $studentApplicationsPages[] = 'application-admission-candidates';
                                 $studentApplicationsPages[] = 'application-admission-cutoff';
                                 $studentApplicationsPages[] = 'application-admission-second-option';
                                 $studentApplicationsPages[] = 'application-admission-report';
@@ -455,7 +456,13 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                             <li>
                                                 <a href="<?php echo APP_URL; ?>/application-admission/interviews" class="<?php echo (isset($page) && $page === 'application-admission-interview') ? 'active' : ''; ?>">
                                                     <i class="fas fa-comments"></i>
-                                                    <span>Interviews</span>
+                                                    <span>Interview schedules</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="<?php echo APP_URL; ?>/application-admission/candidates" class="<?php echo (isset($page) && $page === 'application-admission-candidates') ? 'active' : ''; ?>">
+                                                    <i class="fas fa-list-check"></i>
+                                                    <span>Selected candidates</span>
                                                 </a>
                                             </li>
                                             <li>

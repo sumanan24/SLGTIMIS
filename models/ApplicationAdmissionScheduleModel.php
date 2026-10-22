@@ -2079,4 +2079,273 @@ class ApplicationAdmissionScheduleModel extends Model {
         }
         call_user_func_array([$stmt, 'bind_param'], $bind);
     }
+
+    /**
+     * Course names used as 1st preference on interview schedules.
+     *
+     * @return list<string>
+     */
+    public function interviewOutcomeCourseOptions(): array {
+        $this->ensureTables();
+        $sql = 'SELECT DISTINCT TRIM(sa.`course_priority_1`) AS course_name'
+            . ' FROM `application_admission_schedule_entry` e'
+            . ' INNER JOIN `application_admission_schedule` s ON s.`schedule_id` = e.`schedule_id`'
+            . ' INNER JOIN `student_applications` sa ON sa.`application_id` = e.`application_id`'
+            . ' WHERE s.`schedule_type` = ? AND TRIM(IFNULL(sa.`course_priority_1`, \'\')) <> \'\''
+            . ' ORDER BY course_name ASC';
+        $rows = $this->fetchAllPrepared($sql, 's', [self::TYPE_INTERVIEW]);
+        $out = [];
+        foreach ($rows as $row) {
+            $name = trim((string) ($row['course_name'] ?? ''));
+            if ($name !== '') {
+                $out[] = $name;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * One row per application for interview attendance and selection lists.
+     *
+     * Attended: numeric interview marks. Absent: marks stored as ab, the interview
+     * date is today or earlier, and the same application was not attended.
+     * Selected: selection_status is selected. Blank marks stay out of attended and absent.
+     *
+     * @param array{province?:string,district?:string,course?:string,gender?:string,date_from?:string,date_to?:string,q?:string} $filters
+     * @return array{applicants:int,attended:list<array<string,mixed>>,absent:list<array<string,mixed>>,selected:list<array<string,mixed>>}
+     */
+    public function interviewOutcomeLists(array $filters): array {
+        $entries = $this->interviewOutcomeEntries($filters);
+        $today = date('Y-m-d');
+        $byApplication = [];
+        foreach ($entries as $row) {
+            $appId = (int) ($row['application_id'] ?? 0);
+            if ($appId < 1) {
+                continue;
+            }
+            $byApplication[$appId][] = $row;
+        }
+
+        $attended = [];
+        $absent = [];
+        $selected = [];
+        foreach ($byApplication as $rows) {
+            $attendedEntry = null;
+            $absentEntry = null;
+            $selectedEntry = null;
+            foreach ($rows as $row) {
+                $kind = $this->interviewAttendanceKind($row, $today);
+                if ($kind === 'attended' && $this->interviewEntryPreferred($row, $attendedEntry, true)) {
+                    $attendedEntry = $row;
+                }
+                if ($kind === 'absent' && $this->interviewEntryPreferred($row, $absentEntry, false)) {
+                    $absentEntry = $row;
+                }
+                if (strtolower(trim((string) ($row['selection_status'] ?? ''))) === self::SELECTION_SELECTED
+                    && $this->interviewEntryPreferred($row, $selectedEntry, false)) {
+                    $selectedEntry = $row;
+                }
+            }
+            $selectionLabel = $selectedEntry !== null
+                ? 'Selected'
+                : $this->interviewSelectionLabel((string) (($attendedEntry ?? $absentEntry ?? $rows[0])['selection_status'] ?? ''));
+            if ($attendedEntry !== null) {
+                $attended[] = $this->interviewOutcomeRow($attendedEntry, 'Attended', $selectionLabel);
+            } elseif ($absentEntry !== null) {
+                $absent[] = $this->interviewOutcomeRow($absentEntry, 'Absent', $selectionLabel);
+            }
+            if ($selectedEntry !== null) {
+                $attendance = $attendedEntry !== null
+                    ? 'Attended'
+                    : ($absentEntry !== null ? 'Absent' : 'Not recorded');
+                $selected[] = $this->interviewOutcomeRow($selectedEntry, $attendance, 'Selected');
+            }
+        }
+
+        $sort = static function (array $a, array $b): int {
+            $cmp = strcasecmp((string) ($a['full_name'] ?? ''), (string) ($b['full_name'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return ((int) ($a['application_id'] ?? 0)) <=> ((int) ($b['application_id'] ?? 0));
+        };
+        usort($attended, $sort);
+        usort($absent, $sort);
+        usort($selected, $sort);
+
+        return [
+            'applicants' => count($byApplication),
+            'attended' => $attended,
+            'absent' => $absent,
+            'selected' => $selected,
+        ];
+    }
+
+    /**
+     * @param array{province?:string,district?:string,course?:string,gender?:string,date_from?:string,date_to?:string,q?:string} $filters
+     * @return list<array<string, mixed>>
+     */
+    private function interviewOutcomeEntries(array $filters): array {
+        $this->ensureTables();
+        $this->migrateSchema();
+        $sql = 'SELECT e.`application_id`, e.`selection_status`, e.`exam_marks`,'
+            . ' s.`schedule_date`,'
+            . ' sa.`student_full_name`, sa.`student_nic`, sa.`student_gender`, sa.`student_phone`,'
+            . ' sa.`student_province`, sa.`student_district`, sa.`course_priority_1`,'
+            . ' st.`student_id` AS registration_number'
+            . ' FROM `application_admission_schedule_entry` e'
+            . ' INNER JOIN `application_admission_schedule` s ON s.`schedule_id` = e.`schedule_id`'
+            . ' INNER JOIN `student_applications` sa ON sa.`application_id` = e.`application_id`'
+            . ' LEFT JOIN `student` st ON UPPER(REPLACE(REPLACE(st.`student_nic`, \' \', \'\'), \'-\', \'\'))'
+            . ' = UPPER(REPLACE(REPLACE(sa.`student_nic`, \' \', \'\'), \'-\', \'\'))'
+            . ' WHERE s.`schedule_type` = ?';
+        $types = 's';
+        $params = [self::TYPE_INTERVIEW];
+
+        $provinces = $filters['provinces'] ?? ($filters['province'] ?? []);
+        if (!is_array($provinces)) {
+            $provinces = trim((string) $provinces) === '' ? [] : [trim((string) $provinces)];
+        }
+        $provinces = self::normalizedProvinceFilters($provinces);
+        if ($provinces !== []) {
+            $sql .= ' AND TRIM(IFNULL(sa.`student_province`, \'\')) IN ('
+                . implode(', ', array_fill(0, count($provinces), '?')) . ')';
+            foreach ($provinces as $provinceName) {
+                $types .= 's';
+                $params[] = $provinceName;
+            }
+        }
+        $district = trim((string) ($filters['district'] ?? ''));
+        if ($district !== '') {
+            $sql .= ' AND TRIM(IFNULL(sa.`student_district`, \'\')) = ?';
+            $types .= 's';
+            $params[] = $district;
+        }
+        $course = trim((string) ($filters['course'] ?? ''));
+        if ($course !== '') {
+            $sql .= ' AND TRIM(IFNULL(sa.`course_priority_1`, \'\')) = ?';
+            $types .= 's';
+            $params[] = $course;
+        }
+        $gender = trim((string) ($filters['gender'] ?? ''));
+        if (in_array($gender, ['Male', 'Female', 'Other'], true)) {
+            $sql .= ' AND sa.`student_gender` = ?';
+            $types .= 's';
+            $params[] = $gender;
+        }
+        $dateFrom = trim((string) ($filters['date_from'] ?? ''));
+        if ($dateFrom !== '') {
+            $sql .= ' AND s.`schedule_date` >= ?';
+            $types .= 's';
+            $params[] = $dateFrom;
+        }
+        $dateTo = trim((string) ($filters['date_to'] ?? ''));
+        if ($dateTo !== '') {
+            $sql .= ' AND s.`schedule_date` <= ?';
+            $types .= 's';
+            $params[] = $dateTo;
+        }
+        $q = trim((string) ($filters['q'] ?? ''));
+        if ($q !== '') {
+            $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q) . '%';
+            $sql .= ' AND (sa.`student_full_name` LIKE ? OR sa.`student_nic` LIKE ?';
+            $types .= 'ss';
+            $params[] = $like;
+            $params[] = $like;
+            if (ctype_digit($q)) {
+                $sql .= ' OR sa.`application_id` = ?';
+                $types .= 'i';
+                $params[] = (int) $q;
+            }
+            $sql .= ')';
+        }
+        $sql .= ' ORDER BY s.`schedule_date` DESC, e.`entry_id` DESC';
+
+        return $this->fetchAllPrepared($sql, $types, $params);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function interviewAttendanceKind(array $row, string $today): string {
+        $raw = trim((string) ($row['exam_marks'] ?? ''));
+        if ($raw !== '' && !self::isAbsentMarks($raw) && is_numeric($raw)) {
+            return 'attended';
+        }
+        if (!self::isAbsentMarks($raw)) {
+            return 'unknown';
+        }
+        $date = trim((string) ($row['schedule_date'] ?? ''));
+        if ($date === '' || strpos($date, '0000-00-00') === 0 || $date > $today) {
+            return 'unknown';
+        }
+
+        return 'absent';
+    }
+
+    /**
+     * @param array<string, mixed> $candidate
+     * @param array<string, mixed>|null $current
+     */
+    private function interviewEntryPreferred(array $candidate, ?array $current, bool $preferHigherMarks): bool {
+        if ($current === null) {
+            return true;
+        }
+        $dateCmp = strcmp((string) ($candidate['schedule_date'] ?? ''), (string) ($current['schedule_date'] ?? ''));
+        if ($dateCmp !== 0) {
+            return $dateCmp > 0;
+        }
+        if ($preferHigherMarks) {
+            $marksNow = is_numeric($candidate['exam_marks'] ?? null) ? (float) $candidate['exam_marks'] : -1.0;
+            $marksWas = is_numeric($current['exam_marks'] ?? null) ? (float) $current['exam_marks'] : -1.0;
+            if ($marksNow !== $marksWas) {
+                return $marksNow > $marksWas;
+            }
+        }
+
+        return false;
+    }
+
+    private function interviewSelectionLabel(string $status): string {
+        $status = strtolower(trim($status));
+        $labels = [
+            self::SELECTION_SELECTED => 'Selected',
+            self::SELECTION_NOT_SELECTED => 'Not selected',
+            self::SELECTION_WAITLIST => 'Waitlist',
+            self::SELECTION_SCHEDULED => 'Scheduled',
+        ];
+
+        return $labels[$status] ?? ($status !== '' ? $status : '—');
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function interviewOutcomeRow(array $row, string $attendance, string $selection): array {
+        $date = trim((string) ($row['schedule_date'] ?? ''));
+        $label = '—';
+        if ($date !== '' && strpos($date, '0000-00-00') !== 0) {
+            $ts = strtotime($date);
+            $label = $ts ? date('d M Y', $ts) : $date;
+        }
+        $phone = trim((string) ($row['student_phone'] ?? ''));
+
+        return [
+            'application_id' => (int) ($row['application_id'] ?? 0),
+            'registration_number' => trim((string) ($row['registration_number'] ?? '')),
+            'full_name' => trim((string) ($row['student_full_name'] ?? '')),
+            'nic' => trim((string) ($row['student_nic'] ?? '')),
+            'gender' => trim((string) ($row['student_gender'] ?? '')),
+            'telephone' => $phone,
+            'province' => trim((string) ($row['student_province'] ?? '')),
+            'district' => trim((string) ($row['student_district'] ?? '')),
+            'course' => trim((string) ($row['course_priority_1'] ?? '')),
+            'interview_date' => $label,
+            'attendance_status' => $attendance,
+            'selection_status' => $selection,
+        ];
+    }
 }

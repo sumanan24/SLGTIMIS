@@ -166,6 +166,37 @@ class ApplicationAdmissionController extends Controller {
         return $this->renderScheduleIndex(ApplicationAdmissionScheduleModel::TYPE_INTERVIEW);
     }
 
+    /** Attended, absent, and selected interview candidates. */
+    public function interviewCandidates() {
+        $this->requireView($this->requireLogin());
+
+        return $this->view('application_admission/candidates', [
+            'page' => 'application-admission-candidates',
+            'roster' => $this->interviewRosterViewData($this->scheduleModel()),
+            'levelFilter' => '',
+        ]);
+    }
+
+    /** CSV or Excel of the filtered interview attended, absent, or selected list. */
+    public function interviewsExport() {
+        $this->requireView($this->requireLogin());
+        $request = $this->interviewRosterRequest();
+        $lists = $this->scheduleModel()->interviewOutcomeLists($request['filters']);
+        $list = $request['list'];
+        $rows = $lists[$list] ?? [];
+        $titles = [
+            'attended' => 'Interview Attended Students',
+            'absent' => 'Interview Absent Students',
+            'selected' => 'Selected Students',
+        ];
+        $title = $titles[$list] ?? $titles['attended'];
+        $format = (string) $this->get('format', 'csv');
+        if (!in_array($format, ['csv', 'xls'], true)) {
+            $format = 'csv';
+        }
+        $this->streamInterviewRosterExport($title, $request, $rows, $format);
+    }
+
     public function report() {
         $uid = $this->requireLogin();
         $this->requireView($uid);
@@ -1707,6 +1738,224 @@ class ApplicationAdmissionController extends Controller {
                 ? (rtrim(APP_URL, '/') . '/application-admission/interview-letter')
                 : '',
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function interviewRosterViewData(ApplicationAdmissionScheduleModel $model): array {
+        $request = $this->interviewRosterRequest();
+        $lists = $model->interviewOutcomeLists($request['filters']);
+        $perPage = 25;
+        $titles = [
+            'attended' => 'Interview attended students',
+            'absent' => 'Interview absent students',
+            'selected' => 'Selected students',
+        ];
+        $sections = [];
+        foreach ($titles as $key => $title) {
+            $allRows = $lists[$key] ?? [];
+            $total = count($allRows);
+            $pageCount = max(1, (int) ceil($total / $perPage));
+            $page = min((int) ($request['pages'][$key] ?? 1), $pageCount);
+            $sections[$key] = [
+                'title' => $title,
+                'rows' => array_slice($allRows, ($page - 1) * $perPage, $perPage),
+                'total' => $total,
+                'page' => $page,
+                'pages' => $pageCount,
+            ];
+        }
+
+        return [
+            'filters' => $request['filters'],
+            'date_error' => $request['date_error'],
+            'summary' => [
+                'applicants' => (int) $lists['applicants'],
+                'attended' => count($lists['attended']),
+                'absent' => count($lists['absent']),
+                'selected' => count($lists['selected']),
+            ],
+            'sections' => $sections,
+            'per_page' => $perPage,
+            'courses' => $model->interviewOutcomeCourseOptions(),
+            'province_districts' => $request['province_districts'],
+        ];
+    }
+
+    /**
+     * @return array{list:string,page:int,date_error:string,filters:array<string,string>,province_districts:array<string,list<string>>}
+     */
+    private function interviewRosterRequest(): array {
+        $map = is_file(BASE_PATH . '/config/sl_provinces_districts.php')
+            ? require BASE_PATH . '/config/sl_provinces_districts.php'
+            : [];
+        if (!is_array($map)) {
+            $map = [];
+        }
+        $list = (string) $this->get('list', 'attended');
+        if (!in_array($list, ['attended', 'absent', 'selected'], true)) {
+            $list = 'attended';
+        }
+        $provinceRaw = $this->get('province', []);
+        if (!is_array($provinceRaw)) {
+            $provinceRaw = trim((string) $provinceRaw) === '' ? [] : [$provinceRaw];
+        }
+        $provinces = [];
+        foreach (ApplicationAdmissionScheduleModel::normalizedProvinceFilters($provinceRaw) as $provinceName) {
+            if (isset($map[$provinceName])) {
+                $provinces[] = $provinceName;
+            }
+        }
+        $district = trim((string) $this->get('district', ''));
+        $allowedDistricts = $provinces === []
+            ? array_merge(...(array_values($map) ?: [[]]))
+            : array_merge(...array_map(static function (string $name) use ($map): array {
+                return (array) ($map[$name] ?? []);
+            }, $provinces));
+        $allowedDistricts = array_values(array_unique($allowedDistricts));
+        if ($district !== '' && !in_array($district, $allowedDistricts, true)) {
+            $district = '';
+        }
+        $course = trim((string) $this->get('course', ''));
+        if (strlen($course) > 150) {
+            $course = substr($course, 0, 150);
+        }
+        $gender = trim((string) $this->get('gender', ''));
+        if (!in_array($gender, ['Male', 'Female', 'Other'], true)) {
+            $gender = '';
+        }
+        $dateFrom = $this->validRosterDate((string) $this->get('date_from', ''));
+        $dateTo = $this->validRosterDate((string) $this->get('date_to', ''));
+        $dateError = '';
+        if ($dateFrom !== '' && $dateTo !== '' && $dateFrom > $dateTo) {
+            $dateError = 'The start date must be on or before the end date.';
+            $dateFrom = '';
+            $dateTo = '';
+        }
+        $q = trim((string) $this->get('q', ''));
+        if (strlen($q) > 100) {
+            $q = substr($q, 0, 100);
+        }
+
+        return [
+            'list' => $list,
+            'page' => max(1, (int) $this->get('page', 1)),
+            'pages' => [
+                'attended' => max(1, (int) $this->get('page_attended', 1)),
+                'absent' => max(1, (int) $this->get('page_absent', 1)),
+                'selected' => max(1, (int) $this->get('page_selected', 1)),
+            ],
+            'date_error' => $dateError,
+            'province_districts' => $map,
+            'filters' => [
+                'provinces' => $provinces,
+                'district' => $district,
+                'course' => $course,
+                'gender' => $gender,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'q' => $q,
+            ],
+        ];
+    }
+
+    private function validRosterDate(string $value): string {
+        $value = trim($value);
+        $dt = DateTime::createFromFormat('Y-m-d', $value);
+
+        return ($dt && $dt->format('Y-m-d') === $value) ? $value : '';
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @param array{list:string,filters:array<string,string>} $request
+     */
+    private function streamInterviewRosterExport(string $title, array $request, array $rows, string $format): void {
+        $columns = [
+            'application_id' => 'Application Number',
+            'registration_number' => 'Student Registration Number',
+            'full_name' => 'Full Name',
+            'nic' => 'NIC Number',
+            'gender' => 'Gender',
+            'telephone' => 'Telephone Number',
+            'province' => 'Province',
+            'district' => 'District',
+            'course' => 'Course Applied For',
+            'interview_date' => 'Interview Date',
+            'attendance_status' => 'Interview Attendance Status',
+            'selection_status' => 'Selection Status',
+        ];
+        $filters = $request['filters'];
+        $summaryBits = array_filter([
+            $title,
+            !empty($filters['provinces']) ? ('Province: ' . implode(', ', (array) $filters['provinces'])) : 'All provinces',
+            ($filters['district'] ?? '') !== '' ? ('District: ' . $filters['district']) : 'All districts',
+            ($filters['course'] ?? '') !== '' ? ('Course: ' . $filters['course']) : 'All courses',
+            ($filters['gender'] ?? '') !== '' ? ('Gender: ' . $filters['gender']) : '',
+            ($filters['date_from'] ?? '') !== '' ? ('From: ' . $filters['date_from']) : '',
+            ($filters['date_to'] ?? '') !== '' ? ('To: ' . $filters['date_to']) : '',
+            ($filters['q'] ?? '') !== '' ? ('Search: ' . $filters['q']) : '',
+            count($rows) . ' student(s)',
+        ]);
+        $summary = implode(' · ', $summaryBits);
+        $safeList = preg_replace('/[^a-z]+/', '-', (string) ($request['list'] ?? 'list')) ?: 'list';
+        $filename = 'interview-' . $safeList . '-' . date('Y-m-d');
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        if ($format === 'csv') {
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . $filename . '.csv"');
+            header('Cache-Control: private, max-age=0');
+            $out = fopen('php://output', 'wb');
+            if ($out === false) {
+                exit;
+            }
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['SLGTI — ' . $title]);
+            fputcsv($out, [$summary]);
+            fputcsv($out, ['Exported: ' . date('Y-m-d H:i')]);
+            fputcsv($out, array_values($columns));
+            foreach ($rows as $row) {
+                $line = [];
+                foreach (array_keys($columns) as $key) {
+                    $line[] = (string) ($row[$key] ?? '');
+                }
+                fputcsv($out, $line);
+            }
+            fclose($out);
+            exit;
+        }
+
+        header('Content-Type: application/vnd.ms-excel; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '.xls"');
+        header('Cache-Control: private, max-age=0');
+        echo "\xEF\xBB\xBF";
+        $esc = static function (string $s): string {
+            return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+        };
+        $colCount = count($columns);
+        echo '<table border="1">';
+        echo '<tr><td colspan="' . $colCount . '"><b>SLGTI — ' . $esc($title) . '</b></td></tr>';
+        echo '<tr><td colspan="' . $colCount . '">' . $esc($summary) . '</td></tr>';
+        echo '<tr><td colspan="' . $colCount . '">Exported: ' . $esc(date('Y-m-d H:i')) . '</td></tr>';
+        echo '<tr>';
+        foreach ($columns as $label) {
+            echo '<th style="background:#1F4E79;color:#fff;font-weight:bold;padding:6px;">' . $esc($label) . '</th>';
+        }
+        echo '</tr>';
+        foreach ($rows as $row) {
+            echo '<tr>';
+            foreach (array_keys($columns) as $key) {
+                $value = str_replace(["\r\n", "\r", "\n"], ' ', (string) ($row[$key] ?? ''));
+                echo '<td style="mso-number-format:\'\@\';">' . $esc($value) . '</td>';
+            }
+            echo '</tr>';
+        }
+        echo '</table>';
+        exit;
     }
 
     /**

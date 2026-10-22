@@ -3,6 +3,7 @@ $e = $e ?? static fn (?string $s): string => htmlspecialchars((string) ($s ?? ''
 $aaNavActive = $aaNavActive ?? 'entrance';
 $entranceUrl = rtrim(APP_URL, '/') . '/application-admission';
 $interviewUrl = rtrim(APP_URL, '/') . '/application-admission/interviews';
+$candidatesUrl = rtrim(APP_URL, '/') . '/application-admission/candidates';
 $cutoffUrl = rtrim(APP_URL, '/') . '/application-admission/cutoffs';
 $secondOptionUrl = rtrim(APP_URL, '/') . '/application-admission/second-option';
 $reportUrl = rtrim(APP_URL, '/') . '/application-admission/report';
@@ -47,7 +48,10 @@ $nicResultUrl = rtrim(APP_URL, '/') . '/application-admission/nic-result';
         <i class="fas fa-clipboard-list"></i> Entrance exams
     </a>
     <a class="<?php echo $aaNavActive === 'interview' ? 'is-active' : ''; ?>" href="<?php echo $e($interviewUrl); ?>">
-        <i class="fas fa-comments"></i> Interviews
+        <i class="fas fa-comments"></i> Interview schedules
+    </a>
+    <a class="<?php echo $aaNavActive === 'candidates' ? 'is-active' : ''; ?>" href="<?php echo $e($candidatesUrl); ?>">
+        <i class="fas fa-list-check"></i> Selected candidates
     </a>
     <a class="<?php echo $aaNavActive === 'cutoff' ? 'is-active' : ''; ?>" href="<?php echo $e($cutoffUrl); ?>">
         <i class="fas fa-filter"></i> Cutoff marks
