@@ -147,6 +147,20 @@ $viewOnlyMsg = $isEntranceResults
     white-space: normal;
     line-height: 1.25;
 }
+.aa-sel-sent-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    cursor: pointer;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+.aa-sel-sent-toggle .aa-sel-wa-cb {
+    float: none;
+    margin: 0;
+    cursor: pointer;
+}
 .btn-wa-outline {
     color: #128c7e;
     border-color: #128c7e;
@@ -279,11 +293,14 @@ $viewOnlyMsg = $isEntranceResults
                             <?php if (empty($wa['qualified'])): ?>
                                 <span class="text-muted">—</span>
                             <?php elseif ($canUpdate): ?>
-                                <input type="checkbox" class="form-check-input aa-sel-wa-cb" value="1"
-                                       data-entry-id="<?php echo $entryId; ?>"
-                                       data-schedule-id="<?php echo (int) ($sch['schedule_id'] ?? 0); ?>"
-                                       <?php echo $waSent ? 'checked' : ''; ?>
-                                       title="Mark selection WhatsApp as sent">
+                                <label class="aa-sel-sent-toggle">
+                                    <input type="checkbox" class="form-check-input aa-sel-wa-cb" value="1"
+                                           data-entry-id="<?php echo $entryId; ?>"
+                                           data-schedule-id="<?php echo (int) ($sch['schedule_id'] ?? 0); ?>"
+                                           <?php echo $waSent ? 'checked' : ''; ?>
+                                           title="Tick when the selection WhatsApp is sent. Untick to clear it.">
+                                    <span>Sent</span>
+                                </label>
                                 <span class="aa-sel-wa-meta small text-success" aria-live="polite"><?php
                                     if ($waSent) {
                                         echo $e(trim(($wa['sent_at'] ?? '') . (($wa['sent_by'] ?? '') !== '' ? ' · ' . $wa['sent_by'] : '')));
@@ -463,22 +480,22 @@ $viewOnlyMsg = $isEntranceResults
         }
     }
 
-    function saveSent(cb) {
+    function saveSent(cb, sent) {
         var tr = cb.closest('tr');
         var hint = tr ? tr.querySelector('.aa-sel-wa-meta') : null;
         var entryId = cb.getAttribute('data-entry-id');
         var scheduleId = cb.getAttribute('data-schedule-id');
         if (!entryId || !scheduleId) return;
+        cb.checked = !!sent;
         if (tr) tr.classList.toggle('aa-sel-wa-sent', cb.checked);
         if (hint) {
             hint.textContent = 'Saving…';
             hint.classList.remove('text-danger');
         }
-        cb.disabled = true;
         var body = new URLSearchParams({
             schedule_id: scheduleId,
             entry_id: entryId,
-            sent: cb.checked ? '1' : '0'
+            sent: sent ? '1' : '0'
         });
         fetch(saveUrl, {
             method: 'POST',
@@ -506,29 +523,28 @@ $viewOnlyMsg = $isEntranceResults
                 else removeSentRow(entryId);
             })
             .catch(function (err) {
-                cb.checked = !cb.checked;
+                cb.checked = !sent;
                 if (tr) tr.classList.toggle('aa-sel-wa-sent', cb.checked);
                 if (hint) {
                     hint.textContent = 'Failed';
                     hint.classList.add('text-danger');
                 }
                 alert(err.message || 'Could not save sent status.');
-            })
-            .finally(function () {
-                cb.disabled = false;
             });
     }
 
     document.querySelectorAll('.aa-sel-wa-cb').forEach(function (cb) {
-        cb.addEventListener('change', function () { saveSent(cb); });
+        cb.addEventListener('click', function (e) {
+            e.stopPropagation();
+        });
+        cb.addEventListener('change', function () { saveSent(cb, cb.checked); });
     });
     document.querySelectorAll('.aa-sel-wa-link').forEach(function (link) {
         link.addEventListener('click', function () {
             var tr = link.closest('tr');
             var cb = tr ? tr.querySelector('.aa-sel-wa-cb') : null;
             if (cb && !cb.checked) {
-                cb.checked = true;
-                saveSent(cb);
+                saveSent(cb, true);
             }
         });
     });

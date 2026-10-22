@@ -2267,7 +2267,7 @@ class ApplicationAdmissionController extends Controller {
             $this->json(['success' => false, 'error' => 'Applicant not found on this selection list.'], 404);
         }
         $marks = trim((string) ($entry['exam_marks'] ?? ''));
-        if ($marks === '' || ApplicationAdmissionScheduleModel::isAbsentMarks($marks)) {
+        if ($sent && ($marks === '' || ApplicationAdmissionScheduleModel::isAbsentMarks($marks))) {
             $this->json(['success' => false, 'error' => 'Only applicants with selection marks can be marked as sent.'], 400);
         }
         if (!$model->setSelectionResultWhatsAppSent($entryId, $scheduleId, $sent, $uid)) {
