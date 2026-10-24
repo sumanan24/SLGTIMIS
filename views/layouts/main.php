@@ -152,7 +152,7 @@
                             }
                             $devicePages = ['devices'];
                             $busSeasonPages = ['bus-season-requests-sao', 'bus-season-payments'];
-                            $paymentsPages = ['payments', 'payments-create', 'payments-edit', 'payments-delete'];
+                            $paymentsPages = ['payments', 'payments-create', 'payments-edit', 'payments-delete', 'payments-report'];
                             $hasStaffApprovalAccess = $isADMRole;
                             ?>
                             
@@ -672,6 +672,12 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                         <a href="<?php echo APP_URL; ?>/payments" class="<?php echo (isset($page) && $page === 'payments') ? 'active' : ''; ?>">
                                             <i class="fas fa-list"></i>
                                             <span>All Payments</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/payments/report" class="<?php echo (isset($page) && $page === 'payments-report') ? 'active' : ''; ?>">
+                                            <i class="fas fa-file-alt"></i>
+                                            <span>Payment Report</span>
                                         </a>
                                     </li>
                                     <?php if (!empty($hasFinanceAccess)): ?>

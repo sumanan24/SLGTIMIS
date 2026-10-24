@@ -15,12 +15,13 @@ class PaymentModel extends Model {
      */
     public function getAll($filters = []) {
         $sql = "SELECT p.*, s.student_fullname, s.student_id as student_reg_no, 
-                c.course_name, d.department_name, se.academic_year
+                c.course_name, d.department_name, pd.department_name AS pays_department_name, se.academic_year
                 FROM `{$this->table}` p
                 LEFT JOIN `student` s ON p.student_id = s.student_id
                 LEFT JOIN `student_enroll` se ON s.student_id = se.student_id AND se.student_enroll_status = 'Following'
                 LEFT JOIN `course` c ON se.course_id = c.course_id
                 LEFT JOIN `department` d ON c.department_id = d.department_id
+                LEFT JOIN `department` pd ON p.pays_department = pd.department_id
                 WHERE 1=1";
         
         $params = [];
@@ -42,6 +43,12 @@ class PaymentModel extends Model {
         if (!empty($filters['payment_type'])) {
             $sql .= " AND p.payment_type = ?";
             $params[] = $filters['payment_type'];
+            $types .= 's';
+        }
+
+        if (!empty($filters['payment_subtype'])) {
+            $sql .= " AND p.payment_reason = ?";
+            $params[] = $filters['payment_subtype'];
             $types .= 's';
         }
         
@@ -73,6 +80,21 @@ class PaymentModel extends Model {
             $types .= 'ssss';
         }
         
+        if (!empty($filters['academic_year'])) {
+            $sql .= " AND EXISTS (
+                SELECT 1 FROM `student_enroll` sey
+                WHERE sey.student_id = p.student_id AND sey.academic_year = ?
+            )";
+            $params[] = $filters['academic_year'];
+            $types .= 's';
+        }
+
+        if (!empty($filters['pays_department'])) {
+            $sql .= " AND p.pays_department = ?";
+            $params[] = $filters['pays_department'];
+            $types .= 's';
+        }
+
         if (!empty($filters['department_id'])) {
             $sql .= " AND d.department_id = ?";
             $params[] = $filters['department_id'];
@@ -146,6 +168,12 @@ class PaymentModel extends Model {
             $params[] = $filters['payment_type'];
             $types .= 's';
         }
+
+        if (!empty($filters['payment_subtype'])) {
+            $sql .= " AND p.payment_reason = ?";
+            $params[] = $filters['payment_subtype'];
+            $types .= 's';
+        }
         
         if (!empty($filters['approved'])) {
             $sql .= " AND p.approved = ?";
@@ -175,6 +203,21 @@ class PaymentModel extends Model {
             $types .= 'ssss';
         }
         
+        if (!empty($filters['academic_year'])) {
+            $sql .= " AND EXISTS (
+                SELECT 1 FROM `student_enroll` sey
+                WHERE sey.student_id = p.student_id AND sey.academic_year = ?
+            )";
+            $params[] = $filters['academic_year'];
+            $types .= 's';
+        }
+
+        if (!empty($filters['pays_department'])) {
+            $sql .= " AND p.pays_department = ?";
+            $params[] = $filters['pays_department'];
+            $types .= 's';
+        }
+
         if (!empty($filters['department_id'])) {
             $sql .= " AND d.department_id = ?";
             $params[] = $filters['department_id'];
@@ -296,6 +339,63 @@ class PaymentModel extends Model {
         return $result->fetch_assoc();
     }
     
+    /**
+     * Distinct payment types already used on recorded payments.
+     */
+    public function getUsedPaymentTypes() {
+        $sql = "SELECT DISTINCT payment_type FROM `{$this->table}`
+                WHERE payment_type IS NOT NULL AND payment_type <> ''
+                ORDER BY payment_type ASC";
+        $result = $this->db->query($sql);
+
+        $types = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $types[] = $row['payment_type'];
+            }
+        }
+
+        return $types;
+    }
+
+    /**
+     * Payment method codes already stored on payments.
+     */
+    public function getUsedPaymentMethods() {
+        $sql = "SELECT DISTINCT payment_method FROM `{$this->table}`
+                WHERE payment_method IS NOT NULL AND payment_method <> ''
+                ORDER BY payment_method ASC";
+        $result = $this->db->query($sql);
+
+        $methods = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $methods[] = $row['payment_method'];
+            }
+        }
+
+        return $methods;
+    }
+
+    /**
+     * Type and sub type (payment reason) pairs already used on recorded payments.
+     */
+    public function getUsedPaymentSubtypes() {
+        $sql = "SELECT DISTINCT payment_type, payment_reason FROM `{$this->table}`
+                WHERE payment_reason IS NOT NULL AND payment_reason <> ''
+                ORDER BY payment_type ASC, payment_reason ASC";
+        $result = $this->db->query($sql);
+
+        $rows = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $rows[] = $row;
+            }
+        }
+
+        return $rows;
+    }
+
     /**
      * Get all payment reasons from payment lookup table
      */

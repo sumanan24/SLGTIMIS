@@ -16,12 +16,13 @@ class PaymentTypeController extends Controller {
         }
 
         $paymentTypeModel = $this->model('PaymentTypeModel');
-        $entries = $paymentTypeModel->getAll();
+        $paymentTypeModel->ensureMainTypeTable();
 
         $data = [
-            'title' => 'Payment Types & Reasons',
+            'title' => 'Payment Types',
             'page' => 'payment-types',
-            'entries' => $entries,
+            'mainTypes' => $paymentTypeModel->getMainTypes(),
+            'entries' => $paymentTypeModel->getAll(),
             'message' => $_SESSION['message'] ?? null,
             'error' => $_SESSION['error'] ?? null,
         ];
@@ -42,49 +43,78 @@ class PaymentTypeController extends Controller {
         }
 
         $paymentTypeModel = $this->model('PaymentTypeModel');
+        $paymentTypeModel->ensureMainTypeTable();
+        $kind = $this->get('kind', '') === 'main' ? 'main' : 'sub';
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $kind = $this->post('kind', $kind) === 'main' ? 'main' : 'sub';
             $paymentType = trim($this->post('payment_type', ''));
+            $back = 'payment-types/create?kind=' . $kind;
+
+            if ($kind === 'main') {
+                if ($paymentType === '') {
+                    $_SESSION['error'] = 'Main type name is required.';
+                    $this->redirect($back);
+                    return;
+                }
+                if (strlen($paymentType) > 100) {
+                    $_SESSION['error'] = 'Main type must be 100 characters or fewer.';
+                    $this->redirect($back);
+                    return;
+                }
+                if ($paymentTypeModel->mainTypeExists($paymentType)) {
+                    $_SESSION['error'] = 'This main type already exists.';
+                    $this->redirect($back);
+                    return;
+                }
+
+                $sqlError = null;
+                if ($paymentTypeModel->createMainType($paymentType, $sqlError)) {
+                    $_SESSION['message'] = 'Main type added.';
+                    $this->redirect('payment-types');
+                } else {
+                    $_SESSION['error'] = $sqlError ? 'Failed to add main type: ' . $sqlError : 'Failed to add main type.';
+                    $this->redirect($back);
+                }
+                return;
+            }
+
             $paymentReason = trim($this->post('payment_reason', ''));
-
             if ($paymentType === '' || $paymentReason === '') {
-                $_SESSION['error'] = 'Payment type and reason are required.';
-                $this->redirect('payment-types/create');
+                $_SESSION['error'] = 'Choose a main type and enter a sub type.';
+                $this->redirect($back);
                 return;
             }
-
-            if (strlen($paymentType) > 100) {
-                $_SESSION['error'] = 'Payment type must be 100 characters or fewer.';
-                $this->redirect('payment-types/create');
+            if (strlen($paymentType) > 100 || strlen($paymentReason) > 50) {
+                $_SESSION['error'] = 'Main type (max 100) or sub type (max 50) is too long.';
+                $this->redirect($back);
                 return;
             }
-
-            if (strlen($paymentReason) > 50) {
-                $_SESSION['error'] = 'Payment reason must be 50 characters or fewer.';
-                $this->redirect('payment-types/create');
+            if (!$paymentTypeModel->mainTypeExists($paymentType)) {
+                $_SESSION['error'] = 'Add the main type before adding a sub type under it.';
+                $this->redirect($back);
                 return;
             }
-
             if ($paymentTypeModel->exists($paymentReason, $paymentType)) {
-                $_SESSION['error'] = 'This payment type and reason combination already exists.';
-                $this->redirect('payment-types/create');
+                $_SESSION['error'] = 'This sub type already exists under that main type.';
+                $this->redirect($back);
                 return;
             }
 
             $sqlError = null;
             $result = $paymentTypeModel->createEntry($paymentReason, $paymentType, $sqlError);
-
             if ($result !== false) {
-                $_SESSION['message'] = 'Payment type and reason added successfully.';
+                $_SESSION['message'] = 'Sub type added.';
                 $this->redirect('payment-types');
             } else {
-                $_SESSION['error'] = $sqlError ? 'Failed to add entry: ' . $sqlError : 'Failed to add payment type and reason.';
-                $this->redirect('payment-types/create');
+                $_SESSION['error'] = $sqlError ? 'Failed to add sub type: ' . $sqlError : 'Failed to add sub type.';
+                $this->redirect($back);
             }
         } else {
             $data = [
-                'title' => 'Add Payment Type & Reason',
+                'title' => $kind === 'main' ? 'Add Main Type' : 'Add Sub Type',
                 'page' => 'payment-types',
+                'kind' => $kind,
                 'paymentTypes' => $paymentTypeModel->getDistinctTypes(),
                 'error' => $_SESSION['error'] ?? null,
             ];
@@ -104,70 +134,133 @@ class PaymentTypeController extends Controller {
             return;
         }
 
+        $kind = $this->get('kind', '') === 'main' ? 'main' : 'sub';
         $oldReason = trim($this->get('reason', ''));
         $oldType = trim($this->get('type', ''));
+        $paymentTypeModel = $this->model('PaymentTypeModel');
+        $paymentTypeModel->ensureMainTypeTable();
+
+        if ($kind === 'main') {
+            if ($oldType === '' || !$paymentTypeModel->mainTypeExists($oldType)) {
+                $_SESSION['error'] = 'Main type not found.';
+                $this->redirect('payment-types');
+                return;
+            }
+
+            $back = 'payment-types/edit?' . http_build_query(['kind' => 'main', 'type' => $oldType]);
+            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                $paymentType = trim($this->post('payment_type', ''));
+                if ($paymentType === '') {
+                    $_SESSION['error'] = 'Main type name is required.';
+                    $this->redirect($back);
+                    return;
+                }
+                if (strlen($paymentType) > 100) {
+                    $_SESSION['error'] = 'Main type must be 100 characters or fewer.';
+                    $this->redirect($back);
+                    return;
+                }
+                if ($paymentType !== $oldType && $paymentTypeModel->mainTypeExists($paymentType)) {
+                    $_SESSION['error'] = 'This main type already exists.';
+                    $this->redirect($back);
+                    return;
+                }
+
+                if ($paymentType === $oldType) {
+                    $_SESSION['message'] = 'Main type saved.';
+                    $this->redirect('payment-types');
+                    return;
+                }
+
+                $sqlError = null;
+                if ($paymentTypeModel->renameMainType($oldType, $paymentType, $sqlError)) {
+                    $_SESSION['message'] = 'Main type updated. Existing payments now use the new name.';
+                    $this->redirect('payment-types');
+                } else {
+                    $_SESSION['error'] = $sqlError ? 'Failed to update main type: ' . $sqlError : 'Failed to update main type.';
+                    $this->redirect($back);
+                }
+                return;
+            }
+
+            $data = [
+                'title' => 'Edit Main Type',
+                'page' => 'payment-types',
+                'kind' => 'main',
+                'entry' => ['payment_type' => $oldType, 'payment_reason' => ''],
+                'paymentTypes' => $paymentTypeModel->getDistinctTypes(),
+                'error' => $_SESSION['error'] ?? null,
+            ];
+            unset($_SESSION['error']);
+            return $this->view('payment-types/edit', $data);
+        }
 
         if ($oldReason === '' || $oldType === '') {
-            $_SESSION['error'] = 'Payment type and reason are required.';
+            $_SESSION['error'] = 'Sub type and main type are required.';
             $this->redirect('payment-types');
             return;
         }
 
-        $paymentTypeModel = $this->model('PaymentTypeModel');
         $entry = $paymentTypeModel->findByKey($oldReason, $oldType);
-
         if (!$entry) {
-            $_SESSION['error'] = 'Payment type and reason entry not found.';
+            $_SESSION['error'] = 'Sub type not found.';
             $this->redirect('payment-types');
             return;
         }
 
+        $back = 'payment-types/edit?' . http_build_query(['kind' => 'sub', 'reason' => $oldReason, 'type' => $oldType]);
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $paymentType = trim($this->post('payment_type', ''));
             $paymentReason = trim($this->post('payment_reason', ''));
 
             if ($paymentType === '' || $paymentReason === '') {
-                $_SESSION['error'] = 'Payment type and reason are required.';
-                $this->redirect('payment-types/edit?' . http_build_query(['reason' => $oldReason, 'type' => $oldType]));
+                $_SESSION['error'] = 'Main type and sub type are required.';
+                $this->redirect($back);
                 return;
             }
-
             if (strlen($paymentType) > 100 || strlen($paymentReason) > 50) {
-                $_SESSION['error'] = 'Payment type (max 100) or reason (max 50) is too long.';
-                $this->redirect('payment-types/edit?' . http_build_query(['reason' => $oldReason, 'type' => $oldType]));
+                $_SESSION['error'] = 'Main type (max 100) or sub type (max 50) is too long.';
+                $this->redirect($back);
+                return;
+            }
+            if (!$paymentTypeModel->mainTypeExists($paymentType)) {
+                $_SESSION['error'] = 'Choose an existing main type.';
+                $this->redirect($back);
+                return;
+            }
+            if (($paymentReason !== $oldReason || $paymentType !== $oldType) && $paymentTypeModel->exists($paymentReason, $paymentType)) {
+                $_SESSION['error'] = 'This sub type already exists under that main type.';
+                $this->redirect($back);
                 return;
             }
 
-            if ($paymentReason !== $oldReason || $paymentType !== $oldType) {
-                if ($paymentTypeModel->exists($paymentReason, $paymentType)) {
-                    $_SESSION['error'] = 'This payment type and reason combination already exists.';
-                    $this->redirect('payment-types/edit?' . http_build_query(['reason' => $oldReason, 'type' => $oldType]));
-                    return;
-                }
+            if ($paymentReason === $oldReason && $paymentType === $oldType) {
+                $_SESSION['message'] = 'Sub type saved.';
+                $this->redirect('payment-types');
+                return;
             }
 
             $sqlError = null;
-            $result = $paymentTypeModel->updateEntry($oldReason, $oldType, $paymentReason, $paymentType, $sqlError);
-
-            if ($result) {
-                $_SESSION['message'] = 'Payment type and reason updated successfully.';
+            if ($paymentTypeModel->updateEntry($oldReason, $oldType, $paymentReason, $paymentType, $sqlError)) {
+                $_SESSION['message'] = 'Sub type updated. Existing payments now use the new name.';
                 $this->redirect('payment-types');
             } else {
-                $_SESSION['error'] = $sqlError ? 'Failed to update entry: ' . $sqlError : 'Failed to update payment type and reason.';
-                $this->redirect('payment-types/edit?' . http_build_query(['reason' => $oldReason, 'type' => $oldType]));
+                $_SESSION['error'] = $sqlError ? 'Failed to update sub type: ' . $sqlError : 'Failed to update sub type.';
+                $this->redirect($back);
             }
-        } else {
-            $data = [
-                'title' => 'Edit Payment Type & Reason',
-                'page' => 'payment-types',
-                'entry' => $entry,
-                'paymentTypes' => $paymentTypeModel->getDistinctTypes(),
-                'error' => $_SESSION['error'] ?? null,
-            ];
-            unset($_SESSION['error']);
-
-            return $this->view('payment-types/edit', $data);
+            return;
         }
+
+        $data = [
+            'title' => 'Edit Sub Type',
+            'page' => 'payment-types',
+            'kind' => 'sub',
+            'entry' => $entry,
+            'paymentTypes' => $paymentTypeModel->getDistinctTypes(),
+            'error' => $_SESSION['error'] ?? null,
+        ];
+        unset($_SESSION['error']);
+        return $this->view('payment-types/edit', $data);
     }
 
     public function delete() {
@@ -180,47 +273,86 @@ class PaymentTypeController extends Controller {
             return;
         }
 
+        $kind = $this->get('kind', '') === 'main' ? 'main' : 'sub';
         $reason = trim($this->get('reason', ''));
         $type = trim($this->get('type', ''));
+        $paymentTypeModel = $this->model('PaymentTypeModel');
+        $paymentTypeModel->ensureMainTypeTable();
+
+        if ($kind === 'main') {
+            if ($type === '' || !$paymentTypeModel->mainTypeExists($type)) {
+                $_SESSION['error'] = 'Main type not found.';
+                $this->redirect('payment-types');
+                return;
+            }
+
+            $subtypeCount = $paymentTypeModel->subtypeCount($type);
+            $isUsed = $paymentTypeModel->mainTypeIsUsed($type) || $subtypeCount > 0;
+            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                if ($isUsed) {
+                    $_SESSION['error'] = $subtypeCount > 0
+                        ? 'Remove the sub types under this main type before deleting it.'
+                        : 'Cannot delete. Payments already use this main type.';
+                    $this->redirect('payment-types');
+                    return;
+                }
+                if ($paymentTypeModel->deleteMainType($type)) {
+                    $_SESSION['message'] = 'Main type deleted.';
+                } else {
+                    $_SESSION['error'] = 'Failed to delete main type.';
+                }
+                $this->redirect('payment-types');
+                return;
+            }
+
+            $data = [
+                'title' => 'Delete Main Type',
+                'page' => 'payment-types',
+                'kind' => 'main',
+                'entry' => ['payment_type' => $type, 'payment_reason' => ''],
+                'isUsed' => $isUsed,
+                'subtypeCount' => $subtypeCount,
+            ];
+            return $this->view('payment-types/delete', $data);
+        }
 
         if ($reason === '' || $type === '') {
-            $_SESSION['error'] = 'Payment type and reason are required.';
+            $_SESSION['error'] = 'Sub type and main type are required.';
             $this->redirect('payment-types');
             return;
         }
 
-        $paymentTypeModel = $this->model('PaymentTypeModel');
         $entry = $paymentTypeModel->findByKey($reason, $type);
-
         if (!$entry) {
-            $_SESSION['error'] = 'Payment type and reason entry not found.';
+            $_SESSION['error'] = 'Sub type not found.';
             $this->redirect('payment-types');
             return;
         }
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($paymentTypeModel->isUsed($reason, $type)) {
-                $_SESSION['error'] = 'Cannot delete. This entry is used in existing payment records.';
+                $_SESSION['error'] = 'Cannot delete. This sub type is used in existing payments.';
                 $this->redirect('payment-types');
                 return;
             }
 
             if ($paymentTypeModel->deleteEntry($reason, $type)) {
-                $_SESSION['message'] = 'Payment type and reason deleted successfully.';
+                $_SESSION['message'] = 'Sub type deleted.';
             } else {
-                $_SESSION['error'] = 'Failed to delete payment type and reason.';
+                $_SESSION['error'] = 'Failed to delete sub type.';
             }
-
             $this->redirect('payment-types');
-        } else {
-            $data = [
-                'title' => 'Delete Payment Type & Reason',
-                'page' => 'payment-types',
-                'entry' => $entry,
-                'isUsed' => $paymentTypeModel->isUsed($reason, $type),
-            ];
-
-            return $this->view('payment-types/delete', $data);
+            return;
         }
+
+        $data = [
+            'title' => 'Delete Sub Type',
+            'page' => 'payment-types',
+            'kind' => 'sub',
+            'entry' => $entry,
+            'isUsed' => $paymentTypeModel->isUsed($reason, $type),
+            'subtypeCount' => 0,
+        ];
+        return $this->view('payment-types/delete', $data);
     }
 }

@@ -180,6 +180,53 @@ class StudentModel extends Model {
         
         return $data;
     }
+
+    /**
+     * Active students for the payment counter search.
+     * Matches student ID, name, or NIC, and includes the current enrollment.
+     */
+    public function searchForPaymentCounter($term, $limit = 12) {
+        $term = trim((string) $term);
+        $limit = max(1, min(20, (int) $limit));
+        if ($term === '') {
+            return [];
+        }
+        $this->addStudentProfileImgColumnIfNotExists();
+
+        $like = '%' . $term . '%';
+        $sql = "SELECT s.student_id, s.student_fullname, s.student_nic, s.student_profile_img,
+                       c.course_name, d.department_name, se.academic_year
+                FROM `{$this->table}` s
+                LEFT JOIN `student_enroll` se
+                    ON s.student_id = se.student_id AND se.student_enroll_status = 'Following'
+                LEFT JOIN `course` c ON se.course_id = c.course_id
+                LEFT JOIN `department` d ON c.department_id = d.department_id
+                WHERE s.student_status = 'Active'
+                  AND (s.student_id LIKE ? OR s.student_fullname LIKE ? OR s.student_nic LIKE ?)
+                ORDER BY s.student_fullname ASC, se.academic_year DESC
+                LIMIT 40";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param('sss', $like, $like, $like);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        $rows = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $id = (string) $row['student_id'];
+                if (isset($rows[$id])) {
+                    continue;
+                }
+                $rows[$id] = $row;
+                if (count($rows) >= $limit) {
+                    break;
+                }
+            }
+        }
+
+        return array_values($rows);
+    }
     
     /**
      * Get total count of students with filters

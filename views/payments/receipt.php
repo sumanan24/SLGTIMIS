@@ -15,6 +15,12 @@ $paymentMethod = trim($p['payment_method'] ?? '');
 $referenceNo = trim($p['reference_no'] ?? '');
 $notes = trim($p['pays_note'] ?? '');
 $cashierName = $cashierName ?? ($_SESSION['user_name'] ?? 'Staff');
+$receiptPayments = (isset($payments) && is_array($payments) && count($payments) > 0) ? $payments : [$p];
+$receiptNos = array_map(function ($row) {
+    return str_pad((string) (int) ($row['pays_id'] ?? 0), 6, '0', STR_PAD_LEFT);
+}, $receiptPayments);
+$receiptLabel = count($receiptNos) === 1 ? $receiptNos[0] : $receiptNos[0] . '–' . $receiptNos[count($receiptNos) - 1];
+$grandTotal = isset($lineTotal) ? (float) $lineTotal : ($unitAmount * $qty);
 ?>
 <style>
 .pos-receipt-page {
@@ -192,7 +198,7 @@ $cashierName = $cashierName ?? ($_SESSION['user_name'] ?? 'Staff');
 
         <div class="pos-row">
             <span class="pos-label">Receipt #</span>
-            <span class="pos-val"><?php echo str_pad((string)$receiptNo, 6, '0', STR_PAD_LEFT); ?></span>
+            <span class="pos-val"><?php echo htmlspecialchars($receiptLabel); ?></span>
         </div>
         <div class="pos-row">
             <span class="pos-label">Date</span>
@@ -223,14 +229,30 @@ $cashierName = $cashierName ?? ($_SESSION['user_name'] ?? 'Staff');
 
         <hr class="pos-rule">
 
-        <div class="pos-row">
-            <span class="pos-label">Type</span>
-            <span class="pos-val"><?php echo htmlspecialchars($paymentType); ?></span>
-        </div>
-        <div class="pos-row">
-            <span class="pos-label">Reason</span>
-            <span class="pos-val"><?php echo htmlspecialchars($paymentReason); ?></span>
-        </div>
+        <?php foreach ($receiptPayments as $index => $item): ?>
+            <?php
+            $itemQty = max(1, (int) ($item['pays_qty'] ?? 1));
+            $itemUnit = (float) ($item['pays_amount'] ?? 0);
+            $itemTotal = $itemUnit * $itemQty;
+            $subType = trim((string) ($item['payment_reason'] ?? ''));
+            if ($subType === '') {
+                $subType = '—';
+            }
+            if (count($receiptPayments) > 1) {
+                $subType = ((int) $index + 1) . '. ' . $subType;
+            }
+            ?>
+            <div class="pos-row">
+                <span class="pos-label"><?php echo htmlspecialchars($subType); ?></span>
+                <span class="pos-val">Rs.<?php echo number_format($itemTotal, 2); ?></span>
+            </div>
+            <?php if ($itemQty > 1): ?>
+            <div class="pos-row">
+                <span class="pos-label"></span>
+                <span class="pos-val"><?php echo $itemQty; ?> x Rs.<?php echo number_format($itemUnit, 2); ?></span>
+            </div>
+            <?php endif; ?>
+        <?php endforeach; ?>
         <?php if ($paymentMethod !== ''): ?>
         <div class="pos-row">
             <span class="pos-label">Method</span>
@@ -254,9 +276,11 @@ $cashierName = $cashierName ?? ($_SESSION['user_name'] ?? 'Staff');
 
         <div class="pos-total">
             <div class="pos-total-label">AMOUNT PAID</div>
-            <div class="pos-total-amt">Rs.<?php echo number_format($lineTotal, 2); ?></div>
-            <?php if ($qty > 1): ?>
+            <div class="pos-total-amt">Rs.<?php echo number_format($grandTotal, 2); ?></div>
+            <?php if (count($receiptPayments) === 1 && $qty > 1): ?>
                 <div class="pos-total-sub"><?php echo $qty; ?> x Rs.<?php echo number_format($unitAmount, 2); ?></div>
+            <?php elseif (count($receiptPayments) > 1): ?>
+                <div class="pos-total-sub"><?php echo count($receiptPayments); ?> items</div>
             <?php endif; ?>
         </div>
 
