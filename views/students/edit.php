@@ -123,17 +123,23 @@
                                                            accept="image/jpeg,image/jpg,image/png,image/gif" onchange="previewImage(this)">
                                                     <div class="form-text">Accepted formats: JPG, PNG, GIF (Max 5MB). SAO and ADM only.</div>
                                                 </div>
-                                                <div class="mb-3">
-                                                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenWebcam">
-                                                        <i class="fas fa-camera me-1"></i>Use webcam
+                                                <div class="mb-3 d-flex flex-wrap gap-2">
+                                                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenWebcam" data-facing="user">
+                                                        <i class="fas fa-user me-1"></i>Webcam
+                                                    </button>
+                                                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenBackCamera" data-facing="environment">
+                                                        <i class="fas fa-camera me-1"></i>Back camera
                                                     </button>
                                                 </div>
                                                 <div id="webcamPanel" class="mb-3" style="display: none;">
                                                     <video id="profileWebcam" autoplay playsinline muted style="width: 100%; max-width: 320px; border-radius: 8px; background: #000;"></video>
                                                     <canvas id="profileWebcamCanvas" hidden></canvas>
-                                                    <div class="mt-2 d-flex gap-2">
+                                                    <div class="mt-2 d-flex flex-wrap gap-2">
                                                         <button type="button" class="btn btn-primary btn-sm" id="btnCaptureWebcam">
                                                             <i class="fas fa-camera me-1"></i>Capture
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-primary btn-sm" id="btnSwitchCamera">
+                                                            <i class="fas fa-sync-alt me-1"></i>Switch camera
                                                         </button>
                                                         <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCancelWebcam">Cancel</button>
                                                     </div>
@@ -660,14 +666,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     const openWebcamBtn = document.getElementById('btnOpenWebcam');
+    const openBackCameraBtn = document.getElementById('btnOpenBackCamera');
+    const switchCameraBtn = document.getElementById('btnSwitchCamera');
     const webcamPanel = document.getElementById('webcamPanel');
     const webcamVideo = document.getElementById('profileWebcam');
     const webcamCanvas = document.getElementById('profileWebcamCanvas');
     const captureBtn = document.getElementById('btnCaptureWebcam');
     const cancelWebcamBtn = document.getElementById('btnCancelWebcam');
     let webcamStream = null;
+    let facingMode = 'user';
 
-    function stopWebcam() {
+    function stopCameraTracks() {
         if (webcamStream) {
             webcamStream.getTracks().forEach(function (track) { track.stop(); });
             webcamStream = null;
@@ -675,29 +684,53 @@ document.addEventListener('DOMContentLoaded', function() {
         if (webcamVideo) {
             webcamVideo.srcObject = null;
         }
+    }
+
+    function stopWebcam() {
+        stopCameraTracks();
         if (webcamPanel) {
             webcamPanel.style.display = 'none';
         }
     }
 
-    if (openWebcamBtn && webcamVideo && webcamPanel && webcamCanvas && profileImageInput) {
-        openWebcamBtn.addEventListener('click', function () {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert('This browser cannot use the webcam.');
-                return;
-            }
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
-                .then(function (stream) {
-                    webcamStream = stream;
-                    webcamVideo.srcObject = stream;
-                    webcamPanel.style.display = 'block';
-                    return webcamVideo.play();
-                })
-                .catch(function () {
-                    alert('Could not open the webcam. Allow camera access and try again.');
-                });
-        });
+    function openCamera(facing) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('This browser cannot use the camera.');
+            return;
+        }
+        facingMode = facing === 'environment' ? 'environment' : 'user';
+        stopCameraTracks();
+        if (webcamVideo) {
+            webcamVideo.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'none';
+        }
+        navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: facingMode } },
+            audio: false
+        })
+            .then(function (stream) {
+                webcamStream = stream;
+                webcamVideo.srcObject = stream;
+                webcamPanel.style.display = 'block';
+                return webcamVideo.play();
+            })
+            .catch(function () {
+                const label = facingMode === 'environment' ? 'back camera' : 'webcam';
+                alert('Could not open the ' + label + '. Allow camera access and try again.');
+            });
+    }
 
+    if (webcamVideo && webcamPanel && webcamCanvas && profileImageInput) {
+        if (openWebcamBtn) {
+            openWebcamBtn.addEventListener('click', function () { openCamera('user'); });
+        }
+        if (openBackCameraBtn) {
+            openBackCameraBtn.addEventListener('click', function () { openCamera('environment'); });
+        }
+        if (switchCameraBtn) {
+            switchCameraBtn.addEventListener('click', function () {
+                openCamera(facingMode === 'user' ? 'environment' : 'user');
+            });
+        }
         if (cancelWebcamBtn) {
             cancelWebcamBtn.addEventListener('click', stopWebcam);
         }
@@ -709,7 +742,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 webcamCanvas.width = webcamVideo.videoWidth;
                 webcamCanvas.height = webcamVideo.videoHeight;
-                webcamCanvas.getContext('2d').drawImage(webcamVideo, 0, 0);
+                const ctx = webcamCanvas.getContext('2d');
+                if (facingMode === 'user') {
+                    ctx.setTransform(-1, 0, 0, 1, webcamCanvas.width, 0);
+                } else {
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                }
+                ctx.drawImage(webcamVideo, 0, 0);
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
                 webcamCanvas.toBlob(function (blob) {
                     if (!blob) {
                         return;
