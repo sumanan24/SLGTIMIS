@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SLGTI | Edit Student</title>
+<meta name="description" content="SLGTI (Sri Lanka German Training Institute) official Student Information System (SIS). Access the SLGTI student portal, staff MIS, courses, and institute services online.">
+<meta name="keywords" content="SLGTI, Sri Lanka German Training Institute, SLGTI SIS, SLGTI MIS, SLGTI student portal, SLGTI login, SLGTI Kilinochchi">
+<meta name="robots" content="noindex, nofollow">
+<meta name="author" content="SLGTI — Sri Lanka German Training Institute">
+<link rel="canonical" href="http://localhost/SLGTIMIS/">
+
+<meta property="og:locale" content="en_LK">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SLGTI SIS">
+<meta property="og:title" content="SLGTI | Edit Student">
+<meta property="og:description" content="SLGTI (Sri Lanka German Training Institute) official Student Information System (SIS). Access the SLGTI student portal, staff MIS, courses, and institute services online.">
+<meta property="og:url" content="http://localhost/SLGTIMIS/">
+<meta property="og:image" content="http://localhost/SLGTIMIS/assets/img/logo.png">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="SLGTI | Edit Student">
+<meta name="twitter:description" content="SLGTI (Sri Lanka German Training Institute) official Student Information System (SIS). Access the SLGTI student portal, staff MIS, courses, and institute services online.">
+<meta name="twitter:image" content="http://localhost/SLGTIMIS/assets/img/logo.png">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="http://localhost/SLGTIMIS/assets/css/style.css?v=1793334436">
+</head>
+<body class="logged-in">
+            <!-- Logged In Layout with Sidebar -->
+        <div class="app-wrapper">
+            <!-- Top Navigation Bar -->
+            <nav class="top-navbar">
+                <div class="navbar-content">
+                    <div class="nav-left">
+                        <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu">
+                            <i class="fas fa-bars"></i>
+                        </button>
+                        <div class="nav-brand">
+                            <span class="brand-text">SLGTI - MIS</span>
+                        </div>
+                    </div>
+                    <div class="nav-right">
+                        <div class="user-menu">
+                            <a href="http://localhost/SLGTIMIS/profile" class="profile-btn">
+                                <i class="fas fa-user"></i> <span class="profile-text">Profile</span>
+                            </a>
+                            <a href="http://localhost/SLGTIMIS/logout" class="logout-btn">
+                                <i class="fas fa-sign-out-alt"></i> <span class="logout-text">Logout</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="app-container">
+                <!-- Sidebar Overlay - Outside sidebar for proper z-index -->
+                <div class="sidebar-overlay" id="sidebarOverlay"></div>
+                <!-- Sidebar Menu -->
+                <aside class="sidebar" id="sidebar">
+                    <div class="sidebar-content">
+                        <div class="sidebar-header">
+                        <span class="user-name">
+                                <i class="fas fa-user-circle"></i> 
+                                <span class="user-name-text">admin</span>
+                            </span>
+                            <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <nav class="sidebar-nav">
+                                                        
+                            <ul class="sidebar-menu sidebar-menu-adm">
+                            <li data-nav="dashboard">
+                                <a href="http://localhost/SLGTIMIS/dashboard" class="">
+                                    <i class="fas fa-tachometer-alt"></i>
+                                    <span>Dashboard</span>
+                                </a>
+                            </li>
+
+                                                        <li data-nav="facilities" class="menu-item-has-children ">
+                                <a href="http://localhost/SLGTIMIS/facilities/dashboard" class="menu-toggle">
+                                    <i class="fas fa-tools"></i>
+                                    <span>Facilities</span>
+                                                                        <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="">
+                                    <li><a href="http://localhost/SLGTIMIS/facilities/dashboard" class=""><i class="fas fa-chart-pie"></i><span>Dashboard</span></a></li>
+                                    <li><a href="http://localhost/SLGTIMIS/facilities" class=""><i class="fas fa-ticket-alt"></i><span>All Tickets</span></a></li>
+                                    <li><a href="http://localhost/SLGTIMIS/facilities/create"><i class="fas fa-plus"></i><span>New Ticket</span></a></li>
+                                    <li><a href="http://localhost/SLGTIMIS/facilities/notifications"><i class="fas fa-bell"></i><span>Notifications</span></a></li>
+                                                                        <li><a href="http://localhost/SLGTIMIS/facilities/reports"><i class="fas fa-file-alt"></i><span>Reports</span></a></li>
+                                    <li><a href="http://localhost/SLGTIMIS/facilities/categories"><i class="fas fa-tags"></i><span>Categories</span></a></li>
+                                                                    </ul>
+                            </li>
+                            
+                                                        <li data-nav="devices" class="menu-item-has-children ">
+                                <a href="http://localhost/SLGTIMIS/devices" class="menu-toggle">
+                                    <i class="fas fa-laptop"></i>
+                                    <span>Asset Management</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="">
+                                    <li><a href="http://localhost/SLGTIMIS/devices" class=""><i class="fas fa-chart-pie"></i><span>Dashboard</span></a></li>
+                                    <li><a href="http://localhost/SLGTIMIS/devices/list"><i class="fas fa-list"></i><span>All Devices</span></a></li>
+                                                                        <li><a href="http://localhost/SLGTIMIS/devices/create"><i class="fas fa-plus"></i><span>Add Device</span></a></li>
+                                    <li><a href="http://localhost/SLGTIMIS/devices/assignments"><i class="fas fa-user-check"></i><span>Assignments</span></a></li>
+                                    <li><a href="http://localhost/SLGTIMIS/devices/maintenance"><i class="fas fa-tools"></i><span>Maintenance</span></a></li>
+                                                                        <li><a href="http://localhost/SLGTIMIS/devices/warranty"><i class="fas fa-shield-alt"></i><span>Warranty</span></a></li>
+                                    <li><a href="http://localhost/SLGTIMIS/devices/scan"><i class="fas fa-qrcode"></i><span>QR Scanner</span></a></li>
+                                                                        <li><a href="http://localhost/SLGTIMIS/devices/export"><i class="fas fa-file-export"></i><span>Reports / Export</span></a></li>
+                                    <li><a href="http://localhost/SLGTIMIS/devices/audit"><i class="fas fa-history"></i><span>Audit History</span></a></li>
+                                                                    </ul>
+                            </li>
+                            
+                                                        <li data-nav="exams">
+                                <a href="http://localhost/SLGTIMIS/exams" class="">
+                                    <i class="fas fa-file-signature"></i>
+                                    <span>Exams</span>
+                                </a>
+                            </li>
+                                                        
+                                                        <!-- Deputy Principal Education Branch - Hidden for SAO -->
+                            <li data-nav="management" class="menu-item-has-children ">
+                                <a href="#" class="menu-toggle">
+                                    <i class="fas fa-graduation-cap"></i>
+                                    <span>Management</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="">
+                                                                        <li>
+                                        <a href="http://localhost/SLGTIMIS/departments" class="">
+                                            <i class="fas fa-building"></i>
+                                            <span>Departments</span>
+                                        </a>
+                                    </li>
+                                                                        <li>
+                                        <a href="http://localhost/SLGTIMIS/academic-years" class="">
+                                            <i class="fas fa-calendar-alt"></i>
+                                            <span>Academic Years</span>
+                                        </a>
+                                    </li>
+                                                                        <li>
+                                        <a href="http://localhost/SLGTIMIS/courses" class="">
+                                            <i class="fas fa-book"></i>
+                                            <span>Courses</span>
+                                        </a>
+                                    </li>
+                                                                        <li>
+                                        <a href="http://localhost/SLGTIMIS/modules" class="">
+                                            <i class="fas fa-cubes"></i>
+                                            <span>Modules</span>
+                                        </a>
+                                    </li>
+                                                                        <li>
+                                        <a href="http://localhost/SLGTIMIS/staff-roles" class="">
+                                            <i class="fas fa-user-tag"></i>
+                                            <span>Staff Roles</span>
+                                        </a>
+                                    </li>
+                                                                                                            <li>
+                                        <a href="http://localhost/SLGTIMIS/staff" class="">
+                                            <i class="fas fa-chalkboard-teacher"></i>
+                                            <span>Staff</span>
+                                        </a>
+                                    </li>
+                                                                                                        </ul>
+                            </li>
+                            
+                                                        
+                            <!-- Registrar (Student Affairs) Branch - Visible for all, especially SAO -->
+                                                        <li data-nav="student-info" class="menu-item-has-children active">
+                                <a href="#" class="menu-toggle">
+                                    <i class="fas fa-user-graduate"></i>
+                                    <span>Student Info</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="display: block;">
+                                                                        <li>
+                                        <a href="http://localhost/SLGTIMIS/students" class="active">
+                                            <i class="fas fa-user-graduate"></i>
+                                            <span>Students</span>
+                                        </a>
+                                    </li>
+                                                                                                            <li>
+                                        <a href="http://localhost/SLGTIMIS/groups" class="">
+                                            <i class="fas fa-users"></i>
+                                            <span>Groups</span>
+                                        </a>
+                                    </li>
+                                                                                                            <li>
+                                        <a href="http://localhost/SLGTIMIS/students/id-card-select" class="">
+                                            <i class="fas fa-id-card"></i>
+                                            <span>ID Card Print</span>
+                                        </a>
+                                    </li>
+                                                                                                            <li>
+                                        <a href="http://localhost/SLGTIMIS/complaint-letters" class="">
+                                            <i class="fas fa-envelope-open-text"></i>
+                                            <span>Student Letters</span>
+                                        </a>
+                                    </li>
+                                                                                                            <li data-nav="student-applications" class="menu-item-has-children ">
+                                        <a href="#" class="menu-toggle">
+                                            <i class="fas fa-file-signature"></i>
+                                            <span>Student Applications</span>
+                                            <i class="fas fa-chevron-down menu-arrow"></i>
+                                        </a>
+                                        <ul class="submenu" style="">
+                                                                                        <li>
+                                                <a href="http://localhost/SLGTIMIS/student-applications" class="">
+                                                    <i class="fas fa-file-alt"></i>
+                                                    <span>Online applications</span>
+                                                </a>
+                                            </li>
+                                                                                                                                    <li>
+                                                <a href="http://localhost/SLGTIMIS/application-admission" class="">
+                                                    <i class="fas fa-clipboard-list"></i>
+                                                    <span>Entrance exams</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="http://localhost/SLGTIMIS/application-admission/interviews" class="">
+                                                    <i class="fas fa-comments"></i>
+                                                    <span>Interview schedules</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="http://localhost/SLGTIMIS/application-admission/candidates" class="">
+                                                    <i class="fas fa-list-check"></i>
+                                                    <span>Selected candidates</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="http://localhost/SLGTIMIS/application-admission/cutoffs" class="">
+                                                    <i class="fas fa-filter"></i>
+                                                    <span>Cutoff marks</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="http://localhost/SLGTIMIS/application-admission/second-option" class="">
+                                                    <i class="fas fa-user-check"></i>
+                                                    <span>2nd option</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="http://localhost/SLGTIMIS/application-admission/report" class="">
+                                                    <i class="fas fa-file-alt"></i>
+                                                    <span>Selection report</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="http://localhost/SLGTIMIS/application-admission/nic-result" class="">
+                                                    <i class="fas fa-id-card"></i>
+                                                    <span>NIC result</span>
+                                                </a>
+                                            </li>
+                                                                                    </ul>
+                                    </li>
+                                                                                                            <li data-nav="student-bus-season" class="menu-item-has-children ">
+                                        <a href="#" class="menu-toggle">
+                                            <i class="fas fa-bus"></i>
+                                            <span>Student Bus Season</span>
+                                            <i class="fas fa-chevron-down menu-arrow"></i>
+                                        </a>
+                                        <ul class="submenu" style="">
+                                            <li>
+                                                <a href="http://localhost/SLGTIMIS/bus-season-requests/sao-process" class="">
+                                                    <i class="fas fa-tasks"></i>
+                                                    <span>Process Bus Season</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="http://localhost/SLGTIMIS/bus-season-requests/payment-collections" class="">
+                                                    <i class="fas fa-money-bill-wave"></i>
+                                                    <span>Payment Collections</span>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                                                    </ul>
+                            </li>
+
+                                                        <li data-nav="hostel" class="menu-item-has-children ">
+                                <a href="#" class="menu-toggle">
+                                    <i class="fas fa-hotel"></i>
+                                    <span>Hostel</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="">
+                                                                        <li>
+                                        <a href="http://localhost/SLGTIMIS/hostels" class="">
+                                            <i class="fas fa-building"></i>
+                                            <span>Hostels</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="http://localhost/SLGTIMIS/rooms" class="">
+                                            <i class="fas fa-door-open"></i>
+                                            <span>Rooms</span>
+                                        </a>
+                                    </li>
+                                                                                                            <li>
+                                        <a href="http://localhost/SLGTIMIS/room-allocations" class="">
+                                            <i class="fas fa-user-check"></i>
+                                            <span>Room Allocations</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="http://localhost/SLGTIMIS/hostel-report" class="">
+                                            <i class="fas fa-chart-pie"></i>
+                                            <span>Hostel Report</span>
+                                        </a>
+                                    </li>
+                                                                    </ul>
+                            </li>
+                            
+                                                        <!-- ID Card Print (ADM) - Main menu shortcut -->
+                            <li data-nav="id-card-print">
+                                <a href="http://localhost/SLGTIMIS/students/id-card-select" class="">
+                                    <i class="fas fa-id-card"></i>
+                                    <span>ID Card Print</span>
+                                </a>
+                            </li>
+                                                        
+                                                                                    <li data-nav="student-attendance" class="menu-item-has-children ">
+                                <a href="#" class="menu-toggle">
+                                    <i class="fas fa-calendar-check"></i>
+                                    <span>Student Attendance</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="">
+                                                                        <li>
+                                        <a href="http://localhost/SLGTIMIS/attendance" class="">
+                                            <i class="fas fa-calendar-alt"></i>
+                                            <span>Student Attendance</span>
+                                        </a>
+                                    </li>
+                                                                                                            <li>
+                                        <a href="http://localhost/SLGTIMIS/attendance/report" class="">
+                                            <i class="fas fa-chart-line"></i>
+                                            <span>Attendance Report</span>
+                                        </a>
+                                    </li>
+                                                                                                            <li>
+                                        <a href="http://localhost/SLGTIMIS/attendance/range-summary" class="">
+                                            <i class="fas fa-calendar-week"></i>
+                                            <span>Month Summary</span>
+                                        </a>
+                                    </li>
+                                                                                                            <li>
+                                        <a href="http://localhost/SLGTIMIS/attendance/month-sheet" class="">
+                                            <i class="fas fa-file-excel"></i>
+                                            <span>Month Register</span>
+                                        </a>
+                                    </li>
+                                                                                                            <li>
+                                        <a href="http://localhost/SLGTIMIS/attendance/student-device" class="">
+                                            <i class="fas fa-fingerprint"></i>
+                                            <span>Student Fingerprint</span>
+                                        </a>
+                                    </li>
+                                                                        <li>
+                                        <a href="http://localhost/SLGTIMIS/attendance/student-device/fingerprint-import" class="">
+                                            <i class="fas fa-file-excel"></i>
+                                            <span>Student Excel Export</span>
+                                        </a>
+                                    </li>
+                                                                                                        </ul>
+                            </li>
+                            
+                                                        <li data-nav="staff-attendance">
+                                <a href="http://localhost/SLGTIMIS/attendance/staff-device" class="">
+                                    <i class="fas fa-id-card"></i>
+                                    <span>Staff Attendance</span>
+                                </a>
+                            </li>
+                                                        
+                                                        <li data-nav="payments" class="menu-item-has-children ">
+                                <a href="#" class="menu-toggle">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                    <span>Payment</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="">
+                                    <li>
+                                        <a href="http://localhost/SLGTIMIS/payments" class="">
+                                            <i class="fas fa-list"></i>
+                                            <span>All Payments</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="http://localhost/SLGTIMIS/payments/report" class="">
+                                            <i class="fas fa-file-alt"></i>
+                                            <span>Payment Report</span>
+                                        </a>
+                                    </li>
+                                                                        <li>
+                                        <a href="http://localhost/SLGTIMIS/payments/create" class="">
+                                            <i class="fas fa-plus-circle"></i>
+                                            <span>Add Payment</span>
+                                        </a>
+                                    </li>
+                                                                    </ul>
+                            </li>
+                                                        
+                                                        
+                                                        <!-- Students Approval - Consolidated menu for all student approvals -->
+                            <li data-nav="student-approval" class="menu-item-has-children ">
+                                <a href="#" class="menu-toggle">
+                                    <i class="fas fa-user-check"></i>
+                                    <span>Student Approval</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="">
+                                                                        
+                                                                                                            <li>
+                                        <a href="http://localhost/SLGTIMIS/on-peak-requests/final-approval" class="">
+                                            <i class="fas fa-check-double"></i>
+                                            <span>On-Peak Second Approval</span>
+                                        </a>
+                                    </li>
+                                                                        
+                                                                    </ul>
+                            </li>
+                                                        
+                                                                                    <li data-nav="staff-approval">
+                                <a href="http://localhost/SLGTIMIS/circuit-program/approval" class="">
+                                    <i class="fas fa-user-check"></i>
+                                    <span>Staff Approval</span>
+                                </a>
+                            </li>
+                            
+                                                        <!-- Circuit Program - Staff Only (not students) -->
+                            <li data-nav="circuit-program">
+                                <a href="http://localhost/SLGTIMIS/circuit-program" class="">
+                                    <i class="fas fa-route"></i>
+                                    <span>Circuit Program</span>
+                                </a>
+                            </li>
+                                                        
+                                                        <!-- Instructor Diary (Teaching Staff + HOD) -->
+                            <li data-nav="instructor-diary">
+                                <a href="http://localhost/SLGTIMIS/instructor-diary" class="">
+                                    <i class="fas fa-book-open"></i>
+                                    <span>Instructor Diary</span>
+                                </a>
+                            </li>
+                                                        
+                            
+                                                        <!-- Administration Branch -->
+                            <li data-nav="admin-divider" class="menu-divider"></li>
+                            <li data-nav="administration" class="menu-item-has-children ">
+                                <a href="#" class="menu-toggle">
+                                    <i class="fas fa-cog"></i>
+                                    <span>Administration</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="">
+                                                                        <li>
+                                        <a href="http://localhost/SLGTIMIS/students/upload-images" class="">
+                                            <i class="fas fa-images"></i>
+                                            <span>Upload Student Images</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="http://localhost/SLGTIMIS/admin/deleted-students" class="">
+                                            <i class="fas fa-user-slash"></i>
+                                            <span>Deleted Students</span>
+                                        </a>
+                                    </li>
+                                                                                                                                                <li class="menu-divider-submenu"></li>
+                                                                        <li>
+                                        <a href="http://localhost/SLGTIMIS/admin/users" class="">
+                                            <i class="fas fa-list"></i>
+                                            <span>List</span>
+                                        </a>
+                                    </li>
+                                    <li class="menu-divider-submenu"></li>
+                                    <li>
+                                        <a href="http://localhost/SLGTIMIS/admin/locked-accounts" class="">
+                                            <i class="fas fa-lock"></i>
+                                            <span>Locked Accounts</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="http://localhost/SLGTIMIS/admin/activity-logs" class="">
+                                            <i class="fas fa-history"></i>
+                                            <span>User Activities</span>
+                                        </a>
+                                    </li>
+                                    <li class="menu-divider-submenu"></li>
+                                    <li>
+                                        <a href="http://localhost/SLGTIMIS/admin/backup-db" class="" download>
+                                            <i class="fas fa-database"></i>
+                                            <span>SQL Backup (PC)</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="http://localhost/SLGTIMIS/admin/backup-files" class="" download>
+                                            <i class="fas fa-file-archive"></i>
+                                            <span>Files ZIP (PC)</span>
+                                        </a>
+                                    </li>
+                                                                    </ul>
+                            </li>
+                                                    </ul>
+                        </nav>
+                    </div>
+                </aside>
+
+                <!-- Main Content Area -->
+                <main class="main-content-wrapper">
+                    <div class="main-content">
+                        ﻿<div class="container-fluid px-3 px-md-4 py-3 student-edit-page">
+    <style>
+        /* Ensure only active tab content is visible on this page */
+        #studentTabsContent > .tab-pane {
+            display: none;
+            padding-top: 1rem;
+        }
+        #studentTabsContent > .tab-pane.active,
+        #studentTabsContent > .tab-pane.show.active {
+            display: block;
+        }
+        .student-edit-page .edit-student-header {
+            gap: 0.5rem;
+        }
+        .student-edit-page .edit-student-header h5 {
+            min-width: 0;
+            word-break: break-word;
+        }
+        @media (max-width: 768px) {
+            .student-edit-page {
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+            }
+            .student-edit-page .card {
+                padding: 0;
+                margin-bottom: 0.75rem;
+            }
+            .student-edit-page .card-header {
+                margin-bottom: 0;
+                padding: 0.75rem;
+            }
+            .student-edit-page .card-body {
+                padding: 0.75rem;
+            }
+            .student-edit-page .edit-student-header {
+                flex-wrap: wrap;
+                align-items: flex-start !important;
+            }
+            .student-edit-page .edit-student-header h5 {
+                font-size: 1rem;
+                line-height: 1.35;
+            }
+            .student-edit-page .nav-tabs {
+                flex-wrap: nowrap;
+            }
+            .student-edit-page .nav-tabs .nav-link {
+                font-size: 0.82rem;
+                white-space: nowrap;
+                padding: 0.45rem 0.65rem;
+            }
+            .student-edit-page .form-control,
+            .student-edit-page .form-select,
+            .student-edit-page .input-group,
+            .student-edit-page textarea {
+                width: 100%;
+                max-width: 100%;
+            }
+            .student-edit-page .edit-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .student-edit-page .edit-actions .btn {
+                width: 100%;
+            }
+            .student-edit-page #profileWebcam {
+                max-width: 100%;
+            }
+        }
+    </style>
+    <div class="row justify-content-center">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center edit-student-header">
+                        <h5 class="mb-0 fw-bold"><i class="fas fa-edit me-2"></i>Edit Student: 2022/EET/4EL02</h5>
+                        <a href="http://localhost/SLGTIMIS/students/view?id=2022%2FEET%2F4EL02" class="btn btn-light btn-sm">
+                            <i class="fas fa-eye me-1"></i>View
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                                        
+                                        
+                    <!-- Tabs Navigation -->
+                                        <ul class="nav nav-tabs flex-nowrap overflow-auto mb-3 pb-1" id="studentTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personal" type="button" role="tab">
+                                <i class="fas fa-user me-1"></i>Personal Information
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link " id="enrollment-tab" data-bs-toggle="tab" data-bs-target="#enrollment" type="button" role="tab">
+                                <i class="fas fa-graduation-cap me-1"></i>Enrollment Information
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link " id="bank-tab" data-bs-toggle="tab" data-bs-target="#bank" type="button" role="tab">
+                                <i class="fas fa-university me-1"></i>Bank Details
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link " id="eligibility-tab" data-bs-toggle="tab" data-bs-target="#eligibility" type="button" role="tab">
+                                <i class="fas fa-money-check-alt me-1"></i>Allowance Eligibility
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="studentTabsContent">
+                        <!-- Personal Information Tab -->
+                        <div class="tab-pane fade show active" id="personal" role="tabpanel">
+                            <form method="POST" action="http://localhost/SLGTIMIS/students/edit?id=2022%2FEET%2F4EL02" enctype="multipart/form-data">
+                                <input type="hidden" name="update_section" value="personal">
+                                
+                                <!-- Profile Image Section -->
+                                <div class="card mb-4 border">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0 fw-bold"><i class="fas fa-image me-2"></i>Profile Image</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row align-items-center">
+                                            <div class="col-md-4 text-center mb-3 mb-md-0">
+                                                                                                <div class="position-relative d-inline-block">
+                                                    <div style="width: 150px; height: 150px; border-radius: 50%; overflow: hidden; border: 3px solid #dee2e6; display: flex; align-items: center; justify-content: center; background: #f8f9fa;">
+                                                                                                                    <i class="fas fa-user fa-4x text-muted" id="currentProfileImageIcon"></i>
+                                                                                                            </div>
+                                                                                                    </div>
+                                                <div class="mt-2">
+                                                                                                            <small class="text-muted">No Image</small>
+                                                                                                    </div>
+                                            </div>
+                                            <div class="col-md-8">
+                                                                                                <div class="mb-3">
+                                                    <label for="profile_image" class="form-label fw-semibold">Upload New Profile Image</label>
+                                                    <input type="file" class="form-control" id="profile_image" name="profile_image" 
+                                                           accept="image/jpeg,image/jpg,image/png,image/gif" onchange="previewImage(this)">
+                                                    <div class="form-text">Accepted formats: JPG, PNG, GIF (Max 5MB). SAO and ADM only.</div>
+                                                </div>
+                                                <div class="mb-3 d-flex flex-wrap gap-2">
+                                                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenWebcam" data-facing="user">
+                                                        <i class="fas fa-user me-1"></i>Webcam
+                                                    </button>
+                                                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenBackCamera" data-facing="environment">
+                                                        <i class="fas fa-camera me-1"></i>Back camera
+                                                    </button>
+                                                </div>
+                                                <div id="webcamPanel" class="mb-3" style="display: none;">
+                                                    <video id="profileWebcam" autoplay playsinline muted style="width: 100%; max-width: 320px; border-radius: 8px; background: #000;"></video>
+                                                    <canvas id="profileWebcamCanvas" hidden></canvas>
+                                                    <div class="mt-2 d-flex flex-wrap gap-2">
+                                                        <button type="button" class="btn btn-primary btn-sm" id="btnCaptureWebcam">
+                                                            <i class="fas fa-camera me-1"></i>Capture and update
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-primary btn-sm" id="btnSwitchCamera">
+                                                            <i class="fas fa-sync-alt me-1"></i>Switch camera
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCancelWebcam">Cancel</button>
+                                                    </div>
+                                                </div>
+                                                <div id="profileImageStatus" class="small mb-2" style="display: none;"></div>
+                                                <div id="imagePreview" class="mb-3" style="display: none;">
+                                                    <img id="previewImg" src="" alt="Preview" style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #dee2e6;">
+                                                    <div class="mt-2">
+                                                        <small class="text-info"><i class="fas fa-info-circle me-1"></i>Image Preview</small>
+                                                    </div>
+                                                </div>
+                                                <input type="hidden" name="remove_profile_image" id="remove_profile_image" value="0">
+                                                                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-12 col-md-6 mb-3">
+                                        <label for="student_id" class="form-label fw-semibold">Student ID</label>
+                                        <input type="text" class="form-control" id="student_id" 
+                                               value="2022/EET/4EL02" 
+                                               disabled>
+                                        <div class="form-text">Student ID cannot be changed</div>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-3 mb-3">
+                                        <label for="student_title" class="form-label fw-semibold">Title</label>
+                                        <select class="form-select" id="student_title" name="student_title">
+                                            <option value="">Select</option>
+                                            <option value="Mr." selected>Mr.</option>
+                                            <option value="Mrs." >Mrs.</option>
+                                            <option value="Miss" >Miss</option>
+                                            <option value="Ms." >Ms.</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-3 mb-3">
+                                        <label for="student_gender" class="form-label fw-semibold">Gender</label>
+                                        <select class="form-select" id="student_gender" name="student_gender">
+                                            <option value="">Select</option>
+                                            <option value="Male" selected>Male</option>
+                                            <option value="Female" >Female</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-12 col-md-6 mb-3">
+                                        <label for="student_fullname" class="form-label fw-semibold">
+                                            Full Name <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="student_fullname" name="student_fullname" 
+                                               value="Anantharasa Akash" 
+                                               maxlength="255" required>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-6 mb-3">
+                                        <label for="student_ininame" class="form-label fw-semibold">Name with Initials</label>
+                                        <input type="text" class="form-control" id="student_ininame" name="student_ininame" 
+                                               value="A.Akash" 
+                                               maxlength="255">
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-12 col-md-6 mb-3">
+                                        <label for="student_email" class="form-label fw-semibold">
+                                            Email <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="email" class="form-control" id="student_email" name="student_email" 
+                                               value="2022/EET/4EL02@slgti.com" 
+                                               maxlength="254" required>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-6 mb-3">
+                                        <label for="student_nic" class="form-label fw-semibold">
+                                            NIC <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="student_nic" name="student_nic" 
+                                               value="200536100450" 
+                                               maxlength="12" required>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-12 col-md-4 mb-3">
+                                        <label for="student_dob" class="form-label fw-semibold">Date of Birth</label>
+                                        <input type="date" class="form-control" id="student_dob" name="student_dob" 
+                                               value="2005-12-26">
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-4 mb-3">
+                                        <label for="student_phone" class="form-label fw-semibold">Phone</label>
+                                        <input type="tel" class="form-control" id="student_phone" name="student_phone" 
+                                               value="759258872"
+                                               pattern="[0-9]{9,10}">
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-4 mb-3">
+                                        <label for="student_civil" class="form-label fw-semibold">Civil Status</label>
+                                        <select class="form-select" id="student_civil" name="student_civil">
+                                            <option value="">Select</option>
+                                            <option value="Single" selected>Single</option>
+                                            <option value="Married" >Married</option>
+                                            <option value="Divorced" >Divorced</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                        
+                                <div class="mb-3">
+                                    <label for="student_address" class="form-label fw-semibold">Address</label>
+                                    <textarea class="form-control" id="student_address" name="student_address" rows="2" maxlength="255">Nelliady north karaveddy</textarea>
+                                </div>
+                                        
+                                <div class="row">
+                                    <div class="col-12 col-md-3 mb-3">
+                                        <label for="student_zip" class="form-label fw-semibold">ZIP Code</label>
+                                        <input type="number" class="form-control" id="student_zip" name="student_zip" 
+                                               value="40000">
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-3 mb-3">
+                                        <label for="student_provice" class="form-label fw-semibold">Province <span class="text-danger">*</span></label>
+                                        <select class="form-select" id="student_provice" name="student_provice" required>
+                                            <option value="">Select Province</option>
+                                            <option value="Western Province" >Western Province</option>
+                                            <option value="Central Province" >Central Province</option>
+                                            <option value="Southern Province" >Southern Province</option>
+                                            <option value="Northern Province" selected>Northern Province</option>
+                                            <option value="Eastern Province" >Eastern Province</option>
+                                            <option value="North Western Province" >North Western Province</option>
+                                            <option value="North Central Province" >North Central Province</option>
+                                            <option value="Uva Province" >Uva Province</option>
+                                            <option value="Sabaragamuwa Province" >Sabaragamuwa Province</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-3 mb-3">
+                                        <label for="student_district" class="form-label fw-semibold">District <span class="text-danger">*</span></label>
+                                        <select class="form-select" id="student_district" name="student_district" required>
+                                            <option value="">Select District</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-3 mb-3">
+                                        <label for="student_divisions" class="form-label fw-semibold">Divisions</label>
+                                        <input type="text" class="form-control" id="student_divisions" name="student_divisions" 
+                                               value="J375" 
+                                               maxlength="50">
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-12 col-md-4 mb-3">
+                                        <label for="student_blood" class="form-label fw-semibold">Blood Group</label>
+                                        <select class="form-select" id="student_blood" name="student_blood">
+                                            <option value="">Select</option>
+                                            <option value="A+" selected>A+</option>
+                                            <option value="A-" >A-</option>
+                                            <option value="B+" >B+</option>
+                                            <option value="B-" >B-</option>
+                                            <option value="AB+" >AB+</option>
+                                            <option value="AB-" >AB-</option>
+                                            <option value="O+" >O+</option>
+                                            <option value="O-" >O-</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-4 mb-3">
+                                        <label for="student_nationality" class="form-label fw-semibold">Language</label>
+                                        <select class="form-select" id="student_nationality" name="student_nationality">
+                                            <option value="">Select Language</option>
+                                            <option value="Sinhala" >Sinhala</option>
+                                            <option value="Tamil" selected>Tamil</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-12 col-md-4 mb-3">
+                                        <label for="student_religion" class="form-label fw-semibold">Religion</label>
+                                        <select class="form-select" id="student_religion" name="student_religion">
+                                            <option value="">Select Religion</option>
+                                            <option value="Hinduism" selected>Hinduism</option>
+                                            <option value="Buddhism" >Buddhism</option>
+                                            <option value="Christianity" >Christianity</option>
+                                            <option value="Islam" >Islam</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label for="student_whatsapp" class="form-label fw-semibold">WhatsApp</label>
+                                                <input type="text" class="form-control" id="student_whatsapp" name="student_whatsapp" 
+                                                       value="0759258872" 
+                                                       maxlength="20">
+                                            </div>
+                                            
+                                            <div class="col-md-6 mb-3">
+                                                <label for="student_status" class="form-label fw-semibold">Status</label>
+                                                <select class="form-select" id="student_status" name="student_status">
+                                                    <option value="Active" selected>Active</option>
+                                                    <option value="Inactive" >Inactive</option>
+                                                    <option value="Graduated" >Graduated</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        
+                                        <hr class="my-4">
+                                        <h6 class="fw-bold mb-3">Emergency Contact</h6>
+                                        
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label for="student_em_name" class="form-label fw-semibold">Emergency Contact Name</label>
+                                                <input type="text" class="form-control" id="student_em_name" name="student_em_name" 
+                                                       value="0756104990" 
+                                                       maxlength="255">
+                                            </div>
+                                            
+                                            <div class="col-md-6 mb-3">
+                                                <label for="student_em_relation" class="form-label fw-semibold">Relation</label>
+                                                <input type="text" class="form-control" id="student_em_relation" name="student_em_relation" 
+                                                       value="Mother" 
+                                                       maxlength="20">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label for="student_em_address" class="form-label fw-semibold">Emergency Address</label>
+                                                <textarea class="form-control" id="student_em_address" name="student_em_address" rows="2" maxlength="255">Nelliady north karaveddy</textarea>
+                                            </div>
+                                            
+                                            <div class="col-md-6 mb-3">
+                                                <label for="student_em_phone" class="form-label fw-semibold">Emergency Phone</label>
+                                                <input type="tel" class="form-control" id="student_em_phone" name="student_em_phone" 
+                                                       value="756104990"
+                                                       pattern="[0-9]{9,10}">
+                                            </div>
+                                        </div>
+                                
+                                <div class="d-flex gap-2 mt-4 edit-actions">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i>Update Personal Information
+                                    </button>
+                                    <a href="http://localhost/SLGTIMIS/students/view?id=2022%2FEET%2F4EL02" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times me-1"></i>Cancel
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Enrollment Information Tab -->
+                        <div class="tab-pane fade " id="enrollment" role="tabpanel">
+                            <form method="POST" action="http://localhost/SLGTIMIS/students/edit?id=2022%2FEET%2F4EL02">
+                                <input type="hidden" name="update_section" value="enrollment">
+                                
+                                                                                                        <div class="alert alert-info mb-4">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        <strong>Current Enrollment:</strong>
+                                        Diploma in Mechatronics Technology             - 
+                                        2024/2025 
+                                        (Internship)
+                                                                            </div>
+                                    
+                                    <h6 class="fw-bold mb-3 mt-0">Update Course & Enrollment</h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="course_id" class="form-label fw-semibold">Course <span class="text-danger">*</span></label>
+                                            <select class="form-select" id="course_id" name="course_id" required>
+                                                <option value="">Select Course</option>
+                                                                                                    <option value="4AT" 
+                                                            data-department="AUT"
+                                                            >
+                                                        Automobile Technician                                                    </option>
+                                                                                                    <option value="4IT" 
+                                                            data-department="ICT"
+                                                            >
+                                                        Computer Hardware and Network Technician                                                    </option>
+                                                                                                    <option value="4CS" 
+                                                            data-department="COT"
+                                                            >
+                                                        Construction Site Supervisor                                                    </option>
+                                                                                                    <option value="5AT" 
+                                                            data-department="AUT"
+                                                            >
+                                                        Diploma in Automotive Technology                                                    </option>
+                                                                                                    <option value="5CT" 
+                                                            data-department="COT"
+                                                            >
+                                                        Diploma in Construction Technology                                                                </option>
+                                                                                                    <option value="5DT" 
+                                                            data-department="COT"
+                                                            >
+                                                        Diploma in Drafting Technology                                                    </option>
+                                                                                                    <option value="5EET" 
+                                                            data-department="EET"
+                                                            >
+                                                        Diploma in Electrical Technology                                                    </option>
+                                                                                                    <option value="5FT" 
+                                                            data-department="FDT"
+                                                            >
+                                                        Diploma in Food Technology                                                    </option>
+                                                                                                    <option value="5IT" 
+                                                            data-department="ICT"
+                                                            >
+                                                        Diploma in Information and Communication Technology                                                    </option>
+                                                                                                    <option value="5ME" 
+                                                            data-department="EET"
+                                                            selected>
+                                                        Diploma in Mechatronics Technology                                                                </option>
+                                                                                                    <option value="5MA" 
+                                                            data-department="MEC"
+                                                            >
+                                                        Diploma in Production  Technology                                                    </option>
+                                                                                                    <option value="4EET" 
+                                                            data-department="EET"
+                                                            >
+                                                        Electrician                                                     </option>
+                                                                                                    <option value="6CT" 
+                                                            data-department="COT"
+                                                            >
+                                                        High National Diploma in Construction Technology                                                    </option>
+                                                                                                    <option value="4FT" 
+                                                            data-department="FDT"
+                                                            >
+                                                        Laboratory Assistant And Baker                                                    </option>
+                                                                                                    <option value="4MA" 
+                                                            data-department="MEC"
+                                                            >
+                                                        Machinist                                                    </option>
+                                                                                                    <option value="4AC" 
+                                                            data-department="EET"
+                                                            >
+                                                        Refrigeration and Air Conditioning Technician                                                    </option>
+                                                                                                    <option value="5REG" 
+                                                            data-department="EET"
+                                                            >
+                                                        Renewable Energy                                                    </option>
+                                                                                                    <option value="MET2" 
+                                                            data-department="MEC"
+                                                            >
+                                                        Welder                                                    </option>
+                                                                                            </select>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <label for="academic_year" class="form-label fw-semibold">Academic Year <span class="text-danger">*</span></label>
+                                            <select class="form-select" id="academic_year" name="academic_year" required>
+                                                <option value="">Select Academic Year</option>
+                                                                                                    <option value="2026/2027" 
+                                                            >
+                                                        2026/2027                                                    </option>
+                                                                                                    <option value="2025/2026" 
+                                                            >
+                                                        2025/2026                                                    </option>
+                                                                                                    <option value="2024/2025" 
+                                                            selected>
+                                                        2024/2025                                                    </option>
+                                                                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row g-3 mb-2">
+                                        <div class="col-md-6">
+                                            <label for="student_id_new" class="form-label fw-semibold">
+                                                Registration Number (Student ID) <span class="text-danger">*</span>
+                                            </label>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="student_id_new" name="student_id_new" 
+                                                       value="2022/EET/4EL02" 
+                                                       maxlength="50" required>
+                                                <button type="button" class="btn btn-outline-secondary" id="btnSuggestRegNumber" title="Get next available number for selected course">
+                                                    <i class="fas fa-magic"></i> Suggest
+                                                </button>
+                                            </div>
+                                            <div class="form-text">Changing course? Registration number auto-updates when you select course & year.</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="course_mode" class="form-label fw-semibold">Course Mode</label>
+                                            <select class="form-select" id="course_mode" name="course_mode">
+                                                                                                <option value="Full" selected>Full Time</option>
+                                                <option value="Part" >Part Time</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <label for="student_enroll_status" class="form-label fw-semibold">Enrollment Status</label>
+                                            <select class="form-select" id="student_enroll_status" name="student_enroll_status">
+                                                <option value="Following" >Following</option>
+                                                <option value="Dropout" >Dropout</option>
+                                                <option value="Completed" >Completed</option>
+                                                <option value="Long Absent" >Long Absent</option>
+                                                <option value="Internship" selected>Internship</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <input type="hidden" name="enrollment_id" value="2022/EET/4EL02">
+                                                                
+                                                                    <hr class="my-4">
+                                    <h6 class="fw-bold mb-3">Enrollment History</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Academic Year</th>
+                                                    <th>Course</th>
+                                                    <th>Department</th>
+                                                    <th>Mode</th>
+                                                    <th>Enroll Date</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                                                                    <tr>
+                                                        <td>2024/2025</td>
+                                                        <td>Diploma in Mechatronics Technology            </td>
+                                                        <td>Electrical Technology</td>
+                                                        <td>Full</td>
+                                                        <td>2024-02-01</td>
+                                                        <td>
+                                                            <span class="badge bg-warning rounded-pill">
+                                                                Internship                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                                                            </tbody>
+                                        </table>
+                                    </div>
+                                                                
+                                <div class="d-flex gap-2 mt-4 edit-actions">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i>Update Enrollment Information
+                                    </button>
+                                    <a href="http://localhost/SLGTIMIS/students/view?id=2022%2FEET%2F4EL02" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times me-1"></i>Cancel
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <!-- Bank Details Tab -->
+                        <div class="tab-pane fade " id="bank" role="tabpanel">
+                            <form method="POST" action="http://localhost/SLGTIMIS/students/edit?id=2022%2FEET%2F4EL02">
+                                <input type="hidden" name="update_section" value="bank">
+                                <p class="text-muted small mb-3">Bank details must be entered in English (letters, numbers, and basic punctuation).</p>
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label for="bank_name" class="form-label fw-semibold">Bank Name</label>
+                                        <input type="text" class="form-control" id="bank_name" name="bank_name" 
+                                               value="People&#039;s Bank" 
+                                               maxlength="100">
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label for="bank_account_no" class="form-label fw-semibold">Account Number</label>
+                                        <input type="text" class="form-control" id="bank_account_no" name="bank_account_no" 
+                                               value="" 
+                                               maxlength="50">
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="bank_branch" class="form-label fw-semibold">Branch</label>
+                                        <input type="text" class="form-control" id="bank_branch" name="bank_branch" 
+                                               value="" 
+                                               maxlength="100">
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 mt-4 edit-actions">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i>Update Bank Details
+                                    </button>
+                                    <a href="http://localhost/SLGTIMIS/students/view?id=2022%2FEET%2F4EL02" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times me-1"></i>Cancel
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <!-- Allowance Eligibility Tab -->
+                        <div class="tab-pane fade " id="eligibility" role="tabpanel">
+                            <form method="POST" action="http://localhost/SLGTIMIS/students/edit?id=2022%2FEET%2F4EL02">
+                                <input type="hidden" name="update_section" value="eligibility">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="allowance_eligible" name="allowance_eligible" value="1"
+                                                   >
+                                            <label class="form-check-label fw-semibold" for="allowance_eligible">
+                                                Allowance eligible
+                                            </label>
+                                        </div>
+                                        <div class="form-text">When checked, this student is included in allowance-related reports and FIN attendance views (where filtered).</div>
+                                    </div>
+                                    <div class="col-12 col-md-6 col-lg-4">
+                                        <label for="allowance_eligible_date" class="form-label fw-semibold">Eligible from (optional)</label>
+                                        <input type="date" class="form-control" id="allowance_eligible_date" name="allowance_eligible_date" 
+                                               value="">
+                                        <div class="form-text">Date from which allowance eligibility applies (used by attendance logic when set).</div>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 mt-4 edit-actions">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i>Update Allowance Eligibility
+                                    </button>
+                                    <a href="http://localhost/SLGTIMIS/students/view?id=2022%2FEET%2F4EL02" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times me-1"></i>Cancel
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                            
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Profile Image Preview and Removal
+function previewImage(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const previewImg = document.getElementById('previewImg');
+            const imagePreview = document.getElementById('imagePreview');
+            if (previewImg && imagePreview) {
+                previewImg.src = e.target.result;
+                imagePreview.style.display = 'block';
+            }
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function confirmRemoveImage() {
+    if (confirm('Are you sure you want to remove the current profile image? This action cannot be undone.')) {
+        document.getElementById('remove_profile_image').value = '1';
+        const currentImage = document.getElementById('currentProfileImage');
+        const currentIcon = document.getElementById('currentProfileImageIcon');
+        const imagePreview = document.getElementById('imagePreview');
+        const profileImageInput = document.getElementById('profile_image');
+        
+        if (currentImage) {
+            currentImage.style.display = 'none';
+        }
+        if (currentIcon) {
+            currentIcon.style.display = 'flex';
+        }
+        if (imagePreview) {
+            imagePreview.style.display = 'none';
+        }
+        if (profileImageInput) {
+            profileImageInput.value = '';
+        }
+        
+        // Show message
+        alert('Profile image will be removed when you save the form.');
+    }
+}
+
+// Reset remove flag if user selects a new image after clicking remove
+document.addEventListener('DOMContentLoaded', function() {
+    const profileImageInput = document.getElementById('profile_image');
+    if (profileImageInput) {
+        profileImageInput.addEventListener('change', function() {
+            if (this.files && this.files.length > 0) {
+                // User selected a new image, don't remove the old one
+                document.getElementById('remove_profile_image').value = '0';
+            }
+        });
+    }
+
+    const openWebcamBtn = document.getElementById('btnOpenWebcam');
+    const openBackCameraBtn = document.getElementById('btnOpenBackCamera');
+    const switchCameraBtn = document.getElementById('btnSwitchCamera');
+    const webcamPanel = document.getElementById('webcamPanel');
+    const webcamVideo = document.getElementById('profileWebcam');
+    const webcamCanvas = document.getElementById('profileWebcamCanvas');
+    const captureBtn = document.getElementById('btnCaptureWebcam');
+    const cancelWebcamBtn = document.getElementById('btnCancelWebcam');
+    let webcamStream = null;
+    let facingMode = 'user';
+
+    function stopCameraTracks() {
+        if (webcamStream) {
+            webcamStream.getTracks().forEach(function (track) { track.stop(); });
+            webcamStream = null;
+        }
+        if (webcamVideo) {
+            webcamVideo.srcObject = null;
+        }
+    }
+
+    function stopWebcam() {
+        stopCameraTracks();
+        if (webcamPanel) {
+            webcamPanel.style.display = 'none';
+        }
+    }
+
+    function showUpdatedProfile(url) {
+        if (!url) {
+            return;
+        }
+        const freshUrl = url + (url.indexOf('?') === -1 ? '?' : '&') + 't=' + Date.now();
+        let img = document.getElementById('currentProfileImage');
+        const icon = document.getElementById('currentProfileImageIcon');
+        if (!img && icon) {
+            img = document.createElement('img');
+            img.id = 'currentProfileImage';
+            img.alt = 'Profile image';
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.objectFit = 'cover';
+            icon.parentNode.appendChild(img);
+            icon.remove();
+        }
+        if (img) {
+            img.src = freshUrl;
+            img.style.display = 'block';
+        }
+        const caption = img && img.closest('.col-md-4') ? img.closest('.col-md-4').querySelector('small.text-muted') : null;
+        if (caption) {
+            caption.textContent = 'Current Image';
+        }
+    }
+
+    function openCamera(facing) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('This browser cannot use the camera.');
+            return;
+        }
+        facingMode = facing === 'environment' ? 'environment' : 'user';
+        stopCameraTracks();
+        if (webcamVideo) {
+            webcamVideo.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'none';
+        }
+        navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: facingMode } },
+            audio: false
+        })
+            .then(function (stream) {
+                webcamStream = stream;
+                webcamVideo.srcObject = stream;
+                webcamPanel.style.display = 'block';
+                return webcamVideo.play();
+            })
+            .catch(function () {
+                const label = facingMode === 'environment' ? 'back camera' : 'webcam';
+                alert('Could not open the ' + label + '. Allow camera access and try again.');
+            });
+    }
+
+    if (webcamVideo && webcamPanel && webcamCanvas && profileImageInput) {
+        if (openWebcamBtn) {
+            openWebcamBtn.addEventListener('click', function () { openCamera('user'); });
+        }
+        if (openBackCameraBtn) {
+            openBackCameraBtn.addEventListener('click', function () { openCamera('environment'); });
+        }
+        if (switchCameraBtn) {
+            switchCameraBtn.addEventListener('click', function () {
+                openCamera(facingMode === 'user' ? 'environment' : 'user');
+            });
+        }
+        if (cancelWebcamBtn) {
+            cancelWebcamBtn.addEventListener('click', stopWebcam);
+        }
+
+        if (captureBtn) {
+            captureBtn.addEventListener('click', function () {
+                if (!webcamVideo.videoWidth) {
+                    return;
+                }
+                webcamCanvas.width = webcamVideo.videoWidth;
+                webcamCanvas.height = webcamVideo.videoHeight;
+                const ctx = webcamCanvas.getContext('2d');
+                if (facingMode === 'user') {
+                    ctx.setTransform(-1, 0, 0, 1, webcamCanvas.width, 0);
+                } else {
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                }
+                ctx.drawImage(webcamVideo, 0, 0);
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                webcamCanvas.toBlob(function (blob) {
+                    if (!blob) {
+                        return;
+                    }
+                    const file = new File([blob], 'webcam-profile.jpg', { type: 'image/jpeg' });
+                    const status = document.getElementById('profileImageStatus');
+                    const formData = new FormData();
+                    formData.append('update_section', 'profile_image');
+                    formData.append('profile_image', file);
+                    captureBtn.disabled = true;
+                    if (status) {
+                        status.style.display = 'block';
+                        status.className = 'small mb-2 text-muted';
+                        status.textContent = 'Updating profile image...';
+                    }
+                    const form = profileImageInput.closest('form');
+                    fetch(form ? form.getAttribute('action') : window.location.href, {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    })
+                        .then(function (response) { return response.json(); })
+                        .then(function (data) {
+                            if (!data || !data.success) {
+                                throw new Error((data && data.message) ? data.message : 'Failed to update the profile image.');
+                            }
+                            showUpdatedProfile(data.url);
+                            if (status) {
+                                status.className = 'small mb-2 text-success';
+                                status.textContent = 'Profile image updated.';
+                            }
+                            profileImageInput.value = '';
+                            stopWebcam();
+                        })
+                        .catch(function (error) {
+                            if (status) {
+                                status.className = 'small mb-2 text-danger';
+                                status.textContent = error.message || 'Failed to update the profile image.';
+                            }
+                        })
+                        .finally(function () {
+                            captureBtn.disabled = false;
+                        });
+                }, 'image/jpeg', 0.92);
+            });
+        }
+    }
+});
+
+// Sri Lanka Provinces and Districts mapping
+const sriLankaDistricts = {
+    'Western Province': ['Colombo', 'Gampaha', 'Kalutara'],
+    'Central Province': ['Kandy', 'Matale', 'Nuwara Eliya'],
+    'Southern Province': ['Galle', 'Matara', 'Hambantota'],
+    'Northern Province': ['Jaffna', 'Kilinochchi', 'Mannar', 'Mullaitivu', 'Vavuniya'],
+    'Eastern Province': ['Batticaloa', 'Ampara', 'Trincomalee'],
+    'North Western Province': ['Kurunegala', 'Puttalam'],
+    'North Central Province': ['Anuradhapura', 'Polonnaruwa'],
+    'Uva Province': ['Badulla', 'Monaragala'],
+    'Sabaragamuwa Province': ['Ratnapura', 'Kegalle']
+};
+
+// Function to load districts based on selected province
+function loadDistricts(province, selectedDistrict = '') {
+    const districtSelect = document.getElementById('student_district');
+    if (!districtSelect) {
+        console.error('District select element not found!');
+        return;
+    }
+    
+    districtSelect.innerHTML = '<option value="">Select District</option>';
+    
+    if (province && sriLankaDistricts[province]) {
+        console.log('Loading districts for province:', province, 'Selected district:', selectedDistrict);
+        const normalizedSelectedDistrict = selectedDistrict ? selectedDistrict.trim() : '';
+        
+        sriLankaDistricts[province].forEach(function(district) {
+            const option = document.createElement('option');
+            option.value = district;
+            option.textContent = district;
+            // Case-insensitive comparison for district matching
+            if (normalizedSelectedDistrict && district.toLowerCase() === normalizedSelectedDistrict.toLowerCase()) {
+                option.selected = true;
+                console.log('Selected district matched:', district);
+            }
+            districtSelect.appendChild(option);
+        });
+        
+        // If selected district wasn't found in the list, add it as an option
+        if (normalizedSelectedDistrict && !sriLankaDistricts[province].some(d => d.toLowerCase() === normalizedSelectedDistrict.toLowerCase())) {
+            const option = document.createElement('option');
+            option.value = normalizedSelectedDistrict;
+            option.textContent = normalizedSelectedDistrict;
+            option.selected = true;
+            districtSelect.appendChild(option);
+            console.log('Added custom district:', normalizedSelectedDistrict);
+        }
+    } else {
+        console.warn('No districts found for province:', province);
+        // If province is selected but not in our list, still try to preserve the district value
+        if (selectedDistrict && selectedDistrict.trim()) {
+            const option = document.createElement('option');
+            option.value = selectedDistrict.trim();
+            option.textContent = selectedDistrict.trim();
+            option.selected = true;
+            districtSelect.appendChild(option);
+        }
+    }
+}
+
+// Initialize Bootstrap tabs using Bootstrap's Tab API
+document.addEventListener('DOMContentLoaded', function() {
+    const tabButtons = document.querySelectorAll('#studentTabs button[data-bs-toggle="tab"]');
+    tabButtons.forEach(function(button) {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Use Bootstrap's Tab API
+            const tab = new bootstrap.Tab(button);
+            tab.show();
+        });
+    });
+    
+    // Initialize province and district on page load
+    const provinceSelect = document.getElementById('student_provice');
+    const districtSelect = document.getElementById('student_district');
+    const currentProvince = provinceSelect ? provinceSelect.value : '';
+    const currentDistrict = 'Jaffna';
+    
+    console.log('Initializing province/district:', { currentProvince, currentDistrict });
+    
+    // Load districts immediately if province is selected
+    if (provinceSelect && currentProvince) {
+        console.log('Loading districts for province:', currentProvince);
+        loadDistricts(currentProvince, currentDistrict);
+    } else if (provinceSelect) {
+        // Even if no province selected, ensure district dropdown has placeholder
+        if (districtSelect) {
+            districtSelect.innerHTML = '<option value="">Select District</option>';
+        }
+    }
+    
+    // Handle province change
+    if (provinceSelect) {
+        provinceSelect.addEventListener('change', function() {
+            console.log('Province changed to:', this.value);
+            loadDistricts(this.value);
+        });
+    }
+    
+    // Also trigger on page load to ensure districts are loaded
+    // Use setTimeout to ensure DOM is fully ready
+    setTimeout(function() {
+        if (provinceSelect && provinceSelect.value) {
+            const province = provinceSelect.value;
+            const district = currentDistrict;
+            console.log('Delayed load districts:', { province, district });
+            loadDistricts(province, district);
+        }
+    }, 100);
+    
+    // Enrollment tab: Auto-suggest next registration number when course/year selected
+    const editCourseSelect = document.getElementById('course_id');
+    const editAcademicYearSelect = document.getElementById('academic_year');
+    const studentIdNewInput = document.getElementById('student_id_new');
+    const btnSuggestRegNumber = document.getElementById('btnSuggestRegNumber');
+    
+    function suggestNextRegNumber() {
+        const courseId = editCourseSelect ? editCourseSelect.value : '';
+        const academicYear = editAcademicYearSelect ? editAcademicYearSelect.value : '';
+        if (!courseId || !academicYear || !studentIdNewInput) return;
+        
+        fetch('http://localhost/SLGTIMIS/students/get-last-reg-number?course_id=' + encodeURIComponent(courseId) + '&academic_year=' + encodeURIComponent(academicYear))
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.nextRegNumber) {
+                    studentIdNewInput.value = data.nextRegNumber;
+                }
+            })
+            .catch(err => console.error('Error fetching next reg number:', err));
+    }
+    
+    if (editCourseSelect && editAcademicYearSelect && studentIdNewInput) {
+        editCourseSelect.addEventListener('change', suggestNextRegNumber);
+        editAcademicYearSelect.addEventListener('change', suggestNextRegNumber);
+        if (btnSuggestRegNumber) {
+            btnSuggestRegNumber.addEventListener('click', suggestNextRegNumber);
+        }
+    }
+});
+</script>
+                    </div>
+                </main>
+            </div>
+        </div>
+        
+    <script>
+        // Mobile menu toggle
+        document.addEventListener('DOMContentLoaded', function() {
+            const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+            const sidebar = document.getElementById('sidebar');
+            const sidebarOverlay = document.getElementById('sidebarOverlay');
+            const sidebarClose = document.getElementById('sidebarClose');
+            
+            if (mobileMenuToggle) {
+                mobileMenuToggle.addEventListener('click', function() {
+                    sidebar.classList.add('sidebar-open');
+                    if (sidebarOverlay) {
+                        sidebarOverlay.classList.add('sidebar-open');
+                    }
+                    document.body.style.overflow = 'hidden';
+                });
+            }
+            
+            if (sidebarClose) {
+                sidebarClose.addEventListener('click', function() {
+                    sidebar.classList.remove('sidebar-open');
+                    if (sidebarOverlay) {
+                        sidebarOverlay.classList.remove('sidebar-open');
+                    }
+                    document.body.style.overflow = '';
+                });
+            }
+            
+            if (sidebarOverlay) {
+                sidebarOverlay.addEventListener('click', function(e) {
+                    // Only close if clicking on the overlay itself, not if event bubbles from sidebar
+                    if (e.target === sidebarOverlay) {
+                        sidebar.classList.remove('sidebar-open');
+                        sidebarOverlay.classList.remove('sidebar-open');
+                        document.body.style.overflow = '';
+                    }
+                });
+            }
+            
+            // Close sidebar when clicking on a menu item (mobile)
+            // But NOT on menu-toggle items (they toggle submenus)
+            const sidebarLinks = document.querySelectorAll('.sidebar-menu a');
+            sidebarLinks.forEach(function(link) {
+                // Only close sidebar for actual navigation links, not toggle links
+                if (!link.classList.contains('menu-toggle')) {
+                    link.addEventListener('click', function(e) {
+                        // Allow the link to navigate normally
+                        if (window.innerWidth <= 768) {
+                            // Close sidebar after a small delay to allow navigation
+                            setTimeout(function() {
+                                sidebar.classList.remove('sidebar-open');
+                                if (sidebarOverlay) {
+                                    sidebarOverlay.classList.remove('sidebar-open');
+                                }
+                                document.body.style.overflow = '';
+                            }, 100);
+                        }
+                    });
+                }
+            });
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768) {
+                    sidebar.classList.remove('sidebar-open');
+                    if (sidebarOverlay) {
+                        sidebarOverlay.classList.remove('sidebar-open');
+                    }
+                    document.body.style.overflow = '';
+                }
+            });
+            
+            // Submenu toggle functionality
+            const menuToggles = document.querySelectorAll('.menu-toggle');
+            menuToggles.forEach(function(toggle) {
+                toggle.addEventListener('click', function(e) {
+                    const href = (this.getAttribute('href') || '').trim();
+                    const isRealLink = href !== '' && href !== '#';
+                    const clickedArrow = e.target.closest('.menu-arrow');
+                    if (isRealLink && !clickedArrow) {
+                        return;
+                    }
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const parent = this.parentElement;
+                    const submenu = parent.querySelector('.submenu');
+                    
+                    // Close sibling menus at the same level only (keep ancestors open for nested menus)
+                    const parentList = parent.parentElement;
+                    if (parentList) {
+                        parentList.querySelectorAll(':scope > .menu-item-has-children').forEach(function(item) {
+                            if (item !== parent) {
+                                item.classList.remove('active');
+                                const otherSubmenu = item.querySelector(':scope > .submenu');
+                                if (otherSubmenu) {
+                                    otherSubmenu.style.display = 'none';
+                                }
+                            }
+                        });
+                    }
+                    
+                    // Toggle current submenu
+                    const directSubmenu = parent.querySelector(':scope > .submenu') || submenu;
+                    if (parent.classList.contains('active')) {
+                        parent.classList.remove('active');
+                        if (directSubmenu) {
+                            directSubmenu.style.display = 'none';
+                        }
+                    } else {
+                        parent.classList.add('active');
+                        if (directSubmenu) {
+                            directSubmenu.style.display = 'block';
+                        }
+                    }
+                });
+            });
+        });
+        
+        // Session Timeout Warning (30 minutes = 1800 seconds)
+                (function() {
+            const SESSION_TIMEOUT = 1800000; // 30 minutes in milliseconds
+            const WARNING_TIME = 300000; // 5 minutes before timeout (in milliseconds)
+            let warningShown = false;
+            let lastActivity = Date.now();
+            let warningTimer = null;
+            let timeoutTimer = null;
+            
+            function updateActivity() {
+                lastActivity = Date.now();
+                warningShown = false;
+                
+                // Clear existing timers
+                if (warningTimer) clearTimeout(warningTimer);
+                if (timeoutTimer) clearTimeout(timeoutTimer);
+                
+                // Set warning timer (25 minutes from now)
+                warningTimer = setTimeout(function() {
+                    if (!warningShown) {
+                        warningShown = true;
+                        const response = confirm('Your session will expire in 5 minutes due to inactivity. Do you want to extend your session?');
+                        if (response) {
+                            // Extend session by making a request to update last activity
+                            fetch('http://localhost/SLGTIMIS/dashboard', { method: 'HEAD', cache: 'no-cache' })
+                                .then(() => {
+                                    updateActivity(); // Reset timers
+                                })
+                                .catch(() => {
+                                    updateActivity(); // Reset anyway
+                                });
+                        }
+                    }
+                }, SESSION_TIMEOUT - WARNING_TIME);
+                
+                // Set timeout timer (30 minutes from now)
+                timeoutTimer = setTimeout(function() {
+                    alert('Your session has expired due to inactivity. You will be redirected to the login page.');
+                    window.location.href = 'http://localhost/SLGTIMIS/login?timeout=1';
+                }, SESSION_TIMEOUT);
+            }
+            
+            // Track user activity
+            ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(function(event) {
+                document.addEventListener(event, updateActivity, true);
+            });
+            
+            // Initialize
+            updateActivity();
+            
+            // Check periodically (every minute)
+            setInterval(function() {
+                const timeSinceLastActivity = Date.now() - lastActivity;
+                if (timeSinceLastActivity >= SESSION_TIMEOUT) {
+                    alert('Your session has expired due to inactivity. You will be redirected to the login page.');
+                    window.location.href = 'http://localhost/SLGTIMIS/login?timeout=1';
+                }
+            }, 60000); // Check every minute
+        })();
+            </script>
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+</body>
+</html>
+
+

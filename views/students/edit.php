@@ -1,4 +1,4 @@
-﻿<div class="container-fluid px-4 py-3">
+﻿<div class="container-fluid px-3 px-md-4 py-3 student-edit-page">
     <style>
         /* Ensure only active tab content is visible on this page */
         #studentTabsContent > .tab-pane {
@@ -9,12 +9,69 @@
         #studentTabsContent > .tab-pane.show.active {
             display: block;
         }
+        .student-edit-page .edit-student-header {
+            gap: 0.5rem;
+        }
+        .student-edit-page .edit-student-header h5 {
+            min-width: 0;
+            word-break: break-word;
+        }
+        @media (max-width: 768px) {
+            .student-edit-page {
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+            }
+            .student-edit-page .card {
+                padding: 0;
+                margin-bottom: 0.75rem;
+            }
+            .student-edit-page .card-header {
+                margin-bottom: 0;
+                padding: 0.75rem;
+            }
+            .student-edit-page .card-body {
+                padding: 0.75rem;
+            }
+            .student-edit-page .edit-student-header {
+                flex-wrap: wrap;
+                align-items: flex-start !important;
+            }
+            .student-edit-page .edit-student-header h5 {
+                font-size: 1rem;
+                line-height: 1.35;
+            }
+            .student-edit-page .nav-tabs {
+                flex-wrap: nowrap;
+            }
+            .student-edit-page .nav-tabs .nav-link {
+                font-size: 0.82rem;
+                white-space: nowrap;
+                padding: 0.45rem 0.65rem;
+            }
+            .student-edit-page .form-control,
+            .student-edit-page .form-select,
+            .student-edit-page .input-group,
+            .student-edit-page textarea {
+                width: 100%;
+                max-width: 100%;
+            }
+            .student-edit-page .edit-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .student-edit-page .edit-actions .btn {
+                width: 100%;
+            }
+            .student-edit-page #profileWebcam {
+                max-width: 100%;
+            }
+        }
     </style>
     <div class="row justify-content-center">
         <div class="col-12">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-primary text-white">
-                    <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex justify-content-between align-items-center edit-student-header">
                         <h5 class="mb-0 fw-bold"><i class="fas fa-edit me-2"></i>Edit Student: <?php echo htmlspecialchars($student['student_id']); ?></h5>
                         <a href="<?php echo APP_URL; ?>/students/view?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-light btn-sm">
                             <i class="fas fa-eye me-1"></i>View
@@ -136,7 +193,7 @@
                                                     <canvas id="profileWebcamCanvas" hidden></canvas>
                                                     <div class="mt-2 d-flex flex-wrap gap-2">
                                                         <button type="button" class="btn btn-primary btn-sm" id="btnCaptureWebcam">
-                                                            <i class="fas fa-camera me-1"></i>Capture
+                                                            <i class="fas fa-camera me-1"></i>Capture and update
                                                         </button>
                                                         <button type="button" class="btn btn-outline-primary btn-sm" id="btnSwitchCamera">
                                                             <i class="fas fa-sync-alt me-1"></i>Switch camera
@@ -144,6 +201,7 @@
                                                         <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCancelWebcam">Cancel</button>
                                                     </div>
                                                 </div>
+                                                <div id="profileImageStatus" class="small mb-2" style="display: none;"></div>
                                                 <div id="imagePreview" class="mb-3" style="display: none;">
                                                     <img id="previewImg" src="" alt="Preview" style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #dee2e6;">
                                                     <div class="mt-2">
@@ -383,7 +441,7 @@
                                             </div>
                                         </div>
                                 
-                                <div class="d-flex gap-2 mt-4">
+                                <div class="d-flex gap-2 mt-4 edit-actions">
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-save me-1"></i>Update Personal Information
                                     </button>
@@ -523,7 +581,7 @@
                                     </div>
                                 <?php endif; ?>
                                 
-                                <div class="d-flex gap-2 mt-4">
+                                <div class="d-flex gap-2 mt-4 edit-actions">
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-save me-1"></i>Update Enrollment Information
                                     </button>
@@ -559,7 +617,7 @@
                                                maxlength="100">
                                     </div>
                                 </div>
-                                <div class="d-flex gap-2 mt-4">
+                                <div class="d-flex gap-2 mt-4 edit-actions">
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-save me-1"></i>Update Bank Details
                                     </button>
@@ -592,7 +650,7 @@
                                         <div class="form-text">Date from which allowance eligibility applies (used by attendance logic when set).</div>
                                     </div>
                                 </div>
-                                <div class="d-flex gap-2 mt-4">
+                                <div class="d-flex gap-2 mt-4 edit-actions">
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-save me-1"></i>Update Allowance Eligibility
                                     </button>
@@ -693,6 +751,33 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function showUpdatedProfile(url) {
+        if (!url) {
+            return;
+        }
+        const freshUrl = url + (url.indexOf('?') === -1 ? '?' : '&') + 't=' + Date.now();
+        let img = document.getElementById('currentProfileImage');
+        const icon = document.getElementById('currentProfileImageIcon');
+        if (!img && icon) {
+            img = document.createElement('img');
+            img.id = 'currentProfileImage';
+            img.alt = 'Profile image';
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.objectFit = 'cover';
+            icon.parentNode.appendChild(img);
+            icon.remove();
+        }
+        if (img) {
+            img.src = freshUrl;
+            img.style.display = 'block';
+        }
+        const caption = img && img.closest('.col-md-4') ? img.closest('.col-md-4').querySelector('small.text-muted') : null;
+        if (caption) {
+            caption.textContent = 'Current Image';
+        }
+    }
+
     function openCamera(facing) {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             alert('This browser cannot use the camera.');
@@ -755,15 +840,44 @@ document.addEventListener('DOMContentLoaded', function() {
                         return;
                     }
                     const file = new File([blob], 'webcam-profile.jpg', { type: 'image/jpeg' });
-                    const transfer = new DataTransfer();
-                    transfer.items.add(file);
-                    profileImageInput.files = transfer.files;
-                    const removeFlag = document.getElementById('remove_profile_image');
-                    if (removeFlag) {
-                        removeFlag.value = '0';
+                    const status = document.getElementById('profileImageStatus');
+                    const formData = new FormData();
+                    formData.append('update_section', 'profile_image');
+                    formData.append('profile_image', file);
+                    captureBtn.disabled = true;
+                    if (status) {
+                        status.style.display = 'block';
+                        status.className = 'small mb-2 text-muted';
+                        status.textContent = 'Updating profile image...';
                     }
-                    previewImage(profileImageInput);
-                    stopWebcam();
+                    const form = profileImageInput.closest('form');
+                    fetch(form ? form.getAttribute('action') : window.location.href, {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    })
+                        .then(function (response) { return response.json(); })
+                        .then(function (data) {
+                            if (!data || !data.success) {
+                                throw new Error((data && data.message) ? data.message : 'Failed to update the profile image.');
+                            }
+                            showUpdatedProfile(data.url);
+                            if (status) {
+                                status.className = 'small mb-2 text-success';
+                                status.textContent = 'Profile image updated.';
+                            }
+                            profileImageInput.value = '';
+                            stopWebcam();
+                        })
+                        .catch(function (error) {
+                            if (status) {
+                                status.className = 'small mb-2 text-danger';
+                                status.textContent = error.message || 'Failed to update the profile image.';
+                            }
+                        })
+                        .finally(function () {
+                            captureBtn.disabled = false;
+                        });
                 }, 'image/jpeg', 0.92);
             });
         }

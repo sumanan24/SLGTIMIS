@@ -1582,6 +1582,27 @@ class StudentController extends Controller {
                 // Skip the normal update flow for enrollment
                 $updateSection = null;
                 
+            } elseif ($updateSection === 'profile_image') {
+                if (!$canUpdateProfileImage) {
+                    $this->json(['success' => false, 'message' => 'Only SAO and ADM can update the profile image.'], 403);
+                }
+                $saved = $this->storeStudentProfileImage($studentModel, $student, $id);
+                if (empty($saved['success'])) {
+                    $this->json(['success' => false, 'message' => $saved['message'] ?? 'Failed to update the profile image.'], 400);
+                }
+                $this->logActivity(
+                    'UPDATE',
+                    'student_profile_image',
+                    $id,
+                    "Profile image updated for student {$id}",
+                    null,
+                    ['student_profile_img' => $saved['path'] ?? '']
+                );
+                $this->json([
+                    'success' => true,
+                    'message' => 'Profile image updated.',
+                    'url' => $saved['url'] ?? ''
+                ]);
             } else {
                 $_SESSION['error'] = 'Invalid update section.';
                 $_SESSION['active_tab'] = 'personal';
@@ -1754,6 +1775,72 @@ class StudentController extends Controller {
         ];
         unset($_SESSION['error'], $_SESSION['message']);
         return $this->view('students/edit', $data);
+    }
+
+    /**
+     * Save an uploaded profile photo. Used by the camera capture on the edit page.
+     */
+    private function storeStudentProfileImage($studentModel, $student, $id) {
+        if (!isset($_FILES['profile_image']) || $_FILES['profile_image']['error'] !== UPLOAD_ERR_OK) {
+            return ['success' => false, 'message' => 'No image was received.'];
+        }
+
+        $file = $_FILES['profile_image'];
+        if (($file['size'] ?? 0) > 5 * 1024 * 1024) {
+            return ['success' => false, 'message' => 'Image must be 5MB or smaller.'];
+        }
+
+        $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+        $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
+        if (!in_array($fileExtension, $allowedExtensions, true) || !in_array($file['type'], $allowedMimeTypes, true)) {
+            return ['success' => false, 'message' => 'Please use a JPG, PNG, or GIF image.'];
+        }
+
+        $imageDirectory = BASE_PATH . '/assets/img/Studnet_profile';
+        if (!is_dir($imageDirectory) && !mkdir($imageDirectory, 0755, true)) {
+            return ['success' => false, 'message' => 'Could not create the image folder.'];
+        }
+
+        $currentImagePath = $student['student_profile_img'] ?? $student['file_path'] ?? '';
+        if ($currentImagePath !== '') {
+            $normalizedPath = ltrim($currentImagePath, '/');
+            if (strpos($normalizedPath, 'assets/') === 0) {
+                $normalizedPath = substr($normalizedPath, 7);
+            }
+            if (strpos($normalizedPath, 'img/student_profile/') === 0) {
+                $normalizedPath = str_replace('img/student_profile/', 'img/Studnet_profile/', $normalizedPath);
+            }
+            if (strpos($normalizedPath, 'img/Student_profile/') === 0) {
+                $normalizedPath = str_replace('img/Student_profile/', 'img/Studnet_profile/', $normalizedPath);
+            }
+            if (strpos($normalizedPath, 'img/Studnet_profile/') !== 0) {
+                $normalizedPath = 'img/Studnet_profile/' . basename($normalizedPath);
+            }
+            $oldImagePath = BASE_PATH . '/assets/' . $normalizedPath;
+            if (is_file($oldImagePath)) {
+                @unlink($oldImagePath);
+            }
+        }
+
+        $safeStudentId = preg_replace('/[^a-zA-Z0-9._-]/', '_', $id);
+        $newFilename = $safeStudentId . '_' . time() . '.' . $fileExtension;
+        $targetPath = $imageDirectory . '/' . $newFilename;
+        if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
+            return ['success' => false, 'message' => 'Failed to save the profile image.'];
+        }
+
+        $newImagePath = 'img/Studnet_profile/' . $newFilename;
+        if (!$studentModel->updateStudentImage($id, $newImagePath)) {
+            return ['success' => false, 'message' => 'Failed to save the profile image.'];
+        }
+
+        $updated = $studentModel->find($id);
+        return [
+            'success' => true,
+            'path' => $newImagePath,
+            'url' => $studentModel->getProfileImagePath($updated) ?: (APP_URL . '/assets/' . $newImagePath)
+        ];
     }
     
     public function delete() {
