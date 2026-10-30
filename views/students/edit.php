@@ -67,22 +67,27 @@
             }
         }
         .profile-cam-frame {
+            position: relative;
             width: 100%;
             max-width: 320px;
             height: 280px;
             overflow: hidden;
             border-radius: 8px;
             background: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             border: 1px solid #dee2e6;
         }
         .profile-cam-frame video {
+            position: absolute;
             width: 100%;
             height: 100%;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .profile-cam-frame canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
             object-fit: contain;
-            background: transparent;
         }
         .bg-swatch {
             width: 32px;
@@ -220,6 +225,7 @@
                                                 <div id="webcamPanel" class="mb-3" style="display: none;">
                                                     <div class="profile-cam-frame" id="profileCamFrame">
                                                         <video id="profileWebcam" autoplay playsinline muted></video>
+                                                        <canvas id="profileCamPreview"></canvas>
                                                     </div>
                                                     <canvas id="profileWebcamCanvas" hidden></canvas>
                                                     <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
@@ -230,6 +236,10 @@
                                                         <button type="button" class="btn btn-outline-secondary btn-sm" id="btnZoomIn" title="Zoom in">
                                                             <i class="fas fa-search-plus"></i>
                                                         </button>
+                                                    </div>
+                                                    <div class="form-check mt-2 mb-0">
+                                                        <input class="form-check-input" type="checkbox" id="aiBackgroundFilter" checked>
+                                                        <label class="form-check-label small" for="aiBackgroundFilter">AI background filter</label>
                                                     </div>
                                                     <div class="mt-2">
                                                         <div class="small fw-semibold mb-1">Background color</div>
@@ -780,6 +790,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const webcamPanel = document.getElementById('webcamPanel');
     const webcamVideo = document.getElementById('profileWebcam');
     const webcamCanvas = document.getElementById('profileWebcamCanvas');
+    const previewCanvas = document.getElementById('profileCamPreview');
+    const aiFilterToggle = document.getElementById('aiBackgroundFilter');
     const captureBtn = document.getElementById('btnCaptureWebcam');
     const cancelWebcamBtn = document.getElementById('btnCancelWebcam');
     const zoomInBtn = document.getElementById('btnZoomIn');
@@ -791,6 +803,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let facingMode = 'user';
     let cameraZoom = 1;
     let backgroundColor = '#ffffff';
+    let previewTimer = null;
+    let segmenter = null;
+    let segmenterPromise = null;
+    let maskCanvas = document.createElement('canvas');
 
     function stopCameraTracks() {
         if (webcamStream) {
@@ -803,6 +819,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function stopWebcam() {
+        if (previewTimer) {
+            clearInterval(previewTimer);
+            previewTimer = null;
+        }
         stopCameraTracks();
         if (webcamPanel) {
             webcamPanel.style.display = 'none';
@@ -850,6 +870,151 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function setProfileStatus(text, kind) {
+        const status = document.getElementById('profileImageStatus');
+        if (!status) {
+            return;
+        }
+        status.style.display = 'block';
+        status.className = 'small mb-2 text-' + (kind || 'muted');
+        status.textContent = text;
+    }
+
+    function ensureSegmenter() {
+        if (segmenter) {
+            return Promise.resolve(segmenter);
+        }
+        if (segmenterPromise) {
+            return segmenterPromise;
+        }
+        segmenterPromise = import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.17/+esm')
+            .then(function (vision) {
+                return vision.FilesetResolver.forVisionTasks(
+                    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.17/wasm'
+                ).then(function (fileset) {
+                    const options = {
+                        baseOptions: {
+                            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/1/selfie_segmenter.tflite'
+                        },
+                        runningMode: 'VIDEO',
+                        outputCategoryMask: false,
+                        outputConfidenceMasks: true
+                    };
+                    return vision.ImageSegmenter.createFromOptions(fileset, options).catch(function () {
+                        options.baseOptions.delegate = 'CPU';
+                        return vision.ImageSegmenter.createFromOptions(fileset, options);
+                    });
+                });
+            })
+            .then(function (created) {
+                segmenter = created;
+                return created;
+            })
+            .catch(function () {
+                segmenterPromise = null;
+                return null;
+            });
+        return segmenterPromise;
+    }
+
+    function personMask(result) {
+        const masks = result && result.confidenceMasks ? result.confidenceMasks : [];
+        if (!masks.length) {
+            return null;
+        }
+        return masks.length > 1 ? masks[1] : masks[0];
+    }
+
+    function paintPhoto(target, size) {
+        if (!webcamVideo || !webcamVideo.videoWidth) {
+            return false;
+        }
+        target.width = size;
+        target.height = size;
+        const ctx = target.getContext('2d');
+        const vw = webcamVideo.videoWidth;
+        const vh = webcamVideo.videoHeight;
+        const aspect = vw / vh;
+        let drawW = size;
+        let drawH = size / aspect;
+        if (drawH > size) {
+            drawH = size;
+            drawW = size * aspect;
+        }
+        drawW *= cameraZoom;
+        drawH *= cameraZoom;
+
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, size, size);
+        ctx.save();
+        ctx.translate(size / 2, size / 2);
+        if (facingMode === 'user') {
+            ctx.scale(-1, 1);
+        }
+        ctx.drawImage(webcamVideo, -drawW / 2, -drawH / 2, drawW, drawH);
+        ctx.restore();
+
+        const useFilter = aiFilterToggle && aiFilterToggle.checked && segmenter;
+        if (useFilter) {
+            let result = null;
+            try {
+                result = segmenter.segmentForVideo(webcamVideo, performance.now());
+            } catch (error) {
+                result = null;
+            }
+            const mask = personMask(result);
+            if (mask) {
+                const values = mask.getAsFloat32Array();
+                maskCanvas.width = mask.width;
+                maskCanvas.height = mask.height;
+                const maskCtx = maskCanvas.getContext('2d');
+                const image = maskCtx.createImageData(mask.width, mask.height);
+                for (let i = 0; i < values.length; i++) {
+                    const alpha = Math.min(1, Math.max(0, (values[i] - 0.35) / 0.4));
+                    const pixel = i * 4;
+                    image.data[pixel] = 255;
+                    image.data[pixel + 1] = 255;
+                    image.data[pixel + 2] = 255;
+                    image.data[pixel + 3] = Math.round(alpha * 255);
+                }
+                maskCtx.putImageData(image, 0, 0);
+                ctx.save();
+                ctx.globalCompositeOperation = 'destination-in';
+                ctx.translate(size / 2, size / 2);
+                if (facingMode === 'user') {
+                    ctx.scale(-1, 1);
+                }
+                ctx.drawImage(maskCanvas, -drawW / 2, -drawH / 2, drawW, drawH);
+                ctx.restore();
+            }
+            if (result && result.confidenceMasks) {
+                result.confidenceMasks.forEach(function (item) {
+                    if (item && typeof item.close === 'function') {
+                        item.close();
+                    }
+                });
+            }
+        }
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = backgroundColor;
+        ctx.fillRect(0, 0, size, size);
+        ctx.restore();
+        return true;
+    }
+
+    function startPreview() {
+        if (previewTimer) {
+            clearInterval(previewTimer);
+        }
+        previewTimer = setInterval(function () {
+            if (previewCanvas) {
+                paintPhoto(previewCanvas, 480);
+            }
+        }, 80);
+    }
+
     function openCamera(facing) {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             alert('This browser cannot use the camera.');
@@ -866,6 +1031,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 webcamStream = stream;
                 webcamVideo.srcObject = stream;
                 webcamPanel.style.display = 'block';
+                startPreview();
+                if (aiFilterToggle && aiFilterToggle.checked) {
+                    setProfileStatus('Loading AI background filter...', 'muted');
+                    ensureSegmenter().then(function (ready) {
+                        if (ready) {
+                            setProfileStatus('AI background filter is ready.', 'success');
+                        } else {
+                            setProfileStatus('AI filter could not load. The photo will keep the camera background.', 'danger');
+                        }
+                    });
+                }
                 return webcamVideo.play();
             })
             .catch(function () {
@@ -920,31 +1096,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!webcamVideo.videoWidth) {
                     return;
                 }
-                const size = 640;
-                webcamCanvas.width = size;
-                webcamCanvas.height = size;
-                const ctx = webcamCanvas.getContext('2d');
-                ctx.setTransform(1, 0, 0, 1, 0, 0);
-                ctx.fillStyle = backgroundColor;
-                ctx.fillRect(0, 0, size, size);
-                const vw = webcamVideo.videoWidth;
-                const vh = webcamVideo.videoHeight;
-                const aspect = vw / vh;
-                let drawW = size;
-                let drawH = size / aspect;
-                if (drawH > size) {
-                    drawH = size;
-                    drawW = size * aspect;
+                if (!paintPhoto(webcamCanvas, 640)) {
+                    return;
                 }
-                drawW *= cameraZoom;
-                drawH *= cameraZoom;
-                ctx.save();
-                ctx.translate(size / 2, size / 2);
-                if (facingMode === 'user') {
-                    ctx.scale(-1, 1);
-                }
-                ctx.drawImage(webcamVideo, -drawW / 2, -drawH / 2, drawW, drawH);
-                ctx.restore();
                 webcamCanvas.toBlob(function (blob) {
                     if (!blob) {
                         return;
