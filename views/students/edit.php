@@ -99,7 +99,7 @@
                                                             <i class="fas fa-user fa-4x text-muted" id="currentProfileImageIcon"></i>
                                                         <?php endif; ?>
                                                     </div>
-                                                    <?php if ($profileImageUrl): ?>
+                                                    <?php if ($profileImageUrl && !empty($canUpdateProfileImage)): ?>
                                                         <button type="button" class="btn btn-sm btn-danger position-absolute" 
                                                                 style="top: 0; right: 0; border-radius: 50%; width: 30px; height: 30px; padding: 0;"
                                                                 onclick="confirmRemoveImage()" title="Remove Image">
@@ -116,11 +116,27 @@
                                                 </div>
                                             </div>
                                             <div class="col-md-8">
+                                                <?php if (!empty($canUpdateProfileImage)): ?>
                                                 <div class="mb-3">
                                                     <label for="profile_image" class="form-label fw-semibold">Upload New Profile Image</label>
                                                     <input type="file" class="form-control" id="profile_image" name="profile_image" 
                                                            accept="image/jpeg,image/jpg,image/png,image/gif" onchange="previewImage(this)">
-                                                    <div class="form-text">Accepted formats: JPG, PNG, GIF (Max 5MB)</div>
+                                                    <div class="form-text">Accepted formats: JPG, PNG, GIF (Max 5MB). SAO and ADM only.</div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenWebcam">
+                                                        <i class="fas fa-camera me-1"></i>Use webcam
+                                                    </button>
+                                                </div>
+                                                <div id="webcamPanel" class="mb-3" style="display: none;">
+                                                    <video id="profileWebcam" autoplay playsinline muted style="width: 100%; max-width: 320px; border-radius: 8px; background: #000;"></video>
+                                                    <canvas id="profileWebcamCanvas" hidden></canvas>
+                                                    <div class="mt-2 d-flex gap-2">
+                                                        <button type="button" class="btn btn-primary btn-sm" id="btnCaptureWebcam">
+                                                            <i class="fas fa-camera me-1"></i>Capture
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCancelWebcam">Cancel</button>
+                                                    </div>
                                                 </div>
                                                 <div id="imagePreview" class="mb-3" style="display: none;">
                                                     <img id="previewImg" src="" alt="Preview" style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #dee2e6;">
@@ -129,6 +145,9 @@
                                                     </div>
                                                 </div>
                                                 <input type="hidden" name="remove_profile_image" id="remove_profile_image" value="0">
+                                                <?php else: ?>
+                                                <p class="text-muted mb-0">Profile image can be updated by SAO or ADM only.</p>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                     </div>
@@ -451,6 +470,7 @@
                                                 <option value="Dropout" <?php echo ($currentEnrollment['student_enroll_status'] ?? '') === 'Dropout' ? 'selected' : ''; ?>>Dropout</option>
                                                 <option value="Completed" <?php echo ($currentEnrollment['student_enroll_status'] ?? '') === 'Completed' ? 'selected' : ''; ?>>Completed</option>
                                                 <option value="Long Absent" <?php echo ($currentEnrollment['student_enroll_status'] ?? '') === 'Long Absent' ? 'selected' : ''; ?>>Long Absent</option>
+                                                <option value="Internship" <?php echo ($currentEnrollment['student_enroll_status'] ?? '') === 'Internship' ? 'selected' : ''; ?>>Internship</option>
                                             </select>
                                         </div>
                                     </div>
@@ -637,6 +657,76 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('remove_profile_image').value = '0';
             }
         });
+    }
+
+    const openWebcamBtn = document.getElementById('btnOpenWebcam');
+    const webcamPanel = document.getElementById('webcamPanel');
+    const webcamVideo = document.getElementById('profileWebcam');
+    const webcamCanvas = document.getElementById('profileWebcamCanvas');
+    const captureBtn = document.getElementById('btnCaptureWebcam');
+    const cancelWebcamBtn = document.getElementById('btnCancelWebcam');
+    let webcamStream = null;
+
+    function stopWebcam() {
+        if (webcamStream) {
+            webcamStream.getTracks().forEach(function (track) { track.stop(); });
+            webcamStream = null;
+        }
+        if (webcamVideo) {
+            webcamVideo.srcObject = null;
+        }
+        if (webcamPanel) {
+            webcamPanel.style.display = 'none';
+        }
+    }
+
+    if (openWebcamBtn && webcamVideo && webcamPanel && webcamCanvas && profileImageInput) {
+        openWebcamBtn.addEventListener('click', function () {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert('This browser cannot use the webcam.');
+                return;
+            }
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+                .then(function (stream) {
+                    webcamStream = stream;
+                    webcamVideo.srcObject = stream;
+                    webcamPanel.style.display = 'block';
+                    return webcamVideo.play();
+                })
+                .catch(function () {
+                    alert('Could not open the webcam. Allow camera access and try again.');
+                });
+        });
+
+        if (cancelWebcamBtn) {
+            cancelWebcamBtn.addEventListener('click', stopWebcam);
+        }
+
+        if (captureBtn) {
+            captureBtn.addEventListener('click', function () {
+                if (!webcamVideo.videoWidth) {
+                    return;
+                }
+                webcamCanvas.width = webcamVideo.videoWidth;
+                webcamCanvas.height = webcamVideo.videoHeight;
+                webcamCanvas.getContext('2d').drawImage(webcamVideo, 0, 0);
+                webcamCanvas.toBlob(function (blob) {
+                    if (!blob) {
+                        return;
+                    }
+                    const file = new File([blob], 'webcam-profile.jpg', { type: 'image/jpeg' });
+                    const transfer = new DataTransfer();
+                    transfer.items.add(file);
+                    profileImageInput.files = transfer.files;
+                    const removeFlag = document.getElementById('remove_profile_image');
+                    if (removeFlag) {
+                        removeFlag.value = '0';
+                    }
+                    previewImage(profileImageInput);
+                    stopWebcam();
+                }, 'image/jpeg', 0.92);
+            });
+        }
     }
 });
 

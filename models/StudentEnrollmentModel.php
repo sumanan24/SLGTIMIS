@@ -33,6 +33,30 @@ class StudentEnrollmentModel extends Model {
             $this->db->query($alter);
         }
     }
+
+    /**
+     * Keep enrollment status values the form is allowed to save.
+     */
+    public function ensureEnrollStatusValues() {
+        $sql = "SHOW COLUMNS FROM `{$this->table}` LIKE 'student_enroll_status'";
+        $result = $this->db->query($sql);
+        $row = $result ? $result->fetch_assoc() : null;
+        $type = (string) ($row['Type'] ?? '');
+        if ($type !== '' && stripos($type, 'enum(') === 0 && stripos($type, "'Internship'") === false) {
+            $alter = "ALTER TABLE `{$this->table}`
+                      MODIFY COLUMN `student_enroll_status`
+                      ENUM('Following','Dropout','Completed','Long Absent','Internship')
+                      NOT NULL DEFAULT 'Following'";
+            $this->db->query($alter);
+        }
+    }
+
+    public function normalizeEnrollStatus($status) {
+        $this->ensureEnrollStatusValues();
+        $status = trim((string) $status);
+        $allowed = ['Following', 'Dropout', 'Completed', 'Long Absent', 'Internship'];
+        return in_array($status, $allowed, true) ? $status : 'Following';
+    }
     
     /**
      * Get enrollments for a student
@@ -115,6 +139,7 @@ class StudentEnrollmentModel extends Model {
      */
     public function createEnrollment($data) {
         $this->ensureCourseVersionColumn();
+        $data['student_enroll_status'] = $this->normalizeEnrollStatus($data['student_enroll_status'] ?? 'Following');
 
         // Determine course version: use provided value or latest version for the course
         $courseVersion = isset($data['course_version']) ? (int)$data['course_version'] : null;
@@ -158,6 +183,7 @@ class StudentEnrollmentModel extends Model {
     public function updateEnrollment($studentId, $data) {
         $this->lastSqlError = '';
         $this->ensureCourseVersionColumn();
+        $data['student_enroll_status'] = $this->normalizeEnrollStatus($data['student_enroll_status'] ?? 'Following');
 
         // Update course_version to latest if course_id changes or explicit version provided
         $courseVersion = isset($data['course_version']) ? (int)$data['course_version'] : null;
@@ -209,6 +235,7 @@ class StudentEnrollmentModel extends Model {
     public function updateEnrollmentByRecord($studentId, $courseId, $academicYear, $data) {
         $this->lastSqlError = '';
         $this->ensureCourseVersionColumn();
+        $data['student_enroll_status'] = $this->normalizeEnrollStatus($data['student_enroll_status'] ?? 'Following');
 
         $courseVersion = isset($data['course_version']) ? (int)$data['course_version'] : null;
         if ($courseVersion === null && !empty($data['course_id'])) {

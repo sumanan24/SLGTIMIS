@@ -574,6 +574,12 @@ class StudentController extends Controller {
         $enrollmentModel = $this->model('StudentEnrollmentModel');
         $enrollments = $enrollmentModel->getByStudentId($id);
         $currentEnrollment = $enrollmentModel->getCurrentEnrollment($id);
+        if (empty($currentEnrollment)) {
+            $latestEnrollment = $enrollmentModel->getLatestEnrollment($id);
+            if (($latestEnrollment['student_enroll_status'] ?? '') === 'Internship') {
+                $currentEnrollment = $latestEnrollment;
+            }
+        }
         
         // Get hostel information
         // Note: Hostel allocation information is visible to all authorized users including:
@@ -1340,6 +1346,10 @@ class StudentController extends Controller {
             $this->redirect('students');
             return;
         }
+
+        require_once BASE_PATH . '/models/UserModel.php';
+        $profileUserModel = new UserModel();
+        $canUpdateProfileImage = $profileUserModel->isSAO($_SESSION['user_id']) || $profileUserModel->isAdminOrADM($_SESSION['user_id']);
         
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $updateSection = $this->post('update_section', '');
@@ -1377,9 +1387,12 @@ class StudentController extends Controller {
                 $validationRequired = true;
                 $successMessage = 'Personal information updated successfully.';
                 
-                // Handle profile image upload/removal
+                // Handle profile image upload/removal (SAO and ADM only)
                 $removeImage = $this->post('remove_profile_image', '');
-                if ($removeImage === '1') {
+                $hasImageUpload = isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] === UPLOAD_ERR_OK;
+                if (!$canUpdateProfileImage && ($removeImage === '1' || $hasImageUpload)) {
+                    $_SESSION['error'] = 'Only SAO and ADM can update the profile image.';
+                } elseif ($removeImage === '1') {
                     // Remove existing image
                     $currentImagePath = $student['student_profile_img'] ?? $student['file_path'] ?? '';
                     if (!empty($currentImagePath)) {
@@ -1406,7 +1419,7 @@ class StudentController extends Controller {
                     // Update database to remove image path
                     $studentModel->updateStudentImage($id, '');
                     $successMessage .= ' Profile image removed.';
-                } elseif (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] === UPLOAD_ERR_OK) {
+                } elseif ($hasImageUpload) {
                     // Handle new image upload
                     $file = $_FILES['profile_image'];
                     $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
@@ -1735,6 +1748,7 @@ class StudentController extends Controller {
             'courses' => $courses,
             'departments' => $departments,
             'academicYears' => $academicYears,
+            'canUpdateProfileImage' => $canUpdateProfileImage,
             'error' => $_SESSION['error'] ?? null,
             'message' => $_SESSION['message'] ?? null
         ];

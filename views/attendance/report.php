@@ -1,3 +1,22 @@
+<style>
+@media print {
+    .no-print,
+    form,
+    .btn,
+    .alert {
+        display: none !important;
+    }
+    .card,
+    .card-header,
+    .card-body {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    .table {
+        font-size: 11px;
+    }
+}
+</style>
 <div class="container-fluid py-4">
     <div class="row">
         <div class="col-12">
@@ -95,6 +114,7 @@
                                 <input type="month" class="form-control" id="month" name="month" 
                                        value="<?php echo htmlspecialchars($selectedMonth ?? date('Y-m')); ?>" required>
                             </div>
+                            <input type="hidden" name="view" value="<?php echo htmlspecialchars(($reportView ?? 'summary') === 'daily' ? 'daily' : 'summary'); ?>">
                             
                             <div class="col-md-2">
                                 <label class="form-label fw-semibold">&nbsp;</label>
@@ -121,6 +141,12 @@
                             <div class="col-12">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-search me-1"></i>Generate Report
+                                </button>
+                                <button type="submit" name="view" value="summary" class="btn <?php echo (($reportView ?? 'summary') !== 'daily') ? 'btn-dark' : 'btn-outline-dark'; ?>">
+                                    <i class="fas fa-users me-1"></i>Month summary
+                                </button>
+                                <button type="submit" name="view" value="daily" class="btn <?php echo (($reportView ?? 'summary') === 'daily') ? 'btn-dark' : 'btn-outline-dark'; ?>">
+                                    <i class="fas fa-calendar-day me-1"></i>Daily register
                                 </button>
                                 <a href="<?php echo APP_URL; ?>/attendance/report" class="btn btn-outline-secondary">
                                     <i class="fas fa-redo me-1"></i>Reset
@@ -162,7 +188,130 @@
                         <?php endif; ?>
                         
                         <?php if (!empty($reportData)): ?>
-                        
+                        <?php
+                        $isSummaryView = (($reportView ?? 'summary') !== 'daily');
+                        $monthLabel = !empty($selectedMonth) ? date('F Y', strtotime($selectedMonth . '-01')) : '';
+                        ?>
+
+                        <?php if ($isSummaryView): ?>
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                            <h6 class="mb-0 fw-bold">Student summary — <?php echo htmlspecialchars($monthLabel); ?></h6>
+                            <button type="button" class="btn btn-outline-secondary btn-sm no-print" onclick="window.print();">
+                                <i class="fas fa-print me-1"></i>Print summary
+                            </button>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-2 col-6">
+                                <div class="border rounded p-3 text-center bg-light h-100">
+                                    <div class="text-muted small">Students</div>
+                                    <div class="fs-4 fw-bold"><?php echo (int)($summary['total_students'] ?? 0); ?></div>
+                                </div>
+                            </div>
+                            <div class="col-md-2 col-6">
+                                <div class="border rounded p-3 text-center h-100">
+                                    <div class="text-muted small">Weekdays</div>
+                                    <div class="fs-4 fw-bold"><?php echo (int)($summary['total_working_days'] ?? 0); ?></div>
+                                </div>
+                            </div>
+                            <div class="col-md-2 col-6">
+                                <div class="border rounded p-3 text-center h-100">
+                                    <div class="text-muted small">≥ 90%</div>
+                                    <div class="fs-4 fw-bold text-success"><?php echo (int)($summary['above_90'] ?? 0); ?></div>
+                                </div>
+                            </div>
+                            <div class="col-md-2 col-6">
+                                <div class="border rounded p-3 text-center h-100">
+                                    <div class="text-muted small">80% – 89%</div>
+                                    <div class="fs-4 fw-bold text-warning"><?php echo (int)($summary['above_80'] ?? 0); ?></div>
+                                </div>
+                            </div>
+                            <div class="col-md-2 col-6">
+                                <div class="border rounded p-3 text-center h-100">
+                                    <div class="text-muted small">&lt; 80%</div>
+                                    <div class="fs-4 fw-bold text-danger"><?php echo (int)($summary['below_80'] ?? 0); ?></div>
+                                </div>
+                            </div>
+                            <div class="col-md-2 col-6">
+                                <div class="border rounded p-3 text-center h-100">
+                                    <div class="text-muted small">Total allowance</div>
+                                    <div class="fs-5 fw-bold">Rs. <?php echo number_format($summary['total_allowance'] ?? 0, 0); ?></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped table-hover" style="font-size: 0.9rem;">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th class="text-center" style="width: 48px;">#</th>
+                                        <th>Student ID</th>
+                                        <th>Full name</th>
+                                        <th>NIC</th>
+                                        <th>Department</th>
+                                        <th>Course</th>
+                                        <th class="text-center">Working days</th>
+                                        <th class="text-center">Present</th>
+                                        <th class="text-center">Absent</th>
+                                        <th class="text-center">Holidays</th>
+                                        <th class="text-center">%</th>
+                                        <th class="text-end">Allowance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    $summaryAbsentTotal = 0;
+                                    $summaryWorkingTotal = 0;
+                                    $summaryHolidayTotal = 0;
+                                    $rowNo = 0;
+                                    foreach ($reportData as $student):
+                                        $rowNo++;
+                                        $workingDays = (int)($student['effective_working_days'] ?? 0);
+                                        $presentDays = (int)($student['present_days'] ?? 0);
+                                        $holidayDays = (int)($student['holiday_days'] ?? 0);
+                                        $absentDays = max(0, $workingDays - $presentDays);
+                                        $summaryAbsentTotal += $absentDays;
+                                        $summaryWorkingTotal += $workingDays;
+                                        $summaryHolidayTotal += $holidayDays;
+                                        $pct = (float)($student['attendance_percentage'] ?? 0);
+                                        $badge = $pct >= 90 ? 'bg-success' : ($pct >= 80 ? 'bg-warning text-dark' : 'bg-danger');
+                                    ?>
+                                        <tr>
+                                            <td class="text-center"><?php echo $rowNo; ?></td>
+                                            <td><?php echo htmlspecialchars($student['student_id']); ?></td>
+                                            <td><?php echo htmlspecialchars($student['student_fullname']); ?></td>
+                                            <td><?php echo htmlspecialchars($student['student_nic']); ?></td>
+                                            <td><?php echo htmlspecialchars($student['department_name'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($student['course_name'] ?? ''); ?></td>
+                                            <td class="text-center"><?php echo $workingDays; ?></td>
+                                            <td class="text-center"><?php echo $presentDays; ?></td>
+                                            <td class="text-center"><?php echo $absentDays; ?></td>
+                                            <td class="text-center"><?php echo $holidayDays; ?></td>
+                                            <td class="text-center">
+                                                <span class="badge <?php echo $badge; ?>"><?php echo number_format($pct, 1); ?>%</span>
+                                            </td>
+                                            <td class="text-end">Rs. <?php echo number_format($student['allowance'] ?? 0, 0); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-secondary fw-bold">
+                                        <td colspan="6" class="text-end">Total</td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-center"><?php echo (int)($summary['total_present'] ?? 0); ?></td>
+                                        <td class="text-center"><?php echo (int)$summaryAbsentTotal; ?></td>
+                                        <td class="text-center"><?php echo (int)$summaryHolidayTotal; ?></td>
+                                        <td class="text-center">—</td>
+                                        <td class="text-end">Rs. <?php echo number_format($summary['total_allowance'] ?? 0, 0); ?></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <p class="text-muted small mb-0">
+                            One row per student for the full month. Working days exclude weekends and holidays. Present is marked days only.
+                        </p>
+                        <?php else: ?>
+
                         <!-- Report Table with Day-by-Day Attendance -->
                         <div class="table-responsive" style="max-height: 80vh; overflow-x: auto; overflow-y: auto;">
                             <table class="table table-bordered table-striped" style="font-size: 0.85rem;">
@@ -269,6 +418,7 @@
                                 </div>
                             </div>
                         </div>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div class="alert alert-info text-center">
                             <i class="fas fa-info-circle me-2"></i>

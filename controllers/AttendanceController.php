@@ -397,6 +397,7 @@ class AttendanceController extends Controller {
         $courseId = $this->get('course_id', '');
         $academicYear = $this->get('academic_year', '');
         $month = $this->get('month', date('Y-m'));
+        $reportView = $this->get('view', 'summary') === 'daily' ? 'daily' : 'summary';
         // FIN users see only eligible (allowance-eligible) students; others can toggle via filter
         $eligibleOnly = $isFIN ? true : ($this->get('eligible_only', '0') === '1');
         
@@ -492,6 +493,7 @@ class AttendanceController extends Controller {
             'selectedCourse' => $courseId,
             'selectedAcademicYear' => $academicYear,
             'selectedMonth' => $month,
+            'reportView' => $reportView,
             'eligibleOnly' => $eligibleOnly,
             'isHOD' => $isHOD,
             'isAdmin' => $isAdmin,

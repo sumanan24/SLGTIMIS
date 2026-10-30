@@ -123,6 +123,7 @@
                                                 <option value="Dropout">Dropout</option>
                                                 <option value="Completed">Completed</option>
                                                 <option value="Long Absent">Long Absent</option>
+                                                <option value="Internship">Internship</option>
                                             </select>
                                         </div>
                                     </div>
@@ -265,6 +266,7 @@
                                     <option value="Dropout">Dropout</option>
                                     <option value="Completed">Completed</option>
                                     <option value="Long Absent">Long Absent</option>
+                                    <option value="Internship">Internship</option>
                                 </select>
                             </div>
                         </div>

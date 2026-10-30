@@ -32,7 +32,7 @@ $grandTotal = isset($lineTotal) ? (float) $lineTotal : ($unitAmount * $qty);
 
 .pos-receipt-toolbar {
     width: 100%;
-    max-width: 320px;
+    max-width: 80mm;
     margin-bottom: 1rem;
 }
 
@@ -40,13 +40,22 @@ $grandTotal = isset($lineTotal) ? (float) $lineTotal : ($unitAmount * $qty);
     width: 80mm;
     max-width: 80mm;
     margin: 0 auto;
-    padding: 3mm 4mm 4mm;
+    padding: 4mm 4mm 5mm;
     background: #fff;
     color: #000;
-    font-family: "Courier New", Courier, monospace;
-    font-size: 11px;
-    line-height: 1.4;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.35;
     box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.pos-receipt,
+.pos-receipt * {
+    color: #000;
+    font-weight: 700;
 }
 
 .pos-receipt .pos-center {
@@ -54,46 +63,95 @@ $grandTotal = isset($lineTotal) ? (float) $lineTotal : ($unitAmount * $qty);
 }
 
 .pos-receipt .pos-title {
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    margin: 0 0 2px;
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    margin: 0;
 }
 
-.pos-receipt .pos-sub {
+.pos-receipt .pos-sub,
+.pos-receipt .pos-addr {
     font-size: 10px;
-    margin: 0 0 6px;
+    font-weight: 700;
+    margin: 1px 0 0;
+    line-height: 1.3;
 }
 
 .pos-receipt .pos-heading {
+    display: inline-block;
     font-size: 12px;
-    font-weight: 700;
-    margin: 6px 0 4px;
-    letter-spacing: 0.15em;
+    font-weight: 900;
+    margin: 8px 0 0;
+    padding: 2px 8px;
+    letter-spacing: 0.14em;
+    border: 2px solid #000;
 }
 
 .pos-receipt .pos-rule {
     border: none;
-    border-top: 1px dashed #000;
-    margin: 6px 0;
+    border-top: 2px solid #000;
+    margin: 7px 0;
+}
+
+.pos-receipt .pos-rule-light {
+    border: none;
+    border-top: 1px solid #000;
+    margin: 5px 0;
+}
+
+.pos-receipt .pos-sec {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin: 0 0 3px;
 }
 
 .pos-receipt .pos-row {
     display: flex;
     justify-content: space-between;
-    gap: 6px;
+    align-items: flex-start;
+    gap: 8px;
     margin: 2px 0;
     word-break: break-word;
 }
 
 .pos-receipt .pos-row .pos-label {
     flex-shrink: 0;
-    max-width: 42%;
+    max-width: 52%;
+    font-weight: 700;
 }
 
 .pos-receipt .pos-row .pos-val {
     text-align: right;
     flex: 1;
+    font-weight: 900;
+}
+
+.pos-receipt .pos-cols {
+    margin-bottom: 2px;
+}
+
+.pos-receipt .pos-cols .pos-label,
+.pos-receipt .pos-cols .pos-val {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.pos-receipt .pos-name {
+    display: block;
+    font-size: 14px;
+    font-weight: 900;
+    line-height: 1.25;
+    margin: 0 0 3px;
+}
+
+.pos-receipt .pos-amt {
+    font-size: 13px;
+    font-weight: 900;
+    white-space: nowrap;
 }
 
 .pos-receipt .pos-block {
@@ -101,29 +159,70 @@ $grandTotal = isset($lineTotal) ? (float) $lineTotal : ($unitAmount * $qty);
 }
 
 .pos-receipt .pos-total {
-    text-align: center;
-    margin: 8px 0 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 4px 0 0;
+    background: transparent;
+    color: #000;
+}
+
+.pos-receipt .pos-total,
+.pos-receipt .pos-total * {
+    color: #000;
+    font-weight: 900;
+    background: transparent;
 }
 
 .pos-receipt .pos-total .pos-total-label {
-    font-size: 10px;
-    letter-spacing: 0.2em;
+    font-size: 11px;
+    letter-spacing: 0.08em;
 }
 
 .pos-receipt .pos-total .pos-total-amt {
-    font-size: 18px;
-    font-weight: 700;
-    margin: 2px 0;
+    font-size: 16px;
+    letter-spacing: 0.02em;
+    text-align: right;
 }
 
-.pos-receipt .pos-total .pos-total-sub {
-    font-size: 10px;
+.pos-receipt .pos-total-sub {
+    text-align: right;
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 3px;
+}
+
+.pos-receipt .pos-officer {
+    text-align: center;
+    margin-top: 12px;
+}
+
+.pos-receipt .pos-officer-line {
+    width: 70%;
+    margin: 0 auto 4px;
+    border-top: 1px solid #000;
+}
+
+.pos-receipt .pos-officer-role {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+}
+
+.pos-receipt .pos-officer-name {
+    font-size: 12px;
+    font-weight: 700;
+    margin-top: 1px;
 }
 
 .pos-receipt .pos-footer {
     text-align: center;
     font-size: 10px;
-    margin-top: 6px;
+    font-weight: 700;
+    margin-top: 10px;
+    line-height: 1.4;
 }
 
 @media screen {
@@ -165,6 +264,14 @@ $grandTotal = isset($lineTotal) ? (float) $lineTotal : ($unitAmount * $qty);
         border: none;
         box-shadow: none;
         padding: 0;
+        color: #000 !important;
+        font-weight: 700 !important;
+    }
+
+    .pos-receipt .pos-total,
+    .pos-receipt .pos-total * {
+        background: transparent !important;
+        color: #000 !important;
     }
 }
 </style>
@@ -191,13 +298,14 @@ $grandTotal = isset($lineTotal) ? (float) $lineTotal : ($unitAmount * $qty);
         <div class="pos-center">
             <p class="pos-title">SLGTI</p>
             <p class="pos-sub">Sri Lanka German Training Institute</p>
-            <p class="pos-heading">PAYMENT RECEIPT</p>
+            <p class="pos-addr">Ariviyal Nagar, Kilinochchi</p>
+            <p class="pos-heading">PAYMENT BILL</p>
         </div>
 
         <hr class="pos-rule">
 
         <div class="pos-row">
-            <span class="pos-label">Receipt #</span>
+            <span class="pos-label">Bill No.</span>
             <span class="pos-val"><?php echo htmlspecialchars($receiptLabel); ?></span>
         </div>
         <div class="pos-row">
@@ -211,24 +319,27 @@ $grandTotal = isset($lineTotal) ? (float) $lineTotal : ($unitAmount * $qty);
 
         <hr class="pos-rule">
 
-        <div class="pos-block pos-center" style="text-align: left;">
-            <div class="pos-row" style="flex-direction: column; gap: 0;">
-                <span><strong><?php echo htmlspecialchars($studentName); ?></strong></span>
-            </div>
-            <div class="pos-row">
-                <span class="pos-label">ID</span>
-                <span class="pos-val"><?php echo htmlspecialchars($studentId); ?></span>
-            </div>
-            <?php if ($department !== ''): ?>
-            <div class="pos-row">
-                <span class="pos-label">Dept</span>
-                <span class="pos-val"><?php echo htmlspecialchars($department); ?></span>
-            </div>
-            <?php endif; ?>
+        <div class="pos-sec">Billed to</div>
+        <span class="pos-name"><?php echo htmlspecialchars($studentName); ?></span>
+        <div class="pos-row">
+            <span class="pos-label">Student ID</span>
+            <span class="pos-val"><?php echo htmlspecialchars($studentId); ?></span>
         </div>
+        <?php if ($department !== ''): ?>
+        <div class="pos-row">
+            <span class="pos-label">Department</span>
+            <span class="pos-val"><?php echo htmlspecialchars($department); ?></span>
+        </div>
+        <?php endif; ?>
 
         <hr class="pos-rule">
 
+        <div class="pos-sec">Particulars</div>
+        <div class="pos-row pos-cols">
+            <span class="pos-label">Description</span>
+            <span class="pos-val">Amount</span>
+        </div>
+        <hr class="pos-rule-light">
         <?php foreach ($receiptPayments as $index => $item): ?>
             <?php
             $itemQty = max(1, (int) ($item['pays_qty'] ?? 1));
@@ -244,30 +355,30 @@ $grandTotal = isset($lineTotal) ? (float) $lineTotal : ($unitAmount * $qty);
             ?>
             <div class="pos-row">
                 <span class="pos-label"><?php echo htmlspecialchars($subType); ?></span>
-                <span class="pos-val">Rs.<?php echo number_format($itemTotal, 2); ?></span>
+                <span class="pos-val pos-amt">Rs.<?php echo number_format($itemTotal, 2); ?></span>
             </div>
             <?php if ($itemQty > 1): ?>
             <div class="pos-row">
-                <span class="pos-label"></span>
-                <span class="pos-val"><?php echo $itemQty; ?> x Rs.<?php echo number_format($itemUnit, 2); ?></span>
+                <span class="pos-label"><?php echo $itemQty; ?> x Rs.<?php echo number_format($itemUnit, 2); ?></span>
+                <span class="pos-val"></span>
             </div>
             <?php endif; ?>
         <?php endforeach; ?>
         <?php if ($paymentMethod !== ''): ?>
         <div class="pos-row">
-            <span class="pos-label">Method</span>
+            <span class="pos-label">Payment method</span>
             <span class="pos-val"><?php echo htmlspecialchars($paymentMethod); ?></span>
         </div>
         <?php endif; ?>
         <?php if ($referenceNo !== ''): ?>
         <div class="pos-row">
-            <span class="pos-label">Ref</span>
+            <span class="pos-label">Reference</span>
             <span class="pos-val"><?php echo htmlspecialchars($referenceNo); ?></span>
         </div>
         <?php endif; ?>
         <?php if ($notes !== ''): ?>
         <div class="pos-block" style="margin-top: 4px;">
-            <div>Notes:</div>
+            <div>Notes</div>
             <div><?php echo htmlspecialchars($notes); ?></div>
         </div>
         <?php endif; ?>
@@ -275,25 +386,24 @@ $grandTotal = isset($lineTotal) ? (float) $lineTotal : ($unitAmount * $qty);
         <hr class="pos-rule">
 
         <div class="pos-total">
-            <div class="pos-total-label">AMOUNT PAID</div>
+            <div class="pos-total-label">TOTAL PAID</div>
             <div class="pos-total-amt">Rs.<?php echo number_format($grandTotal, 2); ?></div>
-            <?php if (count($receiptPayments) === 1 && $qty > 1): ?>
-                <div class="pos-total-sub"><?php echo $qty; ?> x Rs.<?php echo number_format($unitAmount, 2); ?></div>
-            <?php elseif (count($receiptPayments) > 1): ?>
-                <div class="pos-total-sub"><?php echo count($receiptPayments); ?> items</div>
-            <?php endif; ?>
         </div>
+        <?php if (count($receiptPayments) === 1 && $qty > 1): ?>
+            <div class="pos-total-sub"><?php echo $qty; ?> x Rs.<?php echo number_format($unitAmount, 2); ?></div>
+        <?php elseif (count($receiptPayments) > 1): ?>
+            <div class="pos-total-sub"><?php echo count($receiptPayments); ?> items</div>
+        <?php endif; ?>
 
-        <hr class="pos-rule">
-
-        <div class="pos-row">
-            <span class="pos-label">Cashier</span>
-            <span class="pos-val"><?php echo htmlspecialchars($cashierName); ?></span>
+        <div class="pos-officer">
+            <div class="pos-officer-line"></div>
+            <div class="pos-officer-role">Finance Officer</div>
+            <div class="pos-officer-name"><?php echo htmlspecialchars($cashierName); ?></div>
         </div>
 
         <div class="pos-footer">
-            <div>Thank you</div>
-            <div style="margin-top: 4px;">*** <?php echo htmlspecialchars(APP_NAME); ?> ***</div>
+            <div>Thank you for your payment.</div>
+            <div>This is a computer-generated bill.</div>
         </div>
     </div>
 </div>
