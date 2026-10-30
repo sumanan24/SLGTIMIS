@@ -66,6 +66,35 @@
                 max-width: 100%;
             }
         }
+        .profile-cam-frame {
+            width: 100%;
+            max-width: 320px;
+            height: 280px;
+            overflow: hidden;
+            border-radius: 8px;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #dee2e6;
+        }
+        .profile-cam-frame video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: transparent;
+        }
+        .bg-swatch {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid #ced4da;
+            padding: 0;
+        }
+        .bg-swatch.is-selected {
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 3px #0d6efd;
+        }
     </style>
     <div class="row justify-content-center">
         <div class="col-12">
@@ -189,8 +218,30 @@
                                                     </button>
                                                 </div>
                                                 <div id="webcamPanel" class="mb-3" style="display: none;">
-                                                    <video id="profileWebcam" autoplay playsinline muted style="width: 100%; max-width: 320px; border-radius: 8px; background: #000;"></video>
+                                                    <div class="profile-cam-frame" id="profileCamFrame">
+                                                        <video id="profileWebcam" autoplay playsinline muted></video>
+                                                    </div>
                                                     <canvas id="profileWebcamCanvas" hidden></canvas>
+                                                    <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
+                                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnZoomOut" title="Zoom out">
+                                                            <i class="fas fa-search-minus"></i>
+                                                        </button>
+                                                        <span class="small fw-semibold" id="zoomLabel">100%</span>
+                                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnZoomIn" title="Zoom in">
+                                                            <i class="fas fa-search-plus"></i>
+                                                        </button>
+                                                    </div>
+                                                    <div class="mt-2">
+                                                        <div class="small fw-semibold mb-1">Background color</div>
+                                                        <div class="d-flex flex-wrap gap-2" id="bgColorChoices">
+                                                            <button type="button" class="bg-swatch is-selected" data-color="#ffffff" style="background:#ffffff;" title="White" aria-label="White"></button>
+                                                            <button type="button" class="bg-swatch" data-color="#dbeafe" style="background:#dbeafe;" title="Light blue" aria-label="Light blue"></button>
+                                                            <button type="button" class="bg-swatch" data-color="#1d4ed8" style="background:#1d4ed8;" title="Blue" aria-label="Blue"></button>
+                                                            <button type="button" class="bg-swatch" data-color="#dc2626" style="background:#dc2626;" title="Red" aria-label="Red"></button>
+                                                            <button type="button" class="bg-swatch" data-color="#16a34a" style="background:#16a34a;" title="Green" aria-label="Green"></button>
+                                                            <button type="button" class="bg-swatch" data-color="#111827" style="background:#111827;" title="Black" aria-label="Black"></button>
+                                                        </div>
+                                                    </div>
                                                     <div class="mt-2 d-flex flex-wrap gap-2">
                                                         <button type="button" class="btn btn-primary btn-sm" id="btnCaptureWebcam">
                                                             <i class="fas fa-camera me-1"></i>Capture and update
@@ -731,8 +782,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const webcamCanvas = document.getElementById('profileWebcamCanvas');
     const captureBtn = document.getElementById('btnCaptureWebcam');
     const cancelWebcamBtn = document.getElementById('btnCancelWebcam');
+    const zoomInBtn = document.getElementById('btnZoomIn');
+    const zoomOutBtn = document.getElementById('btnZoomOut');
+    const zoomLabel = document.getElementById('zoomLabel');
+    const camFrame = document.getElementById('profileCamFrame');
+    const colorChoices = document.getElementById('bgColorChoices');
     let webcamStream = null;
     let facingMode = 'user';
+    let cameraZoom = 1;
+    let backgroundColor = '#ffffff';
 
     function stopCameraTracks() {
         if (webcamStream) {
@@ -778,6 +836,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function applyCameraView() {
+        if (webcamVideo) {
+            const mirror = facingMode === 'user' ? 'scaleX(-1) ' : '';
+            webcamVideo.style.transform = mirror + 'scale(' + cameraZoom + ')';
+            webcamVideo.style.transformOrigin = 'center center';
+        }
+        if (camFrame) {
+            camFrame.style.background = backgroundColor;
+        }
+        if (zoomLabel) {
+            zoomLabel.textContent = Math.round(cameraZoom * 100) + '%';
+        }
+    }
+
     function openCamera(facing) {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             alert('This browser cannot use the camera.');
@@ -785,9 +857,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         facingMode = facing === 'environment' ? 'environment' : 'user';
         stopCameraTracks();
-        if (webcamVideo) {
-            webcamVideo.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'none';
-        }
+        applyCameraView();
         navigator.mediaDevices.getUserMedia({
             video: { facingMode: { ideal: facingMode } },
             audio: false
@@ -819,22 +889,62 @@ document.addEventListener('DOMContentLoaded', function() {
         if (cancelWebcamBtn) {
             cancelWebcamBtn.addEventListener('click', stopWebcam);
         }
+        if (zoomInBtn) {
+            zoomInBtn.addEventListener('click', function () {
+                cameraZoom = Math.min(3, Math.round((cameraZoom + 0.25) * 100) / 100);
+                applyCameraView();
+            });
+        }
+        if (zoomOutBtn) {
+            zoomOutBtn.addEventListener('click', function () {
+                cameraZoom = Math.max(1, Math.round((cameraZoom - 0.25) * 100) / 100);
+                applyCameraView();
+            });
+        }
+        if (colorChoices) {
+            colorChoices.addEventListener('click', function (event) {
+                const swatch = event.target.closest('.bg-swatch');
+                if (!swatch) {
+                    return;
+                }
+                backgroundColor = swatch.getAttribute('data-color') || '#ffffff';
+                colorChoices.querySelectorAll('.bg-swatch').forEach(function (button) {
+                    button.classList.toggle('is-selected', button === swatch);
+                });
+                applyCameraView();
+            });
+        }
 
         if (captureBtn) {
             captureBtn.addEventListener('click', function () {
                 if (!webcamVideo.videoWidth) {
                     return;
                 }
-                webcamCanvas.width = webcamVideo.videoWidth;
-                webcamCanvas.height = webcamVideo.videoHeight;
+                const size = 640;
+                webcamCanvas.width = size;
+                webcamCanvas.height = size;
                 const ctx = webcamCanvas.getContext('2d');
-                if (facingMode === 'user') {
-                    ctx.setTransform(-1, 0, 0, 1, webcamCanvas.width, 0);
-                } else {
-                    ctx.setTransform(1, 0, 0, 1, 0, 0);
-                }
-                ctx.drawImage(webcamVideo, 0, 0);
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.fillStyle = backgroundColor;
+                ctx.fillRect(0, 0, size, size);
+                const vw = webcamVideo.videoWidth;
+                const vh = webcamVideo.videoHeight;
+                const aspect = vw / vh;
+                let drawW = size;
+                let drawH = size / aspect;
+                if (drawH > size) {
+                    drawH = size;
+                    drawW = size * aspect;
+                }
+                drawW *= cameraZoom;
+                drawH *= cameraZoom;
+                ctx.save();
+                ctx.translate(size / 2, size / 2);
+                if (facingMode === 'user') {
+                    ctx.scale(-1, 1);
+                }
+                ctx.drawImage(webcamVideo, -drawW / 2, -drawH / 2, drawW, drawH);
+                ctx.restore();
                 webcamCanvas.toBlob(function (blob) {
                     if (!blob) {
                         return;
