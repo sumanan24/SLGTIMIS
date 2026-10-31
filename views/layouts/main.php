@@ -831,7 +831,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                         $adminPages[] = 'admin-deleted-students';
                                     }
                                     if ($isAdminUser) {
-                                        $adminPages = array_merge($adminPages, ['admin-users', 'admin-locked-accounts', 'admin-activity-logs', 'admin-backup-db', 'admin-backup-files']);
+                                        $adminPages = array_merge($adminPages, ['admin-users', 'admin-locked-accounts', 'admin-activity-logs', 'admin-backup-db', 'admin-backup-files', 'admin-sms-gateway']);
                                     }
                             ?>
                             <!-- Administration Branch -->
@@ -891,6 +891,12 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                         <a href="<?php echo APP_URL; ?>/admin/backup-files" class="<?php echo (isset($page) && $page === 'admin-backup-files') ? 'active' : ''; ?>" download>
                                             <i class="fas fa-file-archive"></i>
                                             <span>Files ZIP (PC)</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/admin/sms-gateway" class="<?php echo (isset($page) && $page === 'admin-sms-gateway') ? 'active' : ''; ?>">
+                                            <i class="fas fa-sms"></i>
+                                            <span>SMS Gateway Test</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>

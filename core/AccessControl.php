@@ -387,6 +387,7 @@ class AccessControl {
         $uri = strtolower(trim((string) $uri, '/'));
         $public = [
             '', 'home', 'login', 'logout',
+            'forgot-password', 'forgot-password/verify', 'forgot-password/reset',
             'student-application/api/check-application',
             'application-admission/interview-letter',
         ];

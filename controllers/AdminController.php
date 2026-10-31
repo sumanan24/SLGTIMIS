@@ -422,5 +422,61 @@ class AdminController extends Controller {
             $this->redirect('admin/users');
         }
     }
+
+    /**
+     * Admin-only Mobitel gateway check. Credentials stay on the server.
+     */
+    public function smsGateway() {
+        if (!$this->checkAdmin()) {
+            return;
+        }
+
+        if (empty($_SESSION['sms_test_csrf'])) {
+            $_SESSION['sms_test_csrf'] = bin2hex(random_bytes(32));
+        }
+
+        require_once BASE_PATH . '/services/MobitelSmsService.php';
+        $sms = new MobitelSmsService();
+        $results = $sms->configurationStatus();
+        $lastCode = trim((string) ($_SESSION['sms_gateway_last_code'] ?? ''));
+        if ($lastCode !== '') {
+            $results[] = [
+                'name' => 'Last SMS response code',
+                'ok' => $lastCode === '200',
+                'detail' => $lastCode,
+            ];
+        }
+        $error = '';
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $sent = (string) $this->post('csrf_token', '');
+            $known = (string) $_SESSION['sms_test_csrf'];
+            if ($sent === '' || !hash_equals($known, $sent)) {
+                $error = 'The form expired. Please try again.';
+            } else {
+                $_SESSION['sms_test_csrf'] = bin2hex(random_bytes(32));
+                $mobile = trim((string) $this->post('test_mobile', ''));
+                $send = $this->post('send_test', '') === '1';
+                try {
+                    $results = $sms->runAdminTests($mobile, $send);
+                    foreach ($results as $row) {
+                        if (($row['name'] ?? '') === 'Last SMS response code') {
+                            $_SESSION['sms_gateway_last_code'] = (string) ($row['detail'] ?? '');
+                        }
+                    }
+                } catch (Throwable $e) {
+                    $error = 'The gateway test could not be completed.';
+                    error_log('[MobitelSMS] admin test failed: ' . $e->getMessage());
+                }
+            }
+        }
+
+        return $this->view('admin/sms-gateway', [
+            'title' => 'SMS gateway test',
+            'page' => 'admin-sms-gateway',
+            'csrf_token' => (string) $_SESSION['sms_test_csrf'],
+            'results' => $results,
+            'error' => $error,
+        ]);
+    }
 }
 

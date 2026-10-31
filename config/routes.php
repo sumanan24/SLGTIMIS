@@ -8,6 +8,9 @@ return [
     'home' => 'HomeController@index',
     'login' => 'AuthController@login',
     'logout' => 'AuthController@logout',
+    'forgot-password' => 'PasswordResetController@requestForm',
+    'forgot-password/verify' => 'PasswordResetController@verifyForm',
+    'forgot-password/reset' => 'PasswordResetController@resetForm',
     
     // Admin Security Routes
     'admin/users' => 'AdminController@users',
@@ -17,6 +20,7 @@ return [
     'admin/activity-logs' => 'AdminController@activityLogs',
     'admin/backup-db' => 'AdminController@backupDb',
     'admin/backup-files' => 'AdminController@backupFiles',
+    'admin/sms-gateway' => 'AdminController@smsGateway',
     'profile' => 'ProfileController@index',
     'profile/update' => 'ProfileController@update',
     'dashboard' => 'DashboardController@index',

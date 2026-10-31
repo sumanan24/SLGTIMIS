@@ -49,6 +49,7 @@ require_once BASE_PATH . '/core/Php74Polyfill.php';
 // Start session with security settings
 ini_set('session.cookie_httponly', 1);
 ini_set('session.use_only_cookies', 1);
+ini_set('session.cookie_samesite', 'Lax');
 // Detect HTTPS and set secure cookie flag accordingly
 $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || 
            (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
@@ -84,7 +85,7 @@ $uri = RequestPath::resolve();
 
 // Check session timeout for logged-in users (after URI is determined and all classes are loaded)
 // Only check timeout if NOT already on login or home page to avoid redirect loops
-$publicNoTimeoutUris = ['login', 'home', '', 'level04application', 'level05application', 'student-application/api/check-application', 'student-application/api/insert-draft', 'student-application/api/save-progress', 'student-application/api/departments', 'student-application/api/courses'];
+$publicNoTimeoutUris = ['login', 'home', '', 'forgot-password', 'forgot-password/verify', 'forgot-password/reset', 'level04application', 'level05application', 'student-application/api/check-application', 'student-application/api/insert-draft', 'student-application/api/save-progress', 'student-application/api/departments', 'student-application/api/courses'];
 if (!in_array($uri, $publicNoTimeoutUris, true)) {
     if (isset($_SESSION['user_id'])) {
         require_once BASE_PATH . '/controllers/AuthController.php';
