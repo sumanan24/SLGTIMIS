@@ -413,6 +413,11 @@
                     <i class="fas fa-edit"></i>Edit Profile
                 </a>
                 <?php endif; ?>
+                <?php if (!empty($_SESSION['user_id']) && ($_SESSION['user_table'] ?? '') !== 'student' && class_exists('AccessControl') && AccessControl::can((int) $_SESSION['user_id'], 'lifecycle', 'view')): ?>
+                <a href="<?php echo APP_URL; ?>/lifecycle/profile?id=<?php echo urlencode($student['student_id']); ?>" class="cv-btn cv-btn-outline">
+                    <i class="fas fa-route"></i>Lifecycle record
+                </a>
+                <?php endif; ?>
                 <a href="<?php echo APP_URL; ?>/student/documents-pdf?id=<?php echo urlencode($student['student_id']); ?>" class="cv-btn cv-btn-outline" target="_blank" rel="noopener">
                     <i class="fas fa-file-pdf"></i>View Student Documents PDF
                 </a>

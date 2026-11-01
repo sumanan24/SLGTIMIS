@@ -204,6 +204,30 @@ class AccessControl {
                 ];
             case 'circuit_program':
                 return self::withDocFlags(['can_view' => 1, 'can_add' => 1, 'can_edit' => 1, 'can_delete' => 1]);
+            case 'lifecycle':
+                $office = $isAdm || $isSao || $role === 'REG';
+                $view = $office || in_array($role, ['DIR', 'DPI', 'DPA', 'HOD', 'IN1', 'IN2', 'IN3', 'FIN', 'ACC', 'HRO'], true);
+                $write = $office || in_array($role, ['HOD', 'FIN', 'ACC', 'DIR', 'DPI', 'DPA'], true);
+                $approve = $office || in_array($role, ['DIR', 'DPI', 'DPA'], true);
+                return self::withDocFlags([
+                    'can_view' => $view ? 1 : 0,
+                    'can_add' => $write ? 1 : 0,
+                    'can_edit' => $write ? 1 : 0,
+                    'can_delete' => $office ? 1 : 0,
+                    'can_approve' => $approve ? 1 : 0,
+                ]);
+            case 'services':
+                $role = (string) $userModel->getUserRole($userId);
+                $office = $userModel->isAdminOrADM($userId) || $role === 'REG';
+                $view = $office || in_array($role, ['DIR', 'DPI', 'DPA', 'FIN', 'ACC', 'HOD', 'HRO', 'AUD', 'SEC', 'MHF', 'FAC', 'FO', 'CLN', 'CNT', 'CAN'], true);
+                $write = $office || in_array($role, ['FIN', 'ACC', 'SEC', 'MHF', 'FAC', 'FO', 'CLN', 'CNT', 'CAN'], true);
+                return self::withDocFlags([
+                    'can_view' => $view ? 1 : 0,
+                    'can_add' => $write ? 1 : 0,
+                    'can_edit' => $write ? 1 : 0,
+                    'can_delete' => $office ? 1 : 0,
+                    'can_approve' => ($office || in_array($role, ['FIN', 'ACC'], true)) ? 1 : 0,
+                ]);
             case 'facilities':
                 $officer = $userModel->isFacilitiesOfficer($userId);
                 $monitor = $userModel->isFacilitiesMonitor($userId);
@@ -388,6 +412,7 @@ class AccessControl {
         $public = [
             '', 'home', 'login', 'logout',
             'forgot-password', 'forgot-password/verify', 'forgot-password/reset',
+            'verify/certificate', 'alumni/portal',
             'student-application/api/check-application',
             'application-admission/interview-letter',
         ];

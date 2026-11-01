@@ -89,4 +89,14 @@ return [
         'prefixes' => ['facilities'],
         'sort' => 125,
     ],
+    'services' => [
+        'label' => 'Service Providers',
+        'prefixes' => ['services'],
+        'sort' => 126,
+    ],
+    'lifecycle' => [
+        'label' => 'Student Lifecycle',
+        'prefixes' => ['lifecycle'],
+        'sort' => 11,
+    ],
 ];

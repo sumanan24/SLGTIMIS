@@ -19,7 +19,8 @@ class FacilitiesProgressService {
         if (!in_array($ticket['status'], [FacilitiesTicketService::ST_ASSIGNED, FacilitiesTicketService::ST_REOPENED], true)) {
             throw new RuntimeException('This ticket is not waiting for acceptance.');
         }
-        $this->tickets->changeStatus($actor, $ticket, FacilitiesTicketService::ST_ACCEPTED, 'Assignment accepted');
+        $this->tickets->changeStatus($actor, $ticket, FacilitiesTicketService::ST_ACCEPTED, 'Assignment acknowledged');
+        $this->model->updateTicket((int) $ticket['id'], ['acknowledged_at' => date('Y-m-d H:i:s')]);
         $this->addProgress($actor, $ticket, (int) $ticket['progress_percent'], 'Work accepted', '');
         $fresh = $this->model->getDetailed((int) $ticket['id']);
         $this->tickets->notifyWatchers($fresh, 'ticket_accepted', 'Work accepted', $actor['name'] . ' accepted ' . $ticket['ticket_number'] . '.');
@@ -75,7 +76,7 @@ class FacilitiesProgressService {
         $this->model->updateTicket((int) $ticket['id'], [
             'status' => FacilitiesTicketService::ST_PENDING,
             'progress_percent' => 100,
-            'expected_completion_date' => $completedDate ?: date('Y-m-d'),
+            'completed_at' => ($completedDate ?: date('Y-m-d')) . ' ' . date('H:i:s'),
         ]);
         $this->addProgress($actor, $ticket, 100, $description, $remarks);
         $this->tickets->statusHistory((int) $ticket['id'], $ticket['status'], FacilitiesTicketService::ST_PENDING, $actor['staff_id'], $description);

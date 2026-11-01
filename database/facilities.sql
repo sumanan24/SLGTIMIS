@@ -197,6 +197,65 @@ CREATE TABLE IF NOT EXISTS `facilities_notifications` (
   KEY `idx_fac_ntf_staff` (`staff_id`, `is_read`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `facilities_routes` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `category_id` INT UNSIGNED NOT NULL,
+  `route_key` VARCHAR(40) NOT NULL,
+  `staff_id` VARCHAR(64) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_fac_route_cat` (`category_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `facilities_sla` (
+  `priority` VARCHAR(20) NOT NULL,
+  `target_days` TINYINT UNSIGNED NOT NULL,
+  PRIMARY KEY (`priority`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `facilities_settings` (
+  `setting_key` VARCHAR(60) NOT NULL,
+  `setting_value` VARCHAR(80) NOT NULL,
+  PRIMARY KEY (`setting_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `facilities_escalations` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `ticket_id` INT UNSIGNED NOT NULL,
+  `level` TINYINT UNSIGNED NOT NULL,
+  `reason` VARCHAR(255) NOT NULL,
+  `notified_staff_id` VARCHAR(64) DEFAULT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_fac_esc` (`ticket_id`, `level`),
+  KEY `idx_fac_esc_ticket` (`ticket_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `facilities_feedback` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `ticket_id` INT UNSIGNED NOT NULL,
+  `overall_rating` TINYINT UNSIGNED NOT NULL,
+  `response_rating` TINYINT UNSIGNED NOT NULL,
+  `quality_rating` TINYINT UNSIGNED NOT NULL,
+  `behaviour_rating` TINYINT UNSIGNED NOT NULL,
+  `comments` TEXT,
+  `created_by` VARCHAR(64) NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_fac_feedback_ticket` (`ticket_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `facilities_materials` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `ticket_id` INT UNSIGNED NOT NULL,
+  `item_name` VARCHAR(160) NOT NULL,
+  `quantity` VARCHAR(40) NOT NULL DEFAULT '1',
+  `notes` VARCHAR(255) DEFAULT NULL,
+  `recorded_by` VARCHAR(64) NOT NULL,
+  `recorded_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_fac_mat_ticket` (`ticket_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `facilities_activity` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `ticket_id` INT UNSIGNED NOT NULL,

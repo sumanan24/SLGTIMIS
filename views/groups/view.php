@@ -214,6 +214,24 @@ $meta = [
             <a href="<?php echo $e($app . '/groups'); ?>" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left me-1"></i>Back
             </a>
+            <?php if ($studentCount > 0):
+                $internshipCount = 0;
+                foreach ($students as $row) {
+                    if (($row['student_enroll_status'] ?? '') === 'Internship') {
+                        $internshipCount++;
+                    }
+                }
+                $allInternship = $internshipCount === $studentCount;
+            ?>
+            <form method="post" action="<?php echo $e($app . '/groups/enrollment-status'); ?>" class="d-inline" onsubmit="return confirm(<?php echo $e(json_encode($allInternship ? 'Set every student in this group back to Following?' : 'Set every student in this group to Internship?')); ?>);">
+                <input type="hidden" name="id" value="<?php echo (int) ($group['id'] ?? 0); ?>">
+                <input type="hidden" name="status" value="<?php echo $allInternship ? 'Following' : 'Internship'; ?>">
+                <input type="hidden" name="return" value="show">
+                <button type="submit" class="btn <?php echo $allInternship ? 'btn-outline-secondary' : 'btn-warning'; ?>">
+                    <i class="fas fa-briefcase me-1"></i><?php echo $allInternship ? 'Set to Following' : 'Set group to Internship'; ?>
+                </button>
+            </form>
+            <?php endif; ?>
             <a href="<?php echo $e($app . '/groups/edit?id=' . urlencode((string) ($group['id'] ?? ''))); ?>" class="btn btn-outline-primary">
                 <i class="fas fa-pen me-1"></i>Edit
             </a>
@@ -293,8 +311,9 @@ $meta = [
                                 <td class="col-email" title="<?php echo $e($student['student_email'] ?? ''); ?>"><?php echo $e($student['student_email'] ?? '—'); ?></td>
                                 <td class="col-when"><?php echo $e($formatWhen($student['enrolled_at'] ?? '')); ?></td>
                                 <td class="col-status">
-                                    <span class="badge rounded-pill <?php echo (($student['status'] ?? '') === 'active') ? 'bg-success' : 'bg-secondary'; ?>">
-                                        <?php echo $e(ucfirst((string) ($student['status'] ?? 'active'))); ?>
+                                    <?php $enrolStatus = (string) ($student['student_enroll_status'] ?? 'Following'); ?>
+                                    <span class="badge rounded-pill <?php echo $enrolStatus === 'Internship' ? 'bg-warning text-dark' : 'bg-success'; ?>">
+                                        <?php echo $e($enrolStatus); ?>
                                     </span>
                                 </td>
                                 <td class="col-actions">

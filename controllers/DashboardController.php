@@ -40,12 +40,10 @@ class DashboardController extends Controller {
                 $selectedAcademicYear = $academicYears[0]; // First one is the latest (DESC order)
             }
             
-            // Fetch all data once - filter by academic year if selected
-            // Always filter for active students only (status 'Following')
+            // Same count as the Students page: Following + Internship for the selected year.
             if (!empty($selectedAcademicYear)) {
                 $totalStudents = $studentModel->getTotalStudents(['academic_year' => $selectedAcademicYear]);
             } else {
-                // Count only active students (those with enrollment status 'Following')
                 $totalStudents = $studentModel->getTotalStudents([]);
             }
             $totalStaff = $staffModel->count();
@@ -61,8 +59,7 @@ class DashboardController extends Controller {
             $departmentStats = $studentModel->getStudentsByDepartment($selectedAcademicYear);
             $districtStats = $studentModel->getStudentsByDistrict($selectedAcademicYear);
             $provinceStats = $studentModel->getStudentsByProvince($selectedAcademicYear);
-            
-            // Get total students for selected academic year (same as totalStudents when filtered)
+            $enrollStatusCounts = $studentModel->getStudentsByEnrollStatus($selectedAcademicYear);
             $totalStudentsByYear = $totalStudents;
             
             // Final deduplication check - ensure each student appears only once
@@ -76,26 +73,6 @@ class DashboardController extends Controller {
                 }
             }
 
-            $inventorySummary = null;
-            if (file_exists(BASE_PATH . '/models/InventoryModel.php')) {
-                try {
-                    require_once BASE_PATH . '/models/InventoryModel.php';
-                    $inventoryModel = new InventoryModel();
-                    if ($inventoryModel->tableExists()) {
-                        $supportsLowStock = $inventoryModel->supportsLowStockCalculation();
-                        $inventorySummary = [
-                            'totalItems' => $inventoryModel->countItems(),
-                            'lowStockCount' => $supportsLowStock
-                                ? count($inventoryModel->getLowStockItems(null, 999))
-                                : null,
-                        ];
-                    }
-                } catch (Throwable $inventoryError) {
-                    // Inventory is an optional widget and must not blank all dashboard statistics.
-                    error_log('DashboardController::inventorySummary: ' . $inventoryError->getMessage());
-                }
-            }
-            
             $data = [
                 'title' => 'Dashboard',
                 'page' => 'dashboard',
@@ -113,9 +90,9 @@ class DashboardController extends Controller {
                 'departmentStats' => $departmentStats,
                 'districtStats' => $districtStats,
                 'provinceStats' => $provinceStats,
+                'enrollStatusCounts' => $enrollStatusCounts,
                 'academicYears' => $academicYears,
                 'selectedAcademicYear' => $selectedAcademicYear,
-                'inventorySummary' => $inventorySummary
             ];
             
             return $this->view('dashboard/index', $data);
@@ -156,9 +133,9 @@ class DashboardController extends Controller {
             'departmentStats' => [],
             'districtStats' => [],
             'provinceStats' => [],
+            'enrollStatusCounts' => [],
             'academicYears' => [],
             'selectedAcademicYear' => '',
-            'inventorySummary' => null,
             'error' => 'Unable to load some dashboard statistics. ' . $e->getMessage(),
         ];
     }

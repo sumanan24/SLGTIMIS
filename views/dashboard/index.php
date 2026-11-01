@@ -665,8 +665,8 @@
                     <small>
                         <i class="fas fa-info-circle me-1"></i>
                         Showing statistics for Academic Year: <strong><?php echo htmlspecialchars($selectedAcademicYear); ?></strong>
-                        <?php if (!empty($totalStudentsByYear)): ?>
-                            (<?php echo number_format($totalStudentsByYear); ?> students)
+                        <?php if ((int) $totalStudents > 0): ?>
+                            (<?php echo number_format((int) $totalStudents); ?> students: Following + Internship)
                         <?php endif; ?>
                     </small>
                 </div>
@@ -684,19 +684,11 @@
                             <div class="stats-card-label">Total Students</div>
                             <div class="stats-card-value"><?php echo number_format($totalStudents); ?></div>
                             <div class="stats-card-subtitle">
-                                <?php 
-                                $maleCount = $genderStats['Male'] ?? 0;
-                                $femaleCount = $genderStats['Female'] ?? 0;
-                                ?>
-                                <span class="me-2">
-                                    <i class="fas fa-mars text-primary"></i> Male: <strong><?php echo number_format($maleCount); ?></strong>
-                                </span>
-                                <span>
-                                    <i class="fas fa-venus text-danger"></i> Female: <strong><?php echo number_format($femaleCount); ?></strong>
-                                </span>
+                                <span class="me-2">Following: <strong><?php echo number_format((int) ($enrollStatusCounts['Following'] ?? 0)); ?></strong></span>
+                                <span>Internship: <strong><?php echo number_format((int) ($enrollStatusCounts['Internship'] ?? 0)); ?></strong></span>
                             </div>
                             <div class="mt-2" style="font-size: 0.75rem; color: #6c757d;">
-                                Active & Following Only
+                                Dropout, Completed, and Long Absent are not included.
                             </div>
                         </div>
                         <div class="stats-card-icon flex-shrink-0 ms-3">
@@ -742,58 +734,30 @@
         </div>
     </div>
 
-    <?php if (!empty($inventorySummary)): ?>
-    <?php $hasLowStockSummary = array_key_exists('lowStockCount', $inventorySummary) && $inventorySummary['lowStockCount'] !== null; ?>
-    <div class="row g-4 mb-4">
-        <div class="<?php echo $hasLowStockSummary ? 'col-md-4' : 'col-md-6'; ?>">
-            <div class="card dashboard-stats-card" style="border-left-color: #0d9488;">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-start justify-content-between">
-                        <div>
-                            <div class="stats-card-label">Inventory items</div>
-                            <div class="stats-card-value" style="color: #0f766e;"><?php echo number_format((int)($inventorySummary['totalItems'] ?? 0)); ?></div>
-                            <a href="<?php echo APP_URL; ?>/inventory" class="small">Open inventory &rarr;</a>
-                        </div>
-                        <div class="stats-card-icon flex-shrink-0 ms-3" style="background: rgba(13, 148, 136, 0.1); color: #0d9488;">
-                            <i class="fas fa-boxes"></i>
-                        </div>
+    <?php
+    $enrollStatusCounts = $enrollStatusCounts ?? [];
+    $statusCards = [
+        'Following' => '#166534',
+        'Internship' => '#92400e',
+        'Completed' => '#1e3a5f',
+        'Long Absent' => '#9a3412',
+        'Dropout' => '#64748b',
+    ];
+    ?>
+    <div class="row g-3 mb-4">
+        <?php foreach ($statusCards as $statusName => $statusColor): ?>
+            <div class="col-6 col-md-4 col-xl">
+                <div class="card dashboard-stats-card h-100" style="border-left-color: <?php echo $statusColor; ?>;">
+                    <div class="card-body p-3">
+                        <div class="stats-card-label"><?php echo htmlspecialchars($statusName); ?></div>
+                        <div class="stats-card-value" style="color: <?php echo $statusColor; ?>; font-size: 1.6rem;"><?php echo number_format((int) ($enrollStatusCounts[$statusName] ?? 0)); ?></div>
+                        <div class="stats-card-subtitle"><?php echo !empty($selectedAcademicYear) ? htmlspecialchars($selectedAcademicYear) : 'All academic years'; ?></div>
                     </div>
                 </div>
             </div>
-        </div>
-        <?php if ($hasLowStockSummary): ?>
-        <div class="col-md-4">
-            <div class="card dashboard-stats-card" style="border-left-color: #f59e0b;">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-start justify-content-between">
-                        <div>
-                            <div class="stats-card-label">Low stock (below reorder)</div>
-                            <div class="stats-card-value text-warning"><?php echo number_format((int)($inventorySummary['lowStockCount'] ?? 0)); ?></div>
-                            <a href="<?php echo APP_URL; ?>/inventory" class="small">View dashboard &rarr;</a>
-                        </div>
-                        <div class="stats-card-icon flex-shrink-0 ms-3" style="background: rgba(245, 158, 11, 0.12); color: #d97706;">
-                            <i class="fas fa-exclamation-triangle"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <?php endif; ?>
-        <div class="<?php echo $hasLowStockSummary ? 'col-md-4' : 'col-md-6'; ?>">
-            <div class="card dashboard-stats-card" style="border-left-color: #64748b;">
-                <div class="card-body p-4 d-flex align-items-center justify-content-between">
-                    <div>
-                        <div class="stats-card-label">Stock activity</div>
-                        <div class="small text-muted mb-2">Recent movements on the inventory log.</div>
-                        <a href="<?php echo APP_URL; ?>/inventory/log" class="btn btn-sm btn-outline-secondary">View log</a>
-                    </div>
-                    <i class="fas fa-clipboard-list fa-2x text-secondary opacity-50"></i>
-                </div>
-            </div>
-        </div>
+        <?php endforeach; ?>
     </div>
-    <?php endif; ?>
-    
+
     <!-- Course Enrollment by Department -->
     <?php if (!empty($courseEnrollmentByDepartment)): ?>
     <div class="row g-4 mb-4">

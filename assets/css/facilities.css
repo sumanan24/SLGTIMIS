@@ -241,12 +241,184 @@ a.fac-stat:hover { border-color: #9bb0c7; background: #fcfdff; }
     background: #fff;
 }
 
+.fac-create .card-header p {
+    margin: 0.25rem 0 0;
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.82);
+    font-weight: 500;
+}
+
+.fac-who {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+    margin-bottom: 1rem;
+}
+
+.fac-who div {
+    background: var(--fac-bg);
+    border: 1px solid var(--fac-border);
+    border-radius: 10px;
+    padding: 0.65rem 0.75rem;
+}
+
+.fac-who span {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--fac-muted);
+}
+
+.fac-who strong {
+    display: block;
+    margin-top: 0.15rem;
+    color: var(--fac-navy);
+    font-size: 0.95rem;
+    line-height: 1.3;
+    word-break: break-word;
+}
+
+.fac-step {
+    display: grid;
+    grid-template-columns: 2rem 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.fac-step-no {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: var(--fac-navy);
+    color: #fff;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+}
+
+.fac-step h6 {
+    margin: 0.35rem 0 0.15rem;
+    color: var(--fac-navy);
+    font-weight: 700;
+}
+
+.fac-step .fac-help { margin: 0 0 0.75rem; }
+
+.fac-choices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem;
+}
+
+.fac-choice {
+    position: relative;
+    display: block;
+    margin: 0;
+    border: 1px solid var(--fac-border);
+    border-radius: 12px;
+    background: #fff;
+    padding: 0.75rem 0.8rem 0.7rem;
+    cursor: pointer;
+    min-height: 4.4rem;
+}
+
+.fac-choice input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.fac-choice strong {
+    display: block;
+    color: var(--fac-navy);
+    font-size: 0.92rem;
+}
+
+.fac-choice span {
+    display: block;
+    margin-top: 0.15rem;
+    color: var(--fac-muted);
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+.fac-choice.is-on,
+.fac-choice:has(input:checked) {
+    border-color: var(--fac-navy);
+    background: #f4f8fc;
+    box-shadow: inset 0 0 0 1px var(--fac-navy);
+}
+
+.fac-priorities {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.fac-priorities .fac-choice { min-height: 4.6rem; text-align: center; padding-top: 0.85rem; }
+.fac-priorities .fac-choice strong { font-size: 0.88rem; }
+
+.fac-create .form-label {
+    font-size: 0.82rem;
+    margin-bottom: 0.35rem;
+}
+
+.fac-create .form-control,
+.fac-create .form-select {
+    min-height: 48px;
+    font-size: 16px;
+    border-radius: 10px;
+}
+
+.fac-create textarea.form-control { min-height: 120px; }
+
+.fac-drop {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    border: 1.5px dashed #9bb0c7;
+    border-radius: 12px;
+    background: var(--fac-bg);
+    padding: 0.9rem 1rem;
+    cursor: pointer;
+    margin: 0;
+}
+
+.fac-drop strong { color: var(--fac-navy); font-size: 0.92rem; }
+.fac-drop span { color: var(--fac-muted); font-size: 0.78rem; }
+.fac-drop input { margin-top: 0.45rem; max-width: 100%; }
+
+.fac-files { margin: 0.45rem 0 0; padding-left: 1.1rem; color: var(--fac-navy); font-size: 0.84rem; }
+
+.fac-submit {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    padding-top: 0.2rem;
+}
+
+.fac-submit .btn {
+    min-height: 48px;
+    padding: 0.55rem 1.2rem;
+    font-weight: 700;
+    border-radius: 10px;
+}
+
 @media (max-width: 991.98px) {
     .fac-stats, .fac-meta, .fac-evidence-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 575.98px) {
     .fac-stats, .fac-meta, .fac-evidence-grid { grid-template-columns: 1fr; }
     .fac-filters > div { min-width: 100%; }
+    .fac-who, .fac-choices, .fac-priorities { grid-template-columns: 1fr; }
+    .fac-step { grid-template-columns: 1fr; gap: 0.35rem; }
+    .fac-submit { flex-direction: column; align-items: stretch; }
+    .fac-submit .btn { width: 100%; }
 }
 
 @media print {

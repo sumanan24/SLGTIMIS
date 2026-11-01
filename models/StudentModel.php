@@ -46,8 +46,11 @@ class StudentModel extends Model {
         $params = [];
         $types = '';
         
-        // Join with student_enroll if filtering by course, academic_year, course_mode, or group
-        if (!empty($filters['course_id']) || !empty($filters['academic_year']) || !empty($filters['course_mode']) || !empty($filters['group_id'])) {
+        // Current register is Following + Internship, the same population as the dashboard total.
+        $currentEnrollment = !empty($filters['current_enrollment']);
+
+        // Join with student_enroll if filtering by course, academic_year, course_mode, group, or current enrolment
+        if ($currentEnrollment || !empty($filters['course_id']) || !empty($filters['academic_year']) || !empty($filters['course_mode']) || !empty($filters['group_id'])) {
             $joins[] = "LEFT JOIN `student_enroll` se ON s.student_id = se.student_id";
         }
         
@@ -130,6 +133,11 @@ class StudentModel extends Model {
             $conditions[] = "se.academic_year = ?";
             $params[] = $filters['academic_year'];
             $types .= 's';
+        }
+
+        // Same students the dashboard counts: Following and Internship only.
+        if ($currentEnrollment) {
+            $conditions[] = "se.student_enroll_status IN ('Following', 'Internship')";
         }
         
         // Course mode filter
@@ -229,8 +237,9 @@ class StudentModel extends Model {
     }
     
     /**
-     * Get total count of students with filters
-     * Counts students where student_status = 'Active' AND student_enroll_status = 'Following'
+     * Count distinct Following and Internship students.
+     * Dropout, Completed, and Long Absent are excluded.
+     * student_status is applied only when that filter is set.
      */
     public function getTotalStudents($filters = []) {
         $sql = "SELECT COUNT(DISTINCT s.student_id) as total FROM `{$this->table}` s";
@@ -239,11 +248,9 @@ class StudentModel extends Model {
         $params = [];
         $types = '';
         
-        // Always join with student_enroll to filter by enrollment status
+        // Same population as the dashboard total: Following + Internship.
         $joins[] = "INNER JOIN `student_enroll` se ON s.student_id = se.student_id";
-        // Filter by: student_status = 'Active' AND student_enroll_status = 'Following'
-        $conditions[] = "s.student_status = 'Active'";
-        $conditions[] = "se.student_enroll_status = 'Following'";
+        $conditions[] = "se.student_enroll_status IN ('Following', 'Internship')";
         
         // Join with course if filtering by course or department
         $needsCourseJoin = !empty($filters['course_id']) || !empty($filters['department_id']);
@@ -362,6 +369,50 @@ class StudentModel extends Model {
         
         $row = $result->fetch_assoc();
         return $row['total'];
+    }
+
+    /**
+     * Count distinct students in an academic year by enrolment status.
+     */
+    public function getStudentsByEnrollStatus($academicYear = null, $departmentId = null) {
+        $statuses = ['Following', 'Internship', 'Completed', 'Long Absent', 'Dropout'];
+        $counts = array_fill_keys($statuses, 0);
+        $sql = "SELECT se.`student_enroll_status` AS status, COUNT(DISTINCT s.`student_id`) AS total
+                FROM `{$this->table}` s
+                INNER JOIN `student_enroll` se ON s.`student_id` = se.`student_id`";
+        $where = ["se.`student_enroll_status` IS NOT NULL", "se.`student_enroll_status` <> ''"];
+        $types = '';
+        $params = [];
+        if (!empty($departmentId)) {
+            $sql .= " INNER JOIN `course` c ON c.`course_id` = se.`course_id`";
+            $where[] = "c.`department_id` = ?";
+            $types .= 's';
+            $params[] = $departmentId;
+        }
+        if (!empty($academicYear)) {
+            $where[] = "se.`academic_year` = ?";
+            $types .= 's';
+            $params[] = $academicYear;
+        }
+        $sql .= " WHERE " . implode(' AND ', $where) . " GROUP BY se.`student_enroll_status`";
+        if ($types !== '') {
+            $stmt = $this->db->prepare($sql);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+        } else {
+            $result = $this->db->query($sql);
+        }
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $status = (string) ($row['status'] ?? '');
+                if (!isset($counts[$status])) {
+                    $counts[$status] = 0;
+                }
+                $counts[$status] = (int) $row['total'];
+            }
+        }
+        return $counts;
     }
     
     /**

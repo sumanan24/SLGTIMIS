@@ -468,7 +468,8 @@ class StudentController extends Controller {
                 'course_id' => $this->get('course_id', ''),
                 'academic_year' => $this->get('academic_year', ''),
                 'course_mode' => $this->get('course_mode', ''),
-                'group_id' => $this->get('group_id', '')
+                'group_id' => $this->get('group_id', ''),
+                'current_enrollment' => true
             ];
         } else {
             $filters = [
@@ -480,7 +481,8 @@ class StudentController extends Controller {
                 'course_id' => $this->get('course_id', ''),
                 'academic_year' => $this->get('academic_year', ''),
                 'course_mode' => $this->get('course_mode', ''),
-                'group_id' => $this->get('group_id', '')
+                'group_id' => $this->get('group_id', ''),
+                'current_enrollment' => true
             ];
         }
         
@@ -3751,7 +3753,8 @@ class StudentController extends Controller {
             'department_id' => $hodDepartmentId ? $hodDepartmentId : $this->get('department_id', $this->post('department_id', '')),
             'course_id' => $this->get('course_id', $this->post('course_id', '')),
             'academic_year' => $this->get('academic_year', $this->post('academic_year', '')),
-            'group_id' => $this->get('group_id', $this->post('group_id', ''))
+            'group_id' => $this->get('group_id', $this->post('group_id', '')),
+            'current_enrollment' => true
         ];
         
         // Get selected columns from POST

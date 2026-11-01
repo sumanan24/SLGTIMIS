@@ -28,6 +28,7 @@ class FacilitiesController extends Controller {
             return;
         }
         $actor = $this->actor();
+        $this->svc->runEscalations();
         $filters = $this->svc->scopeFilters($actor);
         $summary = $this->reports->summary($filters);
         require_once BASE_PATH . '/helpers/FacilitiesNotificationService.php';
@@ -77,6 +78,88 @@ class FacilitiesController extends Controller {
         ], $actor));
     }
 
+    public function tasks() {
+        if (!$this->boot('view')) {
+            return;
+        }
+        $actor = $this->actor();
+        $filters = $this->svc->scopeFilters($actor, $this->listFilters());
+        $filters['assigned_to_me'] = 1;
+        $filters['scope_staff_id'] = $actor['staff_id'];
+        $result = $this->svc->model()->search($filters, (int) $this->get('page', 1), 20);
+        return $this->view('facilities/index', $this->pack([
+            'title' => 'My Assigned Tasks',
+            'section' => 'tasks',
+            'result' => $result,
+            'filters' => $filters,
+        ], $actor));
+    }
+
+    public function feedback() {
+        $this->ticketAction(function ($actor, $ticket) {
+            $this->svc->saveFeedback($actor, $ticket, $this->post());
+            $_SESSION['message'] = 'Thank you. Your feedback was saved.';
+        }, 'view');
+    }
+
+    public function settings() {
+        if (!$this->boot('edit')) {
+            return;
+        }
+        $actor = $this->actor();
+        if (empty($actor['is_admin'])) {
+            $_SESSION['error'] = 'Only a system administrator can change maintenance settings.';
+            $this->redirect('facilities/dashboard');
+            return;
+        }
+        $model = $this->svc->model();
+        return $this->view('facilities/settings', $this->pack([
+            'title' => 'Maintenance Settings',
+            'section' => 'settings',
+            'routes' => $model->routes(),
+            'staff_options' => $model->staffOptions(),
+            'sla' => [
+                'low' => $model->slaDays('low'),
+                'medium' => $model->slaDays('medium'),
+                'high' => $model->slaDays('high'),
+                'critical' => $model->slaDays('critical'),
+            ],
+            'settings' => [
+                'unassigned_hours' => $model->setting('unassigned_hours', '24'),
+                'facility_escalate_days' => $model->setting('facility_escalate_days', '3'),
+                'director_escalate_days' => $model->setting('director_escalate_days', '7'),
+            ],
+        ], $actor));
+    }
+
+    public function settingsSave() {
+        if (!$this->boot('edit')) {
+            return;
+        }
+        $actor = $this->actor();
+        if (empty($actor['is_admin'])) {
+            $_SESSION['error'] = 'Only a system administrator can change maintenance settings.';
+            $this->redirect('facilities/dashboard');
+            return;
+        }
+        $model = $this->svc->model();
+        $routes = $this->post('route_staff', []);
+        if (is_array($routes)) {
+            foreach ($routes as $categoryId => $staffId) {
+                $model->saveRouteStaff((int) $categoryId, trim((string) $staffId));
+            }
+        }
+        foreach (['low', 'medium', 'high', 'critical'] as $priority) {
+            $days = (int) $this->post('sla_' . $priority, 7);
+            $model->saveSla($priority, max(1, min(60, $days)));
+        }
+        foreach (['unassigned_hours', 'facility_escalate_days', 'director_escalate_days'] as $key) {
+            $model->saveSetting($key, (string) max(1, (int) $this->post($key, 1)));
+        }
+        $_SESSION['message'] = 'Maintenance settings saved.';
+        $this->redirect('facilities/settings');
+    }
+
     public function create() {
         if (!$this->boot('add')) {
             return;
@@ -98,7 +181,7 @@ class FacilitiesController extends Controller {
             $ticket = $this->svc->createTicket($actor, $this->post());
             $this->saveUploads($ticket, $actor, 'initial');
             $this->logActivity('CREATE', 'facilities', $ticket['id'], 'Created ' . $ticket['ticket_number']);
-            $_SESSION['message'] = 'Ticket ' . $ticket['ticket_number'] . ' submitted.';
+            $_SESSION['message'] = 'Request submitted. Your reference number is ' . $ticket['ticket_number'] . '.';
             $this->redirect('facilities/view?id=' . $ticket['id']);
         } catch (Throwable $e) {
             $_SESSION['error'] = $e->getMessage();
@@ -127,7 +210,11 @@ class FacilitiesController extends Controller {
         }
         $actor = $this->actor();
         $ticket = $this->loadTicket($actor, true);
-        if (!$ticket || !$this->requireOfficer($actor)) {
+        if (!$ticket || !$this->svc->canAssign($actor, $ticket)) {
+            if ($ticket) {
+                $_SESSION['error'] = 'You cannot assign this request.';
+                $this->redirect('facilities/view?id=' . (int) $ticket['id']);
+            }
             return;
         }
         if ($ticket['status'] === 'new') {
@@ -183,6 +270,7 @@ class FacilitiesController extends Controller {
     public function progress() {
         $this->workAction(function ($actor, $ticket) {
             $this->progress->updateProgress($actor, $ticket, (int) $this->post('progress_percent', 0), (string) $this->post('work_update', ''), (string) $this->post('remarks', ''));
+            $this->svc->recordMaterial($actor, $ticket, (string) $this->post('material_item', ''), (string) $this->post('material_qty', ''), (string) $this->post('material_notes', ''));
             $this->saveUploads($ticket, $actor, $this->post('evidence_type', 'during'));
             $_SESSION['message'] = 'Progress saved.';
         });
@@ -197,12 +285,16 @@ class FacilitiesController extends Controller {
     }
 
     public function verify() {
-        if (!$this->boot('approve')) {
+        if (!$this->boot('edit')) {
             return;
         }
         $actor = $this->actor();
         $ticket = $this->loadTicket($actor, true);
-        if (!$ticket || !$this->requireOfficer($actor)) {
+        if (!$ticket || !$this->svc->canVerify($actor, $ticket)) {
+            if ($ticket) {
+                $_SESSION['error'] = 'You cannot verify this request.';
+                $this->redirect('facilities/view?id=' . (int) $ticket['id']);
+            }
             return;
         }
         return $this->view('facilities/verify', $this->detailData($actor, $ticket, 'Verify ' . $ticket['ticket_number']));
@@ -218,7 +310,7 @@ class FacilitiesController extends Controller {
                 $this->verify->verify($actor, $ticket, (string) $this->post('remarks', ''));
                 $_SESSION['message'] = 'Work verified.';
             }
-        }, 'approve');
+        }, 'edit');
     }
 
     public function confirm() {
@@ -233,7 +325,8 @@ class FacilitiesController extends Controller {
         $this->officerAction(function ($actor, $ticket) {
             $this->verify->close($actor, $ticket, (string) $this->post('remarks', ''), (string) $this->post('no_evidence_reason', ''));
             $_SESSION['message'] = 'Ticket closed.';
-        }, 'approve');
+            $this->svc->notifyStaff((string) $ticket['requester_staff_id'], (int) $ticket['id'], 'feedback_reminder', 'Please rate this request', 'Request ' . $ticket['ticket_number'] . ' is closed. Your feedback helps improve the service.');
+        }, 'edit');
     }
 
     public function reopen() {
@@ -510,7 +603,7 @@ class FacilitiesController extends Controller {
         }
         if ($write && in_array($ticket['status'], ['closed'], true) && $this->post('action') !== 'reopen') {
             $uri = strtolower((string) ($_SERVER['REQUEST_URI'] ?? ''));
-            if (strpos($uri, 'reopen') === false) {
+            if (strpos($uri, 'reopen') === false && strpos($uri, 'feedback') === false) {
                 $_SESSION['error'] = 'Closed tickets cannot be edited.';
                 $this->redirect('facilities/view?id=' . $ticket['id']);
                 return null;
@@ -547,8 +640,8 @@ class FacilitiesController extends Controller {
 
     private function officerAction(callable $fn, string $moduleAction = 'edit'): void {
         $this->ticketAction(function ($actor, $ticket) use ($fn) {
-            if (empty($actor['is_officer'])) {
-                throw new RuntimeException('Only the Facilities Officer can perform this action.');
+            if (!$this->svc->canManage($actor, $ticket)) {
+                throw new RuntimeException('You cannot change this request.');
             }
             $fn($actor, $ticket);
         }, $moduleAction);
@@ -564,7 +657,7 @@ class FacilitiesController extends Controller {
     }
 
     private function listFilters(): array {
-        $keys = ['q', 'status', 'priority', 'category_id', 'department_id', 'staff_id', 'date_from', 'date_to', 'location'];
+        $keys = ['q', 'status', 'priority', 'category_id', 'department_id', 'staff_id', 'date_from', 'date_to', 'location', 'request_type'];
         $out = [];
         foreach ($keys as $key) {
             $val = trim((string) $this->get($key, ''));
@@ -580,6 +673,9 @@ class FacilitiesController extends Controller {
         }
         if ($this->get('unassigned')) {
             $out['unassigned'] = 1;
+        }
+        if ($this->get('escalated')) {
+            $out['escalated'] = 1;
         }
         return $out;
     }
@@ -611,6 +707,10 @@ class FacilitiesController extends Controller {
             'evidence' => $this->svc->model()->evidenceByType($id),
             'verifications' => $this->svc->model()->children('facilities_verifications', $id, 'verified_at DESC'),
             'deadline_history' => $this->svc->model()->children('facilities_deadline_history', $id, 'changed_at DESC'),
+            'feedback' => $this->svc->model()->feedbackFor($id),
+            'materials' => $this->svc->model()->children('facilities_materials', $id, 'recorded_at ASC'),
+            'escalations' => $this->svc->model()->children('facilities_escalations', $id, 'created_at ASC'),
+            'can_feedback' => $this->svc->canFeedback($actor, $ticket),
             'can_assign' => $this->svc->canAssign($actor, $ticket),
             'can_work' => $this->svc->canWork($actor, $ticket),
             'can_verify' => $this->svc->canVerify($actor, $ticket),

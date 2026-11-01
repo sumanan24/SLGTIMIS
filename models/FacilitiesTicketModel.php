@@ -36,7 +36,75 @@ class FacilitiesTicketModel extends Model {
             }
         }
         $this->seedCategories();
+        $this->ensureEnhancements();
         self::$schemaReady = true;
+    }
+
+    private function ensureEnhancements(): void {
+        $columns = [
+            'request_type' => "VARCHAR(40) NOT NULL DEFAULT 'maintenance'",
+            'routed_role' => 'VARCHAR(40) NULL DEFAULT NULL',
+            'routed_staff_id' => 'VARCHAR(64) NULL DEFAULT NULL',
+            'acknowledged_at' => 'DATETIME NULL DEFAULT NULL',
+            'completed_at' => 'DATETIME NULL DEFAULT NULL',
+            'escalation_level' => 'TINYINT UNSIGNED NOT NULL DEFAULT 0',
+        ];
+        foreach ($columns as $name => $definition) {
+            $check = $this->db->query("SHOW COLUMNS FROM `facilities_tickets` LIKE '" . $name . "'");
+            if ($check && $check->num_rows > 0) {
+                continue;
+            }
+            $this->db->query('ALTER TABLE `facilities_tickets` ADD COLUMN `' . $name . '` ' . $definition);
+        }
+        $this->seedRouting();
+    }
+
+    private function seedRouting(): void {
+        $map = [
+            'ict' => 'ict_hod',
+            'electrical' => 'electrical_hod',
+            'building' => 'construction_hod',
+            'plumbing' => 'construction_hod',
+            'furniture' => 'facility_officer',
+            'transport' => 'facility_officer',
+            'cleaning' => 'facility_officer',
+            'other' => 'facility_officer',
+        ];
+        foreach ($map as $slug => $role) {
+            $stmt = $this->db->prepare('SELECT `id` FROM `facilities_categories` WHERE `slug` = ? LIMIT 1');
+            $stmt->bind_param('s', $slug);
+            $stmt->execute();
+            $cat = $stmt->get_result()->fetch_assoc();
+            if (!$cat) {
+                continue;
+            }
+            $cid = (int) $cat['id'];
+            $exists = $this->db->prepare('SELECT `id` FROM `facilities_routes` WHERE `category_id` = ? LIMIT 1');
+            $exists->bind_param('i', $cid);
+            $exists->execute();
+            if ($exists->get_result()->fetch_assoc()) {
+                continue;
+            }
+            $ins = $this->db->prepare('INSERT INTO `facilities_routes` (`category_id`, `route_key`) VALUES (?, ?)');
+            $ins->bind_param('is', $cid, $role);
+            $ins->execute();
+        }
+        $sla = ['low' => 14, 'medium' => 7, 'high' => 3, 'urgent' => 1, 'critical' => 1];
+        foreach ($sla as $priority => $days) {
+            $stmt = $this->db->prepare('INSERT IGNORE INTO `facilities_sla` (`priority`, `target_days`) VALUES (?, ?)');
+            $stmt->bind_param('si', $priority, $days);
+            $stmt->execute();
+        }
+        $settings = [
+            'unassigned_hours' => '24',
+            'facility_escalate_days' => '3',
+            'director_escalate_days' => '7',
+        ];
+        foreach ($settings as $key => $value) {
+            $stmt = $this->db->prepare('INSERT IGNORE INTO `facilities_settings` (`setting_key`, `setting_value`) VALUES (?, ?)');
+            $stmt->bind_param('ss', $key, $value);
+            $stmt->execute();
+        }
     }
 
     private function seedCategories(): void {
@@ -72,6 +140,14 @@ class FacilitiesTicketModel extends Model {
         }
     }
 
+    public function lockTicketSequence(): void {
+        $this->db->query("SELECT GET_LOCK('slgti_fac_ticket', 8)");
+    }
+
+    public function unlockTicketSequence(): void {
+        $this->db->query("SELECT RELEASE_LOCK('slgti_fac_ticket')");
+    }
+
     public function nextTicketNumber(): array {
         $year = (int) date('Y');
         $stmt = $this->db->prepare('SELECT COALESCE(MAX(`ticket_seq`), 0) + 1 AS n FROM `facilities_tickets` WHERE `ticket_year` = ?');
@@ -79,7 +155,7 @@ class FacilitiesTicketModel extends Model {
         $stmt->execute();
         $seq = (int) ($stmt->get_result()->fetch_assoc()['n'] ?? 1);
         return [
-            'ticket_number' => sprintf('SLGTI/FAC/%d/%05d', $year, $seq),
+            'ticket_number' => sprintf('SLGTI/MNT/%d/%04d', $year, $seq),
             'ticket_year' => $year,
             'ticket_seq' => $seq,
         ];
@@ -278,6 +354,7 @@ class FacilitiesTicketModel extends Model {
             'status' => ['t.status = ?', 's'],
             'priority' => ['t.current_priority = ?', 's'],
             'category_id' => ['t.category_id = ?', 'i'],
+            'request_type' => ['t.request_type = ?', 's'],
             'department_id' => ['(t.requester_department_id = ? OR t.responsible_department_id = ?)', 'ss'],
             'staff_id' => ['(t.requester_staff_id = ? OR t.responsible_staff_id = ?)', 'ss'],
             'requester_staff_id' => ['t.requester_staff_id = ?', 's'],
@@ -331,6 +408,14 @@ class FacilitiesTicketModel extends Model {
         if (!empty($filters['unassigned'])) {
             $where[] = "(t.responsible_staff_id IS NULL OR t.responsible_staff_id = '') AND t.status IN ('new','under_review')";
         }
+        if (!empty($filters['escalated'])) {
+            $where[] = 't.escalation_level > 0';
+        }
+        if (!empty($filters['assigned_to_me']) && !empty($filters['scope_staff_id'])) {
+            $where[] = 't.responsible_staff_id = ?';
+            $params[] = $filters['scope_staff_id'];
+            $types .= 's';
+        }
         if (!empty($filters['scope_staff_id']) && empty($filters['officer_all'])) {
             $sid = $filters['scope_staff_id'];
             $dept = $filters['scope_department_id'] ?? '';
@@ -383,7 +468,9 @@ class FacilitiesTicketModel extends Model {
                     SUM(status = 'closed') AS closed_count,
                     SUM(status = 'reopened') AS reopened_count,
                     SUM(current_priority = 'critical') AS critical_count,
-                    SUM(deadline IS NOT NULL AND deadline < CURDATE() AND status NOT IN ('closed','cancelled','rejected')) AS overdue_count
+                    SUM(deadline IS NOT NULL AND deadline < CURDATE() AND status NOT IN ('closed','cancelled','rejected')) AS overdue_count,
+                    SUM(status = 'on_hold') AS on_hold,
+                    SUM(escalation_level > 0) AS escalated_count
                 FROM `facilities_tickets` t
                 WHERE " . implode(' AND ', $where);
         $stmt = $this->db->prepare($sql);
@@ -552,7 +639,7 @@ class FacilitiesTicketModel extends Model {
             'facilities_assignments', 'facilities_progress_updates', 'facilities_evidence',
             'facilities_comments', 'facilities_status_history', 'facilities_priority_history',
             'facilities_deadline_history', 'facilities_verifications', 'facilities_activity',
-            'facilities_notifications',
+            'facilities_notifications', 'facilities_escalations', 'facilities_feedback', 'facilities_materials',
         ];
         if (!in_array($table, $allowed, true)) {
             return false;
@@ -641,5 +728,195 @@ class FacilitiesTicketModel extends Model {
             $rows[] = $this->withDeadlineState($row);
         }
         return $rows;
+    }
+
+    public function setting(string $key, string $default): string {
+        $stmt = $this->db->prepare('SELECT `setting_value` FROM `facilities_settings` WHERE `setting_key` = ? LIMIT 1');
+        $stmt->bind_param('s', $key);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ? (string) $row['setting_value'] : $default;
+    }
+
+    public function saveSetting(string $key, string $value): void {
+        $stmt = $this->db->prepare('INSERT INTO `facilities_settings` (`setting_key`, `setting_value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `setting_value` = VALUES(`setting_value`)');
+        $stmt->bind_param('ss', $key, $value);
+        $stmt->execute();
+    }
+
+    public function slaDays(string $priority): int {
+        $stmt = $this->db->prepare('SELECT `target_days` FROM `facilities_sla` WHERE `priority` = ? LIMIT 1');
+        $stmt->bind_param('s', $priority);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ? (int) $row['target_days'] : 7;
+    }
+
+    public function saveSla(string $priority, int $days): void {
+        $stmt = $this->db->prepare('INSERT INTO `facilities_sla` (`priority`, `target_days`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `target_days` = VALUES(`target_days`)');
+        $stmt->bind_param('si', $priority, $days);
+        $stmt->execute();
+    }
+
+    public function routes(): array {
+        $sql = 'SELECT r.*, c.name AS category_name, c.slug, s.staff_name
+                FROM `facilities_routes` r
+                JOIN `facilities_categories` c ON c.id = r.category_id
+                LEFT JOIN `staff` s ON s.staff_id = r.staff_id
+                ORDER BY c.sort_order, c.name';
+        $res = $this->db->query($sql);
+        $rows = [];
+        while ($res && ($row = $res->fetch_assoc())) {
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
+    public function routeForCategory(int $categoryId): ?array {
+        $stmt = $this->db->prepare('SELECT * FROM `facilities_routes` WHERE `category_id` = ? LIMIT 1');
+        $stmt->bind_param('i', $categoryId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
+    }
+
+    public function saveRouteStaff(int $categoryId, string $staffId): void {
+        if ($staffId === '') {
+            $stmt = $this->db->prepare('UPDATE `facilities_routes` SET `staff_id` = NULL WHERE `category_id` = ?');
+            $stmt->bind_param('i', $categoryId);
+            $stmt->execute();
+            return;
+        }
+        $stmt = $this->db->prepare('UPDATE `facilities_routes` SET `staff_id` = ? WHERE `category_id` = ?');
+        $stmt->bind_param('si', $staffId, $categoryId);
+        $stmt->execute();
+    }
+
+    public function findHodByDepartmentLike(array $likes): ?array {
+        if (!$likes) {
+            return null;
+        }
+        $where = [];
+        $params = [];
+        $types = '';
+        foreach ($likes as $like) {
+            $where[] = 'd.department_name LIKE ?';
+            $params[] = $like;
+            $types .= 's';
+        }
+        $sql = "SELECT s.staff_id, s.department_id
+                FROM `staff` s
+                JOIN `department` d ON d.department_id = s.department_id
+                WHERE s.staff_position = 'HOD' AND (" . implode(' OR ', $where) . ")
+                LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
+    }
+
+    public function findStaffByRoles(array $roles): array {
+        if (!$roles) {
+            return [];
+        }
+        $marks = implode(',', array_fill(0, count($roles), '?'));
+        $sql = "SELECT `user_name` AS staff_id FROM `user` WHERE `user_active` = 1 AND UPPER(`staff_position_type_id`) IN ({$marks})";
+        $stmt = $this->db->prepare($sql);
+        $types = str_repeat('s', count($roles));
+        $upper = array_map('strtoupper', $roles);
+        $stmt->bind_param($types, ...$upper);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $rows = [];
+        while ($row = $res->fetch_assoc()) {
+            $rows[] = $row['staff_id'];
+        }
+        return $rows;
+    }
+
+    public function staffOptions(): array {
+        $res = $this->db->query('SELECT `staff_id`, `staff_name`, `department_id` FROM `staff` ORDER BY `staff_name` LIMIT 500');
+        $rows = [];
+        while ($res && ($row = $res->fetch_assoc())) {
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
+    public function feedbackFor(int $ticketId): ?array {
+        $stmt = $this->db->prepare('SELECT * FROM `facilities_feedback` WHERE `ticket_id` = ? LIMIT 1');
+        $stmt->bind_param('i', $ticketId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
+    }
+
+    public function satisfactionAverage(): ?float {
+        $res = $this->db->query('SELECT AVG(`overall_rating`) AS avg_rating, COUNT(*) AS c FROM `facilities_feedback`');
+        $row = $res ? $res->fetch_assoc() : null;
+        if (!$row || (int) $row['c'] < 1) {
+            return null;
+        }
+        return round((float) $row['avg_rating'], 2);
+    }
+
+    public function categoryBreakdown(array $filters = []): array {
+        $where = ['1=1'];
+        $params = [];
+        $types = '';
+        $this->applyFilters($filters, $where, $params, $types);
+        $sql = 'SELECT c.name AS k, COUNT(*) AS c
+                FROM `facilities_tickets` t
+                LEFT JOIN `facilities_categories` c ON c.id = t.category_id
+                WHERE ' . implode(' AND ', $where) . '
+                GROUP BY c.name
+                ORDER BY c DESC';
+        $stmt = $this->db->prepare($sql);
+        if ($params) {
+            $stmt->bind_param($types, ...$params);
+        }
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $out = [];
+        while ($row = $res->fetch_assoc()) {
+            $out[$row['k'] ?: 'Uncategorised'] = (int) $row['c'];
+        }
+        return $out;
+    }
+
+    public function requestTypeBreakdown(array $filters = []): array {
+        $where = ['1=1'];
+        $params = [];
+        $types = '';
+        $this->applyFilters($filters, $where, $params, $types);
+        $sql = 'SELECT t.request_type AS k, COUNT(*) AS c FROM `facilities_tickets` t WHERE ' . implode(' AND ', $where) . ' GROUP BY t.request_type';
+        $stmt = $this->db->prepare($sql);
+        if ($params) {
+            $stmt->bind_param($types, ...$params);
+        }
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $out = [];
+        while ($row = $res->fetch_assoc()) {
+            $out[$row['k'] ?: 'maintenance'] = (int) $row['c'];
+        }
+        return $out;
+    }
+
+    public function escalationCandidates(string $sql): array {
+        $res = $this->db->query($sql);
+        $rows = [];
+        while ($res && ($row = $res->fetch_assoc())) {
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
+    public function hasEscalation(int $ticketId, int $level): bool {
+        $stmt = $this->db->prepare('SELECT `id` FROM `facilities_escalations` WHERE `ticket_id` = ? AND `level` = ? LIMIT 1');
+        $stmt->bind_param('ii', $ticketId, $level);
+        $stmt->execute();
+        return (bool) $stmt->get_result()->fetch_assoc();
     }
 }

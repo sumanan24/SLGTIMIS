@@ -132,6 +132,7 @@
                             $canMenuStaff = $canMenuStudents = $canMenuStaffAttendance = $canMenuPersonalFiles = true;
                             $canMenuDepartments = $canMenuCourses = true;
                             $canMenuFacilities = true;
+                            $canMenuLifecycle = false;
                             $canMenuStaffRoles = $isAdminOrADM;
                             if (isset($_SESSION['user_id'])) {
                                 require_once BASE_PATH . '/core/AccessControl.php';
@@ -148,6 +149,8 @@
                                 $canViewPaymentsMenu = AccessControl::can($uidMenu, 'payments', 'view');
                                 $canViewDevices = AccessControl::can($uidMenu, 'devices', 'view');
                                 $canMenuFacilities = AccessControl::can($uidMenu, 'facilities', 'view');
+                                $canMenuServices = AccessControl::can($uidMenu, 'services', 'view');
+                                $canMenuLifecycle = AccessControl::can($uidMenu, 'lifecycle', 'view');
                                 $canStaffDeviceAttendanceMenu = $canMenuStaffAttendance;
                             }
                             $devicePages = ['devices'];
@@ -181,14 +184,15 @@
                             <li data-nav="facilities" class="menu-item-has-children <?php echo (isset($page) && $page === 'facilities') ? 'active' : ''; ?>">
                                 <a href="<?php echo APP_URL; ?>/facilities/dashboard" class="menu-toggle">
                                     <i class="fas fa-tools"></i>
-                                    <span>Facilities</span>
+                                    <span>Maintenance</span>
                                     <?php if ($facUnread > 0): ?><span class="badge bg-danger ms-1"><?php echo (int) $facUnread; ?></span><?php endif; ?>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
                                 <ul class="submenu" style="<?php echo (isset($page) && $page === 'facilities') ? 'display: block;' : ''; ?>">
                                     <li><a href="<?php echo APP_URL; ?>/facilities/dashboard" class="<?php echo (isset($section) && $section === 'dashboard') ? 'active' : ''; ?>"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a></li>
                                     <li><a href="<?php echo APP_URL; ?>/facilities" class="<?php echo (isset($section) && $section === 'list') ? 'active' : ''; ?>"><i class="fas fa-ticket-alt"></i><span>All Tickets</span></a></li>
-                                    <li><a href="<?php echo APP_URL; ?>/facilities/create"><i class="fas fa-plus"></i><span>New Ticket</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/facilities/tasks"><i class="fas fa-tasks"></i><span>My Tasks</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/facilities/create"><i class="fas fa-plus"></i><span>New Request</span></a></li>
                                     <li><a href="<?php echo APP_URL; ?>/facilities/notifications"><i class="fas fa-bell"></i><span>Notifications</span></a></li>
                                     <?php if (!empty($canMenuFacilities) && AccessControl::can($uidMenu, 'facilities', 'approve')): ?>
                                     <li><a href="<?php echo APP_URL; ?>/facilities/reports"><i class="fas fa-file-alt"></i><span>Reports</span></a></li>
@@ -196,6 +200,34 @@
                                     <?php elseif (!empty($isAdminOrADM) || (!empty($userRole) && in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'HOD'], true))): ?>
                                     <li><a href="<?php echo APP_URL; ?>/facilities/reports"><i class="fas fa-file-alt"></i><span>Reports</span></a></li>
                                     <?php endif; ?>
+                                </ul>
+                            </li>
+                            <?php endif; ?>
+
+                            <?php if (!empty($canMenuServices)):
+                                $serviceAreas = [];
+                                try {
+                                    require_once BASE_PATH . '/helpers/ServiceAccess.php';
+                                    $serviceAreas = ServiceAccess::actor((int) $uidMenu)['areas'];
+                                } catch (Throwable $e) {
+                                    $serviceAreas = [];
+                                }
+                            ?>
+                            <li data-nav="services" class="menu-item-has-children <?php echo (isset($page) && $page === 'services') ? 'active' : ''; ?>">
+                                <a href="<?php echo APP_URL; ?>/services/dashboard" class="menu-toggle">
+                                    <i class="fas fa-handshake"></i>
+                                    <span>Service Providers</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="<?php echo (isset($page) && $page === 'services') ? 'display: block;' : ''; ?>">
+                                    <li><a href="<?php echo APP_URL; ?>/services/dashboard"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a></li>
+                                    <?php if (in_array('security', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=security"><i class="fas fa-shield-alt"></i><span>Security</span></a></li><?php endif; ?>
+                                    <?php if (in_array('ac', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=ac"><i class="fas fa-snowflake"></i><span>Air Conditioning</span></a></li><?php endif; ?>
+                                    <?php if (in_array('cleaning', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=cleaning"><i class="fas fa-broom"></i><span>Cleaning</span></a></li><?php endif; ?>
+                                    <?php if (in_array('canteen', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=canteen"><i class="fas fa-utensils"></i><span>Canteen</span></a></li><?php endif; ?>
+                                    <?php if (in_array('contracts', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=contracts"><i class="fas fa-file-contract"></i><span>Contracts</span></a></li><?php endif; ?>
+                                    <li><a href="<?php echo APP_URL; ?>/services/reports"><i class="fas fa-file-alt"></i><span>Reports</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/services/notifications"><i class="fas fa-bell"></i><span>Reminders</span></a></li>
                                 </ul>
                             </li>
                             <?php endif; ?>
@@ -330,7 +362,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             <!-- Registrar (Student Affairs) Branch - Visible for all, especially SAO -->
                             <?php 
                             // Build student affairs pages array
-                            $studentAffairsPages = ['students'];
+                            $studentAffairsPages = ['students', 'lifecycle'];
                             
                             // Check if user can view hostel information (FIN, ACC, DIR, REG, HOD, IN1, IN2, IN3, SAO, ADM, Admin)
                             $canViewHostelInfo = false;
@@ -403,6 +435,14 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                         <a href="<?php echo APP_URL; ?>/students" class="<?php echo (isset($page) && $page === 'students') ? 'active' : ''; ?>">
                                             <i class="fas fa-user-graduate"></i>
                                             <span>Students</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
+                                    <?php if (!empty($canMenuLifecycle)): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/lifecycle/dashboard" class="<?php echo (isset($page) && $page === 'lifecycle') ? 'active' : ''; ?>">
+                                            <i class="fas fa-route"></i>
+                                            <span>Lifecycle</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>

@@ -37,7 +37,12 @@ class GroupModel extends Model {
      */
     public function getAllWithDetails($departmentId = null, $courseId = null) {
         $sql = "SELECT g.*, c.course_name, c.department_id, d.department_name,
-                COUNT(gs.id) as student_count
+                COUNT(gs.id) as student_count,
+                (SELECT COUNT(*) FROM `group_students` gsi
+                    INNER JOIN `student_enroll` sei ON sei.student_id = gsi.student_id
+                        AND sei.course_id = g.course_id AND sei.academic_year = g.academic_year
+                        AND sei.student_enroll_status = 'Internship'
+                    WHERE gsi.group_id = g.id AND gsi.status = 'active') AS internship_count
                 FROM `{$this->table}` g
                 LEFT JOIN `course` c ON g.course_id = c.course_id
                 LEFT JOIN `department` d ON c.department_id = d.department_id
@@ -148,9 +153,13 @@ class GroupModel extends Model {
      * Get students in a group (only active students)
      */
     public function getGroupStudents($groupId) {
-        $sql = "SELECT gs.*, s.student_id, s.student_ininame, s.student_fullname, s.student_email
+        $sql = "SELECT gs.*, s.student_id, s.student_ininame, s.student_fullname, s.student_email,
+                       se.student_enroll_status
                 FROM `group_students` gs
                 INNER JOIN `student` s ON gs.student_id = s.student_id
+                INNER JOIN `groups` g ON g.id = gs.group_id
+                LEFT JOIN `student_enroll` se ON se.student_id = gs.student_id
+                    AND se.course_id = g.course_id AND se.academic_year = g.academic_year
                 WHERE gs.group_id = ? AND gs.status = 'active'
                 ORDER BY s.student_id ASC";
         
@@ -222,6 +231,30 @@ class GroupModel extends Model {
     /**
      * Update student status in group
      */
+    public function setGroupEnrollmentStatus($groupId, $status) {
+        $status = $status === 'Internship' ? 'Internship' : 'Following';
+        $groupId = (int) $groupId;
+        $group = $this->getByIdWithDetails($groupId);
+        if (!$group || empty($group['course_id']) || empty($group['academic_year'])) {
+            return 0;
+        }
+        require_once BASE_PATH . '/models/StudentEnrollmentModel.php';
+        (new StudentEnrollmentModel())->ensureEnrollStatusValues();
+        $sql = "UPDATE `student_enroll` se
+                INNER JOIN `group_students` gs ON gs.student_id = se.student_id
+                    AND gs.group_id = ? AND gs.status = 'active'
+                SET se.student_enroll_status = ?
+                WHERE se.course_id = ? AND se.academic_year = ? AND se.student_enroll_status <> ?";
+        $stmt = $this->db->prepare($sql);
+        $courseId = (string) $group['course_id'];
+        $year = (string) $group['academic_year'];
+        $stmt->bind_param('issss', $groupId, $status, $courseId, $year, $status);
+        if (!$stmt->execute()) {
+            return 0;
+        }
+        return (int) $stmt->affected_rows;
+    }
+
     public function updateStudentStatus($groupId, $studentId, $status) {
         $sql = "UPDATE `group_students` SET `status` = ? WHERE `group_id` = ? AND `student_id` = ?";
         $stmt = $this->db->prepare($sql);

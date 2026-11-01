@@ -7,12 +7,12 @@ $hasMore = ($filters['category_id'] ?? '') !== '' || ($filters['department_id'] 
 <div class="container-fluid px-0 fac-page">
     <div class="card border-0">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="fw-bold mb-0">Tickets</h5>
+            <h5 class="fw-bold mb-0"><?php echo ($section ?? '') === 'tasks' ? 'My assigned tasks' : 'Tickets'; ?></h5>
             <a class="btn btn-sm btn-light" href="<?php echo $base; ?>/create">New ticket</a>
         </div>
         <div class="card-body">
             <?php $facNav(); $facFlash(); ?>
-            <form method="get" action="<?php echo $base; ?>">
+            <form method="get" action="<?php echo ($section ?? '') === 'tasks' ? $base . '/tasks' : $base; ?>">
                 <div class="fac-filters">
                     <div><label class="form-label">Search</label><input class="form-control form-control-sm" name="q" value="<?php echo $h($filters['q'] ?? ''); ?>" placeholder="Ticket no. or title"></div>
                     <div><label class="form-label">Status</label>

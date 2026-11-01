@@ -312,6 +312,7 @@
                             </div>
                         <?php endif; ?>
                         <span class="text-white fw-semibold d-none d-sm-inline"><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'Student'); ?></span>
+                        <a href="<?php echo APP_URL; ?>/alumni/portal" class="btn btn-outline-light btn-sm ms-0 ms-md-2">Alumni</a>
                         <a href="<?php echo APP_URL; ?>/logout" class="btn btn-outline-light btn-sm ms-0 ms-md-2">
                             <i class="fas fa-sign-out-alt me-1"></i><span class="d-none d-sm-inline">Logout</span><span class="d-sm-none">Exit</span>
                         </a>

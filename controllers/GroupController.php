@@ -268,6 +268,46 @@ class GroupController extends Controller {
     }
     
     /**
+     * Set every active student in one group to Internship or back to Following.
+     */
+    public function setEnrollmentStatus() {
+        if (!$this->checkGroupAccess()) {
+            return;
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->redirect('groups');
+            return;
+        }
+        $id = (int) $this->post('id', 0);
+        $status = $this->post('status', '') === 'Internship' ? 'Internship' : 'Following';
+        $back = $this->post('return', '') === 'show' ? 'groups/show?id=' . $id : 'groups';
+        if ($id <= 0) {
+            $_SESSION['error'] = 'Choose a group first.';
+            $this->redirect('groups');
+            return;
+        }
+        $groupModel = $this->model('GroupModel');
+        if (!$groupModel->canAccessGroup($id, $this->getUserDepartment())) {
+            $_SESSION['error'] = 'Access denied. You can only update groups from your department.';
+            $this->redirect('groups');
+            return;
+        }
+        $members = count($groupModel->getGroupStudents($id));
+        if ($members === 0) {
+            $_SESSION['error'] = 'This group has no students to update.';
+            $this->redirect($back);
+            return;
+        }
+        $updated = $groupModel->setGroupEnrollmentStatus($id, $status);
+        if ($updated > 0) {
+            $_SESSION['message'] = $updated . ' student' . ($updated === 1 ? '' : 's') . ' set to ' . $status . '.';
+        } else {
+            $_SESSION['message'] = 'Students in this group are already ' . $status . '.';
+        }
+        $this->redirect($back);
+    }
+
+    /**
      * Edit group
      */
     public function edit() {

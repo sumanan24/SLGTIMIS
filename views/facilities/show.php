@@ -20,9 +20,15 @@ $place = trim(($t['building'] ?? '') . ' ' . ($t['floor'] ?? '') . ' ' . ($t['ro
             <?php endif; ?>
 
             <div class="fac-meta">
+                <div><span>Type</span><strong><?php echo $h($labels['types'][$t['request_type'] ?? ''] ?? 'Maintenance Request'); ?></strong></div>
                 <div><span>Requester</span><strong><?php echo $h($t['requester_name'] ?? $t['requester_staff_id']); ?></strong></div>
+                <div><span>Employee ID</span><strong><?php echo $h($t['requester_staff_id']); ?></strong></div>
+                <div><span>Submitted</span><strong><?php echo $h($t['created_at'] ?? ''); ?></strong></div>
                 <div><span>Location</span><strong><?php echo $h($t['location']); ?></strong></div>
+                <div><span>Routed to</span><strong><?php echo $h($labels['routes'][$t['routed_role'] ?? ''] ?? 'Facility Officer'); ?></strong></div>
                 <div><span>Assigned to</span><strong><?php echo $h($t['responsible_name'] ?? $t['vendor_name'] ?? 'Not assigned'); ?></strong></div>
+                <div><span>Expected</span><strong><?php echo $h($t['expected_completion_date'] ?? $t['deadline'] ?? '—'); ?></strong></div>
+                <div><span>Completed</span><strong><?php echo $h($t['completed_at'] ?? '—'); ?></strong></div>
                 <div>
                     <span>Deadline · <?php echo (int) $t['progress_percent']; ?>%</span>
                     <strong><?php echo $h($t['deadline'] ?? '—'); ?></strong>
@@ -38,8 +44,10 @@ $place = trim(($t['building'] ?? '') . ' ' . ($t['floor'] ?? '') . ' ' . ($t['ro
                 <?php if (!empty($can_work) && in_array($t['status'], ['accepted', 'assigned'], true)): ?>
                     <form method="post" action="<?php echo $base; ?>/start"><input type="hidden" name="id" value="<?php echo $id; ?>"><button class="btn btn-sm btn-outline-primary">Start work</button></form>
                 <?php endif; ?>
-                <?php if (!empty($actor['is_officer'])): ?>
+                <?php if (!empty($can_assign)): ?>
                     <a class="btn btn-sm btn-primary" href="<?php echo $base; ?>/assign?id=<?php echo $id; ?>"><?php echo empty($t['responsible_staff_id']) ? 'Assign' : 'Reassign'; ?></a>
+                <?php endif; ?>
+                <?php if (!empty($actor['is_officer']) || !empty($can_assign)): ?>
                     <?php if ($t['status'] === 'new'): ?>
                         <a class="btn btn-sm btn-outline-primary" href="<?php echo $base; ?>/review?id=<?php echo $id; ?>">Mark as reviewed</a>
                     <?php endif; ?>
@@ -89,6 +97,14 @@ $place = trim(($t['building'] ?? '') . ' ' . ($t['floor'] ?? '') . ' ' . ($t['ro
                                     <div class="col-8">
                                         <label class="form-label">What did you do?</label>
                                         <input class="form-control form-control-sm" name="work_update" required>
+                                    </div>
+                                    <div class="col-7">
+                                        <label class="form-label">Material used</label>
+                                        <input class="form-control form-control-sm" name="material_item" placeholder="Optional">
+                                    </div>
+                                    <div class="col-5">
+                                        <label class="form-label">Quantity</label>
+                                        <input class="form-control form-control-sm" name="material_qty" placeholder="1">
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label">Photo (optional)</label>
@@ -256,7 +272,48 @@ $place = trim(($t['building'] ?? '') . ' ' . ($t['floor'] ?? '') . ' ' . ($t['ro
                 <?php endif; ?>
             </div>
 
-            <?php if ($t['status'] === 'closed' && (!empty($actor['is_officer']) || $actor['staff_id'] === $t['requester_staff_id'])): ?>
+            <?php if (!empty($materials)): ?>
+            <div class="fac-section">
+                <h6>Materials used</h6>
+                <ul class="mb-0">
+                    <?php foreach ($materials as $mat): ?>
+                        <li><?php echo $h($mat['item_name']); ?> · <?php echo $h($mat['quantity']); ?> · <?php echo $h($mat['recorded_by']); ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($feedback)): ?>
+            <div class="fac-section">
+                <h6>Requester feedback</h6>
+                <p class="mb-1">Overall <?php echo (int) $feedback['overall_rating']; ?>/5 · Response <?php echo (int) $feedback['response_rating']; ?>/5 · Quality <?php echo (int) $feedback['quality_rating']; ?>/5 · Behaviour <?php echo (int) $feedback['behaviour_rating']; ?>/5</p>
+                <?php if (!empty($feedback['comments'])): ?><p class="mb-0"><?php echo nl2br($h($feedback['comments'])); ?></p><?php endif; ?>
+            </div>
+            <?php elseif (!empty($can_feedback)): ?>
+            <form method="post" action="<?php echo $base; ?>/feedback" class="fac-section">
+                <input type="hidden" name="id" value="<?php echo $id; ?>">
+                <h6>Rate this completed request</h6>
+                <div class="row g-2">
+                    <?php foreach (['overall_rating' => 'Overall', 'response_rating' => 'Response time', 'quality_rating' => 'Quality', 'behaviour_rating' => 'Staff behaviour'] as $name => $label): ?>
+                    <div class="col-md-3">
+                        <label class="form-label"><?php echo $h($label); ?></label>
+                        <select class="form-select form-select-sm" name="<?php echo $h($name); ?>" required>
+                            <option value="">1–5</option>
+                            <?php for ($star = 1; $star <= 5; $star++): ?>
+                                <option value="<?php echo $star; ?>"><?php echo $star; ?></option>
+                            <?php endfor; ?>
+                        </select>
+                    </div>
+                    <?php endforeach; ?>
+                    <div class="col-12">
+                        <label class="form-label">Comments</label>
+                        <textarea class="form-control form-control-sm" name="comments" rows="2"></textarea>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-primary mt-2">Submit feedback</button>
+            </form>
+            <?php endif; ?>
+
+            <?php if ($t['status'] === 'closed' && (!empty($can_assign) || $actor['staff_id'] === $t['requester_staff_id'])): ?>
             <form method="post" action="<?php echo $base; ?>/reopen" class="fac-section">
                 <input type="hidden" name="id" value="<?php echo $id; ?>">
                 <h6>Reopen</h6>

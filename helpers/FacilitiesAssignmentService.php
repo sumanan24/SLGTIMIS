@@ -77,13 +77,13 @@ class FacilitiesAssignmentService {
     }
 
     public function extendDeadline(array $actor, array $ticket, string $deadline, string $reason): array {
-        if (empty($actor['is_officer']) && !$this->tickets->canWork($actor, $ticket)) {
+        if (!$this->tickets->canManage($actor, $ticket) && !$this->tickets->canWork($actor, $ticket)) {
             throw new RuntimeException('You cannot change this deadline.');
         }
         if ($reason === '') {
             throw new InvalidArgumentException('A reason is required for deadline changes.');
         }
-        if (empty($actor['is_officer']) && $this->tickets->canWork($actor, $ticket)) {
+        if (!$this->tickets->canManage($actor, $ticket) && $this->tickets->canWork($actor, $ticket)) {
             $this->tickets->history((int) $ticket['id'], $actor['staff_id'], 'Deadline Extension Requested', $ticket['deadline'], $deadline, $reason);
             $this->tickets->notifyOfficers('deadline_updated', (int) $ticket['id'], 'Deadline extension requested', $actor['name'] . ' requested ' . $deadline . ': ' . $reason);
             return $this->model->getDetailed((int) $ticket['id']);

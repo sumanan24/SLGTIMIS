@@ -56,12 +56,32 @@
                                         </span>
                                     </td>
                                     <td>
-                                        <span class="badge bg-<?php echo ($group['status'] === 'active') ? 'success' : 'secondary'; ?> rounded-pill px-3">
-                                            <?php echo htmlspecialchars(ucfirst($group['status'] ?? 'active')); ?>
-                                        </span>
+                                        <?php
+                                        $memberCount = (int) ($group['student_count'] ?? 0);
+                                        $internshipCount = (int) ($group['internship_count'] ?? 0);
+                                        $allInternship = $memberCount > 0 && $internshipCount === $memberCount;
+                                        ?>
+                                        <?php if ($allInternship): ?>
+                                            <span class="badge bg-warning text-dark rounded-pill px-3">Internship</span>
+                                        <?php elseif ($internshipCount > 0): ?>
+                                            <span class="badge bg-warning text-dark rounded-pill px-3">Internship <?php echo $internshipCount; ?>/<?php echo $memberCount; ?></span>
+                                        <?php else: ?>
+                                            <span class="badge bg-<?php echo ($group['status'] === 'active') ? 'success' : 'secondary'; ?> rounded-pill px-3">
+                                                <?php echo htmlspecialchars(ucfirst($group['status'] ?? 'active')); ?>
+                                            </span>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="text-end">
                                         <div class="btn-group" role="group">
+                                            <?php if ($memberCount > 0): ?>
+                                            <form method="post" action="<?php echo APP_URL; ?>/groups/enrollment-status" class="d-inline" onsubmit="return confirm(<?php echo htmlspecialchars(json_encode($allInternship ? 'Set every student in ' . $group['name'] . ' back to Following?' : 'Set every student in ' . $group['name'] . ' to Internship?'), ENT_QUOTES, 'UTF-8'); ?>);">
+                                                <input type="hidden" name="id" value="<?php echo (int) $group['id']; ?>">
+                                                <input type="hidden" name="status" value="<?php echo $allInternship ? 'Following' : 'Internship'; ?>">
+                                                <button type="submit" class="btn btn-outline-warning btn-sm" title="<?php echo $allInternship ? 'Set the group back to Following' : 'Set the group to Internship'; ?>">
+                                                    <?php echo $allInternship ? 'Following' : 'Internship'; ?>
+                                                </button>
+                                            </form>
+                                            <?php endif; ?>
                                             <a href="<?php echo APP_URL; ?>/groups/show?id=<?php echo urlencode($group['id']); ?>" 
                                                class="btn btn-outline-primary btn-sm" 
                                                title="View Group">

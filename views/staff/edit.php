@@ -52,11 +52,9 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
     <div class="card border-0">
         <div class="card-header d-flex justify-content-between align-items-center gap-3">
             <div class="st-file-heading">
-                <h5 class="fw-bold mb-0"><i class="fas fa-folder-open me-2"></i>Staff Personal File</h5>
-                <p class="st-file-sub mb-0">
-                    <?php echo $h($staff['staff_name'] ?? $sid); ?>
-                    <span><?php echo $h($sid); ?></span>
-                </p>
+                <p class="st-file-kicker mb-0">Staff personal file</p>
+                <h5 class="fw-bold mb-0"><?php echo $h($staff['staff_name'] ?? $sid); ?></h5>
+                <p class="st-file-id mb-0"><?php echo $h($sid); ?></p>
             </div>
             <a href="<?php echo APP_URL; ?>/staff" class="btn btn-sm btn-light flex-shrink-0">Back</a>
         </div>
@@ -101,66 +99,77 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                             <div class="st-photo-empty"><i class="fas fa-user"></i></div>
                         <?php endif; ?>
                         <?php if ($canUploadFile): ?>
-                            <form method="POST" action="<?php echo APP_URL; ?>/staff/file/photo?id=<?php echo urlencode($sid); ?>" enctype="multipart/form-data" class="mt-2">
-                                <input type="file" name="photo" accept="image/*" class="form-control form-control-sm mb-2" required>
-                                <button class="btn btn-outline-primary btn-sm w-100" type="submit">Upload Photo</button>
+                            <form method="POST" action="<?php echo APP_URL; ?>/staff/file/photo?id=<?php echo urlencode($sid); ?>" enctype="multipart/form-data" class="st-photo-form">
+                                <label class="st-photo-pick">
+                                    <input type="file" name="photo" accept="image/*" required onchange="var n=this.files&&this.files[0]?this.files[0].name:'Choose photo'; this.parentNode.querySelector('span').textContent=n;">
+                                    <span>Choose photo</span>
+                                </label>
+                                <button class="btn btn-primary btn-sm w-100" type="submit">Upload photo</button>
                             </form>
                         <?php endif; ?>
                     </div>
                     <form method="POST" action="<?php echo $h($base); ?>" class="st-file-form">
                         <input type="hidden" name="update_section" value="personal">
-                        <div class="st-grid-2">
-                            <div>
-                                <label class="form-label" for="staff_id">Staff ID / Employee No. <span class="text-danger">*</span></label>
-                                <input class="form-control" id="staff_id" name="staff_id" maxlength="64" required value="<?php echo $h($sid); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                        <section class="st-person-block">
+                            <h6>Name and identity</h6>
+                            <div class="st-grid-2">
+                                <div>
+                                    <label class="form-label" for="staff_id">Staff ID / Employee No. <span class="text-danger">*</span></label>
+                                    <input class="form-control" id="staff_id" name="staff_id" maxlength="64" required value="<?php echo $h($sid); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                </div>
+                                <div>
+                                    <label class="form-label" for="finger_machine_no">Finger Machine Number</label>
+                                    <input class="form-control" id="finger_machine_no" name="finger_machine_no" maxlength="50" value="<?php echo $h($staff['finger_machine_no'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                </div>
                             </div>
-                            <div>
-                                <label class="form-label" for="finger_machine_no">Finger Machine Number</label>
-                                <input class="form-control" id="finger_machine_no" name="finger_machine_no" maxlength="50" value="<?php echo $h($staff['finger_machine_no'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            <div class="st-grid-2">
+                                <div>
+                                    <label class="form-label" for="staff_name">Full Name <span class="text-danger">*</span></label>
+                                    <input class="form-control" id="staff_name" name="staff_name" maxlength="100" required value="<?php echo $h($staff['staff_name'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                </div>
+                                <div>
+                                    <label class="form-label" for="staff_ininame">Name with Initials</label>
+                                    <input class="form-control" id="staff_ininame" name="staff_ininame" maxlength="100" value="<?php echo $h($staff['staff_ininame'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                </div>
                             </div>
-                        </div>
-                        <div class="st-grid-2">
-                            <div>
-                                <label class="form-label" for="staff_name">Full Name <span class="text-danger">*</span></label>
-                                <input class="form-control" id="staff_name" name="staff_name" maxlength="100" required value="<?php echo $h($staff['staff_name'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                        </section>
+                        <section class="st-person-block">
+                            <h6>Personal details</h6>
+                            <div class="st-grid-2">
+                                <div>
+                                    <label class="form-label" for="staff_dob">Date of Birth</label>
+                                    <input type="date" class="form-control" id="staff_dob" name="staff_dob" value="<?php echo $h($staff['staff_dob'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                </div>
+                                <div>
+                                    <label class="form-label" for="staff_nic">NIC No. <span class="text-danger">*</span></label>
+                                    <input class="form-control" id="staff_nic" name="staff_nic" maxlength="20" required value="<?php echo $h($staff['staff_nic'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                </div>
                             </div>
-                            <div>
-                                <label class="form-label" for="staff_ininame">Name with Initials</label>
-                                <input class="form-control" id="staff_ininame" name="staff_ininame" maxlength="100" value="<?php echo $h($staff['staff_ininame'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            <div class="st-grid-2">
+                                <div>
+                                    <label class="form-label" for="staff_gender">Gender</label>
+                                    <select class="form-select" id="staff_gender" name="staff_gender" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                        <option value="">Select</option>
+                                        <?php echo $opt(['Male' => 'Male', 'Female' => 'Female', 'Transgender' => 'Transgender'], $staff['staff_gender'] ?? ''); ?>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="form-label" for="staff_civil_status">Civil Status</label>
+                                    <select class="form-select" id="staff_civil_status" name="staff_civil_status" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                        <option value="">Select</option>
+                                        <?php echo $opt(['Single' => 'Single', 'Married' => 'Married', 'Widowed' => 'Widowed', 'Divorced' => 'Divorced'], $staff['staff_civil_status'] ?? ''); ?>
+                                    </select>
+                                </div>
                             </div>
-                        </div>
-                        <div class="st-grid-3">
-                            <div>
-                                <label class="form-label" for="staff_dob">Date of Birth</label>
-                                <input type="date" class="form-control" id="staff_dob" name="staff_dob" value="<?php echo $h($staff['staff_dob'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            <div class="st-grid-2">
+                                <div>
+                                    <label class="form-label" for="staff_nationality">Nationality</label>
+                                    <input class="form-control" id="staff_nationality" name="staff_nationality" maxlength="50" value="<?php echo $h($staff['staff_nationality'] ?? 'Sri Lankan'); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                </div>
                             </div>
-                            <div>
-                                <label class="form-label" for="staff_nic">NIC No. <span class="text-danger">*</span></label>
-                                <input class="form-control" id="staff_nic" name="staff_nic" maxlength="20" required value="<?php echo $h($staff['staff_nic'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                            </div>
-                            <div>
-                                <label class="form-label" for="staff_gender">Gender</label>
-                                <select class="form-select" id="staff_gender" name="staff_gender" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                                    <option value="">Select</option>
-                                    <?php echo $opt(['Male' => 'Male', 'Female' => 'Female', 'Transgender' => 'Transgender'], $staff['staff_gender'] ?? ''); ?>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="st-grid-2">
-                            <div>
-                                <label class="form-label" for="staff_civil_status">Civil Status</label>
-                                <select class="form-select" id="staff_civil_status" name="staff_civil_status" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                                    <option value="">Select</option>
-                                    <?php echo $opt(['Single' => 'Single', 'Married' => 'Married', 'Widowed' => 'Widowed', 'Divorced' => 'Divorced'], $staff['staff_civil_status'] ?? ''); ?>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="form-label" for="staff_nationality">Nationality</label>
-                                <input class="form-control" id="staff_nationality" name="staff_nationality" maxlength="50" value="<?php echo $h($staff['staff_nationality'] ?? 'Sri Lankan'); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                            </div>
-                        </div>
+                        </section>
                         <?php if ($canEditFile): ?>
-                            <div class="st-form-actions"><button class="btn btn-primary" type="submit">Save Personal Information</button></div>
+                            <div class="st-form-actions"><button class="btn btn-primary" type="submit">Save personal information</button></div>
                         <?php endif; ?>
                     </form>
                 </div>

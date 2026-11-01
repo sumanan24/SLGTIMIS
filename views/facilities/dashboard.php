@@ -26,6 +26,9 @@ $isLead = !empty($actor['is_officer']) || !empty($actor['is_monitor']);
                 <a class="fac-stat is-bad" href="<?php echo $base; ?>?overdue=1"><span>Overdue</span><strong><?php echo (int) ($c['overdue_count'] ?? 0); ?></strong></a>
                 <a class="fac-stat is-warn" href="<?php echo $base; ?>?priority=critical"><span>Critical</span><strong><?php echo (int) ($c['critical_count'] ?? 0); ?></strong></a>
                 <a class="fac-stat" href="<?php echo $base; ?>?status=closed"><span>Closed</span><strong><?php echo (int) ($c['closed_count'] ?? 0); ?></strong></a>
+                <a class="fac-stat" href="<?php echo $base; ?>?status=on_hold"><span>On hold</span><strong><?php echo (int) ($c['on_hold'] ?? 0); ?></strong></a>
+                <a class="fac-stat is-warn" href="<?php echo $base; ?>?escalated=1"><span>Escalated</span><strong><?php echo (int) ($c['escalated_count'] ?? 0); ?></strong></a>
+                <a class="fac-stat" href="<?php echo $base; ?>/reports"><span>Satisfaction</span><strong><?php echo isset($summary['satisfaction']) && $summary['satisfaction'] !== null ? $h(number_format((float) $summary['satisfaction'], 1)) : '—'; ?></strong></a>
                 <a class="fac-stat" href="<?php echo $base; ?>?due_soon=1"><span>Due soon</span><strong><?php echo (int) ($mc['due_soon'] ?? 0); ?></strong></a>
             </div>
             <?php if (($summary['avg_hours'] ?? null) !== null): ?>

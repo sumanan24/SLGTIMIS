@@ -34,9 +34,13 @@ $facNav = static function () use ($base, $section, $unread, $actor, $h) {
     $items = [
         'dashboard' => ['Dashboard', $base . '/dashboard'],
         'list' => ['Tickets', $base],
-        'create' => ['New ticket', $base . '/create'],
+        'tasks' => ['My tasks', $base . '/tasks'],
+        'create' => ['New request', $base . '/create'],
         'notifications' => ['Notices' . ($unread > 0 ? ' (' . $unread . ')' : ''), $base . '/notifications'],
     ];
+    if (!empty($actor['is_admin'])) {
+        $items['settings'] = ['Settings', $base . '/settings'];
+    }
     if (!empty($actor['is_officer']) || !empty($actor['is_monitor']) || !empty($actor['is_hod'])) {
         $items['reports'] = ['Reports', $base . '/reports'];
     }

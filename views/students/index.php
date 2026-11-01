@@ -205,6 +205,7 @@ $staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsa
                 <div class="text-muted small mb-2 mb-md-0">
                     <i class="fas fa-info-circle me-1"></i>
                     Showing <strong><?php echo count($students); ?></strong> of <strong><?php echo number_format($total); ?></strong> students
+                    <span class="d-block">Following and Internship only. Dropout, Completed, and Long Absent are not included.</span>
                     <?php if (!empty($filters['search']) || !empty($filters['status']) || !empty($filters['district']) || !empty($filters['gender']) || !empty($filters['department_id']) || !empty($filters['course_id']) || !empty($filters['academic_year']) || !empty($filters['course_mode']) || !empty($filters['group_id'])): ?>
                         <a href="<?php echo APP_URL; ?>/students" class="text-primary ms-2 text-decoration-none">
                             <i class="fas fa-times-circle me-1"></i>Clear filters

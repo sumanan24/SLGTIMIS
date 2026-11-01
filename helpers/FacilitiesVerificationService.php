@@ -36,8 +36,8 @@ class FacilitiesVerificationService {
     }
 
     public function returnForCorrection(array $actor, array $ticket, string $reason, string $correction, ?string $newDeadline = null): array {
-        if (empty($actor['is_officer']) || $ticket['status'] !== FacilitiesTicketService::ST_PENDING) {
-            throw new RuntimeException('Only the Facilities Officer can return completion evidence.');
+        if (!$this->tickets->canManage($actor, $ticket) || $ticket['status'] !== FacilitiesTicketService::ST_PENDING) {
+            throw new RuntimeException('You cannot return this completion evidence.');
         }
         if (trim($reason) === '') {
             throw new InvalidArgumentException('A return reason is required.');
@@ -131,7 +131,7 @@ class FacilitiesVerificationService {
     }
 
     public function reopen(array $actor, array $ticket, string $reason): array {
-        if (empty($actor['is_officer']) && $actor['staff_id'] !== $ticket['requester_staff_id']) {
+        if (!$this->tickets->canManage($actor, $ticket) && $actor['staff_id'] !== $ticket['requester_staff_id']) {
             throw new RuntimeException('You cannot reopen this ticket.');
         }
         if (trim($reason) === '') {
@@ -150,22 +150,22 @@ class FacilitiesVerificationService {
     }
 
     public function hold(array $actor, array $ticket, string $reason): array {
-        if (empty($actor['is_officer'])) {
-            throw new RuntimeException('Only the Facilities Officer can hold a ticket.');
+        if (!$this->tickets->canManage($actor, $ticket)) {
+            throw new RuntimeException('You cannot hold this request.');
         }
         return $this->tickets->changeStatus($actor, $ticket, FacilitiesTicketService::ST_HOLD, $reason);
     }
 
     public function cancel(array $actor, array $ticket, string $reason): array {
-        if (empty($actor['is_officer'])) {
-            throw new RuntimeException('Only the Facilities Officer can cancel a ticket.');
+        if (!$this->tickets->canManage($actor, $ticket)) {
+            throw new RuntimeException('You cannot cancel this request.');
         }
         return $this->tickets->changeStatus($actor, $ticket, FacilitiesTicketService::ST_CANCELLED, $reason);
     }
 
     public function review(array $actor, array $ticket): array {
-        if (empty($actor['is_officer'])) {
-            throw new RuntimeException('Only the Facilities Officer can review tickets.');
+        if (!$this->tickets->canManage($actor, $ticket)) {
+            throw new RuntimeException('You cannot review this request.');
         }
         if ($ticket['status'] !== FacilitiesTicketService::ST_NEW) {
             return $ticket;

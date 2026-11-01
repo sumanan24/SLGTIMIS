@@ -17,6 +17,9 @@ class FacilitiesReportService {
     public function summary(array $filters): array {
         return [
             'counts' => $this->model->dashboardCounts($filters),
+            'categories' => $this->model->categoryBreakdown($filters),
+            'request_types' => $this->model->requestTypeBreakdown($filters),
+            'satisfaction' => $this->model->satisfactionAverage(),
             'status' => $this->model->statusBreakdown($filters),
             'priority' => $this->model->priorityBreakdown($filters),
             'departments' => $this->model->departmentPerformance(),
@@ -28,11 +31,12 @@ class FacilitiesReportService {
 
     public function toCsv(array $rows): string {
         $fh = fopen('php://temp', 'w+');
-        fputcsv($fh, ['Ticket', 'Date', 'Requester', 'Department', 'Category', 'Title', 'Location', 'Priority', 'Status', 'Assigned', 'Deadline', 'Progress', 'Overdue']);
+        fputcsv($fh, ['Reference', 'Date', 'Type', 'Requester', 'Department', 'Category', 'Title', 'Location', 'Priority', 'Status', 'Assigned', 'Expected', 'Completed', 'Progress', 'Overdue']);
         foreach ($rows as $row) {
             fputcsv($fh, [
                 $row['ticket_number'] ?? '',
                 $row['created_at'] ?? '',
+                $row['request_type'] ?? '',
                 $row['requester_name'] ?? $row['requester_staff_id'] ?? '',
                 $row['requester_department_name'] ?? '',
                 $row['category_name'] ?? '',
@@ -41,7 +45,8 @@ class FacilitiesReportService {
                 $row['current_priority'] ?? '',
                 $row['status'] ?? '',
                 $row['responsible_name'] ?? $row['responsible_staff_id'] ?? '',
-                $row['deadline'] ?? '',
+                $row['expected_completion_date'] ?? $row['deadline'] ?? '',
+                $row['completed_at'] ?? '',
                 $row['progress_percent'] ?? 0,
                 !empty($row['is_overdue']) ? 'Yes' : 'No',
             ]);

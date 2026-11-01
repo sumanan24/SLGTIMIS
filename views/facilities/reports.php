@@ -8,13 +8,21 @@ unset($exportQs['officer_all'], $exportQs['scope_staff_id'], $exportQs['hod_scop
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="fw-bold mb-0">Reports</h5>
             <div>
-                <a class="btn btn-sm btn-light" href="<?php echo $base; ?>/export?format=csv&amp;<?php echo $h(http_build_query($exportQs)); ?>">CSV</a>
+                <a class="btn btn-sm btn-light" href="<?php echo $base; ?>/export?format=csv&amp;<?php echo $h(http_build_query($exportQs)); ?>">Excel</a>
                 <a class="btn btn-sm btn-light" href="<?php echo $base; ?>/export?format=print&amp;<?php echo $h(http_build_query($exportQs)); ?>" target="_blank">Print</a>
             </div>
         </div>
         <div class="card-body">
             <?php $facNav(); $facFlash(); ?>
             <form method="get" action="<?php echo $base; ?>/reports" class="fac-filters">
+                <div><label class="form-label">Type</label>
+                    <select class="form-select form-select-sm" name="request_type">
+                        <option value="">All</option>
+                        <?php foreach (($labels['types'] ?? []) as $k => $lab): ?>
+                            <option value="<?php echo $h($k); ?>" <?php echo (($filters['request_type'] ?? '') === $k) ? 'selected' : ''; ?>><?php echo $h($lab); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
                 <div><label class="form-label">Status</label>
                     <select class="form-select form-select-sm" name="status">
                         <option value="">All</option>
