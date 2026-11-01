@@ -42,9 +42,11 @@ class Database {
                 
                 error_log("Database::connect - Connection successful to " . DB_NAME);
             } catch (Exception $e) {
+                $this->connection = null;
                 error_log("Database::connect - Exception: " . $e->getMessage());
                 throw new Exception("Database Error: " . $e->getMessage());
             } catch (Error $e) {
+                $this->connection = null;
                 error_log("Database::connect - Fatal Error: " . $e->getMessage());
                 throw new Exception("Database Fatal Error: " . $e->getMessage());
             }
