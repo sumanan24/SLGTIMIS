@@ -35,24 +35,113 @@
 
 //====================================ESMS WEB SERVCIES START ================================
 
+/**
+ * The gateway stalls PHP's own HTTP client. Curl with this agent gets a response.
+ */
+function mobitelSoapTransport($request, $location, $action, $version, $oneWay)
+{
+	if (!function_exists('curl_init')) {
+		throw new SoapFault('HTTP', 'Error Fetching http headers');
+	}
+	static $ch = null;
+	$headers = array(
+		'Content-Type: text/xml; charset=utf-8',
+		'SOAPAction: "' . $action . '"',
+		'Connection: keep-alive',
+	);
+	$response = false;
+	$errno = 0;
+	for ($attempt = 1; $attempt <= 4; $attempt++) {
+		$open = is_resource($ch) || (class_exists('CurlHandle', false) && $ch instanceof CurlHandle);
+		if (!$open) {
+			$ch = curl_init($location);
+			$options = array(
+				CURLOPT_POST => true,
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_USERAGENT => 'curl/7.68.0',
+				CURLOPT_TIMEOUT => 4,
+				CURLOPT_CONNECTTIMEOUT => 4,
+			);
+			if (defined('CURL_HTTP_VERSION_1_1')) {
+				$options[CURLOPT_HTTP_VERSION] = CURL_HTTP_VERSION_1_1;
+			}
+			$ca = '/etc/ssl/certs/ca-certificates.crt';
+			if (is_file($ca)) {
+				$options[CURLOPT_CAINFO] = $ca;
+			}
+			if (defined('CURLSSLOPT_NATIVE_CA')) {
+				$options[CURLOPT_SSL_OPTIONS] = CURLSSLOPT_NATIVE_CA;
+			}
+			curl_setopt_array($ch, $options);
+		}
+		curl_setopt($ch, CURLOPT_URL, $location);
+		curl_setopt($ch, CURLOPT_POSTFIELDS, $request);
+		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+		$response = curl_exec($ch);
+		$errno = curl_errno($ch);
+		$http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		if ($response !== false && $errno === 0 && $http !== 0) {
+			break;
+		}
+		curl_close($ch);
+		$ch = null;
+	}
+	if ($response === false || $errno !== 0) {
+		throw new SoapFault('HTTP', 'Error Fetching http headers');
+	}
+	if ($oneWay) {
+		return '';
+	}
+	return $response;
+}
 
+if (PHP_VERSION_ID >= 80000) {
+	class MobitelCurlSoapClient extends SoapClient
+	{
+		public function __doRequest(string $request, string $location, string $action, int $version, bool $one_way = false): ?string
+		{
+			return mobitelSoapTransport($request, $location, $action, $version, $one_way);
+		}
+	}
+} else {
+	class MobitelCurlSoapClient extends SoapClient
+	{
+		public function __doRequest($request, $location, $action, $version, $one_way = 0)
+		{
+			return mobitelSoapTransport($request, $location, $action, $version, $one_way);
+		}
+	}
+}
+
+function mobitelWsdlPath()
+{
+	$bundled = __DIR__ . DIRECTORY_SEPARATOR . 'mSMSEnterpriseAPI.wsdl';
+	if (class_exists('EnvLoader', false)) {
+		$configured = trim((string) EnvLoader::get('MOBITEL_SMS_WSDL', ''));
+		if ($configured !== '' && !preg_match('#^https?://#i', $configured) && is_file($configured)) {
+			return $configured;
+		}
+	}
+	return $bundled;
+}
 
 //create soap client
 function getClient()
 {
-
-	ini_set("soap.wsdl_cache_enabled", "0");
-	$wsdl = "https://msmsenterpriseapi.mobitel.lk/mSMSEnterpriseAPI/mSMSEnterpriseAPI.wsdl";
-	if (class_exists('EnvLoader', false)) {
-		$configured = trim((string) EnvLoader::get('MOBITEL_SMS_WSDL', ''));
-		if ($configured !== '') {
-			$wsdl = $configured;
-		}
+	static $extended = false;
+	if (!$extended && function_exists('set_time_limit')) {
+		@set_time_limit(60);
+		$extended = true;
 	}
-	$client = new SoapClient($wsdl);
+	ini_set("soap.wsdl_cache_enabled", "0");
+	$client = new MobitelCurlSoapClient(mobitelWsdlPath(), array(
+		'exceptions' => true,
+		'cache_wsdl' => WSDL_CACHE_NONE,
+		'connection_timeout' => 20,
+		'user_agent' => 'curl/7.68.0',
+	));
 
 	return $client;
-
 }
 
 
