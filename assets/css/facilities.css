@@ -241,6 +241,10 @@ a.fac-stat:hover { border-color: #9bb0c7; background: #fcfdff; }
     background: #fff;
 }
 
+.fac-simple { max-width: 640px; }
+.fac-simple .form-label { font-size: 1rem; font-weight: 700; color: var(--fac-navy); }
+.fac-simple .form-text { font-size: 0.85rem; }
+
 .fac-create .card-header p {
     margin: 0.25rem 0 0;
     font-size: 0.82rem;
