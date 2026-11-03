@@ -9,7 +9,7 @@ $aa = $activeAssignment ?? null;
     <?php require BASE_PATH . '/views/devices/_styles.php'; ?>
     <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
         <div>
-            <h1 class="h4 mb-1"><?php echo $e($d['asset_id'] ?? 'Device'); ?></h1>
+            <h1 class="h4 mb-1"><?php echo $e($d['asset_name'] ?: ($d['asset_id'] ?? 'Asset')); ?></h1>
             <p class="text-muted small mb-0"><?php echo $e(trim(($d['brand'] ?? '') . ' ' . ($d['model'] ?? ''))); ?></p>
         </div>
         <div class="d-flex flex-wrap gap-1">
@@ -21,15 +21,9 @@ $aa = $activeAssignment ?? null;
             <a href="<?php echo APP_URL; ?>/devices/print?id=<?php echo $id; ?>" class="btn btn-sm btn-outline-secondary" target="_blank"><i class="fas fa-print me-1"></i> Property Receipt</a>
             <?php if (!empty($canManage)): ?>
             <a href="<?php echo APP_URL; ?>/devices/edit?id=<?php echo $id; ?>" class="btn btn-sm btn-primary">Edit</a>
-            <?php
-            $statusNow = strtolower(trim((string) ($d['status'] ?? '')));
-            $canShowAssign = $statusNow === DeviceModel::STATUS_AVAILABLE
-                && empty($aa)
-                && trim((string) ($d['assigned_employee_id'] ?? '')) === '';
-            if ($canShowAssign):
-            ?>
             <a href="<?php echo APP_URL; ?>/devices/assign?id=<?php echo $id; ?>" class="btn btn-sm btn-outline-primary">Assign</a>
-            <?php endif; ?>
+            <a href="<?php echo APP_URL; ?>/devices/condition?id=<?php echo $id; ?>" class="btn btn-sm btn-outline-primary">Update Condition</a>
+            <a href="<?php echo APP_URL; ?>/devices/transfer" class="btn btn-sm btn-outline-primary">Transfer</a>
             <?php endif; ?>
             <a href="<?php echo APP_URL; ?>/devices/history?id=<?php echo $id; ?>" class="btn btn-sm btn-outline-info">History</a>
         </div>

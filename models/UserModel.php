@@ -847,26 +847,51 @@ class UserModel extends Model {
     }
 
     /**
-     * Full CRUD on device assets: system admin, ADM, HOD ICT.
+     * Register and update assets: admin, ADM, inventory officer (ACC), and every HOD.
+     * HODs are limited to their own department in the controller.
      */
     public function canManageDevices($userId): bool {
         if ($this->isAdminOrADM($userId)) {
             return true;
         }
+        $role = $this->getUserRole($userId);
+        if ($role === 'ACC') {
+            return true;
+        }
 
-        return $this->isHodIct($userId);
+        return $this->isHOD($userId);
     }
 
     /**
-     * View/search/scan/export device assets: ADM, HOD ICT, ACC, DIR (+ system admin).
+     * Approve a transfer or a disposal request.
+     */
+    public function canApproveDeviceRequests($userId): bool {
+        if ($this->isAdminOrADM($userId)) {
+            return true;
+        }
+
+        return $this->getUserRole($userId) === 'ACC';
+    }
+
+    /**
+     * View assets. Directors monitor every department. Other staff and students
+     * only see assets assigned to them (scoped in the controller).
      */
     public function canViewDevices($userId): bool {
         if ($this->canManageDevices($userId)) {
             return true;
         }
         $role = $this->getUserRole($userId);
+        if (in_array($role, ['DIR', 'DPI', 'DPA', 'ACC'], true)) {
+            return true;
+        }
+        $user = $this->find($userId);
+        if (!$user) {
+            return false;
+        }
+        $table = (string) ($user['user_table'] ?? '');
 
-        return in_array($role, ['ACC', 'DIR'], true);
+        return $table === 'student' || $table === 'staff' || $table === '';
     }
 
     public function canScanDeviceQr($userId): bool {

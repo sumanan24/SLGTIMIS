@@ -14,7 +14,8 @@ $aa = $activeAssignment ?? null;
     <div class="row g-3 justify-content-center">
         <div class="col-lg-8">
             <div class="device-detail-section">
-                <h3>Device</h3>
+                <h3><?php echo $e($d['asset_name'] ?: 'Asset'); ?></h3>
+                <?php if (!empty($d['photo_path'])): ?><img src="<?php echo APP_URL . '/' . $e($d['photo_path']); ?>" alt="" class="asset-photo mb-2"><?php endif; ?>
                 <div class="row g-2 small">
                     <?php foreach (['asset_id' => 'Asset ID', 'asset_tag_no' => 'Asset Tag', 'device_type' => 'Device Type', 'brand' => 'Brand', 'model' => 'Model', 'serial_number' => 'Serial Number', 'product_number' => 'Product Number', 'service_tag' => 'Service Tag', 'computer_name' => 'Computer Name'] as $k => $lbl): ?>
                     <div class="col-md-4"><span class="text-muted"><?php echo $e($lbl); ?>:</span> <?php echo $e($d[$k] ?? '—'); ?></div>
@@ -37,9 +38,14 @@ $aa = $activeAssignment ?? null;
             </div>
             <div class="device-detail-section">
                 <h3>Assigned User</h3>
-                <?php if ($aa || !empty($d['assigned_staff_name'])): ?>
-                <p class="mb-1"><strong><?php echo $e($aa['staff_name'] ?? $d['assigned_staff_name'] ?? ''); ?></strong></p>
-                <p class="small mb-0">ID: <?php echo $e($aa['employee_id'] ?? $d['assigned_employee_id'] ?? '—'); ?> · <?php echo $e($aa['department_name'] ?? $d['assigned_department_name'] ?? '—'); ?></p>
+                <?php
+                $person = (string) (($d['assigned_student_name'] ?? '') ?: ($aa['student_fullname'] ?? '') ?: ($aa['staff_name'] ?? '') ?: ($d['assigned_staff_name'] ?? ''));
+                $personId = (string) (($d['assigned_student_id'] ?? '') ?: ($aa['student_id'] ?? '') ?: ($aa['employee_id'] ?? '') ?: ($d['assigned_employee_id'] ?? ''));
+                $deptName = (string) (($d['owner_department_name'] ?? '') ?: ($aa['department_name'] ?? '') ?: ($d['assigned_department_name'] ?? ''));
+                ?>
+                <?php if ($person !== ''): ?>
+                <p class="mb-1"><strong><?php echo $e($person); ?></strong></p>
+                <p class="small mb-0">ID: <?php echo $e($personId !== '' ? $personId : '—'); ?> · <?php echo $e($deptName !== '' ? $deptName : '—'); ?></p>
                 <p class="small mb-0">Issue: <?php echo $e($aa['issue_date'] ?? '—'); ?><?php if (!empty($aa['return_date'])): ?> · Return: <?php echo $e($aa['return_date']); ?><?php endif; ?></p>
                 <?php else: ?><p class="text-muted mb-0">Not assigned</p><?php endif; ?>
             </div>
