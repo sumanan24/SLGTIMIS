@@ -241,9 +241,92 @@ a.fac-stat:hover { border-color: #9bb0c7; background: #fcfdff; }
     background: #fff;
 }
 
-.fac-simple { max-width: 640px; }
-.fac-simple .form-label { font-size: 1rem; font-weight: 700; color: var(--fac-navy); }
-.fac-simple .form-text { font-size: 0.85rem; }
+.fac-create { max-width: 820px; }
+.fac-create .card-body { padding: 1.15rem 1.25rem 1.35rem; }
+.fac-create .fac-nav { margin-bottom: 1rem; }
+
+.fac-who-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.65rem;
+    margin-bottom: 1rem;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--fac-border);
+    border-radius: 10px;
+    background: var(--fac-bg);
+    color: var(--fac-label);
+}
+.fac-who-line span {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--fac-muted);
+}
+.fac-who-line strong { color: var(--fac-navy); font-size: 0.98rem; }
+.fac-who-line em { font-style: normal; color: var(--fac-muted); font-size: 0.9rem; }
+
+.fac-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.95rem 1rem;
+}
+.fac-span { grid-column: 1 / -1; }
+.fac-optional {
+    margin-left: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--fac-muted);
+}
+
+.fac-create .form-label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--fac-navy);
+}
+.fac-create .form-control,
+.fac-create .form-select {
+    width: 100%;
+    min-height: 46px;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #fff;
+}
+.fac-create textarea.form-control {
+    min-height: 110px;
+    resize: vertical;
+}
+.fac-create .form-control:focus,
+.fac-create .form-select:focus {
+    border-color: var(--fac-navy);
+    box-shadow: 0 0 0 3px rgba(0, 31, 63, 0.12);
+}
+.fac-create input[type="file"].form-control {
+    padding: 0.55rem 0.75rem;
+    line-height: 1.4;
+}
+.fac-create .form-text { margin-top: 0.3rem; font-size: 0.8rem; }
+
+.fac-create .fac-submit {
+    margin-top: 1.15rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--fac-border);
+}
+.fac-create .fac-submit .btn {
+    min-width: 9.5rem;
+    min-height: 46px;
+    font-size: 1rem;
+}
+
+@media (max-width: 640px) {
+    .fac-grid { grid-template-columns: 1fr; }
+    .fac-create .fac-submit .btn { width: 100%; }
+}
 
 .fac-create .card-header p {
     margin: 0.25rem 0 0;
@@ -365,20 +448,6 @@ a.fac-stat:hover { border-color: #9bb0c7; background: #fcfdff; }
 
 .fac-priorities .fac-choice { min-height: 4.6rem; text-align: center; padding-top: 0.85rem; }
 .fac-priorities .fac-choice strong { font-size: 0.88rem; }
-
-.fac-create .form-label {
-    font-size: 0.82rem;
-    margin-bottom: 0.35rem;
-}
-
-.fac-create .form-control,
-.fac-create .form-select {
-    min-height: 48px;
-    font-size: 16px;
-    border-radius: 10px;
-}
-
-.fac-create textarea.form-control { min-height: 120px; }
 
 .fac-drop {
     display: flex;
