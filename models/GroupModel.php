@@ -130,6 +130,15 @@ class GroupModel extends Model {
             $stmt->bind_param("i", $id);
             $stmt->execute();
             $stmt->close();
+
+            $timetable = $conn->query("SHOW TABLES LIKE 'group_timetable'");
+            if ($timetable && $timetable->num_rows > 0) {
+                $deleteTimetableSql = "DELETE FROM `group_timetable` WHERE `group_id` = ?";
+                $stmt = $conn->prepare($deleteTimetableSql);
+                $stmt->bind_param("i", $id);
+                $stmt->execute();
+                $stmt->close();
+            }
             
             // Delete group
             $deleteGroupSql = "DELETE FROM `{$this->table}` WHERE `id` = ?";

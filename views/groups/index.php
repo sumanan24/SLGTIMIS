@@ -87,6 +87,11 @@
                                                title="View Group">
                                                 <i class="fas fa-eye"></i>
                                             </a>
+                                            <a href="<?php echo APP_URL; ?>/groups/timetable?id=<?php echo urlencode($group['id']); ?>"
+                                               class="btn btn-outline-primary btn-sm"
+                                               title="Timetable">
+                                                <i class="fas fa-calendar-alt"></i>
+                                            </a>
                                             <a href="<?php echo APP_URL; ?>/groups/edit?id=<?php echo urlencode($group['id']); ?>" 
                                                class="btn btn-outline-primary btn-sm" 
                                                title="Edit Group">

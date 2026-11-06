@@ -308,6 +308,212 @@ class GroupController extends Controller {
     }
 
     /**
+     * Add or update one class on this group's weekly timetable.
+     */
+    public function saveTimetable() {
+        if (!$this->checkGroupAccess()) {
+            return;
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->redirect('groups');
+            return;
+        }
+        $groupId = (int) $this->post('group_id', 0);
+        $back = 'groups/timetable?id=' . $groupId;
+        $groupModel = $this->model('GroupModel');
+        $group = $groupId > 0 ? $groupModel->getByIdWithDetails($groupId) : null;
+        if (!$group || !$groupModel->canAccessGroup($groupId, $this->getUserDepartment())) {
+            $_SESSION['error'] = 'Access denied. You can only update groups from your department.';
+            $this->redirect('groups');
+            return;
+        }
+
+        $timetable = $this->timetableModel();
+        $days = GroupTimetableModel::dayNames();
+        $periods = GroupTimetableModel::periods();
+        $day = (int) $this->post('weekday', 0);
+        $period = trim((string) $this->post('period', ''));
+        $moduleId = trim((string) $this->post('module_id', ''));
+        $subject = trim((string) $this->post('subject', ''));
+        $staffId = trim((string) $this->post('staff_id', ''));
+        $room = trim((string) $this->post('classroom', ''));
+        $startDate = $this->isoDate($this->post('start_date', ''));
+        $endDate = $this->isoDate($this->post('end_date', ''));
+        $slotId = (int) $this->post('slot_id', 0);
+
+        if (!isset($days[$day]) || !isset($periods[$period]) || $startDate === '' || $endDate === '' || $startDate > $endDate) {
+            $_SESSION['error'] = 'Choose the day, period, and a finish date that is not before the start date.';
+            $this->redirect($back);
+            return;
+        }
+        if (strlen($subject) > 120) {
+            $subject = substr($subject, 0, 120);
+        }
+        if (strlen($room) > 64) {
+            $room = substr($room, 0, 64);
+        }
+
+        $context = $this->timetableContext($group);
+        $allowedModules = [];
+        foreach ($context['modules'] as $module) {
+            $allowedModules[(string) $module['module_id']] = (string) ($module['module_name'] ?? $module['module_id']);
+        }
+        if ($moduleId !== '' && !isset($allowedModules[$moduleId])) {
+            $_SESSION['error'] = 'Choose a module from this course.';
+            $this->redirect($back);
+            return;
+        }
+        if ($moduleId === '' && $subject === '') {
+            $_SESSION['error'] = 'Type the class name, or choose a module.';
+            $this->redirect($back);
+            return;
+        }
+        $allowedStaff = [];
+        foreach ($context['staff'] as $staff) {
+            $allowedStaff[(string) $staff['staff_id']] = (string) ($staff['staff_name'] ?? $staff['staff_id']);
+        }
+        if ($staffId === '' || !isset($allowedStaff[$staffId])) {
+            $_SESSION['error'] = 'Choose a lecturer from this department.';
+            $this->redirect($back);
+            return;
+        }
+
+        if ($slotId > 0 && !$timetable->findSlot($slotId, $groupId)) {
+            $_SESSION['error'] = 'That class is no longer on this timetable.';
+            $this->redirect($back);
+            return;
+        }
+        if ($timetable->groupOverlaps($groupId, $day, $period, $startDate, $endDate, $slotId)) {
+            $_SESSION['error'] = 'This group already has ' . $periods[$period] . ' on ' . $days[$day] . ' for those dates.';
+            $this->redirect($back);
+            return;
+        }
+        $busy = $timetable->staffOverlap($staffId, $day, $period, $startDate, $endDate, $slotId);
+        if ($busy) {
+            $_SESSION['error'] = $allowedStaff[$staffId] . ' already has ' . $periods[$period] . ' on ' . $days[$day] . ' in ' . $busy['group_name'] . '.';
+            $this->redirect($back);
+            return;
+        }
+
+        $saved = $timetable->saveSlot([
+            'group_id' => $groupId,
+            'weekday' => $day,
+            'period' => $period,
+            'module_id' => $moduleId !== '' ? $moduleId : null,
+            'subject' => $subject !== '' ? $subject : null,
+            'staff_id' => $staffId,
+            'classroom' => $room !== '' ? $room : null,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ], $slotId);
+        if (!$saved) {
+            $_SESSION['error'] = 'The class could not be saved.';
+            $this->redirect($back);
+            return;
+        }
+        $_SESSION['message'] = $slotId > 0 ? 'Class updated.' : 'Class added to the timetable.';
+        $this->redirect($back);
+    }
+
+    /**
+     * Remove one class from this group's timetable.
+     */
+    public function deleteTimetable() {
+        if (!$this->checkGroupAccess()) {
+            return;
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->redirect('groups');
+            return;
+        }
+        $groupId = (int) $this->post('group_id', 0);
+        $slotId = (int) $this->post('slot_id', 0);
+        $groupModel = $this->model('GroupModel');
+        if ($groupId <= 0 || !$groupModel->canAccessGroup($groupId, $this->getUserDepartment())) {
+            $_SESSION['error'] = 'Access denied. You can only update groups from your department.';
+            $this->redirect('groups');
+            return;
+        }
+        if ($this->timetableModel()->deleteSlot($slotId, $groupId)) {
+            $_SESSION['message'] = 'Class removed from the timetable.';
+        } else {
+            $_SESSION['error'] = 'That class is no longer on this timetable.';
+        }
+        $this->redirect('groups/timetable?id=' . $groupId);
+    }
+
+    /**
+     * Weekly class timetable for one group.
+     */
+    public function timetable() {
+        if (!$this->checkGroupAccess()) {
+            return;
+        }
+        $id = (int) $this->get('id', 0);
+        if ($id <= 0) {
+            $_SESSION['error'] = 'Group ID is required.';
+            $this->redirect('groups');
+            return;
+        }
+        $groupModel = $this->model('GroupModel');
+        $group = $groupModel->getByIdWithDetails($id);
+        if (!$group) {
+            $_SESSION['error'] = 'Group not found.';
+            $this->redirect('groups');
+            return;
+        }
+        if (!$groupModel->canAccessGroup($id, $this->getUserDepartment())) {
+            $_SESSION['error'] = 'Access denied. You can only view groups from your department.';
+            $this->redirect('groups');
+            return;
+        }
+        $timetable = $this->timetableContext($group);
+        $data = [
+            'title' => 'Timetable: ' . $group['name'],
+            'page' => 'groups',
+            'group' => $group,
+            'timetableSlots' => $timetable['slots'],
+            'timetableModules' => $timetable['modules'],
+            'timetableStaff' => $timetable['staff'],
+            'message' => $_SESSION['message'] ?? null,
+            'error' => $_SESSION['error'] ?? null,
+        ];
+        unset($_SESSION['message'], $_SESSION['error']);
+        return $this->view('groups/timetable_page', $data);
+    }
+
+    /**
+     * @return array{slots: array, modules: array, staff: array}
+     */
+    private function timetableContext(array $group) {
+        $moduleModel = $this->model('ModuleModel');
+        $modules = $moduleModel->getAllWithCourseFiltered([
+            'course_id' => (string) ($group['course_id'] ?? ''),
+            'course_version' => (int) ($group['course_version'] ?? 0),
+        ]);
+        $staff = $this->timetableModel()->listStaff((string) ($group['department_id'] ?? ''));
+        return [
+            'slots' => $this->timetableModel()->listByGroup((int) ($group['id'] ?? 0)),
+            'modules' => $modules,
+            'staff' => $staff,
+        ];
+    }
+
+    private function timetableModel() {
+        require_once BASE_PATH . '/models/GroupTimetableModel.php';
+        return new GroupTimetableModel();
+    }
+
+    private function isoDate($value) {
+        $value = trim((string) $value);
+        $dt = DateTime::createFromFormat('Y-m-d', $value);
+        if (!$dt || $dt->format('Y-m-d') !== $value) {
+            return '';
+        }
+        return $value;
+    }
+
+    /**
      * Edit group
      */
     public function edit() {

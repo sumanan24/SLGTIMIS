@@ -232,6 +232,9 @@ $meta = [
                 </button>
             </form>
             <?php endif; ?>
+            <a href="<?php echo $e($app . '/groups/timetable?id=' . urlencode((string) ($group['id'] ?? ''))); ?>" class="btn btn-outline-primary">
+                <i class="fas fa-calendar-alt me-1"></i>Timetable
+            </a>
             <a href="<?php echo $e($app . '/groups/edit?id=' . urlencode((string) ($group['id'] ?? ''))); ?>" class="btn btn-outline-primary">
                 <i class="fas fa-pen me-1"></i>Edit
             </a>
@@ -274,7 +277,7 @@ $meta = [
         </div>
     </div>
 
-    <div class="group-panel">
+    <div class="group-panel group-students-panel">
         <div class="group-panel-head">
             <h2 class="group-panel-title">
                 Students
