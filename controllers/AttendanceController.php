@@ -324,7 +324,7 @@ class AttendanceController extends Controller {
         
         // Allow DIR, DPI, DPA, REG, FIN, ACC, SAO, HOD, IN1, IN2, IN3, ADM, and Admin
         $allowedRoles = ['DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'HOD', 'IN1', 'IN2', 'IN3', 'ADM'];
-        $hasAccess = in_array($userRole, $allowedRoles) || $isAdmin;
+        $hasAccess = in_array($userRole, $allowedRoles) || $isAdmin || $userModel->isSAO($_SESSION['user_id']);
         
         if (!$hasAccess) {
             $_SESSION['error'] = 'Access denied. Only authorized roles can view attendance reports.';

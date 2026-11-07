@@ -111,7 +111,7 @@ class AccessControl {
                     'can_delete' => $manage ? 1 : 0,
                 ]);
             case 'student_attendance':
-                $view = in_array($role, ['HOD', 'IN1', 'IN2', 'IN3', 'DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'ADM'], true) || $isAdmin;
+                $view = in_array($role, ['HOD', 'IN1', 'IN2', 'IN3', 'DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'ADM'], true) || $isAdmin || $isSao;
                 $manage = in_array($role, ['HOD', 'IN1', 'IN2', 'IN3', 'ADM'], true) || $isAdmin;
                 return [
                     'can_view' => $view ? 1 : 0,

@@ -105,7 +105,7 @@
                                 // Attendance access: HOD, IN1, IN2, IN3, and Admin
                                 $hasAttendanceAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3']) || $isAdmin;
                                 // Attendance report access: DIR, DPI, DPA, REG, FIN, ACC, SAO, HOD, IN1, IN2, IN3, ADM, and Admin
-                                $hasAttendanceReportAccess = in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'HOD', 'IN1', 'IN2', 'IN3', 'ADM']) || $isAdmin;
+                                $hasAttendanceReportAccess = in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'HOD', 'IN1', 'IN2', 'IN3', 'ADM']) || $isAdmin || $isSAO;
                                 // Blank month attendance Excel (weekdays, 4 slots): ADM, HOD, IN1–IN3, Admin
                                 $hasMonthAttendanceSheetAccess = in_array($userRole, ['ADM', 'HOD', 'IN1', 'IN2', 'IN3'], true) || $isAdmin;
                                 // Month-range % summary: HOD, ADM, Admin
@@ -296,7 +296,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             $canViewHostelInfo = false;
                             if (isset($_SESSION['user_id'])) {
                                 $allowedHostelViewRoles = ['FIN', 'ACC', 'DIR', 'REG', 'HOD', 'IN1', 'IN2', 'IN3', 'SAO', 'ADM'];
-                                $canViewHostelInfo = in_array($userRole, $allowedHostelViewRoles) || $isAdmin;
+                                $canViewHostelInfo = in_array($userRole, $allowedHostelViewRoles) || $isAdmin || $isSAO;
                             }
                             
                             // Check if user can view room allocations (SAO, ADM, FIN, DIR, Admin)

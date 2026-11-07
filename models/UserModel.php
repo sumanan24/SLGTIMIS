@@ -360,7 +360,11 @@ class UserModel extends Model {
      */
     public function isSAO($userId) {
         $role = $this->getUserRole($userId);
-        return $role === 'SAO' || $role === 'RSA'; // SAO or Registrar (Student Affairs)
+        if ($role === 'SAO' || $role === 'RSA') { // SAO or Registrar (Student Affairs)
+            return true;
+        }
+        // Management Assistants of the Student Affairs Office department do the SAO's work
+        return $this->isStudentAffairsAssistant($userId);
     }
     
     /**
@@ -530,7 +534,31 @@ class UserModel extends Model {
     }
     
     /**
-     * Student fingerprint device attendance: SAO and ADM (or system Admin) only.
+     * Management Assistant (MA, MA1, MA2 ...) who works in the Student Affairs Office department (STU).
+     * isSAO() treats them as SAO, so they have every function the SAO has.
+     */
+    public function isStudentAffairsAssistant($userId): bool {
+        $role = (string) $this->getUserRole($userId);
+        if ($role === '' || strpos($role, 'MA') !== 0) {
+            return false;
+        }
+        try {
+            $stmt = $this->db->prepare("SELECT s.`department_id` FROM `{$this->table}` u
+                JOIN `staff` s ON s.`staff_id` = u.`user_name`
+                WHERE u.`user_id` = ? AND u.`user_table` = 'staff' LIMIT 1");
+            $stmt->bind_param('i', $userId);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            return $row && strtoupper(trim((string) $row['department_id'])) === 'STU';
+        } catch (Throwable $e) {
+            error_log('isStudentAffairsAssistant: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Student fingerprint device attendance: SAO, Student Affairs Office assistants (MA in STU),
+     * and ADM (or system Admin).
      */
     public function canManageStudentFingerprintAttendance($userId): bool {
         return $this->isAdminOrADM($userId) || $this->isSAO($userId);
