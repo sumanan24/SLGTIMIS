@@ -33,14 +33,6 @@
                                     <th class="bg-light">Role Name:</th>
                                     <td><?php echo htmlspecialchars($role['staff_position_type_name']); ?></td>
                                 </tr>
-                                <tr>
-                                    <th class="bg-light">Position Level:</th>
-                                    <td>
-                                        <span class="badge bg-info bg-opacity-10 text-info">
-                                            Level <?php echo htmlspecialchars($role['staff_position']); ?>
-                                        </span>
-                                    </td>
-                                </tr>
                             </tbody>
                         </table>
                     </div>

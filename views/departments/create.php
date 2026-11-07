@@ -8,7 +8,7 @@
 .dept-form-shell {
     width: 100%;
     max-width: 760px;
-    margin: 0;
+    margin: 0 auto;
 }
 .dept-form-wrap .dept-head {
     display: flex;
@@ -65,6 +65,15 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+}
+.dept-form-grid .dept-field-full { grid-column: 1 / -1; }
+.dept-form-wrap .form-select {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-height: 42px;
+    box-sizing: border-box;
+    border-color: #cbd5e1;
 }
 .dept-form-wrap .form-label {
     display: block;
@@ -169,6 +178,15 @@
                             <input type="text" class="form-control" id="department_name" name="department_name"
                                    maxlength="60" required placeholder="e.g. Information and Communication Technology">
                             <div class="help-mini">Official name, maximum 60 characters.</div>
+                        </div>
+                        <div class="dept-field dept-field-full">
+                            <label for="department_category" class="form-label">Category <span class="req">*</span></label>
+                            <select class="form-select" id="department_category" name="department_category" required>
+                                <?php foreach (DepartmentModel::categories() as $catKey => $catLabel): ?>
+                                    <option value="<?php echo htmlspecialchars($catKey); ?>"><?php echo htmlspecialchars($catLabel); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="help-mini">Academic: teaching departments. Admin: administrative / support units.</div>
                         </div>
                     </div>
                     <div class="dept-actions">

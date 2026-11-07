@@ -24,8 +24,10 @@ class StaffController extends Controller {
         $page = $this->get('page', 1);
         $search = $this->get('search', '');
         
-        $staff = $staffModel->getStaffWithDepartment($page, 20, $search, $userDepartmentId ? $userDepartmentId : '');
-        $total = $staffModel->getTotalStaff($search, $userDepartmentId ? $userDepartmentId : '');
+        // System administrator accounts (position ADM) are not listed here.
+        $hiddenPositions = ['ADM'];
+        $staff = $staffModel->getStaffWithDepartment($page, 20, $search, $userDepartmentId ? $userDepartmentId : '', $hiddenPositions);
+        $total = $staffModel->getTotalStaff($search, $userDepartmentId ? $userDepartmentId : '', $hiddenPositions);
         $totalPages = ceil($total / 20);
         
         require_once BASE_PATH . '/core/AccessControl.php';

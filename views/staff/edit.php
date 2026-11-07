@@ -54,9 +54,16 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
             <div class="st-file-heading">
                 <p class="st-file-kicker mb-0">Staff personal file</p>
                 <h5 class="fw-bold mb-0"><?php echo $h($staff['staff_name'] ?? $sid); ?></h5>
-                <p class="st-file-id mb-0"><?php echo $h($sid); ?></p>
+                <div class="st-file-chips">
+                    <span class="st-file-id"><?php echo $h($sid); ?></span>
+                    <?php if (!empty($staff['staff_position'])): ?><span class="st-file-chip"><?php echo $h($staff['staff_position']); ?></span><?php endif; ?>
+                    <?php if (!empty($staff['department_name'])): ?><span class="st-file-chip"><?php echo $h($staff['department_name']); ?></span><?php endif; ?>
+                    <?php if (!empty($staff['staff_status'])): ?>
+                        <span class="st-file-chip <?php echo ($staff['staff_status'] === 'Working') ? 'is-ok' : 'is-warn'; ?>"><?php echo $h($staff['staff_status']); ?></span>
+                    <?php endif; ?>
+                </div>
             </div>
-            <a href="<?php echo APP_URL; ?>/staff" class="btn btn-sm btn-light flex-shrink-0">Back</a>
+            <a href="<?php echo APP_URL; ?>/staff" class="btn btn-sm btn-light flex-shrink-0"><i class="fas fa-arrow-left me-1"></i>Back</a>
         </div>
         <div class="card-body">
             <?php if (!empty($message)): ?>
@@ -92,7 +99,7 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
 
             <?php if ($activeTab === 'personal'): ?>
                 <div class="st-file-grid">
-                    <div class="st-photo-card">
+                    <aside class="st-photo-card">
                         <?php if ($photoUrl): ?>
                             <img src="<?php echo $h($photoUrl); ?>" alt="Profile photo">
                         <?php else: ?>
@@ -107,19 +114,23 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                                 <button class="btn btn-primary btn-sm w-100" type="submit">Upload photo</button>
                             </form>
                         <?php endif; ?>
-                    </div>
+                    </aside>
                     <form method="POST" action="<?php echo $h($base); ?>" class="st-file-form">
                         <input type="hidden" name="update_section" value="personal">
                         <section class="st-person-block">
-                            <h6>Name and identity</h6>
-                            <div class="st-grid-2">
+                            <h6><i class="fas fa-id-card" aria-hidden="true"></i>Name and identity</h6>
+                            <div class="st-grid-3">
                                 <div>
                                     <label class="form-label" for="staff_id">Staff ID / Employee No. <span class="text-danger">*</span></label>
-                                    <input class="form-control" id="staff_id" name="staff_id" maxlength="64" required value="<?php echo $h($sid); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                    <input class="form-control" id="staff_id" name="staff_id" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false" required value="<?php echo $h($sid); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
                                 </div>
                                 <div>
-                                    <label class="form-label" for="finger_machine_no">Finger Machine Number</label>
-                                    <input class="form-control" id="finger_machine_no" name="finger_machine_no" maxlength="50" value="<?php echo $h($staff['finger_machine_no'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                    <label class="form-label" for="finger_machine_no">Finger Machine No.</label>
+                                    <input class="form-control" id="finger_machine_no" name="finger_machine_no" maxlength="50" autocomplete="off" value="<?php echo $h($staff['finger_machine_no'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                </div>
+                                <div>
+                                    <label class="form-label" for="staff_nic">NIC No. <span class="text-danger">*</span></label>
+                                    <input class="form-control" id="staff_nic" name="staff_nic" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" required value="<?php echo $h($staff['staff_nic'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
                                 </div>
                             </div>
                             <div class="st-grid-2">
@@ -134,18 +145,12 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                             </div>
                         </section>
                         <section class="st-person-block">
-                            <h6>Personal details</h6>
-                            <div class="st-grid-2">
+                            <h6><i class="fas fa-user" aria-hidden="true"></i>Personal details</h6>
+                            <div class="st-grid-4">
                                 <div>
                                     <label class="form-label" for="staff_dob">Date of Birth</label>
                                     <input type="date" class="form-control" id="staff_dob" name="staff_dob" value="<?php echo $h($staff['staff_dob'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
                                 </div>
-                                <div>
-                                    <label class="form-label" for="staff_nic">NIC No. <span class="text-danger">*</span></label>
-                                    <input class="form-control" id="staff_nic" name="staff_nic" maxlength="20" required value="<?php echo $h($staff['staff_nic'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                                </div>
-                            </div>
-                            <div class="st-grid-2">
                                 <div>
                                     <label class="form-label" for="staff_gender">Gender</label>
                                     <select class="form-select" id="staff_gender" name="staff_gender" <?php echo $canEditFile ? '' : 'disabled'; ?>>
@@ -160,8 +165,6 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                                         <?php echo $opt(['Single' => 'Single', 'Married' => 'Married', 'Widowed' => 'Widowed', 'Divorced' => 'Divorced'], $staff['staff_civil_status'] ?? ''); ?>
                                     </select>
                                 </div>
-                            </div>
-                            <div class="st-grid-2">
                                 <div>
                                     <label class="form-label" for="staff_nationality">Nationality</label>
                                     <input class="form-control" id="staff_nationality" name="staff_nationality" maxlength="50" value="<?php echo $h($staff['staff_nationality'] ?? 'Sri Lankan'); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
@@ -190,11 +193,11 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                     <div class="st-grid-2">
                         <div>
                             <label class="form-label" for="staff_pno">Mobile</label>
-                            <input class="form-control" id="staff_pno" name="staff_pno" maxlength="20" value="<?php echo $h($staff['staff_pno'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            <input type="tel" inputmode="tel" autocomplete="tel" class="form-control" id="staff_pno" name="staff_pno" maxlength="20" value="<?php echo $h($staff['staff_pno'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
                         </div>
                         <div>
                             <label class="form-label" for="staff_email">Email <span class="text-danger">*</span></label>
-                            <input type="email" class="form-control" id="staff_email" name="staff_email" required value="<?php echo $h($staff['staff_email'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            <input type="email" inputmode="email" autocomplete="email" autocapitalize="none" class="form-control" id="staff_email" name="staff_email" required value="<?php echo $h($staff['staff_email'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
                         </div>
                     </div>
                     <div class="st-grid-3">
@@ -204,7 +207,7 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                         </div>
                         <div>
                             <label class="form-label" for="staff_emergency_phone">Emergency Contact Number</label>
-                            <input class="form-control" id="staff_emergency_phone" name="staff_emergency_phone" maxlength="20" value="<?php echo $h($staff['staff_emergency_phone'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            <input type="tel" inputmode="tel" autocomplete="off" class="form-control" id="staff_emergency_phone" name="staff_emergency_phone" maxlength="20" value="<?php echo $h($staff['staff_emergency_phone'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
                         </div>
                         <div>
                             <label class="form-label" for="staff_emergency_relation">Relationship</label>
@@ -226,7 +229,7 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                         </div>
                         <div>
                             <label class="form-label" for="finger_machine_no">Employee Number</label>
-                            <input class="form-control" id="finger_machine_no" name="finger_machine_no" maxlength="50" value="<?php echo $h($staff['finger_machine_no'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            <input class="form-control" id="finger_machine_no" name="finger_machine_no" maxlength="50" autocomplete="off" value="<?php echo $h($staff['finger_machine_no'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
                         </div>
                         <div>
                             <label class="form-label" for="staff_designation">Designation</label>
@@ -264,7 +267,7 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                             </select>
                         </div>
                     </div>
-                    <div class="st-grid-3">
+                    <div class="st-grid-4">
                         <div>
                             <label class="form-label" for="staff_type">Employment Type</label>
                             <select class="form-select" id="staff_type" name="staff_type" required <?php echo $canEditFile ? '' : 'disabled'; ?>>
@@ -281,8 +284,6 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                                 <?php echo $opt(['Working' => 'Working', 'Terminated' => 'Terminated', 'Resigned' => 'Resigned'], $staff['staff_status'] ?? 'Working'); ?>
                             </select>
                         </div>
-                    </div>
-                    <div class="st-grid-3">
                         <div>
                             <label class="form-label" for="staff_retirement_date">Retirement Date</label>
                             <input type="date" class="form-control" id="staff_retirement_date" name="staff_retirement_date" value="<?php echo $h($staff['staff_retirement_date'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
@@ -757,6 +758,77 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
     </div>
 </div>
 <script>
+/* Usability helpers: responsive tables, unsaved-changes guard, safe submit, tab scroll */
+(function () {
+    var page = document.querySelector('.st-file-page');
+    if (!page) return;
+
+    // 1) Stack wide tables into labelled cards on phones (labels come from the header row).
+    page.querySelectorAll('.st-file-panel .st-table:not(.st-perm-table)').forEach(function (table) {
+        var heads = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) {
+            return th.textContent.replace(/\s+/g, ' ').trim();
+        });
+        table.classList.add('st-stack');
+        table.querySelectorAll('tbody tr').forEach(function (tr) {
+            Array.prototype.forEach.call(tr.children, function (td, i) {
+                if (td.getAttribute('colspan') || td.colSpan > 1) { td.classList.add('st-stack-wide'); return; }
+                if (heads[i]) td.setAttribute('data-label', heads[i]);
+            });
+        });
+    });
+
+    // 2) Keep the active section tab visible in the scrolling tab bar.
+    var activeTab = page.querySelector('.st-file-nav-item.active');
+    if (activeTab && activeTab.scrollIntoView) {
+        var nav = activeTab.parentNode;
+        if (nav.scrollWidth > nav.clientWidth) {
+            nav.scrollLeft = activeTab.offsetLeft - (nav.clientWidth - activeTab.offsetWidth) / 2;
+        }
+    }
+
+    // 3) Warn before leaving with unsaved edits; prevent double submits.
+    var dirty = false;
+    var submitting = false;
+    var editForms = page.querySelectorAll('.st-file-panel form[method="POST"]:not(#stPermForm)');
+    editForms.forEach(function (f) {
+        if (!f.querySelector('input[name="update_section"]')) return;
+        f.addEventListener('input', function () { dirty = true; });
+        f.addEventListener('change', function () { dirty = true; });
+        f.addEventListener('submit', function () {
+            submitting = true;
+            var btn = f.querySelector('button[type="submit"]');
+            if (btn) {
+                setTimeout(function () {
+                    btn.disabled = true;
+                    btn.setAttribute('data-label-original', btn.textContent);
+                    btn.textContent = 'Saving…';
+                }, 0);
+            }
+        });
+    });
+    window.addEventListener('beforeunload', function (e) {
+        if (dirty && !submitting) { e.preventDefault(); e.returnValue = ''; }
+    });
+    // Re-enable the button if the browser restores the page from cache (back button).
+    window.addEventListener('pageshow', function (ev) {
+        if (!ev.persisted) return;
+        submitting = false;
+        page.querySelectorAll('button[data-label-original]').forEach(function (b) {
+            b.disabled = false;
+            b.textContent = b.getAttribute('data-label-original');
+        });
+    });
+
+    // 4) Success messages fade out on their own; errors stay until dismissed.
+    page.querySelectorAll('.alert-success').forEach(function (a) {
+        setTimeout(function () {
+            if (window.bootstrap && bootstrap.Alert && a.isConnected) {
+                bootstrap.Alert.getOrCreateInstance(a).close();
+            }
+        }, 6000);
+    });
+})();
+
 (function () {
     var form = document.getElementById('stStaffForm');
     if (form) {

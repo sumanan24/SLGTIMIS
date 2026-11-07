@@ -18,6 +18,56 @@ class StaffRoleModel extends Model {
     }
     
     /**
+     * All roles with how many staff / login accounts use each one.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getAllWithUsage() {
+        $sql = "SELECT t.*,
+                    COALESCE(s.total, 0)   AS staff_total,
+                    COALESCE(s.working, 0) AS staff_working,
+                    COALESCE(u.total, 0)   AS user_total
+                FROM `{$this->table}` t
+                LEFT JOIN (
+                    SELECT `staff_position` AS role_id,
+                           COUNT(*) AS total,
+                           SUM(`staff_status` = 'Working') AS working
+                    FROM `staff`
+                    GROUP BY `staff_position`
+                ) s ON s.role_id = t.`staff_position_type_id`
+                LEFT JOIN (
+                    SELECT `staff_position_type_id` AS role_id, COUNT(*) AS total
+                    FROM `user`
+                    GROUP BY `staff_position_type_id`
+                ) u ON u.role_id = t.`staff_position_type_id`
+                ORDER BY t.`staff_position_type_name` ASC, t.`staff_position_type_id` ASC";
+
+        try {
+            $result = $this->db->query($sql);
+        } catch (Throwable $e) {
+            error_log('StaffRoleModel::getAllWithUsage: ' . $e->getMessage());
+            $result = false;
+        }
+        if (!$result) {
+            // Fall back to the plain list so the page still works.
+            $rows = $this->getAll();
+            foreach ($rows as &$row) {
+                $row['staff_total'] = 0;
+                $row['staff_working'] = 0;
+                $row['user_total'] = 0;
+            }
+            unset($row);
+            return $rows;
+        }
+
+        $rows = [];
+        while ($row = $result->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
+    /**
      * Get role by ID
      */
     public function getById($id) {
@@ -27,10 +77,17 @@ class StaffRoleModel extends Model {
     /**
      * Create new role
      */
-    public function createRole($data) {
-        return $this->create($data);
+    public function createRole($data, &$sqlError = null) {
+        // The staff_position column (old "level") is still NOT NULL in the database but is no
+        // longer entered by users; keep it filled so existing ordering and inserts stay valid.
+        if (!isset($data['staff_position'])) {
+            $result = $this->db->query("SELECT COALESCE(MAX(`staff_position`), 0) + 1 AS next_pos FROM `{$this->table}`");
+            $row = $result ? $result->fetch_assoc() : null;
+            $data['staff_position'] = min(127, max(1, (int) ($row['next_pos'] ?? 1)));
+        }
+        return $this->create($data, $sqlError);
     }
-    
+
     /**
      * Update role
      */

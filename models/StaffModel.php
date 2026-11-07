@@ -148,7 +148,7 @@ class StaffModel extends Model {
     /**
      * Get staff with department info
      */
-    public function getStaffWithDepartment($page = 1, $perPage = 20, $search = '', $departmentId = '') {
+    public function getStaffWithDepartment($page = 1, $perPage = 20, $search = '', $departmentId = '', array $excludePositions = []) {
         $offset = ($page - 1) * $perPage;
         
         $sql = "SELECT s.*, d.department_name 
@@ -158,6 +158,14 @@ class StaffModel extends Model {
         $conditions = [];
         $params = [];
         $types = '';
+
+        if (!empty($excludePositions)) {
+            $conditions[] = "s.staff_position NOT IN (" . implode(',', array_fill(0, count($excludePositions), '?')) . ")";
+            foreach ($excludePositions as $pos) {
+                $params[] = (string) $pos;
+                $types .= 's';
+            }
+        }
         
         if (!empty($departmentId)) {
             $conditions[] = "s.department_id = ?";
@@ -208,12 +216,20 @@ class StaffModel extends Model {
     /**
      * Get total count of staff
      */
-    public function getTotalStaff($search = '', $departmentId = '') {
+    public function getTotalStaff($search = '', $departmentId = '', array $excludePositions = []) {
         $sql = "SELECT COUNT(*) as total FROM `{$this->table}`";
         
         $conditions = [];
         $params = [];
         $types = '';
+
+        if (!empty($excludePositions)) {
+            $conditions[] = "staff_position NOT IN (" . implode(',', array_fill(0, count($excludePositions), '?')) . ")";
+            foreach ($excludePositions as $pos) {
+                $params[] = (string) $pos;
+                $types .= 's';
+            }
+        }
         
         if (!empty($departmentId)) {
             $conditions[] = "department_id = ?";

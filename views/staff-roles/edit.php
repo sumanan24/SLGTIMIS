@@ -64,11 +64,6 @@ $effVal = $scale['effective_date'] ?? date('Y-m-d');
                            value="<?php echo $h($role['staff_position_type_name']); ?>" maxlength="64" required>
                 </div>
                 <div>
-                    <label class="form-label" for="staff_position">Level</label>
-                    <input type="number" class="form-control" id="staff_position" name="staff_position"
-                           value="<?php echo $h($role['staff_position']); ?>" min="1" required>
-                </div>
-                <div>
                     <label class="form-label d-none d-md-block">&nbsp;</label>
                     <button type="submit" class="btn btn-primary">Update Role</button>
                 </div>

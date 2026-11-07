@@ -119,6 +119,18 @@
                                        maxlength="60" required>
                                 <div class="help-mini">Official name, maximum 60 characters.</div>
                             </div>
+                            <div class="col-12">
+                                <?php $currentCat = DepartmentModel::normalizeCategory($department['department_category'] ?? ''); ?>
+                                <label for="department_category" class="form-label">Category <span class="req">*</span></label>
+                                <select class="form-select" id="department_category" name="department_category" required>
+                                    <?php foreach (DepartmentModel::categories() as $catKey => $catLabel): ?>
+                                        <option value="<?php echo htmlspecialchars($catKey); ?>" <?php echo $catKey === $currentCat ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($catLabel); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="help-mini">Academic: teaching departments. Admin: administrative / support units.</div>
+                            </div>
                         </div>
                         <div class="dept-actions">
                             <a href="<?php echo APP_URL; ?>/departments" class="btn btn-outline-secondary">Cancel</a>

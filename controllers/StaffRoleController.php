@@ -17,12 +17,18 @@ class StaffRoleController extends Controller {
         }
         
         $roleModel = $this->model('StaffRoleModel');
-        $roles = $roleModel->getAll();
+        $roles = $roleModel->getAllWithUsage();
+
+        require_once BASE_PATH . '/core/AccessControl.php';
+        $uid = (int) $_SESSION['user_id'];
         
         $data = [
             'title' => 'Staff Roles',
             'page' => 'staff-roles',
             'roles' => $roles,
+            'canAdd' => AccessControl::can($uid, 'staff_roles', 'add'),
+            'canEdit' => AccessControl::can($uid, 'staff_roles', 'edit'),
+            'canDelete' => AccessControl::can($uid, 'staff_roles', 'delete'),
             'message' => $_SESSION['message'] ?? null,
             'error' => $_SESSION['error'] ?? null
         ];
@@ -47,8 +53,7 @@ class StaffRoleController extends Controller {
             
             $data = [
                 'staff_position_type_id' => strtoupper(trim($this->post('staff_position_type_id', ''))),
-                'staff_position_type_name' => trim($this->post('staff_position_type_name', '')),
-                'staff_position' => (int)$this->post('staff_position', 0)
+                'staff_position_type_name' => trim($this->post('staff_position_type_name', ''))
             ];
             
             // Validation
@@ -66,13 +71,29 @@ class StaffRoleController extends Controller {
             }
             
             // Create role
-            $result = $roleModel->createRole($data);
+            $sqlError = null;
+            $result = $roleModel->createRole($data, $sqlError);
             
-            if ($result) {
+            // The primary key is a manual string (not auto-increment), so insert_id is 0 on
+            // success. Only a strict `false` means the insert failed.
+            if ($result !== false) {
+                $this->logActivity(
+                    'CREATE',
+                    'staff-roles',
+                    $data['staff_position_type_id'],
+                    'Staff role created: ' . $data['staff_position_type_name'] . ' (' . $data['staff_position_type_id'] . ')',
+                    null,
+                    $data
+                );
                 $_SESSION['message'] = 'Staff role created successfully.';
                 $this->redirect('staff-roles');
             } else {
-                $_SESSION['error'] = 'Failed to create staff role.';
+                if ($sqlError) {
+                    error_log('StaffRoleController::create - ' . $sqlError);
+                    $_SESSION['error'] = 'Failed to create staff role. Database error: ' . $sqlError;
+                } else {
+                    $_SESSION['error'] = 'Failed to create staff role.';
+                }
                 $this->redirect('staff-roles/create');
             }
         } else {
@@ -115,8 +136,7 @@ class StaffRoleController extends Controller {
         
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && $this->post('form_section', 'role') === 'role') {
             $data = [
-                'staff_position_type_name' => trim($this->post('staff_position_type_name', '')),
-                'staff_position' => (int)$this->post('staff_position', 0)
+                'staff_position_type_name' => trim($this->post('staff_position_type_name', ''))
             ];
             
             // Validation
@@ -127,8 +147,7 @@ class StaffRoleController extends Controller {
             }
             
             $oldValues = [
-                'staff_position_type_name' => $role['staff_position_type_name'],
-                'staff_position' => $role['staff_position']
+                'staff_position_type_name' => $role['staff_position_type_name']
             ];
             $result = $roleModel->updateRole($id, $data);
             
