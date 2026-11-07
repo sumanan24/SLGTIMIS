@@ -424,21 +424,23 @@ class FacilitiesTicketModel extends Model {
             $where[] = 't.escalation_level > 0';
         }
         if (!empty($filters['assigned_to_me']) && !empty($filters['scope_staff_id'])) {
-            $where[] = 't.responsible_staff_id = ?';
-            $params[] = $filters['scope_staff_id'];
-            $types .= 's';
+            $where[] = '(t.responsible_staff_id = ? OR EXISTS (SELECT 1 FROM `facilities_assignments` tm WHERE tm.ticket_id = t.id AND tm.is_current = 1 AND tm.staff_id = ?))';
+            array_push($params, $filters['scope_staff_id'], $filters['scope_staff_id']);
+            $types .= 'ss';
         }
         if (!empty($filters['scope_staff_id']) && empty($filters['officer_all'])) {
             $sid = $filters['scope_staff_id'];
             $dept = $filters['scope_department_id'] ?? '';
             if (!empty($filters['hod_scope']) && $dept !== '') {
-                $where[] = '(t.requester_staff_id = ? OR t.responsible_staff_id = ? OR t.requester_department_id = ? OR t.responsible_department_id = ?)';
-                array_push($params, $sid, $sid, $dept, $dept);
-                $types .= 'ssss';
+                $where[] = '(t.requester_staff_id = ? OR t.responsible_staff_id = ? OR t.routed_staff_id = ? OR t.requester_department_id = ? OR t.responsible_department_id = ?
+                    OR EXISTS (SELECT 1 FROM `facilities_assignments` ta WHERE ta.ticket_id = t.id AND ta.is_current = 1 AND ta.staff_id = ?))';
+                array_push($params, $sid, $sid, $sid, $dept, $dept, $sid);
+                $types .= 'ssssss';
             } else {
-                $where[] = '(t.requester_staff_id = ? OR t.responsible_staff_id = ?)';
-                array_push($params, $sid, $sid);
-                $types .= 'ss';
+                $where[] = '(t.requester_staff_id = ? OR t.responsible_staff_id = ? OR t.routed_staff_id = ?
+                    OR EXISTS (SELECT 1 FROM `facilities_assignments` ta WHERE ta.ticket_id = t.id AND ta.is_current = 1 AND ta.staff_id = ?))';
+                array_push($params, $sid, $sid, $sid, $sid);
+                $types .= 'ssss';
             }
         }
     }
@@ -579,7 +581,7 @@ class FacilitiesTicketModel extends Model {
                 FROM `staff` s
                 LEFT JOIN `department` d ON d.department_id = s.department_id
                 LEFT JOIN `facilities_tickets` t ON t.responsible_staff_id = s.staff_id
-                WHERE (s.staff_status IS NULL OR s.staff_status = '' OR s.staff_status IN ('Active','Permanent','On Contract','1'))";
+                WHERE (s.staff_status IS NULL OR s.staff_status = '' OR s.staff_status NOT IN ('Terminated','Resigned','Retired','Inactive','Left','0'))";
         if ($departmentId) {
             $sql .= ' AND s.department_id = ?';
         }
@@ -912,6 +914,68 @@ class FacilitiesTicketModel extends Model {
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         return (string) ($row['department_id'] ?? '');
+    }
+
+    /** Name, position, department and mobile of one staff member (empty strings when not found). */
+    public function staffContact(string $staffId): array {
+        $stmt = $this->db->prepare('SELECT s.`staff_id`, s.`staff_name`, s.`staff_position`, s.`staff_pno`, d.`department_name`
+            FROM `staff` s LEFT JOIN `department` d ON d.`department_id` = s.`department_id` WHERE s.`staff_id` = ? LIMIT 1');
+        $stmt->bind_param('s', $staffId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc() ?: [];
+        return [
+            'staff_id' => (string) ($row['staff_id'] ?? $staffId),
+            'name' => trim((string) ($row['staff_name'] ?? '')),
+            'position' => trim((string) ($row['staff_position'] ?? '')),
+            'department' => trim((string) ($row['department_name'] ?? '')),
+            'phone' => trim((string) ($row['staff_pno'] ?? '')),
+        ];
+    }
+
+    /** staff_id => staff_name for the given ids (only ids that exist). */
+    public function staffNamesByIds(array $ids): array {
+        $ids = array_values(array_unique(array_filter(array_map('strval', $ids), static function ($v) {
+            return $v !== '';
+        })));
+        if (!$ids) {
+            return [];
+        }
+        $marks = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->db->prepare("SELECT `staff_id`, `staff_name` FROM `staff` WHERE `staff_id` IN ($marks)");
+        $stmt->bind_param(str_repeat('s', count($ids)), ...$ids);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $out = [];
+        while ($row = $res->fetch_assoc()) {
+            $out[(string) $row['staff_id']] = (string) $row['staff_name'];
+        }
+        return $out;
+    }
+
+    /** True when the person is on the ticket's current assignment (single assignee or team member). */
+    public function isOnTicketTeam(int $ticketId, string $staffId): bool {
+        if ($ticketId <= 0 || $staffId === '') {
+            return false;
+        }
+        $stmt = $this->db->prepare('SELECT 1 FROM `facilities_assignments` WHERE `ticket_id` = ? AND `staff_id` = ? AND `is_current` = 1 LIMIT 1');
+        $stmt->bind_param('is', $ticketId, $staffId);
+        $stmt->execute();
+        return (bool) $stmt->get_result()->fetch_assoc();
+    }
+
+    /** Current assigned people (lead first) as [staff_id, staff_name, role]. */
+    public function currentTeam(int $ticketId): array {
+        $stmt = $this->db->prepare("SELECT a.`staff_id`, s.`staff_name`, a.`remarks`
+            FROM `facilities_assignments` a LEFT JOIN `staff` s ON s.`staff_id` = a.`staff_id`
+            WHERE a.`ticket_id` = ? AND a.`is_current` = 1 AND a.`staff_id` IS NOT NULL ORDER BY a.`id` ASC");
+        $stmt->bind_param('i', $ticketId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $rows = [];
+        while ($row = $res->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        return $rows;
     }
 
     public function findHodByDepartmentLike(array $likes): ?array {

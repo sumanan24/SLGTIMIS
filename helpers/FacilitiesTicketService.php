@@ -88,13 +88,21 @@ class FacilitiesTicketService {
         if (!empty($actor['is_officer']) || !empty($actor['is_monitor']) || !empty($actor['is_admin'])) {
             return true;
         }
-        $sid = $actor['staff_id'];
-        if ($sid !== '' && ($ticket['requester_staff_id'] === $sid || $ticket['responsible_staff_id'] === $sid)) {
+        $sid = (string) $actor['staff_id'];
+        // Requester, the person the category routes to (gets the SMS link), and the assigned person
+        if ($sid !== '' && in_array($sid, [
+            (string) ($ticket['requester_staff_id'] ?? ''),
+            (string) ($ticket['routed_staff_id'] ?? ''),
+            (string) ($ticket['responsible_staff_id'] ?? ''),
+        ], true)) {
+            return true;
+        }
+        if ($sid !== '' && !empty($ticket['id']) && $this->model->isOnTicketTeam((int) $ticket['id'], $sid)) {
             return true;
         }
         if (!empty($actor['is_hod']) && $actor['hod_department_id']) {
-            $dept = $actor['hod_department_id'];
-            return $ticket['requester_department_id'] === $dept || $ticket['responsible_department_id'] === $dept;
+            $dept = (string) $actor['hod_department_id'];
+            return (string) ($ticket['requester_department_id'] ?? '') === $dept || (string) ($ticket['responsible_department_id'] ?? '') === $dept;
         }
         return false;
     }
@@ -124,8 +132,11 @@ class FacilitiesTicketService {
     }
 
     public function canWork(array $actor, array $ticket): bool {
-        return $actor['staff_id'] !== '' && $ticket['responsible_staff_id'] === $actor['staff_id']
-            && !in_array($ticket['status'], self::CLOSED, true);
+        if ($actor['staff_id'] === '' || in_array($ticket['status'], self::CLOSED, true)) {
+            return false;
+        }
+        return (string) ($ticket['responsible_staff_id'] ?? '') === (string) $actor['staff_id']
+            || $this->model->isOnTicketTeam((int) ($ticket['id'] ?? 0), (string) $actor['staff_id']);
     }
 
     public function canVerify(array $actor, array $ticket): bool {
@@ -249,6 +260,7 @@ class FacilitiesTicketService {
         $created = $this->model->getDetailed((int) $id);
         if ($route['staff_id'] !== '' && $created) {
             $this->smsResponsible($route['staff_id'], $created, 'new', (string) $actor['staff_id']);
+            $this->smsRequester($created, [$route['staff_id']], 'received');
         }
         return $created;
     }
@@ -425,6 +437,97 @@ class FacilitiesTicketService {
     }
 
     /**
+     * Text the person who raised the ticket, with the details of the person (or team) handling it.
+     * $kind: 'received' (routed to the category's person), 'assigned' or 'reassigned'.
+     * Never blocks the ticket: the result is written to the ticket history.
+     */
+    public function smsRequester(array $ticket, array $staffIds, string $kind = 'assigned'): void {
+        $ticketId = (int) ($ticket['id'] ?? 0);
+        $requesterId = trim((string) ($ticket['requester_staff_id'] ?? ''));
+        $staffIds = array_values(array_unique(array_filter(array_map('strval', $staffIds), static function ($v) {
+            return $v !== '';
+        })));
+        // Nothing to tell when there is no requester or the requester is the person handling it
+        if ($ticketId <= 0 || $requesterId === '' || !$staffIds || in_array($requesterId, $staffIds, true)) {
+            return;
+        }
+        try {
+            require_once BASE_PATH . '/services/MobitelSmsService.php';
+            $sms = new MobitelSmsService();
+            $mobile = $this->model->staffPhone($requesterId);
+            if ($sms->normalizeSriLankanMobile($mobile) === null) {
+                $this->history($ticketId, $requesterId, 'SMS not sent', '', $requesterId, 'Requester has no valid mobile number on the staff record.');
+                return;
+            }
+            $people = [];
+            foreach ($staffIds as $id) {
+                $people[] = $this->model->staffContact($id);
+            }
+            $result = $sms->sendSms($mobile, $this->buildRequesterSmsText($ticket, $people, $kind));
+            $this->history(
+                $ticketId,
+                $requesterId,
+                $result['ok'] ? 'SMS sent to requester' : 'SMS to requester failed',
+                '',
+                $requesterId,
+                $result['ok'] ? 'Gateway accepted the message.' : ('Gateway code ' . $result['result_code'] . ' (' . (string) $result['error'] . ').')
+            );
+        } catch (Throwable $e) {
+            error_log('[FacilitiesSMS] requester: ' . $e->getMessage());
+        }
+    }
+
+    /** SMS for the requester. $people: staffContact() rows, the first one is the lead. */
+    public function buildRequesterSmsText(array $ticket, array $people, string $kind = 'assigned'): string {
+        $cut = static function (string $v, int $max): string {
+            $v = trim((string) preg_replace('/\s+/', ' ', $v));
+            if (function_exists('mb_strlen')) {
+                return mb_strlen($v) > $max ? mb_substr($v, 0, $max - 3) . '...' : $v;
+            }
+            return strlen($v) > $max ? substr($v, 0, $max - 3) . '...' : $v;
+        };
+        $lead = $people[0] ?? ['name' => '', 'position' => '', 'department' => '', 'phone' => '', 'staff_id' => ''];
+        $leadName = $lead['name'] !== '' ? $lead['name'] : $lead['staff_id'];
+        $names = [];
+        foreach ($people as $i => $p) {
+            $names[] = ($p['name'] !== '' ? $p['name'] : $p['staff_id']) . (count($people) > 1 && $i === 0 ? ' (lead)' : '');
+        }
+        // SMS always says "Assigned" (also when the ticket moves to another person)
+        $heading = $kind === 'received' ? 'Ticket Received' : 'Ticket Assigned';
+        $intro = $kind === 'received'
+            ? 'Your ticket has been received and sent to the person below.'
+            : 'Your ticket has been assigned.';
+        $description = trim((string) ($ticket['description'] ?? ''));
+        $subject = $description !== '' ? $description : (string) ($ticket['title'] ?? '');
+        $lines = [
+            'SLGTI MIS - ' . $heading,
+            '',
+            $intro,
+            '',
+            'Ticket ID: ' . ($ticket['ticket_number'] ?? ''),
+            'Subject: ' . $cut($subject, 80),
+            (count($people) > 1 ? 'Assigned Team: ' : ($kind === 'received' ? 'Received By: ' : 'Assigned To: ')) . $cut(implode(', ', $names), 90),
+        ];
+        if ($lead['position'] !== '') {
+            $lines[] = 'Position: ' . $cut($lead['position'], 40);
+        }
+        if ($lead['department'] !== '') {
+            $lines[] = 'Department: ' . $cut($lead['department'], 50);
+        }
+        if ($lead['phone'] !== '') {
+            $lines[] = 'Contact: ' . $lead['phone'];
+        }
+        if (!empty($ticket['deadline'])) {
+            $lines[] = ($kind === 'received' ? 'Expected By: ' : 'Deadline: ') . substr((string) $ticket['deadline'], 0, 10);
+        }
+        if (defined('APP_URL') && !empty($ticket['id'])) {
+            $lines[] = '';
+            $lines[] = 'Track: ' . APP_URL . '/facilities/view?id=' . (int) $ticket['id'];
+        }
+        return implode("\n", $lines);
+    }
+
+    /**
      * SMS body. $kind: 'new' (ticket received), 'assigned' or 'reassigned'.
      */
     public function buildSmsText(array $ticket, string $kind = 'new'): string {
@@ -444,10 +547,11 @@ class FacilitiesTicketService {
             $department = trim((string) ($ticket['responsible_department_name'] ?? ''));
         }
         $created = !empty($ticket['created_at']) ? date('Y-m-d H:i', strtotime((string) $ticket['created_at'])) : date('Y-m-d H:i');
-        $heading = $kind === 'reassigned' ? 'Ticket Reassigned' : ($kind === 'assigned' ? 'Ticket Assigned' : 'New Ticket Notification');
+        // SMS always says "Assigned" (also when the ticket moves to another person)
+        $heading = $kind === 'new' ? 'New Ticket Notification' : 'Ticket Assigned';
         $intro = $kind === 'new'
             ? 'A new ticket has been received.'
-            : 'A ticket has been ' . ($kind === 'reassigned' ? 'reassigned' : 'assigned') . ' to you.';
+            : 'A ticket has been assigned to you.';
         $outro = $kind === 'new'
             ? 'Please review the request and assign a suitable technician to handle the issue.'
             : 'Please review the request and take the necessary action.';

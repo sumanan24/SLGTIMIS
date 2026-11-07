@@ -75,7 +75,7 @@ class FacilitiesController extends Controller {
             $group = '';
         }
         $groupTitles = ['pending' => 'Pending Tickets', 'in_progress' => 'In Progress', 'resolved' => 'Resolved Tickets', 'closed' => 'Closed Tickets'];
-        $result = $this->svc->model()->search($filters, (int) $this->get('page', 1), 20);
+        $result = $this->markAssignable($this->svc->model()->search($filters, (int) $this->get('page', 1), 20), $actor);
         return $this->view('facilities/index', $this->pack([
             'title' => $group !== '' ? $groupTitles[$group] : 'Facilities Tickets',
             'heading' => $group !== '' ? $groupTitles[$group] : 'All Tickets',
@@ -93,7 +93,7 @@ class FacilitiesController extends Controller {
         $filters = $this->svc->scopeFilters($actor, $this->listFilters());
         $filters['assigned_to_me'] = 1;
         $filters['scope_staff_id'] = $actor['staff_id'];
-        $result = $this->svc->model()->search($filters, (int) $this->get('page', 1), 20);
+        $result = $this->markAssignable($this->svc->model()->search($filters, (int) $this->get('page', 1), 20), $actor);
         return $this->view('facilities/index', $this->pack([
             'title' => 'My Assigned Tickets',
             'heading' => 'My Assigned Tickets',
@@ -285,7 +285,7 @@ class FacilitiesController extends Controller {
         $ticket = $this->loadTicket($actor, true);
         if (!$ticket || !$this->svc->canAssign($actor, $ticket)) {
             if ($ticket) {
-                $_SESSION['error'] = 'You cannot assign this request.';
+                $_SESSION['error'] = 'You do not have permission to assign this ticket.';
                 $this->redirect('facilities/view?id=' . (int) $ticket['id']);
             }
             return;
@@ -294,7 +294,13 @@ class FacilitiesController extends Controller {
             $ticket = $this->verify->review($actor, $ticket);
         }
         $deptId = $this->get('department_id', $ticket['responsible_department_id'] ?? '');
-        return $this->view('facilities/assign', $this->detailData($actor, $ticket, 'Assign ' . $ticket['ticket_number'], [
+        // Suggest a deadline that is not already in the past (keeps the current one if it is still ahead)
+        $suggested = date('Y-m-d', strtotime('+' . max(1, $this->svc->model()->slaDays((string) ($ticket['current_priority'] ?? 'medium'))) . ' days'));
+        if (!empty($ticket['deadline']) && $ticket['deadline'] >= date('Y-m-d')) {
+            $suggested = substr((string) $ticket['deadline'], 0, 10);
+        }
+        return $this->view('facilities/assign', $this->detailData($actor, $ticket, ($ticket['responsible_staff_id'] ?? '') !== '' ? 'Reassign ' . $ticket['ticket_number'] : 'Assign ' . $ticket['ticket_number'], [
+            'suggested_deadline' => $suggested,
             'picker' => $this->svc->model()->staffPickerRows($deptId ?: null),
             'selected_department' => $deptId,
         ]));
@@ -309,12 +315,16 @@ class FacilitiesController extends Controller {
         if (!$ticket) {
             return;
         }
+        $wasAssigned = !empty($ticket['responsible_staff_id']) || !empty($ticket['responsible_department_id']);
         try {
             $ticket = $this->assign->assign($actor, $ticket, $this->post());
-            $this->logActivity('UPDATE', 'facilities', $ticket['id'], 'Assigned ' . $ticket['ticket_number'], null, $this->post());
-            $_SESSION['message'] = 'Ticket assigned.';
+            $this->logActivity('UPDATE', 'facilities', $ticket['id'], ($wasAssigned ? 'Reassigned ' : 'Assigned ') . $ticket['ticket_number'], null, $this->post());
+            $_SESSION['message'] = $wasAssigned ? 'The ticket has been reassigned.' : 'The ticket has been assigned.';
         } catch (Throwable $e) {
+            // Stay on the form so the user can correct the problem
             $_SESSION['error'] = $e->getMessage();
+            $this->redirect('facilities/assign?id=' . (int) $ticket['id']);
+            return;
         }
         $this->redirect('facilities/view?id=' . (int) $ticket['id']);
     }
@@ -812,6 +822,15 @@ class FacilitiesController extends Controller {
         return $out;
     }
 
+    /** Flags each listed ticket the current user may assign or reassign (drives the Action button). */
+    private function markAssignable(array $result, array $actor): array {
+        foreach ($result['rows'] as &$row) {
+            $row['can_assign'] = $this->svc->canAssign($actor, $row) ? 1 : 0;
+        }
+        unset($row);
+        return $result;
+    }
+
     private function pack(array $data, array $actor): array {
         $deptModel = $this->model('DepartmentModel');
         $data['page'] = 'facilities';
@@ -833,6 +852,7 @@ class FacilitiesController extends Controller {
             'section' => 'view',
             'ticket' => $ticket,
             'assignments' => $this->svc->model()->children('facilities_assignments', $id, 'assigned_at DESC'),
+            'team' => $this->svc->model()->currentTeam($id),
             'progress_rows' => $this->svc->model()->children('facilities_progress_updates', $id, 'created_at ASC'),
             'comments' => $this->svc->model()->children('facilities_comments', $id, 'created_at ASC'),
             'timeline' => $this->svc->model()->children('facilities_activity', $id, 'created_at ASC'),

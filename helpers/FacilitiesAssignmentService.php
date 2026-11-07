@@ -14,71 +14,156 @@ class FacilitiesAssignmentService {
 
     public function assign(array $actor, array $ticket, array $input): array {
         if (!$this->tickets->canAssign($actor, $ticket)) {
-            throw new RuntimeException('You cannot assign this ticket.');
+            throw new RuntimeException('You do not have permission to assign this ticket.');
         }
-        $type = $input['assignment_type'] ?? 'staff';
-        if (!in_array($type, ['staff', 'department', 'team', 'vendor'], true)) {
-            throw new InvalidArgumentException('Invalid assignment type.');
+        $type = (string) ($input['assignment_type'] ?? 'staff');
+        if (!in_array($type, ['staff', 'team', 'vendor'], true)) {
+            throw new InvalidArgumentException('Please select a valid assignee type.');
         }
-        $staffId = trim((string) ($input['staff_id'] ?? ''));
-        $deptId = trim((string) ($input['department_id'] ?? ''));
-        $vendor = trim((string) ($input['vendor_name'] ?? ''));
-        if ($type === 'staff' && $staffId === '') {
-            throw new InvalidArgumentException('Select a responsible person.');
+        if ($type === 'vendor') {
+            return $this->closeWithVendor($actor, $ticket, $input);
         }
-        if ($type === 'department' && $deptId === '') {
-            throw new InvalidArgumentException('Select a responsible department.');
+
+        // Who will do the work: one staff member, or a team of two or more
+        if ($type === 'team') {
+            $rawIds = $input['team_staff_ids'] ?? [];
+            $ids = array_values(array_unique(array_filter(array_map(static function ($v) {
+                return trim((string) $v);
+            }, is_array($rawIds) ? $rawIds : []), static function ($v) {
+                return $v !== '';
+            })));
+            if (count($ids) < 2) {
+                throw new InvalidArgumentException('Please select at least two staff members for a team.');
+            }
+        } else {
+            $one = trim((string) ($input['staff_id'] ?? ''));
+            if ($one === '') {
+                throw new InvalidArgumentException('Please select a staff member.');
+            }
+            $ids = [$one];
         }
-        if ($type === 'vendor' && $vendor === '') {
-            throw new InvalidArgumentException('Enter the vendor name.');
+        $names = $this->model->staffNamesByIds($ids);
+        foreach ($ids as $id) {
+            if (!isset($names[$id])) {
+                throw new InvalidArgumentException('One of the selected staff members could not be found.');
+            }
         }
         if (empty($input['deadline'])) {
-            throw new InvalidArgumentException('Deadline is required.');
+            throw new InvalidArgumentException('Please enter a deadline.');
         }
+        $leadId = $ids[0];
+        $deptId = $this->model->staffDepartmentId($leadId);
+        $others = [];
+        foreach (array_slice($ids, 1) as $id) {
+            $others[] = $names[$id];
+        }
+        $supporting = $type === 'team' ? implode(', ', $others) : trim((string) ($input['supporting_staff'] ?? ''));
+        $startDate = !empty($input['start_date']) ? $input['start_date'] : date('Y-m-d');
+        $expected = !empty($input['expected_completion_date']) ? $input['expected_completion_date'] : $input['deadline'];
+        $instructions = trim((string) ($input['instructions'] ?? ''));
+
         $this->model->clearCurrentAssignments((int) $ticket['id']);
-        $this->model->addChild('facilities_assignments', [
-            'ticket_id' => $ticket['id'],
-            'assignment_type' => $type,
-            'department_id' => $deptId !== '' ? $deptId : null,
-            'staff_id' => $staffId !== '' ? $staffId : null,
-            'vendor_name' => $vendor !== '' ? $vendor : null,
-            'supporting_staff' => trim((string) ($input['supporting_staff'] ?? '')),
-            'assigned_by' => $actor['staff_id'],
-            'assigned_at' => date('Y-m-d H:i:s'),
-            'start_date' => !empty($input['start_date']) ? $input['start_date'] : date('Y-m-d'),
-            'deadline' => $input['deadline'],
-            'expected_completion_date' => (!empty($input['expected_completion_date']) ? $input['expected_completion_date'] : $input['deadline']),
-            'instructions' => trim((string) ($input['instructions'] ?? '')),
-            'remarks' => trim((string) ($input['remarks'] ?? '')),
-            'is_current' => 1,
-        ]);
+        foreach ($ids as $i => $id) {
+            // One current assignment row per person, so every team member can see and work on the ticket
+            $this->model->addChild('facilities_assignments', [
+                'ticket_id' => $ticket['id'],
+                'assignment_type' => $type,
+                'department_id' => $this->model->staffDepartmentId($id) ?: null,
+                'staff_id' => $id,
+                'vendor_name' => null,
+                'supporting_staff' => $supporting,
+                'assigned_by' => $actor['staff_id'],
+                'assigned_at' => date('Y-m-d H:i:s'),
+                'start_date' => $startDate,
+                'deadline' => $input['deadline'],
+                'expected_completion_date' => $expected,
+                'instructions' => $instructions,
+                'remarks' => $type === 'team' ? ($i === 0 ? 'Team lead' : 'Team member') : trim((string) ($input['remarks'] ?? '')),
+                'is_current' => 1,
+            ]);
+        }
         $oldDeadline = $ticket['deadline'];
         $this->model->updateTicket((int) $ticket['id'], [
             'status' => FacilitiesTicketService::ST_ASSIGNED,
             'assignment_type' => $type,
-            'responsible_staff_id' => $staffId !== '' ? $staffId : null,
+            'responsible_staff_id' => $leadId,
             'responsible_department_id' => $deptId !== '' ? $deptId : ($ticket['responsible_department_id'] ?? null),
-            'vendor_name' => $vendor !== '' ? $vendor : null,
-            'start_date' => !empty($input['start_date']) ? $input['start_date'] : date('Y-m-d'),
+            'vendor_name' => null,
+            'start_date' => $startDate,
             'deadline' => $input['deadline'],
-            'expected_completion_date' => (!empty($input['expected_completion_date']) ? $input['expected_completion_date'] : $input['deadline']),
+            'expected_completion_date' => $expected,
         ]);
         $isReassign = !empty($ticket['responsible_staff_id']) || !empty($ticket['responsible_department_id']);
         $action = $isReassign ? 'Reassigned' : 'Assigned';
-        $target = $staffId !== '' ? $staffId : ($deptId !== '' ? $deptId : $vendor);
-        $this->tickets->statusHistory((int) $ticket['id'], $ticket['status'], FacilitiesTicketService::ST_ASSIGNED, $actor['staff_id'], $input['instructions'] ?? '');
-        $this->tickets->history((int) $ticket['id'], $actor['staff_id'], $action, $ticket['responsible_staff_id'] ?? '', $target, (string) ($input['instructions'] ?? ''));
+        $target = implode(', ', $ids);
+        $this->tickets->statusHistory((int) $ticket['id'], $ticket['status'], FacilitiesTicketService::ST_ASSIGNED, $actor['staff_id'], $instructions);
+        $this->tickets->history((int) $ticket['id'], $actor['staff_id'], $action, $ticket['responsible_staff_id'] ?? '', $target, $instructions);
         if ((string) $oldDeadline !== (string) $input['deadline']) {
             $this->recordDeadline($ticket, $actor, $input['deadline'], $isReassign ? 'Reassignment deadline' : 'Initial assignment deadline');
         }
         $fresh = $this->model->getDetailed((int) $ticket['id']);
-        $this->tickets->notifyWatchers($fresh, $isReassign ? 'ticket_reassigned' : 'ticket_assigned', $action, 'Ticket ' . $ticket['ticket_number'] . ' assigned to ' . $target . '.');
-        if ($staffId !== '' && $fresh) {
-            $this->tickets->smsResponsible($staffId, $fresh, $isReassign ? 'reassigned' : 'assigned', (string) $actor['staff_id']);
+        $who = $type === 'team' ? 'a team (' . implode(', ', array_values($names)) . ')' : $names[$leadId];
+        $this->tickets->notifyWatchers($fresh, $isReassign ? 'ticket_reassigned' : 'ticket_assigned', $action, 'Ticket ' . $ticket['ticket_number'] . ' assigned to ' . $who . '.');
+        if ($fresh) {
+            // The person who raised the ticket also learns who is handling it
+            $this->tickets->smsRequester($fresh, $ids, $isReassign ? 'reassigned' : 'assigned');
+        }
+        foreach ($ids as $i => $id) {
+            if ($i > 0) {
+                $this->tickets->notifyStaff($id, (int) $ticket['id'], $isReassign ? 'ticket_reassigned' : 'ticket_assigned', 'You were added to a team', $ticket['ticket_number'] . ' was assigned to a team that includes you.');
+            }
+            if ($fresh) {
+                $this->tickets->smsResponsible($id, $fresh, $isReassign ? 'reassigned' : 'assigned', (string) $actor['staff_id']);
+            }
         }
         return $fresh;
     }
 
+    /**
+     * External vendor: no staff or department is chosen. The vendor name and a proper reason
+     * are recorded and the ticket is closed.
+     */
+    private function closeWithVendor(array $actor, array $ticket, array $input): array {
+        $reason = trim((string) ($input['vendor_reason'] ?? ''));
+        $len = function_exists('mb_strlen') ? mb_strlen($reason) : strlen($reason);
+        if ($len < 10) {
+            throw new InvalidArgumentException('Please give a proper reason for closing this ticket (at least 10 characters).');
+        }
+        $remarks = 'Handled by an external vendor. Reason: ' . $reason;
+        $now = date('Y-m-d H:i:s');
+        $this->model->clearCurrentAssignments((int) $ticket['id']);
+        $this->model->addChild('facilities_assignments', [
+            'ticket_id' => $ticket['id'],
+            'assignment_type' => 'vendor',
+            'department_id' => null,
+            'staff_id' => null,
+            'vendor_name' => null,
+            'supporting_staff' => '',
+            'assigned_by' => $actor['staff_id'],
+            'assigned_at' => $now,
+            'start_date' => date('Y-m-d'),
+            'deadline' => null,
+            'expected_completion_date' => null,
+            'instructions' => '',
+            'remarks' => $reason,
+            'is_current' => 1,
+        ]);
+        $this->model->updateTicket((int) $ticket['id'], [
+            'status' => FacilitiesTicketService::ST_CLOSED,
+            'assignment_type' => 'vendor',
+            'responsible_staff_id' => null,
+            'vendor_name' => null,
+            'closed_by' => $actor['staff_id'],
+            'closed_at' => $now,
+            'closure_remarks' => $remarks,
+            'no_evidence_reason' => $reason,
+        ]);
+        $this->tickets->statusHistory((int) $ticket['id'], $ticket['status'], FacilitiesTicketService::ST_CLOSED, $actor['staff_id'], $remarks);
+        $this->tickets->history((int) $ticket['id'], $actor['staff_id'], 'Closed', $ticket['status'], FacilitiesTicketService::ST_CLOSED, $remarks);
+        $fresh = $this->model->getDetailed((int) $ticket['id']);
+        $this->tickets->notifyWatchers($fresh, 'ticket_closed', 'Ticket closed', $ticket['ticket_number'] . ' was closed. It is being handled by an external vendor.');
+        return $fresh;
+    }
     public function extendDeadline(array $actor, array $ticket, string $deadline, string $reason): array {
         if (!$this->tickets->canManage($actor, $ticket) && !$this->tickets->canWork($actor, $ticket)) {
             throw new RuntimeException('You cannot change this deadline.');

@@ -63,16 +63,17 @@ $facNav = static function () use ($base, $section, $unread, $actor, $h) {
         echo '<a class="fac-nav-a' . $on . '" href="' . $h($item[1]) . '"' . ($on ? ' aria-current="page"' : '') . '>'
             . '<i class="fas ' . $h($item[2]) . '"></i><span>' . $h($item[0]) . '</span></a>';
     }
-    $noticeOn = $current === 'notifications' ? ' is-on' : '';
-    echo '<a class="fac-nav-a fac-nav-end' . $noticeOn . '" href="' . $h($base . '/notifications') . '"><i class="fas fa-bell"></i><span>Notices</span>'
-        . ($unread > 0 ? '<span class="fac-nav-count">' . (int) $unread . '</span>' : '') . '</a>';
     echo '</nav>';
 };
 /** Same page header for every facilities screen: title, optional subtitle, optional action buttons (trusted HTML). */
-$facHeader = static function ($title, $subtitle = '', $actions = '') use ($h) {
+$facHeader = static function ($title, $subtitle = '', $actions = '') use ($h, $base, $unread, $section) {
+    // Notices live in the header (top right) so the section tabs below stay on one tidy row
+    $bell = '<a class="fac-bell' . ($section === 'notifications' ? ' is-on' : '') . '" href="' . $h($base . '/notifications') . '" title="Notices">'
+        . '<i class="fas fa-bell"></i><span>Notices</span>'
+        . ($unread > 0 ? '<span class="fac-nav-count">' . (int) $unread . '</span>' : '') . '</a>';
     echo '<div class="card-header fac-head"><div class="fac-head-text"><h5>' . $h($title) . '</h5>'
         . ($subtitle !== '' ? '<p>' . $h($subtitle) . '</p>' : '') . '</div>'
-        . ($actions !== '' ? '<div class="fac-head-actions">' . $actions . '</div>' : '') . '</div>';
+        . '<div class="fac-head-actions">' . $actions . $bell . '</div></div>';
 };
 $facNewBtn = '<a class="btn btn-sm btn-light" href="' . $h($base . '/create') . '"><i class="fas fa-plus me-1"></i>Create New Ticket</a>';$facFlash = static function () use ($message, $error, $h) {
     if (!empty($message)) {

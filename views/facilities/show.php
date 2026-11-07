@@ -23,7 +23,17 @@ $place = trim(($t['building'] ?? '') . ' ' . ($t['floor'] ?? '') . ' ' . ($t['ro
                 <div><span>Submitted</span><strong><?php echo $h($t['created_at'] ?? ''); ?></strong></div>
                 <div><span>Location</span><strong><?php echo $h($t['location']); ?></strong></div>
                 <div><span>Routed to</span><strong><?php echo $h($labels['routes'][$t['routed_role'] ?? ''] ?? 'Facility Officer'); ?></strong></div>
-                <div><span>Assigned to</span><strong><?php echo $h($t['responsible_name'] ?? $t['vendor_name'] ?? 'Not assigned'); ?></strong></div>
+                <div><span><?php echo count($team ?? []) > 1 ? 'Assigned team' : 'Assigned to'; ?></span><strong><?php
+                    if (count($team ?? []) > 1) {
+                        $names = [];
+                        foreach ($team as $i => $m) { $names[] = ($m['staff_name'] ?? $m['staff_id']) . ($i === 0 ? ' (lead)' : ''); }
+                        echo $h(implode(', ', $names));
+                    } elseif (($t['assignment_type'] ?? '') === 'vendor') {
+                        echo $h(!empty($t['vendor_name']) ? $t['vendor_name'] . ' (external vendor)' : 'External vendor');
+                    } else {
+                        echo $h($t['responsible_name'] ?? $t['vendor_name'] ?? 'Not assigned');
+                    }
+                ?></strong></div>
                 <div><span>Expected</span><strong><?php echo $h($t['expected_completion_date'] ?? $t['deadline'] ?? '—'); ?></strong></div>
                 <div><span>Completed</span><strong><?php echo $h($t['completed_at'] ?? '—'); ?></strong></div>
                 <div>
