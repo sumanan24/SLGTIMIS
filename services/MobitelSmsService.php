@@ -345,6 +345,10 @@ class MobitelSmsService {
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 12,
         ];
+        $bundledCa = BASE_PATH . '/services/mobitel/cacert.pem';
+        if (is_file($bundledCa)) {
+            $options[CURLOPT_CAINFO] = $bundledCa;
+        }
         if (defined('CURLSSLOPT_NATIVE_CA')) {
             $options[CURLOPT_SSL_OPTIONS] = CURLSSLOPT_NATIVE_CA;
         }

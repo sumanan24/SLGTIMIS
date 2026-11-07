@@ -31,30 +31,50 @@ $unread = (int) ($unread ?? 0);
 $message = $message ?? null;
 $error = $error ?? null;
 $facNav = static function () use ($base, $section, $unread, $actor, $h) {
+    // Same order as the Maintenance sidebar menu
+    $canReport = !empty($actor['is_officer']) || !empty($actor['is_monitor']) || !empty($actor['is_hod']) || !empty($actor['is_admin']);
     $items = [
-        'dashboard' => ['Dashboard', $base . '/dashboard'],
-        'list' => ['Tickets', $base],
-        'tasks' => ['My tasks', $base . '/tasks'],
-        'create' => ['New request', $base . '/create'],
-        'notifications' => ['Notices' . ($unread > 0 ? ' (' . $unread . ')' : ''), $base . '/notifications'],
+        'dashboard' => ['Dashboard', $base . '/dashboard', 'fa-chart-pie', true],
+        'create' => ['Create New Ticket', $base . '/create', 'fa-plus', true],
+        'list' => ['All Tickets', $base, 'fa-ticket-alt', true],
+        'tasks' => ['My Assigned Tickets', $base . '/tasks', 'fa-user-check', true],
+        'pending' => ['Pending Tickets', $base . '?group=pending', 'fa-hourglass-half', true],
+        'in_progress' => ['In Progress', $base . '?group=in_progress', 'fa-spinner', true],
+        'resolved' => ['Resolved Tickets', $base . '?group=resolved', 'fa-check-circle', true],
+        'closed' => ['Closed Tickets', $base . '?group=closed', 'fa-lock', true],
+        'categories' => ['Ticket Categories', $base . '/categories', 'fa-tags', !empty($actor['is_officer'])],
+        'departments' => ['Departments', $base . '/departments', 'fa-building', $canReport],
+        'officers' => ['Assign Officers', $base . '/officers', 'fa-user-cog', !empty($actor['is_admin'])],
+        'reports' => ['Reports & Analytics', $base . '/reports', 'fa-chart-line', $canReport],
+        'settings' => ['Ticket Settings', $base . '/settings', 'fa-cog', !empty($actor['is_admin'])],
     ];
-    if (!empty($actor['is_admin'])) {
-        $items['settings'] = ['Settings', $base . '/settings'];
-    }
-    if (!empty($actor['is_officer']) || !empty($actor['is_monitor']) || !empty($actor['is_hod'])) {
-        $items['reports'] = ['Reports', $base . '/reports'];
-    }
-    if (!empty($actor['is_officer'])) {
-        $items['categories'] = ['Categories', $base . '/categories'];
-    }
-    echo '<nav class="fac-nav">';
+    // Ticket detail / assign / verify screens belong to the All Tickets tab
+    $current = in_array($section, ['view', 'assign', 'verify'], true) ? 'list' : $section;
+    echo '<nav class="fac-nav" aria-label="Maintenance sections">';
     foreach ($items as $key => $item) {
-        $on = $section === $key ? ' is-on' : '';
-        echo '<a class="fac-nav-a' . $on . '" href="' . $h($item[1]) . '">' . $h($item[0]) . '</a>';
+        if (empty($item[3])) {
+            continue;
+        }
+        // Visual break between ticket views and management pages
+        if ($key === 'categories') {
+            echo '<span class="fac-nav-sep" aria-hidden="true"></span>';
+        }
+        $on = $current === $key ? ' is-on' : '';
+        echo '<a class="fac-nav-a' . $on . '" href="' . $h($item[1]) . '"' . ($on ? ' aria-current="page"' : '') . '>'
+            . '<i class="fas ' . $h($item[2]) . '"></i><span>' . $h($item[0]) . '</span></a>';
     }
+    $noticeOn = $current === 'notifications' ? ' is-on' : '';
+    echo '<a class="fac-nav-a fac-nav-end' . $noticeOn . '" href="' . $h($base . '/notifications') . '"><i class="fas fa-bell"></i><span>Notices</span>'
+        . ($unread > 0 ? '<span class="fac-nav-count">' . (int) $unread . '</span>' : '') . '</a>';
     echo '</nav>';
 };
-$facFlash = static function () use ($message, $error, $h) {
+/** Same page header for every facilities screen: title, optional subtitle, optional action buttons (trusted HTML). */
+$facHeader = static function ($title, $subtitle = '', $actions = '') use ($h) {
+    echo '<div class="card-header fac-head"><div class="fac-head-text"><h5>' . $h($title) . '</h5>'
+        . ($subtitle !== '' ? '<p>' . $h($subtitle) . '</p>' : '') . '</div>'
+        . ($actions !== '' ? '<div class="fac-head-actions">' . $actions . '</div>' : '') . '</div>';
+};
+$facNewBtn = '<a class="btn btn-sm btn-light" href="' . $h($base . '/create') . '"><i class="fas fa-plus me-1"></i>Create New Ticket</a>';$facFlash = static function () use ($message, $error, $h) {
     if (!empty($message)) {
         echo '<div class="fac-flash fac-flash-ok">' . $h($message) . '</div>';
     }

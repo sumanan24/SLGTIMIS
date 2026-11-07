@@ -171,6 +171,9 @@ class DepartmentController extends Controller {
         if (!$this->requireModule('departments', 'view')) {
             return;
         }
+        if (!$this->requireDepartmentAssigned('dashboard')) {
+            return;
+        }
         
         $departmentModel = $this->model('DepartmentModel');
         $perPage = 12;
@@ -264,7 +267,7 @@ class DepartmentController extends Controller {
 
         // HOD / instructors may only open their own department.
         $userDepartmentId = $this->getUserDepartment();
-        if ($userDepartmentId && $userDepartmentId !== $department['department_id']) {
+        if (($userDepartmentId || $this->isDepartmentRestricted()) && $userDepartmentId !== $department['department_id']) {
             $_SESSION['error'] = 'You can only view your own department.';
             $this->redirect('departments');
             return;

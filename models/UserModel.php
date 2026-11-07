@@ -411,6 +411,119 @@ class UserModel extends Model {
      * ACC = Accountant
      * ADM = Administrator
      */
+    /**
+     * Department-bound academic staff see only their own department on the dashboard:
+     * HOD, instructors (IN1-IN3) and lecturers (LE1, LE2, SLE).
+     */
+    public function usesDepartmentDashboard($userId): bool {
+        if ($this->isAdminOrADM($userId)) {
+            return false;
+        }
+        return in_array($this->getUserRole($userId), ['HOD', 'IN1', 'IN2', 'IN3', 'LE1', 'LE2', 'SLE'], true);
+    }
+
+    /**
+     * Department id of a staff login (user_name = staff_id), or null.
+     */
+    public function getStaffDepartmentId($userId): ?string {
+        $user = $this->find($userId);
+        if (!$user || ($user['user_table'] ?? '') !== 'staff' || empty($user['user_name'])) {
+            return null;
+        }
+        $stmt = $this->db->prepare("SELECT `department_id` FROM `staff` WHERE `staff_id` = ? LIMIT 1");
+        $stmt->bind_param('s', $user['user_name']);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $dept = $row ? trim((string) ($row['department_id'] ?? '')) : '';
+        return $dept !== '' ? $dept : null;
+    }
+
+    /**
+     * Department this staff login is the assigned head of (department.head_staff_id), or null.
+     */
+    public function getHeadedDepartmentId($userId): ?string {
+        try {
+            $user = $this->find($userId);
+            if (!$user || ($user['user_table'] ?? '') !== 'staff' || empty($user['user_name'])) {
+                return null;
+            }
+            $stmt = $this->db->prepare("SELECT `department_id` FROM `department` WHERE `head_staff_id` = ? ORDER BY `department_id` LIMIT 1");
+            if (!$stmt) {
+                return null;
+            }
+            $stmt->bind_param('s', $user['user_name']);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            return $row && trim((string) $row['department_id']) !== '' ? (string) $row['department_id'] : null;
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Departments this staff login heads, for display ("Head of Department - ICT").
+     * Based on department.head_staff_id; a HOD position without an assignment falls back to
+     * the staff member's own department.
+     *
+     * @return list<array{department_id:string, department_name:string, head_type:string, head_type_label:string}>
+     */
+    public function getHeadedDepartments($userId): array {
+        $out = [];
+        try {
+            $user = $this->find($userId);
+            if (!$user || ($user['user_table'] ?? '') !== 'staff' || empty($user['user_name'])) {
+                return [];
+            }
+            $stmt = $this->db->prepare(
+                "SELECT `department_id`, `department_name`, `head_type` FROM `department` WHERE `head_staff_id` = ? ORDER BY `department_name`"
+            );
+            if ($stmt) {
+                $stmt->bind_param('s', $user['user_name']);
+                $stmt->execute();
+                $res = $stmt->get_result();
+                $labels = ['permanent' => 'Permanent', 'acting' => 'Acting', 'cover_up' => 'Cover-up'];
+                while ($res && ($row = $res->fetch_assoc())) {
+                    $type = strtolower((string) ($row['head_type'] ?? ''));
+                    $out[] = [
+                        'department_id' => (string) $row['department_id'],
+                        'department_name' => (string) $row['department_name'],
+                        'head_type' => $type,
+                        'head_type_label' => $labels[$type] ?? '',
+                    ];
+                }
+            }
+            if (empty($out) && $this->getUserRole($userId) === 'HOD') {
+                $deptId = $this->getHODDepartment($userId) ?: $this->getStaffDepartmentId($userId);
+                if ($deptId) {
+                    $s2 = $this->db->prepare("SELECT `department_name` FROM `department` WHERE `department_id` = ?");
+                    $s2->bind_param('s', $deptId);
+                    $s2->execute();
+                    $r2 = $s2->get_result()->fetch_assoc();
+                    $out[] = [
+                        'department_id' => (string) $deptId,
+                        'department_name' => (string) ($r2['department_name'] ?? $deptId),
+                        'head_type' => '',
+                        'head_type_label' => '',
+                    ];
+                }
+            }
+        } catch (Throwable $e) {
+            return [];
+        }
+        return $out;
+    }
+
+    /**
+     * Finance staff (position FIN or ACC) get a finance-only dashboard.
+     * System admin and ADM keep the full dashboard.
+     */
+    public function usesFinanceDashboard($userId): bool {
+        if ($this->isAdminOrADM($userId)) {
+            return false;
+        }
+        return in_array($this->getUserRole($userId), ['FIN', 'ACC'], true);
+    }
+
     public function hasFinanceAccess($userId) {
         $role = $this->getUserRole($userId);
         return in_array($role, ['FIN', 'ACC', 'ADM']);

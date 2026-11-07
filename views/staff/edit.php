@@ -15,6 +15,13 @@ $canUploadFile = !empty($canUploadFile);
 $canDownloadFile = !empty($canDownloadFile);
 $canApproveFile = !empty($canApproveFile);
 $canEditStaffAccess = !empty($canEditStaffAccess);
+// Own file without HR rights: only some tabs are editable, HR-only tabs are hidden.
+$selfMode = !empty($selfMode);
+$selfEditTabs = ['personal', 'contact', 'qualifications', 'training', 'documents', 'payroll', 'family'];
+if ($selfMode && !in_array($activeTab, $selfEditTabs, true)) {
+    $canEditFile = $canAddFile = $canDeleteFile = $canUploadFile = false;
+}
+$lockHrFields = $selfMode; // Staff ID, finger no., EPF and ETF stay HR managed
 $fileLabels = $fileLabels ?? [];
 $photoUrl = !empty($staff['staff_photo_path'])
     ? APP_URL . '/staff/file/photo?id=' . urlencode($sid)
@@ -52,7 +59,7 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
     <div class="card border-0">
         <div class="card-header d-flex justify-content-between align-items-center gap-3">
             <div class="st-file-heading">
-                <p class="st-file-kicker mb-0">Staff personal file</p>
+                <p class="st-file-kicker mb-0"><?php echo $selfMode ? 'My personal file' : 'Staff personal file'; ?></p>
                 <h5 class="fw-bold mb-0"><?php echo $h($staff['staff_name'] ?? $sid); ?></h5>
                 <div class="st-file-chips">
                     <span class="st-file-id"><?php echo $h($sid); ?></span>
@@ -63,7 +70,7 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                     <?php endif; ?>
                 </div>
             </div>
-            <a href="<?php echo APP_URL; ?>/staff" class="btn btn-sm btn-light flex-shrink-0"><i class="fas fa-arrow-left me-1"></i>Back</a>
+            <a href="<?php echo APP_URL . ($selfMode ? '/profile' : '/staff'); ?>" class="btn btn-sm btn-light flex-shrink-0"><i class="fas fa-arrow-left me-1"></i>Back</a>
         </div>
         <div class="card-body">
             <?php if (!empty($message)): ?>
@@ -78,6 +85,9 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
             <nav class="st-file-nav" aria-label="Personal file sections">
                 <?php foreach ($tabs as $key => $meta):
                     if ($key === 'access' && !$canEditStaffAccess) {
+                        continue;
+                    }
+                    if ($selfMode && $key === 'administrative') {
                         continue;
                     }
                     $isActive = $activeTab === $key; ?>
@@ -122,11 +132,11 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                             <div class="st-grid-3">
                                 <div>
                                     <label class="form-label" for="staff_id">Staff ID / Employee No. <span class="text-danger">*</span></label>
-                                    <input class="form-control" id="staff_id" name="staff_id" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false" required value="<?php echo $h($sid); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                    <input class="form-control" id="staff_id" name="staff_id" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false" required value="<?php echo $h($sid); ?>" <?php echo ($canEditFile && !$lockHrFields) ? '' : 'disabled'; ?>>
                                 </div>
                                 <div>
                                     <label class="form-label" for="finger_machine_no">Finger Machine No.</label>
-                                    <input class="form-control" id="finger_machine_no" name="finger_machine_no" maxlength="50" autocomplete="off" value="<?php echo $h($staff['finger_machine_no'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                    <input class="form-control" id="finger_machine_no" name="finger_machine_no" maxlength="50" autocomplete="off" value="<?php echo $h($staff['finger_machine_no'] ?? ''); ?>" <?php echo ($canEditFile && !$lockHrFields) ? '' : 'disabled'; ?>>
                                 </div>
                                 <div>
                                     <label class="form-label" for="staff_nic">NIC No. <span class="text-danger">*</span></label>
@@ -178,152 +188,189 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                 </div>
 
             <?php elseif ($activeTab === 'contact'): ?>
-                <form method="POST" action="<?php echo $h($base); ?>">
+                <form method="POST" action="<?php echo $h($base); ?>" class="st-file-form" autocomplete="off">
                     <input type="hidden" name="update_section" value="contact">
-                    <div class="st-grid-2">
-                        <div>
-                            <label class="form-label" for="staff_address">Permanent Address</label>
-                            <textarea class="form-control" id="staff_address" name="staff_address" rows="2" maxlength="255" <?php echo $canEditFile ? '' : 'disabled'; ?>><?php echo $h($staff['staff_address'] ?? ''); ?></textarea>
+                    <section class="st-person-block">
+                        <h6><i class="fas fa-mobile-alt" aria-hidden="true"></i>Phone and email</h6>
+                        <div class="st-grid-2">
+                            <div>
+                                <label class="form-label" for="staff_pno">Mobile number</label>
+                                <input type="tel" inputmode="tel" autocomplete="tel" class="form-control" id="staff_pno" name="staff_pno" maxlength="20" value="<?php echo $h($staff['staff_pno'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            </div>
+                            <div>
+                                <label class="form-label" for="staff_email">Email <span class="text-danger">*</span></label>
+                                <input type="email" inputmode="email" autocomplete="email" autocapitalize="none" class="form-control" id="staff_email" name="staff_email" required value="<?php echo $h($staff['staff_email'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                <div class="form-text">Also used as the sign-in email.</div>
+                            </div>
                         </div>
-                        <div>
-                            <label class="form-label" for="staff_current_address">Current Address</label>
-                            <textarea class="form-control" id="staff_current_address" name="staff_current_address" rows="2" maxlength="255" <?php echo $canEditFile ? '' : 'disabled'; ?>><?php echo $h($staff['staff_current_address'] ?? ''); ?></textarea>
+                    </section>
+                    <section class="st-person-block">
+                        <h6><i class="fas fa-home" aria-hidden="true"></i>Addresses</h6>
+                        <div class="st-grid-2">
+                            <div>
+                                <label class="form-label" for="staff_address">Permanent address</label>
+                                <textarea class="form-control" id="staff_address" name="staff_address" rows="3" maxlength="255" <?php echo $canEditFile ? '' : 'disabled'; ?>><?php echo $h(($staff['staff_address'] ?? '') === '-' ? '' : ($staff['staff_address'] ?? '')); ?></textarea>
+                            </div>
+                            <div>
+                                <label class="form-label d-flex justify-content-between align-items-center" for="staff_current_address">
+                                    <span>Current address</span>
+                                    <?php if ($canEditFile): ?>
+                                        <button type="button" class="btn btn-link btn-sm p-0" id="stCopyAddress">Same as permanent</button>
+                                    <?php endif; ?>
+                                </label>
+                                <textarea class="form-control" id="staff_current_address" name="staff_current_address" rows="3" maxlength="255" <?php echo $canEditFile ? '' : 'disabled'; ?>><?php echo $h($staff['staff_current_address'] ?? ''); ?></textarea>
+                            </div>
                         </div>
-                    </div>
-                    <div class="st-grid-2">
-                        <div>
-                            <label class="form-label" for="staff_pno">Mobile</label>
-                            <input type="tel" inputmode="tel" autocomplete="tel" class="form-control" id="staff_pno" name="staff_pno" maxlength="20" value="<?php echo $h($staff['staff_pno'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                    </section>
+                    <section class="st-person-block">
+                        <h6><i class="fas fa-phone-alt" aria-hidden="true"></i>Emergency contact</h6>
+                        <div class="st-grid-3">
+                            <div>
+                                <label class="form-label" for="staff_emergency_name">Name</label>
+                                <input class="form-control" id="staff_emergency_name" name="staff_emergency_name" maxlength="100" value="<?php echo $h($staff['staff_emergency_name'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            </div>
+                            <div>
+                                <label class="form-label" for="staff_emergency_relation">Relationship</label>
+                                <input class="form-control" id="staff_emergency_relation" name="staff_emergency_relation" maxlength="50" value="<?php echo $h($staff['staff_emergency_relation'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            </div>
+                            <div>
+                                <label class="form-label" for="staff_emergency_phone">Phone number</label>
+                                <input type="tel" inputmode="tel" autocomplete="off" class="form-control" id="staff_emergency_phone" name="staff_emergency_phone" maxlength="20" value="<?php echo $h($staff['staff_emergency_phone'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            </div>
                         </div>
-                        <div>
-                            <label class="form-label" for="staff_email">Email <span class="text-danger">*</span></label>
-                            <input type="email" inputmode="email" autocomplete="email" autocapitalize="none" class="form-control" id="staff_email" name="staff_email" required value="<?php echo $h($staff['staff_email'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                        </div>
-                    </div>
-                    <div class="st-grid-3">
-                        <div>
-                            <label class="form-label" for="staff_emergency_name">Emergency Contact Name</label>
-                            <input class="form-control" id="staff_emergency_name" name="staff_emergency_name" maxlength="100" value="<?php echo $h($staff['staff_emergency_name'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                        </div>
-                        <div>
-                            <label class="form-label" for="staff_emergency_phone">Emergency Contact Number</label>
-                            <input type="tel" inputmode="tel" autocomplete="off" class="form-control" id="staff_emergency_phone" name="staff_emergency_phone" maxlength="20" value="<?php echo $h($staff['staff_emergency_phone'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                        </div>
-                        <div>
-                            <label class="form-label" for="staff_emergency_relation">Relationship</label>
-                            <input class="form-control" id="staff_emergency_relation" name="staff_emergency_relation" maxlength="50" value="<?php echo $h($staff['staff_emergency_relation'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                        </div>
-                    </div>
+                    </section>
                     <?php if ($canEditFile): ?>
-                        <div class="st-form-actions"><button class="btn btn-primary" type="submit">Save Contact Information</button></div>
+                        <div class="st-form-actions"><button class="btn btn-primary" type="submit">Save contact information</button></div>
                     <?php endif; ?>
                 </form>
+                <script>
+                (function () {
+                    var btn = document.getElementById('stCopyAddress');
+                    if (!btn) return;
+                    btn.addEventListener('click', function () {
+                        var from = document.getElementById('staff_address');
+                        var to = document.getElementById('staff_current_address');
+                        if (from && to) { to.value = from.value; to.focus(); }
+                    });
+                })();
+                </script>
 
             <?php elseif ($activeTab === 'employment'): ?>
-                <form method="POST" action="<?php echo $h($base); ?>" id="stStaffForm">
+                <form method="POST" action="<?php echo $h($base); ?>" id="stStaffForm" class="st-file-form">
                     <input type="hidden" name="update_section" value="employment">
-                    <div class="st-grid-3">
-                        <div>
-                            <label class="form-label" for="staff_date_of_join">Appointment Date</label>
-                            <input type="date" class="form-control" id="staff_date_of_join" name="staff_date_of_join" value="<?php echo $h($staff['staff_date_of_join'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                    <section class="st-person-block">
+                        <h6><i class="fas fa-calendar-check" aria-hidden="true"></i>Appointment</h6>
+                        <div class="st-grid-3">
+                            <div>
+                                <label class="form-label" for="staff_date_of_join">Appointment date</label>
+                                <input type="date" class="form-control" id="staff_date_of_join" name="staff_date_of_join" value="<?php echo $h($staff['staff_date_of_join'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            </div>
+                            <div>
+                                <label class="form-label" for="finger_machine_no">Employee number (finger machine)</label>
+                                <input class="form-control" id="finger_machine_no" name="finger_machine_no" maxlength="50" autocomplete="off" value="<?php echo $h($staff['finger_machine_no'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            </div>
+                            <div>
+                                <label class="form-label" for="staff_designation">Designation</label>
+                                <input class="form-control" id="staff_designation" name="staff_designation" maxlength="100" value="<?php echo $h($staff['staff_designation'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            </div>
                         </div>
-                        <div>
-                            <label class="form-label" for="finger_machine_no">Employee Number</label>
-                            <input class="form-control" id="finger_machine_no" name="finger_machine_no" maxlength="50" autocomplete="off" value="<?php echo $h($staff['finger_machine_no'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                    </section>
+                    <section class="st-person-block">
+                        <h6><i class="fas fa-building" aria-hidden="true"></i>Post and department</h6>
+                        <div class="st-grid-3">
+                            <div>
+                                <label class="form-label" for="staff_position">Position <span class="text-danger">*</span></label>
+                                <select class="form-select" id="staff_position" name="staff_position" required <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                    <option value="">Select position</option>
+                                    <?php foreach ($roles as $role): ?>
+                                        <option value="<?php echo $h($role['staff_position_type_id']); ?>" <?php echo ($staff['staff_position'] ?? '') === $role['staff_position_type_id'] ? 'selected' : ''; ?>>
+                                            <?php echo $h($role['staff_position_type_name']); ?> (<?php echo $h($role['staff_position_type_id']); ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label" for="department_id">Department <span class="text-danger">*</span></label>
+                                <select class="form-select" id="department_id" name="department_id" required <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                    <option value="">Select department</option>
+                                    <?php foreach ($departments as $dept): ?>
+                                        <option value="<?php echo $h($dept['department_id']); ?>" <?php echo ($staff['department_id'] ?? '') === $dept['department_id'] ? 'selected' : ''; ?>>
+                                            <?php echo $h($dept['department_name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label" for="salary_grade">Salary grade</label>
+                                <select class="form-select" id="salary_grade" name="salary_grade" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                    <option value="">Not assigned</option>
+                                    <?php echo $opt(['3' => 'Grade 3', '2' => 'Grade 2', '1' => 'Grade 1'], (string) ($staff['salary_grade'] ?? '')); ?>
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <label class="form-label" for="staff_designation">Designation</label>
-                            <input class="form-control" id="staff_designation" name="staff_designation" maxlength="100" value="<?php echo $h($staff['staff_designation'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                    </section>
+                    <section class="st-person-block">
+                        <h6><i class="fas fa-user-clock" aria-hidden="true"></i>Status and dates</h6>
+                        <div class="st-grid-4">
+                            <div>
+                                <label class="form-label" for="staff_type">Staff type</label>
+                                <select class="form-select" id="staff_type" name="staff_type" required <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                    <?php echo $opt(array_combine($staffTypes ?? [], $staffTypes ?? []) ?: [], $staff['staff_type'] ?? ''); ?>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label" for="staff_status">Employment status</label>
+                                <select class="form-select" id="staff_status" name="staff_status" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                    <?php echo $opt(['Working' => 'Working', 'Terminated' => 'Terminated', 'Resigned' => 'Resigned'], $staff['staff_status'] ?? 'Working'); ?>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label" for="staff_confirmation_date">Confirmation date</label>
+                                <input type="date" class="form-control" id="staff_confirmation_date" name="staff_confirmation_date" value="<?php echo $h($staff['staff_confirmation_date'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            </div>
+                            <div>
+                                <label class="form-label" for="staff_retirement_date">Retirement date</label>
+                                <input type="date" class="form-control" id="staff_retirement_date" name="staff_retirement_date" value="<?php echo $h($staff['staff_retirement_date'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                            </div>
                         </div>
-                    </div>
-                    <div class="st-grid-3">
-                        <div>
-                            <label class="form-label" for="staff_position">Role <span class="text-danger">*</span></label>
-                            <select class="form-select" id="staff_position" name="staff_position" required <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                                <option value="">Select role</option>
-                                <?php foreach ($roles as $role): ?>
-                                    <option value="<?php echo $h($role['staff_position_type_id']); ?>" <?php echo ($staff['staff_position'] ?? '') === $role['staff_position_type_id'] ? 'selected' : ''; ?>>
-                                        <?php echo $h($role['staff_position_type_name']); ?> (<?php echo $h($role['staff_position_type_id']); ?>)
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label" for="salary_grade">Grade</label>
-                            <select class="form-select" id="salary_grade" name="salary_grade" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                                <option value="">Not assigned</option>
-                                <?php echo $opt(['3' => 'Grade 3', '2' => 'Grade 2', '1' => 'Grade 1'], (string) ($staff['salary_grade'] ?? '')); ?>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label" for="department_id">Department <span class="text-danger">*</span></label>
-                            <select class="form-select" id="department_id" name="department_id" required <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                                <option value="">Select department</option>
-                                <?php foreach ($departments as $dept): ?>
-                                    <option value="<?php echo $h($dept['department_id']); ?>" <?php echo ($staff['department_id'] ?? '') === $dept['department_id'] ? 'selected' : ''; ?>>
-                                        <?php echo $h($dept['department_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="st-grid-4">
-                        <div>
-                            <label class="form-label" for="staff_type">Employment Type</label>
-                            <select class="form-select" id="staff_type" name="staff_type" required <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                                <?php echo $opt(['Permanent' => 'Permanent', 'On Contract' => 'On Contract', 'Visiting Lecturer' => 'Visiting Lecturer'], $staff['staff_type'] ?? ''); ?>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label" for="staff_confirmation_date">Confirmation Date</label>
-                            <input type="date" class="form-control" id="staff_confirmation_date" name="staff_confirmation_date" value="<?php echo $h($staff['staff_confirmation_date'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                        </div>
-                        <div>
-                            <label class="form-label" for="staff_status">Current Employment Status</label>
-                            <select class="form-select" id="staff_status" name="staff_status" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                                <?php echo $opt(['Working' => 'Working', 'Terminated' => 'Terminated', 'Resigned' => 'Resigned'], $staff['staff_status'] ?? 'Working'); ?>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label" for="staff_retirement_date">Retirement Date</label>
-                            <input type="date" class="form-control" id="staff_retirement_date" name="staff_retirement_date" value="<?php echo $h($staff['staff_retirement_date'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                        </div>
-                    </div>
-                    <div class="st-section-label">Another appointment</div>
-                    <p class="st-perm-note mb-2">One permanent post per person. Cover-up / Acting is for Permanent staff only.</p>
+                    </section>
                     <?php $appointType = strtolower((string) ($staff['appoint_type'] ?? 'none')); ?>
-                    <div class="st-grid-3 st-appoint" id="stAppointBlock">
-                        <div>
-                            <label class="form-label" for="appoint_type">Appointment Type</label>
-                            <select class="form-select" id="appoint_type" name="appoint_type" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                                <?php echo $opt(['none' => 'None', 'cover_up' => 'Cover-up', 'acting' => 'Acting'], $appointType); ?>
-                            </select>
+                    <section class="st-person-block">
+                        <h6><i class="fas fa-exchange-alt" aria-hidden="true"></i>Another appointment (Cover-up / Acting)</h6>
+                        <p class="st-perm-note mb-0" style="padding:.75rem 1rem 0;">One permanent post per person. Cover-up or Acting is for Permanent staff only.</p>
+                        <div class="st-grid-3 st-appoint" id="stAppointBlock">
+                            <div>
+                                <label class="form-label" for="appoint_type">Appointment type</label>
+                                <select class="form-select" id="appoint_type" name="appoint_type" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                    <?php echo $opt(['none' => 'None', 'cover_up' => 'Cover-up', 'acting' => 'Acting'], $appointType); ?>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label" for="appoint_position">Position</label>
+                                <select class="form-select" id="appoint_position" name="appoint_position" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                    <option value="">Select position</option>
+                                    <?php foreach ($roles as $role): ?>
+                                        <option value="<?php echo $h($role['staff_position_type_id']); ?>" <?php echo (($staff['appoint_position'] ?? '') === $role['staff_position_type_id']) ? 'selected' : ''; ?>>
+                                            <?php echo $h($role['staff_position_type_name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label" for="appoint_department_id">Department</label>
+                                <select class="form-select" id="appoint_department_id" name="appoint_department_id" <?php echo $canEditFile ? '' : 'disabled'; ?>>
+                                    <option value="">Same as primary</option>
+                                    <?php foreach ($departments as $dept): ?>
+                                        <option value="<?php echo $h($dept['department_id']); ?>" <?php echo (($staff['appoint_department_id'] ?? '') === $dept['department_id']) ? 'selected' : ''; ?>>
+                                            <?php echo $h($dept['department_name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <label class="form-label" for="appoint_position">Position</label>
-                            <select class="form-select" id="appoint_position" name="appoint_position" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                                <option value="">Select position</option>
-                                <?php foreach ($roles as $role): ?>
-                                    <option value="<?php echo $h($role['staff_position_type_id']); ?>" <?php echo (($staff['appoint_position'] ?? '') === $role['staff_position_type_id']) ? 'selected' : ''; ?>>
-                                        <?php echo $h($role['staff_position_type_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label" for="appoint_department_id">Department</label>
-                            <select class="form-select" id="appoint_department_id" name="appoint_department_id" <?php echo $canEditFile ? '' : 'disabled'; ?>>
-                                <option value="">Same as primary</option>
-                                <?php foreach ($departments as $dept): ?>
-                                    <option value="<?php echo $h($dept['department_id']); ?>" <?php echo (($staff['appoint_department_id'] ?? '') === $dept['department_id']) ? 'selected' : ''; ?>>
-                                        <?php echo $h($dept['department_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                    </div>
+                    </section>
                     <?php if ($canEditFile): ?>
-                        <div class="st-form-actions"><button class="btn btn-primary" type="submit">Save Employment Information</button></div>
+                        <div class="st-form-actions"><button class="btn btn-primary" type="submit">Save employment information</button></div>
                     <?php endif; ?>
                 </form>
 
@@ -338,6 +385,44 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                 [$kind, $typeKey, $rows, $heads] = $kindMap[$activeTab];
                 $typeOptions = $fileLabels[$typeKey] ?? [];
                 ?>
+                <?php if ($activeTab === 'administrative' && !empty($canResetPassword)):
+                    $acc = $loginAccount ?? null;
+                    $mustChange = $acc && !empty($acc['must_change_password']);
+                    $lastLogin = $acc && !empty($acc['user_last_login_timestamp']) ? date('d M Y, H:i', (int) $acc['user_last_login_timestamp']) : null;
+                    ?>
+                    <section class="st-person-block st-pw-reset">
+                        <h6><i class="fas fa-key" aria-hidden="true"></i>Login password</h6>
+                        <?php if (!$acc): ?>
+                            <p class="text-muted small mb-0">This staff member has no login account yet.</p>
+                        <?php else: ?>
+                            <div class="st-pw-reset-row">
+                                <div>
+                                    <div class="mb-1">
+                                        <?php if ($mustChange): ?>
+                                            <span class="badge bg-warning text-dark">Default password - change pending</span>
+                                        <?php else: ?>
+                                            <span class="badge bg-success">Own password set</span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="text-muted small">
+                                        Last login: <?php echo $lastLogin ? $h($lastLogin) : 'never'; ?>.
+                                        Reset sets the password to <code><?php echo $h($defaultPassword); ?></code>; the staff member must choose a new one at the next login.
+                                    </div>
+                                </div>
+                                <form method="POST" action="<?php echo APP_URL; ?>/staff/reset-password"
+                                      onsubmit="return confirm('Reset the password of <?php echo $h(addslashes((string) $sid)); ?> to the default password? They will have to change it at the next login.');">
+                                    <input type="hidden" name="staff_id" value="<?php echo $h($sid); ?>">
+                                    <button type="submit" class="btn btn-warning"><i class="fas fa-undo me-1"></i>Reset to default password</button>
+                                </form>
+                            </div>
+                        <?php endif; ?>
+                    </section>
+                    <style>
+                        .st-pw-reset { margin-bottom: 1rem; }
+                        .st-pw-reset-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+                        @media (max-width: 576px) { .st-pw-reset-row form, .st-pw-reset-row .btn { width: 100%; } }
+                    </style>
+                <?php endif; ?>
                 <?php if ($canAddFile): ?>
                 <form method="POST" action="<?php echo $fileBase; ?>/save?id=<?php echo urlencode($sid); ?>" class="st-add-box mb-3">
                     <input type="hidden" name="kind" value="<?php echo $h($kind); ?>">
@@ -665,7 +750,7 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                                     <?php if ($canApproveFile && empty($doc['approved'])): ?>
                                         <a class="btn btn-outline-success btn-sm" href="<?php echo $fileBase; ?>/document/approve?id=<?php echo urlencode($sid); ?>&doc=<?php echo (int) $doc['id']; ?>">Approve</a>
                                     <?php endif; ?>
-                                    <?php if ($canDeleteFile): ?>
+                                    <?php if ($canDeleteFile && !($selfMode && !empty($doc['approved']))): ?>
                                         <a class="btn btn-outline-danger btn-sm" href="<?php echo $fileBase; ?>/document/delete?id=<?php echo urlencode($sid); ?>&doc=<?php echo (int) $doc['id']; ?>" onclick="return confirm('Delete this document?');">Delete</a>
                                     <?php endif; ?>
                                 </td>
@@ -676,8 +761,10 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                 </div>
 
             <?php elseif ($activeTab === 'payroll'): ?>
-                <form method="POST" action="<?php echo $h($base); ?>">
+                <form method="POST" action="<?php echo $h($base); ?>" class="st-file-form" autocomplete="off">
                     <input type="hidden" name="update_section" value="payroll">
+                    <section class="st-person-block">
+                    <h6><i class="fas fa-university" aria-hidden="true"></i>Bank details</h6>
                     <div class="st-grid-3">
                         <div><label class="form-label" for="staff_bank_name">Bank</label>
                             <input class="form-control" id="staff_bank_name" name="staff_bank_name" value="<?php echo $h($staff['staff_bank_name'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>></div>
@@ -686,14 +773,18 @@ $labelOf = static function ($group, $key) use ($fileLabels) {
                         <div><label class="form-label" for="staff_bank_account">Account Number</label>
                             <input class="form-control" id="staff_bank_account" name="staff_bank_account" value="<?php echo $h($staff['staff_bank_account'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>></div>
                     </div>
+                    </section>
+                    <section class="st-person-block">
+                    <h6><i class="fas fa-piggy-bank" aria-hidden="true"></i>EPF and ETF<?php echo $lockHrFields ? ' (managed by HR)' : ''; ?></h6>
                     <div class="st-grid-2">
                         <div><label class="form-label" for="staff_epf">EPF No. <span class="text-danger">*</span></label>
-                            <input class="form-control" id="staff_epf" name="staff_epf" required value="<?php echo $h($staff['staff_epf'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>></div>
+                            <input class="form-control" id="staff_epf" name="staff_epf" required value="<?php echo $h($staff['staff_epf'] ?? ''); ?>" <?php echo ($canEditFile && !$lockHrFields) ? '' : 'disabled'; ?>></div>
                         <div><label class="form-label" for="staff_etf">ETF No.</label>
-                            <input class="form-control" id="staff_etf" name="staff_etf" value="<?php echo $h($staff['staff_etf'] ?? ''); ?>" <?php echo $canEditFile ? '' : 'disabled'; ?>></div>
+                            <input class="form-control" id="staff_etf" name="staff_etf" value="<?php echo $h($staff['staff_etf'] ?? ''); ?>" <?php echo ($canEditFile && !$lockHrFields) ? '' : 'disabled'; ?>></div>
                     </div>
+                    </section>
                     <?php if (!empty($salaryCalc['has_scale'])): ?>
-                        <p class="st-perm-note">Current scale basic <?php echo $h(number_format((float) $salaryCalc['basic'], 2)); ?>, gross <?php echo $h(number_format((float) $salaryCalc['gross'], 2)); ?>.</p>
+                        <p class="st-perm-note" style="margin-top:1rem;">Current scale basic <?php echo $h(number_format((float) $salaryCalc['basic'], 2)); ?>, gross <?php echo $h(number_format((float) $salaryCalc['gross'], 2)); ?>.</p>
                     <?php endif; ?>
                     <?php if ($canEditFile): ?>
                         <div class="st-form-actions"><button class="btn btn-primary" type="submit">Save Payroll Information</button></div>

@@ -398,6 +398,11 @@ class AttendanceController extends Controller {
         $academicYear = $this->get('academic_year', '');
         $month = $this->get('month', date('Y-m'));
         $reportView = $this->get('view', 'summary') === 'daily' ? 'daily' : 'summary';
+        // Attendance source: manual (marked by staff), finger (biometric device) or both
+        $source = $this->get('source', 'manual');
+        if (!in_array($source, ['manual', 'finger', 'both'], true)) {
+            $source = 'manual';
+        }
         // FIN users see only eligible (allowance-eligible) students; others can toggle via filter
         $eligibleOnly = $isFIN ? true : ($this->get('eligible_only', '0') === '1');
         
@@ -435,6 +440,7 @@ class AttendanceController extends Controller {
             'total_working_days' => 0,
             'total_effective_working_days' => 0,
             'total_allowance' => 0,
+            'total_finger_present' => 0,
             'above_90' => 0,
             'above_80' => 0,
             'below_80' => 0
@@ -447,7 +453,9 @@ class AttendanceController extends Controller {
                 'department_id' => $departmentId,
                 'course_id' => $courseId,
                 'academic_year' => $academicYear,
-                'eligible_only' => $eligibleOnly
+                'eligible_only' => $eligibleOnly,
+                'source' => $source,
+                'include_finger' => true
             ];
             
             $reportData = $attendanceModel->getAttendanceReport($month, $filters);
@@ -468,6 +476,7 @@ class AttendanceController extends Controller {
                     $summary['total_absent'] += ($student['effective_working_days'] - $student['present_days']);
                     $summary['total_holidays'] += $student['holiday_days'];
                     $summary['total_allowance'] += $student['allowance'];
+                    $summary['total_finger_present'] += (int)($student['finger_present_days'] ?? 0);
                     
                     if ($student['attendance_percentage'] >= 90) {
                         $summary['above_90']++;
@@ -494,6 +503,7 @@ class AttendanceController extends Controller {
             'selectedAcademicYear' => $academicYear,
             'selectedMonth' => $month,
             'reportView' => $reportView,
+            'source' => $source,
             'eligibleOnly' => $eligibleOnly,
             'isHOD' => $isHOD,
             'isAdmin' => $isAdmin,

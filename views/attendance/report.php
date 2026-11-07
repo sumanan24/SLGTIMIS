@@ -138,6 +138,17 @@
                         </div>
                         
                         <div class="row mt-3">
+                            <div class="col-md-4 col-lg-3 mb-3">
+                                <label for="source" class="form-label fw-semibold">Attendance source</label>
+                                <select class="form-select" id="source" name="source">
+                                    <option value="manual" <?php echo ($source ?? 'manual') === 'manual' ? 'selected' : ''; ?>>Manual (marked by staff)</option>
+                                    <option value="finger" <?php echo ($source ?? '') === 'finger' ? 'selected' : ''; ?>>Finger machine</option>
+                                    <option value="both" <?php echo ($source ?? '') === 'both' ? 'selected' : ''; ?>>Manual + Finger (either)</option>
+                                </select>
+                                <div class="form-text small">Finger present = In by 08:40 and Out from 16:00</div>
+                            </div>
+                        </div>
+                        <div class="row">
                             <div class="col-12">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-search me-1"></i>Generate Report
@@ -255,6 +266,8 @@
                                         <th class="text-center">Absent</th>
                                         <th class="text-center">Holidays</th>
                                         <th class="text-center">%</th>
+                                        <th class="text-center" title="Days present on the finger machine (In by 08:40 and Out from 16:00)"><i class="fas fa-fingerprint me-1"></i>Finger present</th>
+                                        <th class="text-center"><i class="fas fa-fingerprint me-1"></i>Finger %</th>
                                         <th class="text-end">Allowance</th>
                                     </tr>
                                 </thead>
@@ -290,6 +303,8 @@
                                             <td class="text-center">
                                                 <span class="badge <?php echo $badge; ?>"><?php echo number_format($pct, 1); ?>%</span>
                                             </td>
+                                            <td class="text-center"><?php echo (int)($student['finger_present_days'] ?? 0); ?><?php if (!empty($student['finger_late_days'])): ?> <small class="text-warning" title="Late / incomplete punches"><?php echo '(+' . (int)$student['finger_late_days'] . ' late)'; ?></small><?php endif; ?></td>
+                                            <td class="text-center"><?php echo number_format((float)($student['finger_percentage'] ?? 0), 1); ?>%</td>
                                             <td class="text-end">Rs. <?php echo number_format($student['allowance'] ?? 0, 0); ?></td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -302,13 +317,15 @@
                                         <td class="text-center"><?php echo (int)$summaryAbsentTotal; ?></td>
                                         <td class="text-center"><?php echo (int)$summaryHolidayTotal; ?></td>
                                         <td class="text-center">—</td>
+                                        <td class="text-center"><?php echo (int)($summary['total_finger_present'] ?? 0); ?></td>
+                                        <td class="text-center">—</td>
                                         <td class="text-end">Rs. <?php echo number_format($summary['total_allowance'] ?? 0, 0); ?></td>
                                     </tr>
                                 </tfoot>
                             </table>
                         </div>
                         <p class="text-muted small mb-0">
-                            One row per student for the full month. Working days exclude weekends and holidays. Present is marked days only.
+                            One row per student for the full month. Working days exclude weekends and holidays. Present, % and allowance follow the selected attendance source; the Finger columns always show the finger machine result.
                         </p>
                         <?php else: ?>
 
@@ -333,6 +350,7 @@
                                         <th rowspan="2" class="text-center" style="min-width: 70px;">Total Days</th>
                                         <th rowspan="2" class="text-center" style="min-width: 60px;">P</th>
                                         <th rowspan="2" class="text-center" style="min-width: 60px;">%</th>
+                                        <th rowspan="2" class="text-center" style="min-width: 70px;" title="Days present on the finger machine"><i class="fas fa-fingerprint"></i> Finger P</th>
                                         <th rowspan="2" class="text-center" style="min-width: 80px;">Allowance</th>
                                     </tr>
                                 </thead>
@@ -361,14 +379,23 @@
                                                     } elseif ($status == 'H') {
                                                         $class = 'bg-warning text-dark';
                                                         $statusValue = '-1'; // Holiday = -1 (as per requirement)
+                                                    } elseif ($status == 'L') {
+                                                        $class = 'text-dark';
+                                                        $statusValue = 'L'; // Finger: late / incomplete punch
                                                     } else {
                                                         $statusValue = ''; // Not marked = empty
                                                     }
                                                     ?>
-                                                    <td class="text-center <?php echo $class; ?>" style="min-width: 60px; padding: 0.5rem;">
+                                                    <?php $fingerMark = $student['finger_by_day'][$day['date']] ?? ''; ?>
+                                                    <td class="text-center <?php echo $class; ?>" style="min-width: 60px; padding: 0.5rem;<?php echo $status == 'L' ? ' background:#ffe5b4;' : ''; ?>">
                                                         <div style="font-size: 1.2rem; font-weight: bold;">
                                                             <?php echo $statusValue; ?>
                                                         </div>
+                                                        <?php if ($fingerMark !== '' && ($source ?? 'manual') === 'manual'): ?>
+                                                            <div style="font-size: .65rem; line-height: 1;" title="<?php echo $fingerMark === 'P' ? 'Finger: present' : 'Finger: late / incomplete'; ?>">
+                                                                <i class="fas fa-fingerprint"></i> <?php echo $fingerMark; ?>
+                                                            </div>
+                                                        <?php endif; ?>
                                                     </td>
                                                 <?php endforeach; ?>
                                             <?php endif; ?>
@@ -382,6 +409,7 @@
                                                     <?php echo number_format($student['attendance_percentage'], 1); ?>%
                                                 </span>
                                             </td>
+                                            <td class="text-center"><?php echo (int)($student['finger_present_days'] ?? 0); ?></td>
                                             <td class="text-center fw-bold">
                                                 Rs. <?php echo number_format($student['allowance'], 0); ?>
                                             </td>
@@ -393,6 +421,7 @@
                                             <td class="text-center"><?php echo number_format($summary['total_effective_working_days'] ?? 0, 0); ?></td>
                                             <td class="text-center"><?php echo number_format($summary['total_present'] ?? 0, 0); ?></td>
                                             <td class="text-center">-</td>
+                                            <td class="text-center"><?php echo number_format($summary['total_finger_present'] ?? 0, 0); ?></td>
                                             <td class="text-center">Rs. <?php echo number_format($summary['total_allowance'] ?? 0, 0); ?></td>
                                         </tr>
                                     <?php endif; ?>
@@ -408,6 +437,8 @@
                                         <span class="badge bg-success text-white">1</span> = Present, 
                                         <span class="badge bg-danger text-white">0</span> = Absent, 
                                         <span class="badge bg-warning text-dark">-1</span> = Holiday,
+                                        <span class="badge text-dark" style="background:#ffe5b4;">L</span> = Finger: late / incomplete punch,
+                                        <i class="fas fa-fingerprint"></i> P/L = finger result shown under manual mark,
                                         <span class="badge bg-light text-dark">Empty</span> = Not Marked
                                     </small>
                                 </div>

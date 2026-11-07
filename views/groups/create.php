@@ -116,6 +116,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const courseHelp = document.getElementById('courseHelp');
     const versionHelp = document.getElementById('versionHelp');
     const versionsByCourse = {};
+    let preCourseId = <?php echo json_encode((string) ($preCourseId ?? '')); ?>;
+    const preVersion = <?php echo json_encode(isset($preVersion) ? (string) $preVersion : ''); ?>;
 
     function versionLabel(v) {
         v = parseInt(v, 10) || 0;
@@ -182,6 +184,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         : [0];
                 });
                 if (courseHelp) courseHelp.textContent = courses.length ? 'Select the course for this group.' : 'No courses found for this department.';
+                if (preCourseId && versionsByCourse[preCourseId]) {
+                    courseSelect.value = preCourseId;
+                    fillVersions(preCourseId, preVersion);
+                    preCourseId = '';
+                }
             })
             .catch(error => {
                 console.error('Error fetching courses:', error);

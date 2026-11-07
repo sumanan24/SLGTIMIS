@@ -65,8 +65,13 @@ function mobitelSoapTransport($request, $location, $action, $version, $oneWay)
 			if (defined('CURL_HTTP_VERSION_1_1')) {
 				$options[CURLOPT_HTTP_VERSION] = CURL_HTTP_VERSION_1_1;
 			}
+			// Windows/WAMP PHP has no CA bundle configured, so curl cannot verify the gateway.
+			// Use the certificate chain shipped next to this file (DigiCert chain of the Mobitel host).
 			$ca = '/etc/ssl/certs/ca-certificates.crt';
-			if (is_file($ca)) {
+			$bundledCa = __DIR__ . DIRECTORY_SEPARATOR . 'cacert.pem';
+			if (is_file($bundledCa)) {
+				$options[CURLOPT_CAINFO] = $bundledCa;
+			} elseif (is_file($ca)) {
 				$options[CURLOPT_CAINFO] = $ca;
 			}
 			if (defined('CURLSSLOPT_NATIVE_CA')) {

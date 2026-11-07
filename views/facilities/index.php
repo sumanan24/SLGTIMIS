@@ -2,23 +2,26 @@
 $filters = $filters ?? [];
 $result = $result ?? ['rows' => [], 'total' => 0, 'page' => 1, 'per_page' => 20];
 $pages = max(1, (int) ceil(($result['total'] ?: 1) / $result['per_page']));
+$group = (string) ($filters['group'] ?? '');
+$groupStatuses = ($group !== '' && isset(FacilitiesTicketModel::STATUS_GROUPS[$group])) ? FacilitiesTicketModel::STATUS_GROUPS[$group] : null;
 $hasMore = ($filters['category_id'] ?? '') !== '' || ($filters['department_id'] ?? '') !== '' || ($filters['staff_id'] ?? '') !== '' || ($filters['location'] ?? '') !== '' || ($filters['date_from'] ?? '') !== '' || ($filters['date_to'] ?? '') !== '';
 ?>
 <div class="container-fluid px-0 fac-page">
     <div class="card border-0">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="fw-bold mb-0"><?php echo ($section ?? '') === 'tasks' ? 'My assigned tasks' : 'Tickets'; ?></h5>
-            <a class="btn btn-sm btn-light" href="<?php echo $base; ?>/create">New ticket</a>
-        </div>
+        <?php
+        $facSubtitles = ['tasks' => 'Tickets assigned to you.', 'pending' => 'Tickets waiting to be reviewed, assigned or started.', 'in_progress' => 'Tickets currently being worked on.', 'resolved' => 'Work completed and waiting for verification.', 'closed' => 'Tickets that are closed, cancelled or rejected.'];
+        $facHeader($heading ?? 'All Tickets', $facSubtitles[$section ?? ''] ?? 'Search and filter every maintenance ticket.', $facNewBtn);
+        ?>
         <div class="card-body">
             <?php $facNav(); $facFlash(); ?>
             <form method="get" action="<?php echo ($section ?? '') === 'tasks' ? $base . '/tasks' : $base; ?>">
+                <?php if ($groupStatuses !== null): ?><input type="hidden" name="group" value="<?php echo $h($group); ?>"><?php endif; ?>
                 <div class="fac-filters">
                     <div><label class="form-label">Search</label><input class="form-control form-control-sm" name="q" value="<?php echo $h($filters['q'] ?? ''); ?>" placeholder="Ticket no. or title"></div>
                     <div><label class="form-label">Status</label>
                         <select class="form-select form-select-sm" name="status">
                             <option value="">All</option>
-                            <?php foreach ($stLabel as $k => $lab): ?>
+                            <?php foreach ($stLabel as $k => $lab): if ($groupStatuses !== null && !in_array($k, $groupStatuses, true)) { continue; } ?>
                                 <option value="<?php echo $h($k); ?>" <?php echo (($filters['status'] ?? '') === $k) ? 'selected' : ''; ?>><?php echo $h($lab); ?></option>
                             <?php endforeach; ?>
                         </select>

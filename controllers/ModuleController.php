@@ -109,6 +109,9 @@ class ModuleController extends Controller {
             $this->redirect('login');
             return;
         }
+        if (!$this->requireDepartmentAssigned('dashboard')) {
+            return;
+        }
         if (!$this->checkNotSAO()) {
             return;
         }
@@ -116,7 +119,7 @@ class ModuleController extends Controller {
         $userModel = new UserModel();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
-        $deptRestricted = $this->isDepartmentRestricted();
+        $deptRestricted = $this->isDepartmentRestricted() || $this->isDepartmentManager();
         if (!$deptRestricted && !$isADM) {
             $_SESSION['error'] = 'Access denied.';
             $this->redirect('modules');
@@ -299,6 +302,9 @@ class ModuleController extends Controller {
             $this->redirect('login');
             return;
         }
+        if (!$this->requireDepartmentAssigned('dashboard')) {
+            return;
+        }
         if (!$this->checkNotSAO()) {
             return;
         }
@@ -371,7 +377,7 @@ class ModuleController extends Controller {
         $userModel = new UserModel();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
-        $canCreate = $isADM || $this->isDepartmentRestricted();
+        $canCreate = $isADM || $this->isDepartmentRestricted() || $this->isDepartmentManager();
         $canEdit = $canCreate;
 
         $filterCourseVersion = ($filterVersionRaw !== null && $filterVersionRaw !== '') ? (int) $filterVersionRaw : '';
@@ -399,6 +405,9 @@ class ModuleController extends Controller {
     public function show() {
         if (!isset($_SESSION['user_id'])) {
             $this->redirect('login');
+            return;
+        }
+        if (!$this->requireDepartmentAssigned('dashboard')) {
             return;
         }
         if (!$this->checkNotSAO()) {
@@ -442,11 +451,14 @@ class ModuleController extends Controller {
             $this->redirect('login');
             return;
         }
+        if (!$this->requireDepartmentAssigned('dashboard')) {
+            return;
+        }
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
-        $deptRestricted = $this->isDepartmentRestricted();
+        $deptRestricted = $this->isDepartmentRestricted() || $this->isDepartmentManager();
         if (!$deptRestricted && !$isADM) {
             $_SESSION['error'] = 'Only HOD / Instructors and ADM can add modules.';
             $this->redirect('modules');
@@ -460,9 +472,13 @@ class ModuleController extends Controller {
             $credit = $this->post('credit');
             $credit = $credit === '' || $credit === null ? null : (float) $credit;
             $semester = $this->normalizeSemester($this->post('semester', ''));
+            $returnCourse = $this->post('return_course', '') === '1';
+            $createUrl = $returnCourse
+                ? 'modules/create?course_id=' . urlencode($courseId) . '&course_version=' . $courseVersion . '&return_course=1'
+                : 'modules/create';
             if (empty($courseId) || empty($moduleId) || empty($moduleName)) {
                 $_SESSION['error'] = 'Course, version, module ID and module name are required.';
-                $this->redirect('modules/create');
+                $this->redirect($createUrl);
                 return;
             }
             $deptId = $this->getUserDepartment();
@@ -478,7 +494,7 @@ class ModuleController extends Controller {
             $moduleModel = $this->model('ModuleModel');
             if ($moduleModel->exists($courseId, $moduleId, $courseVersion)) {
                 $_SESSION['error'] = 'This module ID already exists for the selected course and version.';
-                $this->redirect('modules/create');
+                $this->redirect($createUrl);
                 return;
             }
             $sqlError = null;
@@ -492,10 +508,10 @@ class ModuleController extends Controller {
             ], $sqlError);
             if ($result !== false) {
                 $_SESSION['message'] = 'Module added successfully.';
-                $this->redirect('modules');
+                $this->redirect($returnCourse ? 'courses/manage?id=' . urlencode($courseId) . '&version=' . $courseVersion : 'modules');
             } else {
                 $_SESSION['error'] = $sqlError ?: 'Failed to add module.';
-                $this->redirect('modules/create');
+                $this->redirect($createUrl);
             }
         } else {
             $courseModel = $this->model('CourseModel');
@@ -519,6 +535,9 @@ class ModuleController extends Controller {
                 'page' => 'modules',
                 'courses' => $courses,
                 'versionsByCourse' => $versionsByCourse,
+                'preCourseId' => trim((string) $this->get('course_id', '')),
+                'preVersion' => $this->get('course_version', '') === '' ? null : (int) $this->get('course_version'),
+                'returnCourse' => $this->get('return_course', '') === '1',
                 'error' => $_SESSION['error'] ?? null
             ];
             unset($_SESSION['error']);
@@ -534,11 +553,14 @@ class ModuleController extends Controller {
             $this->redirect('login');
             return;
         }
+        if (!$this->requireDepartmentAssigned('dashboard')) {
+            return;
+        }
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
-        $deptRestricted = $this->isDepartmentRestricted();
+        $deptRestricted = $this->isDepartmentRestricted() || $this->isDepartmentManager();
         if (!$deptRestricted && !$isADM) {
             $_SESSION['error'] = 'Only HOD / Instructors and ADM can edit modules.';
             $this->redirect('modules');
@@ -574,7 +596,7 @@ class ModuleController extends Controller {
             $semester = $this->normalizeSemester($this->post('semester', ''));
             if (empty($moduleName)) {
                 $_SESSION['error'] = 'Module name is required.';
-                $this->redirect('modules/edit?course_id=' . urlencode($courseId) . '&module_id=' . urlencode($moduleId) . '&course_version=' . $courseVersion);
+                $this->redirect('modules/edit?course_id=' . urlencode($courseId) . '&module_id=' . urlencode($moduleId) . '&course_version=' . $courseVersion . ($this->get('return_course', '') === '1' ? '&return_course=1' : ''));
                 return;
             }
             $sqlError = null;
@@ -585,10 +607,10 @@ class ModuleController extends Controller {
             ], $sqlError);
             if ($ok) {
                 $_SESSION['message'] = 'Module updated successfully.';
-                $this->redirect('modules');
+                $this->redirect($this->get('return_course', '') === '1' ? 'courses/manage?id=' . urlencode($courseId) . '&version=' . $courseVersion : 'modules');
             } else {
                 $_SESSION['error'] = $sqlError ?: 'Failed to update module.';
-                $this->redirect('modules/edit?course_id=' . urlencode($courseId) . '&module_id=' . urlencode($moduleId) . '&course_version=' . $courseVersion);
+                $this->redirect('modules/edit?course_id=' . urlencode($courseId) . '&module_id=' . urlencode($moduleId) . '&course_version=' . $courseVersion . ($this->get('return_course', '') === '1' ? '&return_course=1' : ''));
             }
         } else {
             $data = [
@@ -610,9 +632,12 @@ class ModuleController extends Controller {
             $this->redirect('login');
             return;
         }
+        if (!$this->requireDepartmentAssigned('dashboard')) {
+            return;
+        }
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
-        $isHOD = $this->isHOD();
+        $isHOD = $this->isDepartmentManager();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
         if (!$isHOD && !$isADM) {
@@ -630,7 +655,7 @@ class ModuleController extends Controller {
         }
         $courseModel = $this->model('CourseModel');
         $course = $courseModel->getById($courseId);
-        $hodDepartmentId = $this->getHODDepartment();
+        $hodDepartmentId = $this->getUserDepartment();
         if ($hodDepartmentId && $course && isset($course['department_id']) && $course['department_id'] !== $hodDepartmentId) {
             $_SESSION['error'] = 'Access denied. You can only delete modules for courses in your department.';
             $this->redirect('modules');
@@ -642,6 +667,6 @@ class ModuleController extends Controller {
         } else {
             $_SESSION['error'] = 'Failed to delete module or module not found.';
         }
-        $this->redirect('modules');
+        $this->redirect($this->get('return_course', '') === '1' ? 'courses/manage?id=' . urlencode($courseId) . '&version=' . $courseVersion : 'modules');
     }
 }

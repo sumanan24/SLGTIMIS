@@ -1,5 +1,5 @@
 <style>
-/* Column plan (%): No 4 | ID 9 | Name 30 | Dept 18 | NVQ 10 | Status 12 | Actions 11 */
+/* Column plan (%): No 4 | ID 9 | Name 25 | Dept 14 | NVQ 8 | Modules 8 | Groups 8 | Status 10 | Actions 14 */
 .courses-table {
     table-layout: fixed;
     width: 100%;
@@ -10,11 +10,21 @@
 
 .courses-table col.col-no { width: 4%; }
 .courses-table col.col-id { width: 9%; }
-.courses-table col.col-name { width: 30%; }
-.courses-table col.col-dept { width: 18%; }
-.courses-table col.col-nvq { width: 10%; }
-.courses-table col.col-status { width: 12%; }
-.courses-table col.col-actions { width: 11%; }
+.courses-table col.col-name { width: 25%; }
+.courses-table col.col-dept { width: 14%; }
+.courses-table col.col-nvq { width: 8%; }
+.courses-table col.col-count { width: 8%; }
+.courses-table col.col-status { width: 10%; }
+.courses-table col.col-actions { width: 14%; }
+.courses-table th.col-count,
+.courses-table td.col-count { text-align: center; padding-left: 0.5rem; padding-right: 0.5rem; }
+.courses-dept-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; margin-bottom: 1.25rem; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 0.5rem; }
+.courses-dept-banner .dept-title { font-weight: 700; color: #0f172a; font-size: 1.05rem; }
+.courses-dept-banner .dept-sub { font-size: 0.8rem; color: #64748b; }
+.courses-dept-stats { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+.courses-dept-stats .n { font-size: 1.35rem; font-weight: 700; line-height: 1.1; color: #0f172a; }
+.courses-dept-stats .l { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
+.courses-chip-count { background: #f1f5f9; color: #334155; }
 
 .courses-table thead th {
     padding: 0.625rem 0.75rem;
@@ -241,7 +251,7 @@
         -webkit-overflow-scrolling: touch;
     }
     .courses-table {
-        min-width: 900px;
+        min-width: 1020px;
     }
     .courses-table thead th,
     .courses-table tbody td {
@@ -304,6 +314,25 @@
                     <i class="fas fa-exclamation-circle me-2"></i>
                     <div><?php echo htmlspecialchars($error); ?></div>
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
+
+            <?php if (!empty($deptRestricted) && empty($myDepartment)): ?>
+                <div class="alert alert-warning">Your account is not linked to a department yet, so no courses can be shown. Please contact the administrator.</div>
+            <?php endif; ?>
+
+            <?php if (!empty($myDepartment) && !empty($departmentTotals)): ?>
+                <div class="courses-dept-banner">
+                    <div>
+                        <div class="dept-title"><i class="fas fa-building me-2 text-primary"></i><?php echo htmlspecialchars($myDepartment['department_name'] ?? ''); ?></div>
+                        <div class="dept-sub">You manage the courses, modules and groups of your own department.</div>
+                    </div>
+                    <div class="courses-dept-stats">
+                        <div><div class="n"><?php echo (int) $departmentTotals['courses']; ?></div><div class="l">Courses</div></div>
+                        <div><div class="n"><?php echo (int) $departmentTotals['active']; ?></div><div class="l">Active</div></div>
+                        <div><div class="n"><?php echo (int) $departmentTotals['modules']; ?></div><div class="l">Modules</div></div>
+                        <div><div class="n"><?php echo (int) $departmentTotals['groups']; ?></div><div class="l">Groups</div></div>
+                    </div>
                 </div>
             <?php endif; ?>
 
@@ -405,6 +434,8 @@
                             <col class="col-name">
                             <col class="col-dept">
                             <col class="col-nvq">
+                            <col class="col-count">
+                            <col class="col-count">
                             <col class="col-status">
                             <col class="col-actions">
                         </colgroup>
@@ -415,6 +446,8 @@
                                 <th scope="col" class="fw-semibold col-name">Course Name</th>
                                 <th scope="col" class="fw-semibold col-dept">Department</th>
                                 <th scope="col" class="fw-semibold col-nvq">NVQ Level</th>
+                                <th scope="col" class="fw-semibold col-count">Modules</th>
+                                <th scope="col" class="fw-semibold col-count">Groups</th>
                                 <th scope="col" class="fw-semibold col-status">Status</th>
                                 <th scope="col" class="fw-semibold col-actions">Actions</th>
                             </tr>
@@ -444,6 +477,9 @@
                                             Lv <?php echo htmlspecialchars($course['course_nvq_level']); ?>
                                         </span>
                                     </td>
+                                    <?php $cnt = $courseCounts[(string) ($course['course_id'] ?? '')] ?? ['modules' => 0, 'groups' => 0]; ?>
+                                    <td class="col-count"><span class="courses-chip courses-chip-count"><?php echo (int) $cnt['modules']; ?></span></td>
+                                    <td class="col-count"><span class="courses-chip courses-chip-count"><?php echo (int) $cnt['groups']; ?></span></td>
                                     <?php
                                     $courseStatus = $course['course_status'] ?? 'active';
                                     $chipClass = $courseStatus === 'active'
@@ -457,23 +493,39 @@
                                         </span>
                                     </td>
                                     <td class="col-actions courses-actions">
-                                        <?php if (isset($canEdit) && $canEdit): ?>
                                         <div class="btn-group btn-group-sm" role="group">
+                                            <a href="<?php echo APP_URL; ?>/courses/manage?id=<?php echo urlencode($course['course_id']); ?>"
+                                               class="btn btn-primary"
+                                               title="Manage modules and groups">
+                                                <i class="fas fa-layer-group"></i>
+                                            </a>
+                                        <?php if (isset($canEdit) && $canEdit): ?>
                                             <a href="<?php echo APP_URL; ?>/courses/edit?id=<?php echo urlencode($course['course_id']); ?>"
                                                class="btn btn-outline-primary"
                                                title="Edit Course">
                                                 <i class="fas fa-edit"></i>
                                             </a>
+                                            <?php
+                                            $inUse = ((int) ($cnt['enrollments'] ?? 0) > 0) || ((int) ($cnt['groups'] ?? 0) > 0);
+                                            $inUseMsg = 'Cannot delete: ' . (int) ($cnt['enrollments'] ?? 0) . ' student enrollment(s), '
+                                                . (int) ($cnt['groups'] ?? 0) . ' group(s). Set the course to Inactive instead.';
+                                            ?>
+                                            <?php if ($inUse): ?>
+                                            <span class="d-inline-block" tabindex="0" title="<?php echo htmlspecialchars($inUseMsg); ?>">
+                                                <button type="button" class="btn btn-outline-secondary" disabled style="pointer-events:none;border-top-left-radius:0;border-bottom-left-radius:0;">
+                                                    <i class="fas fa-lock"></i>
+                                                </button>
+                                            </span>
+                                            <?php else: ?>
                                             <a href="<?php echo APP_URL; ?>/courses/delete?id=<?php echo urlencode($course['course_id']); ?>"
                                                class="btn btn-outline-danger"
-                                               onclick="return confirm('Are you sure you want to delete this course?');"
+                                               onclick="return confirm('Delete this course and its modules? This cannot be undone.');"
                                                title="Delete Course">
                                                 <i class="fas fa-trash"></i>
                                             </a>
-                                        </div>
-                                        <?php else: ?>
-                                        <span class="text-muted small">View only</span>
+                                            <?php endif; ?>
                                         <?php endif; ?>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

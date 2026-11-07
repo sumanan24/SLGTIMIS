@@ -21,6 +21,11 @@ class CourseController extends Controller {
         }
         
         $departmentId = $this->get('department_id', '');
+
+        // Department-restricted roles (HOD / IN1-3) only get their own department
+        if ($this->isDepartmentScoped()) {
+            $departmentId = (string) $this->getUserDepartment();
+        }
         
         if (empty($departmentId)) {
             header('Content-Type: application/json');
@@ -58,10 +63,13 @@ class CourseController extends Controller {
         
         // Get user's department if user is HOD, IN1, IN2, or IN3
         $userDepartmentId = $this->getUserDepartment();
+        // Scoped = HOD / IN1-3, lecturers and department heads: own department only
+        $deptRestricted = $this->isDepartmentScoped();
         
         // Get filter parameters
         $filters = [
-            'department_id' => $userDepartmentId ? $userDepartmentId : $this->get('department_id', ''),
+            // A restricted user without a department must never fall back to "all departments"
+            'department_id' => $userDepartmentId ? $userDepartmentId : ($deptRestricted ? '__none__' : $this->get('department_id', '')),
             'nvq_level' => $this->get('nvq_level', ''),
             'search' => $this->get('search', ''),
             'course_status' => $this->get('course_status', ''),
@@ -85,8 +93,28 @@ class CourseController extends Controller {
         if ($userDepartmentId) {
             $dept = $departmentModel->getById($userDepartmentId);
             $departments = $dept ? [$dept] : [];
+        } elseif ($deptRestricted) {
+            $departments = [];
         } else {
             $departments = $departmentModel->getAll();
+        }
+
+        $courseCounts = $courseModel->getWorkspaceCounts(array_column($courses, 'course_id'));
+        $myDepartment = ($userDepartmentId && !empty($departments)) ? $departments[0] : null;
+        $departmentTotals = null;
+        if ($myDepartment) {
+            $allDeptCourses = $courseModel->getCoursesWithDepartment(['department_id' => $userDepartmentId]);
+            $deptCounts = $courseModel->getWorkspaceCounts(array_column($allDeptCourses, 'course_id'));
+            $departmentTotals = ['courses' => count($allDeptCourses), 'modules' => 0, 'groups' => 0, 'active' => 0];
+            foreach ($allDeptCourses as $dc) {
+                if (($dc['course_status'] ?? 'active') === 'active') {
+                    $departmentTotals['active']++;
+                }
+            }
+            foreach ($deptCounts as $dcCount) {
+                $departmentTotals['modules'] += $dcCount['modules'];
+                $departmentTotals['groups'] += $dcCount['groups'];
+            }
         }
         
         // Check if user is department-restricted or ADM for edit permissions
@@ -96,7 +124,7 @@ class CourseController extends Controller {
         $isDepartmentRestricted = $this->isDepartmentRestricted();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
-        $isHOD = $this->isHOD();
+        $isHOD = $this->isDepartmentManager();
         $uid = (int) $_SESSION['user_id'];
         $canEdit = AccessControl::can($uid, 'courses', 'edit');
         $canCreate = AccessControl::can($uid, 'courses', 'add');
@@ -117,6 +145,10 @@ class CourseController extends Controller {
                 'course_status' => $this->get('course_status', ''),
             ],
             'isHOD' => $isHOD,
+            'courseCounts' => $courseCounts,
+            'myDepartment' => $myDepartment,
+            'departmentTotals' => $departmentTotals,
+            'deptRestricted' => $deptRestricted,
             'canEdit' => $canEdit,
             'canCreate' => $canCreate,
             'message' => $_SESSION['message'] ?? null,
@@ -127,10 +159,148 @@ class CourseController extends Controller {
         return $this->view('courses/index', $data);
     }
     
+    /**
+     * Course workspace: one page to manage a course's versions, modules and groups.
+     * Department-restricted users (HOD / IN1-3) can only open courses of their own department.
+     */
+    public function manage() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        if (!$this->requireDepartmentAssigned('dashboard')) {
+            return;
+        }
+        if (!$this->requireModule('courses', 'view')) {
+            return;
+        }
+
+        $id = trim((string) $this->get('id', ''));
+        if ($id === '') {
+            $_SESSION['error'] = 'Course ID is required.';
+            $this->redirect('courses');
+            return;
+        }
+
+        $courseModel = $this->model('CourseModel');
+        $course = $courseModel->getById($id);
+        if (!$course) {
+            $_SESSION['error'] = 'Course not found.';
+            $this->redirect('courses');
+            return;
+        }
+
+        require_once BASE_PATH . '/models/UserModel.php';
+        require_once BASE_PATH . '/core/AccessControl.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        $userRole = $userModel->getUserRole($uid);
+        $isADM = ($userRole === 'ADM') || $userModel->isAdmin($uid);
+        $isHOD = $this->isDepartmentManager();
+        $deptRestricted = $this->isDepartmentRestricted();
+        $userDepartmentId = $this->getUserDepartment();
+
+        if ($this->isDepartmentScoped() && (!$userDepartmentId || ($course['department_id'] ?? '') !== $userDepartmentId)) {
+            $_SESSION['error'] = 'Access denied. You can only manage courses from your own department.';
+            $this->redirect('courses');
+            return;
+        }
+
+        // Versions (0 = default / unversioned)
+        $versionRows = $courseModel->getVersionsForCourse($id);
+        $versionNumbers = [];
+        foreach ($versionRows as $v) {
+            $versionNumbers[] = (int) ($v['version_no'] ?? 0);
+        }
+        $versionNumbers[] = 0;
+        $versionNumbers = array_values(array_unique($versionNumbers));
+        rsort($versionNumbers, SORT_NUMERIC);
+
+        $versionParam = $this->get('version', '');
+        $versionFilter = ($versionParam === '' || $versionParam === null || !in_array((int) $versionParam, $versionNumbers, true))
+            ? null
+            : (int) $versionParam;
+
+        $moduleModel = $this->model('ModuleModel');
+        $allModules = $moduleModel->getAllWithCourseFiltered(['course_id' => $id]);
+        $modules = $allModules;
+        if ($versionFilter !== null) {
+            $modules = array_values(array_filter($allModules, static fn($m) => (int) ($m['course_version'] ?? 0) === $versionFilter));
+        }
+
+        // Order by semester (unset last), then newest version first, then module id
+        $sortModules = static function (array $a, array $b): int {
+            $sa = ($a['semester'] ?? '') === '' || $a['semester'] === null ? PHP_INT_MAX : (int) $a['semester'];
+            $sb = ($b['semester'] ?? '') === '' || $b['semester'] === null ? PHP_INT_MAX : (int) $b['semester'];
+            return [$sa, -(int) ($a['course_version'] ?? 0), (string) $a['module_id']]
+                <=> [$sb, -(int) ($b['course_version'] ?? 0), (string) $b['module_id']];
+        };
+        usort($modules, $sortModules);
+
+        $canViewGroups = AccessControl::can($uid, 'groups', 'view');
+        $allGroups = [];
+        $groups = [];
+        if ($canViewGroups) {
+            $groupModel = $this->model('GroupModel');
+            $allGroups = $groupModel->getAllWithDetails(null, $id);
+            $groups = $allGroups;
+            if ($versionFilter !== null) {
+                $groups = array_values(array_filter($allGroups, static fn($g) => (int) ($g['course_version'] ?? 0) === $versionFilter));
+            }
+        }
+
+        $studentTotal = 0;
+        $creditTotal = 0.0;
+        foreach ($groups as $g) {
+            $studentTotal += (int) ($g['student_count'] ?? 0);
+        }
+        foreach ($modules as $m) {
+            $creditTotal += (float) ($m['credit'] ?? 0);
+        }
+
+        $moduleCountByVersion = [];
+        foreach ($allModules as $m) {
+            $ver = (int) ($m['course_version'] ?? 0);
+            $moduleCountByVersion[$ver] = ($moduleCountByVersion[$ver] ?? 0) + 1;
+        }
+        $groupCountByVersion = [];
+        foreach ($allGroups as $g) {
+            $ver = (int) ($g['course_version'] ?? 0);
+            $groupCountByVersion[$ver] = ($groupCountByVersion[$ver] ?? 0) + 1;
+        }
+
+        $data = [
+            'title' => 'Manage Course',
+            'page' => 'courses',
+            'course' => $course,
+            'versionNumbers' => $versionNumbers,
+            'versionFilter' => $versionFilter,
+            'moduleCountByVersion' => $moduleCountByVersion,
+            'groupCountByVersion' => $groupCountByVersion,
+            'modules' => $modules,
+            'groups' => $groups,
+            'studentTotal' => $studentTotal,
+            'creditTotal' => $creditTotal,
+            'canViewGroups' => $canViewGroups,
+            'canEditCourse' => AccessControl::can($uid, 'courses', 'edit'),
+            'canManageVersions' => $isHOD || $isADM,
+            'canEditModules' => $isADM || $deptRestricted || $isHOD,
+            'canDeleteModules' => $isADM || $isHOD,
+            'canManageGroups' => AccessControl::can($uid, 'groups', 'add'),
+            'message' => $_SESSION['message'] ?? null,
+            'error' => $_SESSION['error'] ?? null,
+        ];
+        unset($_SESSION['message'], $_SESSION['error']);
+        return $this->view('courses/manage', $data);
+    }
+
     public function create() {
         // Check authentication
         if (!isset($_SESSION['user_id'])) {
             $this->redirect('login');
+            return;
+        }
+        if (!$this->requireDepartmentAssigned('dashboard')) {
             return;
         }
         
@@ -139,7 +309,7 @@ class CourseController extends Controller {
         }
         
         // Get HOD's department if user is HOD
-        $hodDepartmentId = $this->getHODDepartment();
+        $hodDepartmentId = $this->getUserDepartment();
         
         $departmentModel = $this->model('DepartmentModel');
         
@@ -248,6 +418,9 @@ class CourseController extends Controller {
             $this->redirect('login');
             return;
         }
+        if (!$this->requireDepartmentAssigned('dashboard')) {
+            return;
+        }
         
         if (!$this->requireModule('courses', 'edit')) {
             return;
@@ -261,7 +434,7 @@ class CourseController extends Controller {
         }
         
         // Get HOD's department if user is HOD
-        $hodDepartmentId = $this->getHODDepartment();
+        $hodDepartmentId = $this->getUserDepartment();
         
         $courseModel = $this->model('CourseModel');
         $course = $courseModel->getById($id);
@@ -362,9 +535,12 @@ class CourseController extends Controller {
             $this->redirect('login');
             return;
         }
+        if (!$this->requireDepartmentAssigned('dashboard')) {
+            return;
+        }
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
-        $isHOD = $this->isHOD();
+        $isHOD = $this->isDepartmentManager();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
         if (!$isHOD && !$isADM) {
@@ -385,7 +561,7 @@ class CourseController extends Controller {
             $this->redirect('courses');
             return;
         }
-        $hodDepartmentId = $this->getHODDepartment();
+        $hodDepartmentId = $this->getUserDepartment();
         if ($hodDepartmentId && isset($course['department_id']) && $course['department_id'] !== $hodDepartmentId) {
             $_SESSION['error'] = 'Access denied. You can only manage versions for courses in your department.';
             $this->redirect('courses');
@@ -409,9 +585,12 @@ class CourseController extends Controller {
             $this->redirect('login');
             return;
         }
+        if (!$this->requireDepartmentAssigned('dashboard')) {
+            return;
+        }
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
-        $isHOD = $this->isHOD();
+        $isHOD = $this->isDepartmentManager();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isADM = ($userRole === 'ADM') || $userModel->isAdmin($_SESSION['user_id']);
         if (!$isHOD && !$isADM) {
@@ -433,7 +612,7 @@ class CourseController extends Controller {
             $this->redirect('courses');
             return;
         }
-        $hodDepartmentId = $this->getHODDepartment();
+        $hodDepartmentId = $this->getUserDepartment();
         if ($hodDepartmentId && isset($course['department_id']) && $course['department_id'] !== $hodDepartmentId) {
             $_SESSION['error'] = 'Access denied. You can only manage versions for courses in your department.';
             $this->redirect('courses');
@@ -454,6 +633,9 @@ class CourseController extends Controller {
             $this->redirect('login');
             return;
         }
+        if (!$this->requireDepartmentAssigned('dashboard')) {
+            return;
+        }
         
         if (!$this->requireModule('courses', 'delete')) {
             return;
@@ -467,7 +649,7 @@ class CourseController extends Controller {
         }
         
         // Get HOD's department if user is HOD
-        $hodDepartmentId = $this->getHODDepartment();
+        $hodDepartmentId = $this->getUserDepartment();
         
         $courseModel = $this->model('CourseModel');
         $course = $courseModel->getById($id);
@@ -488,9 +670,18 @@ class CourseController extends Controller {
         // Store old values for logging
         $oldValues = $course;
         
+        // A course in use cannot be deleted: its students / groups would lose their course.
+        $deps = $courseModel->getDependencyCounts($id);
+        if ($deps['enrollments'] > 0 || $deps['groups'] > 0) {
+            $_SESSION['error'] = 'This course cannot be deleted: it has ' . $deps['enrollments'] . ' student enrollment(s) and '
+                . $deps['groups'] . ' group(s). Set its status to Inactive instead.';
+            $this->redirect('courses');
+            return;
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            // Delete course
-            $result = $courseModel->deleteCourse($id);
+            // Delete course (its unused modules and versions go with it)
+            $result = $courseModel->deleteCourseWithContent($id);
             
             if ($result) {
                 // Log activity

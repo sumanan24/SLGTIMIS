@@ -19,10 +19,16 @@ class DashboardController extends Controller {
             return;
         }
         
-        // Redirect HOD, IN1, IN2, IN3 users to their dedicated department dashboard
-        if ($this->isDepartmentRestricted()) {
+        // HOD, instructors and lecturers only see their own department
+        require_once BASE_PATH . '/models/UserModel.php';
+        if ($this->isDepartmentRestricted() || (new UserModel())->usesDepartmentDashboard((int) $_SESSION['user_id'])) {
             $this->redirect('hod/dashboard');
             return;
+        }
+
+        // Finance staff (FIN / ACC) only see finance-related items
+        if ((new UserModel())->usesFinanceDashboard((int) $_SESSION['user_id'])) {
+            return $this->financeDashboard();
         }
         
         try {
@@ -110,6 +116,26 @@ class DashboardController extends Controller {
                 ]);
             }
         }
+    }
+
+    private function financeDashboard() {
+        require_once BASE_PATH . '/core/AccessControl.php';
+        $uid = (int) $_SESSION['user_id'];
+        $data = [
+            'title' => 'Finance Dashboard',
+            'page' => 'dashboard',
+            'user_name' => $_SESSION['user_name'] ?? 'User',
+            'canManagePayments' => AccessControl::can($uid, 'payments', 'add'),
+            'canViewPayments' => AccessControl::can($uid, 'payments', 'view'),
+            'error' => null,
+        ];
+        try {
+            $data += $this->model('PaymentModel')->getFinanceDashboard();
+        } catch (Throwable $e) {
+            error_log('DashboardController::financeDashboard: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+            $data['error'] = 'Unable to load the finance figures right now.';
+        }
+        return $this->view('dashboard/finance', $data);
     }
 
     /**

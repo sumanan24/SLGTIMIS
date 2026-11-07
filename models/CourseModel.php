@@ -314,6 +314,48 @@ class CourseModel extends Model {
     }
     
     /**
+     * Module and group counts per course (for the course list / workspace).
+     *
+     * @param list<string> $courseIds
+     * @return array<string, array{modules:int, groups:int, enrollments:int}>
+     */
+    public function getWorkspaceCounts(array $courseIds): array {
+        $courseIds = array_values(array_unique(array_filter(array_map('strval', $courseIds), static fn($v) => $v !== '')));
+        $out = [];
+        foreach ($courseIds as $id) {
+            $out[$id] = ['modules' => 0, 'groups' => 0, 'enrollments' => 0];
+        }
+        if (empty($courseIds)) {
+            return $out;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($courseIds), '?'));
+        $types = str_repeat('s', count($courseIds));
+        $queries = [
+            'modules' => "SELECT course_id, COUNT(*) AS n FROM `module` WHERE course_id IN ({$placeholders}) GROUP BY course_id",
+            'groups' => "SELECT course_id, COUNT(*) AS n FROM `groups` WHERE course_id IN ({$placeholders}) GROUP BY course_id",
+            'enrollments' => "SELECT course_id, COUNT(*) AS n FROM `student_enroll` WHERE course_id IN ({$placeholders}) GROUP BY course_id",
+        ];
+        foreach ($queries as $key => $sql) {
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                continue;
+            }
+            $stmt->bind_param($types, ...$courseIds);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            while ($res && ($row = $res->fetch_assoc())) {
+                $cid = (string) $row['course_id'];
+                if (isset($out[$cid])) {
+                    $out[$cid][$key] = (int) $row['n'];
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Get all courses
      */
     public function getAll() {
@@ -388,6 +430,54 @@ class CourseModel extends Model {
      */
     public function deleteCourse($id) {
         return $this->delete($id);
+    }
+
+    /**
+     * What still depends on a course: student enrollments, groups, modules.
+     *
+     * @return array{enrollments:int, groups:int, modules:int}
+     */
+    public function getDependencyCounts($courseId): array {
+        $out = ['enrollments' => 0, 'groups' => 0, 'modules' => 0];
+        $queries = [
+            'enrollments' => "SELECT COUNT(*) AS n FROM `student_enroll` WHERE course_id = ?",
+            'groups' => "SELECT COUNT(*) AS n FROM `groups` WHERE course_id = ?",
+            'modules' => "SELECT COUNT(*) AS n FROM `module` WHERE course_id = ?",
+        ];
+        foreach ($queries as $key => $sql) {
+            try {
+                $stmt = $this->db->prepare($sql);
+                if (!$stmt) {
+                    continue;
+                }
+                $stmt->bind_param('s', $courseId);
+                $stmt->execute();
+                $row = $stmt->get_result()->fetch_assoc();
+                $out[$key] = (int) ($row['n'] ?? 0);
+            } catch (Throwable $e) {
+                // table missing: nothing depends on it
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Delete a course together with its (unused) modules and versions.
+     */
+    public function deleteCourseWithContent($courseId): bool {
+        $this->ensureCourseVersionTable();
+        foreach (["DELETE FROM `module` WHERE course_id = ?", "DELETE FROM `{$this->courseVersionTable}` WHERE course_id = ?"] as $sql) {
+            try {
+                $stmt = $this->db->prepare($sql);
+                if ($stmt) {
+                    $stmt->bind_param('s', $courseId);
+                    $stmt->execute();
+                }
+            } catch (Throwable $e) {
+                error_log('CourseModel::deleteCourseWithContent - ' . $e->getMessage());
+            }
+        }
+        return (bool) $this->delete($courseId);
     }
     
     /**

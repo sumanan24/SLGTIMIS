@@ -31,7 +31,7 @@ return [
     ],
     'staff_roles' => [
         'label' => 'Staff Roles',
-        'prefixes' => ['staff-roles'],
+        'prefixes' => ['staff-roles', 'staff-types'],
         'sort' => 60,
     ],
     'departments' => [

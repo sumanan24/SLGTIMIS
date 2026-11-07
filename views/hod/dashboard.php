@@ -752,6 +752,12 @@
                 <div class="flex-grow-1">
                     <h1 class="mb-2">Welcome, <?php echo htmlspecialchars($user_name ?? 'User'); ?>!</h1>
                     <p class="mb-2">Department Dashboard - Viewing your department's statistics</p>
+                    <?php
+                    require_once BASE_PATH . '/models/UserModel.php';
+                    $dashHeaded = (new UserModel())->getHeadedDepartments((int) ($_SESSION['user_id'] ?? 0));
+                    foreach ($dashHeaded as $dh): ?>
+                        <p class="mb-2"><i class="fas fa-user-tie me-2"></i><strong>Head of Department</strong> &mdash; <?php echo htmlspecialchars($dh['department_name']); ?><?php echo $dh['head_type_label'] !== '' ? ' (' . htmlspecialchars($dh['head_type_label']) . ')' : ''; ?></p>
+                    <?php endforeach; ?>
                     <?php if (!empty($department)): ?>
                     <div class="mt-2">
                         <span class="department-badge">

@@ -37,6 +37,8 @@ class View {
             $layoutFile = BASE_PATH . '/views/layouts/print_label.php';
         } elseif (!empty($this->data['use_print_layout'])) {
             $layoutFile = BASE_PATH . '/views/layouts/print.php';
+        } elseif (!empty($this->data['use_bare_layout'])) {
+            $layoutFile = BASE_PATH . '/views/layouts/bare.php';
         } elseif (!empty($this->data['use_public_layout'])) {
             $layoutFile = BASE_PATH . '/views/layouts/public.php';
         } elseif (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student') {

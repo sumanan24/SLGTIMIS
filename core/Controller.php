@@ -150,9 +150,16 @@ class Controller {
             return null;
         }
         
-        // HOD: use existing method
+        // HOD: use existing method (fall back to the department they are assigned to head)
         if ($userRole === 'HOD') {
-            return $userModel->getHODDepartment($_SESSION['user_id']);
+            return $userModel->getHODDepartment($_SESSION['user_id'])
+                ?: ($userModel->getHeadedDepartmentId($_SESSION['user_id']) ?: $userModel->getStaffDepartmentId($_SESSION['user_id']));
+        }
+
+        // Lecturers: their own department, or the one they head
+        if (in_array($userRole, self::LECTURER_ROLES, true)) {
+            return $userModel->getStaffDepartmentId($_SESSION['user_id'])
+                ?: $userModel->getHeadedDepartmentId($_SESSION['user_id']);
         }
         
         // IN1, IN2, IN3: get department from staff table
@@ -166,8 +173,61 @@ class Controller {
             $staff = $staffModel->find($user['user_name']);
             return $staff ? ($staff['department_id'] ?? null) : null;
         }
+
+        // Anyone else who is the assigned head of a department sees that department only
+        // (institute-wide roles such as DIR / REG / FIN keep their full view).
+        if (!in_array($userRole, self::INSTITUTE_WIDE_ROLES, true)) {
+            return $userModel->getHeadedDepartmentId($_SESSION['user_id']);
+        }
         
         return null;
+    }
+
+    /** Lecturer positions: their data views are limited to their own department. */
+    const LECTURER_ROLES = ['LE1', 'LE2', 'SLE'];
+    /** Positions that always see every department. */
+    const INSTITUTE_WIDE_ROLES = ['ADM', 'DIR', 'DPI', 'DPA', 'REG', 'SAO', 'FIN', 'ACC', 'HRO', 'MHF', 'EXAM'];
+
+    /**
+     * HOD, or the staff member assigned as head of a department: may manage (CRUD) the
+     * courses and modules of their OWN department (see getUserDepartment()).
+     */
+    protected function isDepartmentManager(): bool {
+        if (!isset($_SESSION['user_id'])) {
+            return false;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $role = $userModel->getUserRole($_SESSION['user_id']);
+        if ($role === 'HOD') {
+            return true;
+        }
+        return !in_array($role, self::INSTITUTE_WIDE_ROLES, true)
+            && $userModel->getHeadedDepartmentId($_SESSION['user_id']) !== null;
+    }
+
+    /**
+     * True when the current user's data views must be limited to one department:
+     * HOD / IN1-3, lecturers, and assigned department heads. (Write rights are not implied.)
+     */
+    protected function isDepartmentScoped(): bool {
+        if (!isset($_SESSION['user_id'])) {
+            return false;
+        }
+        if ($this->isDepartmentRestricted()) {
+            return true;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        if ($userModel->isAdmin($_SESSION['user_id'])) {
+            return false;
+        }
+        $role = $userModel->getUserRole($_SESSION['user_id']);
+        if (in_array($role, self::LECTURER_ROLES, true)) {
+            return true;
+        }
+        return !in_array($role, self::INSTITUTE_WIDE_ROLES, true)
+            && $userModel->getHeadedDepartmentId($_SESSION['user_id']) !== null;
     }
     
     /**
@@ -183,6 +243,47 @@ class Controller {
         return $userModel->isHOD($_SESSION['user_id']);
     }
     
+    /**
+     * HOD / IN1-3 without a department on their account must never fall back to "all departments".
+     * Returns false (after redirecting with a message) in that case.
+     */
+    protected function requireDepartmentAssigned(string $redirect = 'dashboard'): bool {
+        if ($this->isDepartmentScoped() && !$this->getUserDepartment()) {
+            $_SESSION['error'] = 'Your account has no department assigned. Please contact the administrator.';
+            $this->redirect($redirect);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Whether the current user may open a student's record.
+     * Department-restricted users (HOD, IN1-3) only see students enrolled in a course of their own department.
+     * Everyone else is not restricted here (module permissions still apply).
+     */
+    protected function canAccessStudentRecord($studentId): bool {
+        if (!$this->isDepartmentScoped()) {
+            return true;
+        }
+        $deptId = $this->getUserDepartment();
+        $studentId = trim((string) $studentId);
+        if (!$deptId || $studentId === '') {
+            return false;
+        }
+        $stmt = Database::getInstance()->prepare(
+            "SELECT 1 FROM `student_enroll` se
+             INNER JOIN `course` c ON c.course_id = se.course_id
+             WHERE se.student_id = ? AND c.department_id = ? LIMIT 1"
+        );
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param('ss', $studentId, $deptId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        return $res && $res->num_rows > 0;
+    }
+
     /**
      * Check if user is HOD, IN1, IN2, or IN3 (department-restricted roles)
      */

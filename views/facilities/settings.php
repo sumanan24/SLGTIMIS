@@ -1,37 +1,11 @@
 <?php require BASE_PATH . '/views/facilities/partials/helpers.php'; ?>
 <div class="container-fluid px-0 fac-page">
     <div class="card border-0">
-        <div class="card-header"><h5 class="fw-bold mb-0">Maintenance settings</h5></div>
+        <?php $facHeader('Ticket Settings', 'Completion time for each priority and escalation rules.'); ?>
         <div class="card-body">
             <?php $facNav(); $facFlash(); ?>
-            <p class="fac-help">Choose who receives each category. Leave a person blank to use the head of the matching department, or the Facility Officer when no head is found.</p>
+            <p class="fac-help">Set how long each priority is given to finish, and when unassigned or overdue tickets are escalated. To choose who receives each category, use <a href="<?php echo $base; ?>/officers">Assign Officers</a>.</p>
             <form method="post" action="<?php echo $base; ?>/settings/save">
-                <div class="fac-section">
-                    <h6>Category routing</h6>
-                    <div class="fac-table-wrap">
-                        <table class="table table-sm mb-0">
-                            <thead><tr><th>Category</th><th>Routes to</th><th>Specific officer</th></tr></thead>
-                            <tbody>
-                            <?php foreach ($routes as $route): ?>
-                                <tr>
-                                    <td><?php echo $h($route['category_name']); ?></td>
-                                    <td><?php echo $h($labels['routes'][$route['route_key']] ?? $route['route_key']); ?></td>
-                                    <td>
-                                        <select class="form-select form-select-sm" name="route_staff[<?php echo (int) $route['category_id']; ?>]">
-                                            <option value="">Automatic</option>
-                                            <?php foreach ($staff_options as $staff): ?>
-                                                <option value="<?php echo $h($staff['staff_id']); ?>" <?php echo ((string) ($route['staff_id'] ?? '') === (string) $staff['staff_id']) ? 'selected' : ''; ?>>
-                                                    <?php echo $h($staff['staff_name'] . ' (' . $staff['staff_id'] . ')'); ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
                 <div class="fac-section">
                     <h6>Expected completion (days)</h6>
                     <div class="row g-2">

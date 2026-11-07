@@ -25,7 +25,7 @@ class HODDashboardController extends Controller {
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $allowedRoles = ['HOD', 'IN1', 'IN2', 'IN3', 'FIN', 'ACC', 'DIR', 'REG'];
+        $allowedRoles = ['HOD', 'IN1', 'IN2', 'IN3', 'LE1', 'LE2', 'SLE', 'FIN', 'ACC', 'DIR', 'REG'];
         
         if (!in_array($userRole, $allowedRoles)) {
             $_SESSION['error'] = 'Access denied. This dashboard is only available for authorized roles.';
@@ -37,6 +37,10 @@ class HODDashboardController extends Controller {
             // Get user's department (for HOD, IN1, IN2, or IN3)
             // FIN, ACC, DIR, REG may not have a department
             $userDepartmentId = $this->getUserDepartment();
+            if (!$userDepartmentId && in_array($userRole, ['LE1', 'LE2', 'SLE'], true)) {
+                // Lecturers: use the department on their own staff record
+                $userDepartmentId = $userModel->getStaffDepartmentId((int) $_SESSION['user_id']);
+            }
             $department = null;
             
             // Load models

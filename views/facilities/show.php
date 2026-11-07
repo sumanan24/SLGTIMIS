@@ -6,10 +6,7 @@ $place = trim(($t['building'] ?? '') . ' ' . ($t['floor'] ?? '') . ' ' . ($t['ro
 ?>
 <div class="container-fluid px-0 fac-page">
     <div class="card border-0">
-        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h5 class="fw-bold mb-0"><?php echo $h($t['ticket_number']); ?></h5>
-            <div><?php echo $badgeStatus($t['status']); ?> <?php echo $badgePriority($t['current_priority']); ?></div>
-        </div>
+        <?php $facHeader($t['ticket_number'], (string) $t['title'], $badgeStatus($t['status']) . ' ' . $badgePriority($t['current_priority'])); ?>
         <div class="card-body">
             <?php $facNav(); $facFlash(); ?>
 

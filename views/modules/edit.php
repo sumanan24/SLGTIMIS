@@ -23,7 +23,7 @@
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     <?php endif; ?>
-                    <form method="POST" action="<?php echo APP_URL; ?>/modules/edit?course_id=<?php echo urlencode($mod['course_id'] ?? ''); ?>&module_id=<?php echo urlencode($mod['module_id'] ?? ''); ?>&course_version=<?php echo $ver; ?>" id="moduleEditForm">
+                    <form method="POST" action="<?php echo APP_URL; ?>/modules/edit?course_id=<?php echo urlencode($mod['course_id'] ?? ''); ?>&module_id=<?php echo urlencode($mod['module_id'] ?? ''); ?>&course_version=<?php echo $ver; ?><?php echo (($_GET['return_course'] ?? '') === '1') ? '&return_course=1' : ''; ?>" id="moduleEditForm">
                         <div class="mb-3">
                             <label class="form-label fw-semibold text-muted">Course</label>
                             <input type="text" class="form-control" value="<?php echo htmlspecialchars(($mod['course_name'] ?? '') . ' (' . ($mod['course_id'] ?? '') . ')'); ?>" disabled>
@@ -56,7 +56,7 @@
                         </div>
                         <div class="d-flex gap-2 mt-4">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save</button>
-                            <a href="<?php echo APP_URL; ?>/modules" class="btn btn-outline-secondary"><i class="fas fa-times me-1"></i>Cancel</a>
+                            <a href="<?php echo (($_GET['return_course'] ?? '') === '1') ? APP_URL . '/courses/manage?id=' . urlencode((string) ($mod['course_id'] ?? '')) . '&version=' . (int) $ver : APP_URL . '/modules'; ?>" class="btn btn-outline-secondary"><i class="fas fa-times me-1"></i>Cancel</a>
                         </div>
                     </form>
                 </div>

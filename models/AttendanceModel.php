@@ -364,8 +364,26 @@ class AttendanceModel extends Model {
         $allowanceTierHigh = ($reportYm >= '2026-01') ? 7500 : 5000;
         $allowanceTierMid = ($reportYm >= '2026-01') ? 6000 : 4000;
         
+        // Attendance source: manual (default, marked by staff), finger (biometric device) or both (either counts)
+        $source = $filters['source'] ?? 'manual';
+        if (!in_array($source, ['manual', 'finger', 'both'], true)) {
+            $source = 'manual';
+        }
+        $includeFinger = !empty($filters['include_finger']) || $source !== 'manual';
+
+        $baseRows = [];
+        while ($r = $result->fetch_assoc()) {
+            $baseRows[] = $r;
+        }
+
+        $fingerMap = [];
+        if ($includeFinger && !empty($baseRows)) {
+            $fingerMap = $this->getFingerDayMap(array_column($baseRows, 'student_id'), $startDate, $endDate);
+        }
+        $today = date('Y-m-d');
+
         $students = [];
-        while ($row = $result->fetch_assoc()) {
+        foreach ($baseRows as $row) {
             $studentId = $row['student_id'];
             
             // Get attendance records for this student
@@ -397,20 +415,61 @@ class AttendanceModel extends Model {
             $presentDays = 0;
             $holidayDays = 0;
             
+            $fingerByDay = [];
+            $fingerPresentDays = 0;
+            $fingerLateDays = 0;
+
             foreach ($workingDaysList as $day) {
                 $date = $day['date'];
                 $status = $attendanceRecords[$date] ?? null;
-                
+
+                // Finger (device) status for this day: P present, L late/incomplete, '' no punch
+                $fingerMark = '';
+                if ($includeFinger) {
+                    $fingerMark = $fingerMap[$studentId][$date] ?? '';
+                    if ($fingerMark === 'P' && $status != -1) {
+                        $fingerPresentDays++;
+                    } elseif ($fingerMark === 'L' && $status != -1) {
+                        $fingerLateDays++;
+                    }
+                    $fingerByDay[$date] = $fingerMark;
+                }
+
                 if ($status == -1) {
                     $holidayDays++;
-                    $dayByDayAttendance[$date] = 'H'; // Holiday
-                } elseif ($status == 1) {
-                    $presentDays++;
-                    $dayByDayAttendance[$date] = 'P'; // Present
-                } elseif ($status === 0) {
-                    $dayByDayAttendance[$date] = 'A'; // Absent
+                    $dayByDayAttendance[$date] = 'H'; // Holiday (always from the manual calendar)
+                    continue;
+                }
+
+                if ($source === 'finger') {
+                    if ($fingerMark === 'P') {
+                        $presentDays++;
+                        $dayByDayAttendance[$date] = 'P';
+                    } elseif ($fingerMark === 'L') {
+                        $dayByDayAttendance[$date] = 'L';
+                    } else {
+                        $dayByDayAttendance[$date] = ($date <= $today) ? 'A' : '';
+                    }
+                } elseif ($source === 'both') {
+                    if ($status == 1 || $fingerMark === 'P') {
+                        $presentDays++;
+                        $dayByDayAttendance[$date] = 'P';
+                    } elseif ($status === 0) {
+                        $dayByDayAttendance[$date] = 'A';
+                    } elseif ($fingerMark === 'L') {
+                        $dayByDayAttendance[$date] = 'L';
+                    } else {
+                        $dayByDayAttendance[$date] = '';
+                    }
                 } else {
-                    $dayByDayAttendance[$date] = ''; // Not marked
+                    if ($status == 1) {
+                        $presentDays++;
+                        $dayByDayAttendance[$date] = 'P'; // Present
+                    } elseif ($status === 0) {
+                        $dayByDayAttendance[$date] = 'A'; // Absent
+                    } else {
+                        $dayByDayAttendance[$date] = ''; // Not marked
+                    }
                 }
             }
             
@@ -457,6 +516,13 @@ class AttendanceModel extends Model {
             $row['allowance'] = $allowance;
             $row['day_by_day'] = $dayByDayAttendance;
             $row['all_days'] = $workingDaysList;
+            $row['finger_by_day'] = $fingerByDay;
+            $row['finger_present_days'] = $fingerPresentDays;
+            $row['finger_late_days'] = $fingerLateDays;
+            $row['finger_percentage'] = ($effectiveWorkingDays > 0)
+                ? round(($fingerPresentDays / $effectiveWorkingDays) * 100, 2)
+                : 0;
+            $row['attendance_source'] = $source;
             
             $students[] = self::formatStudentDisplayNames($row);
         }
@@ -464,6 +530,56 @@ class AttendanceModel extends Model {
         $stmt->close();
         
         return $students;
+    }
+
+    /**
+     * Finger (biometric device) attendance per student per day.
+     * Uses the existing In/Out rule: In on/before 08:40 and Out on/after 16:00 = present ('P');
+     * any other punches = late / incomplete ('L'); no punches = no entry.
+     *
+     * @param array $studentIds
+     * @return array<string, array<string, string>> [student_id => [Y-m-d => 'P'|'L']]
+     */
+    public function getFingerDayMap(array $studentIds, $startDate, $endDate): array {
+        $studentIds = array_values(array_unique(array_filter(array_map('strval', $studentIds), 'strlen')));
+        if (empty($studentIds)) {
+            return [];
+        }
+
+        $conn = $this->db->getConnection();
+        $exists = $conn->query("SHOW TABLES LIKE 'student_attendance'");
+        if (!$exists || $exists->num_rows === 0) {
+            return [];
+        }
+
+        require_once BASE_PATH . '/models/StudentDeviceAttendanceModel.php';
+
+        $map = [];
+        foreach (array_chunk($studentIds, 500) as $chunk) {
+            $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+            $sql = "SELECT `student_id`, `attendance_date`,
+                           GROUP_CONCAT(`attendance_time` ORDER BY `attendance_time` ASC SEPARATOR ',') AS times_csv
+                    FROM `student_attendance`
+                    WHERE `student_id` IN ({$placeholders}) AND `attendance_date` >= ? AND `attendance_date` <= ?
+                    GROUP BY `student_id`, `attendance_date`";
+            $stmt = $conn->prepare($sql);
+            if (!$stmt) {
+                error_log('AttendanceModel::getFingerDayMap - Prepare failed: ' . $conn->error);
+                continue;
+            }
+            $params = array_merge($chunk, [$startDate, $endDate]);
+            $stmt->bind_param(str_repeat('s', count($params)), ...$params);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            while ($r = $res->fetch_assoc()) {
+                $split = StudentDeviceAttendanceModel::splitDayTimes(explode(',', (string) $r['times_csv']));
+                $class = StudentDeviceAttendanceModel::classifyDayStatus($split['in'], $split['out'], $split['others']);
+                $map[$r['student_id']][$r['attendance_date']] = ($class['status'] === 'present') ? 'P' : 'L';
+            }
+            $stmt->close();
+        }
+
+        return $map;
     }
     
     /**

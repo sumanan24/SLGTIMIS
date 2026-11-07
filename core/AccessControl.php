@@ -134,7 +134,11 @@ class AccessControl {
                     'can_delete' => $isAdm ? 1 : 0,
                 ];
             case 'courses':
-                $manageCourses = $isAdm || $isHod;
+                // ADM, HOD and the assigned head of a department (limited to their own department
+                // by CourseController) can add / edit / delete courses.
+                $isDeptHead = !in_array($role, ['DIR', 'DPI', 'DPA', 'REG', 'SAO', 'FIN', 'ACC', 'HRO', 'MHF', 'EXAM'], true)
+                    && $userModel->getHeadedDepartmentId($userId) !== null;
+                $manageCourses = $isAdm || $isHod || $isDeptHead;
                 return [
                     'can_view' => !$isSao ? 1 : 0,
                     'can_add' => $manageCourses ? 1 : 0,
@@ -328,11 +332,31 @@ class AccessControl {
                 return true;
             }
         }
+        // Staff may open their own personal file. StaffController limits what they can change.
+        if (self::isOwnStaffFileRequest($norm)) {
+            return true;
+        }
         $mapped = self::mapUri($uri);
         if ($mapped === null) {
             return true;
         }
         return self::can((int) $_SESSION['user_id'], $mapped['module'], $mapped['action']);
+    }
+
+    /**
+     * True when a staff login requests its OWN personal file (staff/edit or staff/file/*).
+     * Mirrors how StaffController reads the target id (GET id, then POST staff_id).
+     */
+    private static function isOwnStaffFileRequest($norm) {
+        if ($norm !== 'staff/edit' && strpos($norm, 'staff/file/') !== 0) {
+            return false;
+        }
+        if (($_SESSION['user_table'] ?? '') !== 'staff') {
+            return false;
+        }
+        $own = (string) ($_SESSION['user_name'] ?? '');
+        $target = trim((string) ($_GET['id'] ?? $_POST['staff_id'] ?? ''));
+        return $own !== '' && $target !== '' && hash_equals($own, $target);
     }
 
     public static function denyAndRedirect() {

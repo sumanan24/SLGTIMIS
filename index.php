@@ -119,6 +119,10 @@ if (!in_array($uri, $publicNoTimeoutUris, true)) {
 if (isset($_SESSION['user_id']) && ($_SESSION['user_table'] ?? '') === 'student') {
     require_once BASE_PATH . '/helpers/StudentPortalGuard.php';
     StudentPortalGuard::enforce($uri);
+} elseif (isset($_SESSION['user_id'])) {
+    // Staff / other accounts: force a new password after creation or a reset to the default.
+    require_once BASE_PATH . '/helpers/StaffPasswordGuard.php';
+    StaffPasswordGuard::enforce($uri);
 }
 
 // Create router and dispatch

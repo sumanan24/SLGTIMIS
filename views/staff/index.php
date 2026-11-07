@@ -142,7 +142,7 @@ $firstShown = ($currentPage - 1) * $perPage + 1;
 .sti-table col.c-person { width: auto; }
 .sti-table col.c-finger { width: 100px; }
 .sti-table col.c-dept { width: 21%; }
-.sti-table col.c-pos { width: 130px; }
+.sti-table col.c-pos { width: 19%; }
 .sti-table col.c-status { width: 120px; }
 .sti-table col.c-actions { width: 104px; }
 .sti-table th.c-no, .sti-table td.c-no { text-align: center; color: var(--sti-muted); font-variant-numeric: tabular-nums; }
@@ -191,9 +191,8 @@ $firstShown = ($currentPage - 1) * $perPage + 1;
     border-radius: 6px;
     background: #eff6ff;
     color: #1d4ed8;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
+    font-size: 0.8rem;
+    font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -371,7 +370,8 @@ $firstShown = ($currentPage - 1) * $perPage + 1;
                             $isWorking = ($member['staff_status'] ?? '') === 'Working';
                             $finger = trim((string) ($member['finger_machine_no'] ?? ''));
                             $dept = trim((string) ($member['department_name'] ?? ''));
-                            $pos = trim((string) ($member['staff_position'] ?? ''));
+                            $posCode = trim((string) ($member['staff_position'] ?? ''));
+                            $pos = $posCode !== '' ? (string) (($positionNames ?? [])[$posCode] ?? $posCode) : '';
                             ?>
                             <tr>
                                 <td class="c-no"><?php echo $firstShown + $i; ?></td>

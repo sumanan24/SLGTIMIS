@@ -4,7 +4,7 @@ $id = (int) $t['id'];
 ?>
 <div class="container-fluid px-0 fac-page">
     <div class="card border-0">
-        <div class="card-header"><h5 class="fw-bold mb-0">Check completed work</h5></div>
+        <?php $facHeader('Check Completed Work', 'Confirm the work is done before the ticket is closed.'); ?>
         <div class="card-body">
             <?php $facNav(); $facFlash(); ?>
             <p><?php echo $badgeStatus($t['status']); ?> <?php echo $badgePriority($t['current_priority']); ?></p>

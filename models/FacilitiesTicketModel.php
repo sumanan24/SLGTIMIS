@@ -6,6 +6,14 @@ class FacilitiesTicketModel extends Model {
     protected $table = 'facilities_tickets';
     private static $schemaReady = false;
 
+    /** Status groups used by the Pending / In Progress / Resolved / Closed ticket views. */
+    public const STATUS_GROUPS = [
+        'pending' => ['new', 'under_review', 'assigned', 'accepted', 'reopened', 'on_hold'],
+        'in_progress' => ['in_progress'],
+        'resolved' => ['completed_pending_verification', 'verified'],
+        'closed' => ['closed', 'cancelled', 'rejected'],
+    ];
+
     public function __construct() {
         parent::__construct();
         $this->ensureSchema();
@@ -399,6 +407,10 @@ class FacilitiesTicketModel extends Model {
             $params[] = $filters['date_to'];
             $types .= 's';
         }
+        if (!empty($filters['group']) && isset(self::STATUS_GROUPS[$filters['group']])) {
+            $quoted = array_map(static function ($s) { return "'" . $s . "'"; }, self::STATUS_GROUPS[$filters['group']]);
+            $where[] = 't.status IN (' . implode(',', $quoted) . ')';
+        }
         if (!empty($filters['overdue'])) {
             $where[] = "t.deadline IS NOT NULL AND t.deadline < CURDATE() AND t.status NOT IN ('closed','cancelled','rejected')";
         }
@@ -513,6 +525,7 @@ class FacilitiesTicketModel extends Model {
                     d.department_name,
                     COUNT(*) AS total,
                     SUM(t.status = 'closed') AS completed,
+                    SUM(t.status = 'in_progress') AS in_progress,
                     SUM(t.status NOT IN ('closed','cancelled','rejected')) AS pending,
                     SUM(t.deadline IS NOT NULL AND t.deadline < CURDATE() AND t.status NOT IN ('closed','cancelled','rejected')) AS overdue,
                     AVG(CASE WHEN t.closed_at IS NOT NULL THEN TIMESTAMPDIFF(HOUR, t.created_at, t.closed_at) END) AS avg_hours
@@ -661,9 +674,23 @@ class FacilitiesTicketModel extends Model {
         $stmt->execute();
     }
 
+    /**
+     * SQL condition (alias t = ticket) for tickets that concern one person:
+     * they raised it, are responsible for it, were routed it, or are/were assigned it (or assigned it).
+     * Uses six "?" placeholders, all bound to the same staff id.
+     */
+    private const RELATED_TICKET_SQL = "(t.requester_staff_id = ? OR t.responsible_staff_id = ? OR t.routed_staff_id = ?
+        OR EXISTS (SELECT 1 FROM `facilities_assignments` a WHERE a.ticket_id = t.id AND (a.staff_id = ? OR a.assigned_by = ?)))";
+
+    /** Notices for the logged-in person, only for tickets that are related to them. */
     public function notificationsFor(string $staffId, int $limit = 30): array {
-        $stmt = $this->db->prepare('SELECT * FROM `facilities_notifications` WHERE `staff_id` = ? ORDER BY `created_at` DESC LIMIT ?');
-        $stmt->bind_param('si', $staffId, $limit);
+        $sql = 'SELECT n.*, t.ticket_number, t.title AS ticket_title, t.status AS ticket_status
+                FROM `facilities_notifications` n
+                JOIN `facilities_tickets` t ON t.id = n.ticket_id
+                WHERE n.staff_id = ? AND ' . self::RELATED_TICKET_SQL . '
+                ORDER BY n.created_at DESC, n.id DESC LIMIT ?';
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param('ssssssi', $staffId, $staffId, $staffId, $staffId, $staffId, $staffId, $limit);
         $stmt->execute();
         $res = $stmt->get_result();
         $rows = [];
@@ -674,8 +701,12 @@ class FacilitiesTicketModel extends Model {
     }
 
     public function unreadCount(string $staffId): int {
-        $stmt = $this->db->prepare('SELECT COUNT(*) AS c FROM `facilities_notifications` WHERE `staff_id` = ? AND `is_read` = 0');
-        $stmt->bind_param('s', $staffId);
+        $sql = 'SELECT COUNT(*) AS c
+                FROM `facilities_notifications` n
+                JOIN `facilities_tickets` t ON t.id = n.ticket_id
+                WHERE n.staff_id = ? AND n.is_read = 0 AND ' . self::RELATED_TICKET_SQL;
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param('ssssss', $staffId, $staffId, $staffId, $staffId, $staffId, $staffId);
         $stmt->execute();
         return (int) ($stmt->get_result()->fetch_assoc()['c'] ?? 0);
     }
@@ -781,6 +812,7 @@ class FacilitiesTicketModel extends Model {
     }
 
     public function saveRouteStaff(int $categoryId, string $staffId): void {
+        $this->ensureRoute($categoryId);
         if ($staffId === '') {
             $stmt = $this->db->prepare('UPDATE `facilities_routes` SET `staff_id` = NULL WHERE `category_id` = ?');
             $stmt->bind_param('i', $categoryId);
@@ -790,6 +822,96 @@ class FacilitiesTicketModel extends Model {
         $stmt = $this->db->prepare('UPDATE `facilities_routes` SET `staff_id` = ? WHERE `category_id` = ?');
         $stmt->bind_param('si', $staffId, $categoryId);
         $stmt->execute();
+    }
+
+    /** Make sure a category has a routing row (default: Facility Officer). */
+    public function ensureRoute(int $categoryId, string $routeKey = 'facility_officer'): void {
+        $stmt = $this->db->prepare('INSERT IGNORE INTO `facilities_routes` (`category_id`, `route_key`) VALUES (?, ?)');
+        $stmt->bind_param('is', $categoryId, $routeKey);
+        $stmt->execute();
+    }
+
+    /** Every category (active or not) with its responsible person and usage counts. */
+    public function categoriesWithRoutes(): array {
+        $sql = 'SELECT c.*, r.route_key, r.staff_id, s.staff_name,
+                    (SELECT COUNT(*) FROM `facilities_tickets` t WHERE t.category_id = c.id) AS ticket_count,
+                    (SELECT COUNT(*) FROM `facilities_subcategories` sc WHERE sc.category_id = c.id) AS sub_count
+                FROM `facilities_categories` c
+                LEFT JOIN `facilities_routes` r ON r.category_id = c.id
+                LEFT JOIN `staff` s ON s.staff_id = r.staff_id
+                ORDER BY c.sort_order, c.name';
+        $res = $this->db->query($sql);
+        $rows = [];
+        while ($res && ($row = $res->fetch_assoc())) {
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
+    public function categoryByName(string $name, int $exceptId = 0): ?array {
+        $stmt = $this->db->prepare('SELECT * FROM `facilities_categories` WHERE LOWER(`name`) = LOWER(?) AND `id` <> ? LIMIT 1');
+        $stmt->bind_param('si', $name, $exceptId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
+    }
+
+    /** A slug that is not used by another category. */
+    public function uniqueCategorySlug(string $name, int $exceptId = 0): string {
+        $slug = strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', $name), '-'));
+        if ($slug === '') {
+            $slug = 'category-' . substr(md5($name), 0, 8);
+        }
+        $base = $slug;
+        $i = 2;
+        while (true) {
+            $stmt = $this->db->prepare('SELECT `id` FROM `facilities_categories` WHERE `slug` = ? AND `id` <> ? LIMIT 1');
+            $stmt->bind_param('si', $slug, $exceptId);
+            $stmt->execute();
+            if (!$stmt->get_result()->fetch_assoc()) {
+                return $slug;
+            }
+            $slug = $base . '-' . $i++;
+        }
+    }
+
+    public function categoryTicketCount(int $categoryId): int {
+        $stmt = $this->db->prepare('SELECT COUNT(*) AS c FROM `facilities_tickets` WHERE `category_id` = ?');
+        $stmt->bind_param('i', $categoryId);
+        $stmt->execute();
+        return (int) ($stmt->get_result()->fetch_assoc()['c'] ?? 0);
+    }
+
+    /** Delete a category that has no tickets, with its subcategories and routing row. */
+    public function deleteCategory(int $categoryId): bool {
+        if ($this->categoryTicketCount($categoryId) > 0) {
+            return false;
+        }
+        foreach (['DELETE FROM `facilities_subcategories` WHERE `category_id` = ?', 'DELETE FROM `facilities_routes` WHERE `category_id` = ?'] as $sql) {
+            $stmt = $this->db->prepare($sql);
+            $stmt->bind_param('i', $categoryId);
+            $stmt->execute();
+        }
+        $stmt = $this->db->prepare('DELETE FROM `facilities_categories` WHERE `id` = ?');
+        $stmt->bind_param('i', $categoryId);
+        return $stmt->execute();
+    }
+
+    /** Staff mobile number (staff_pno) or an empty string. */
+    public function staffPhone(string $staffId): string {
+        $stmt = $this->db->prepare('SELECT `staff_pno` FROM `staff` WHERE `staff_id` = ? LIMIT 1');
+        $stmt->bind_param('s', $staffId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return trim((string) ($row['staff_pno'] ?? ''));
+    }
+
+    public function staffDepartmentId(string $staffId): string {
+        $stmt = $this->db->prepare('SELECT `department_id` FROM `staff` WHERE `staff_id` = ? LIMIT 1');
+        $stmt->bind_param('s', $staffId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return (string) ($row['department_id'] ?? '');
     }
 
     public function findHodByDepartmentLike(array $likes): ?array {

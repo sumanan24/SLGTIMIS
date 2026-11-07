@@ -20,7 +20,7 @@
             <h1 class="h4 mb-1 fw-bold"><i class="fas fa-cubes text-primary me-2"></i>Modules</h1>
             <div class="text-muted small">Add a single module or import multiple modules from Excel.</div>
         </div>
-        <a href="<?php echo APP_URL; ?>/modules" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Back</a>
+        <a href="<?php echo (!empty($returnCourse) && ($preCourseId ?? '') !== '') ? APP_URL . '/courses/manage?id=' . urlencode($preCourseId) : APP_URL . '/modules'; ?>" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Back</a>
     </div>
 
     <?php if (isset($error)): ?>
@@ -49,13 +49,14 @@
             <div class="tab-content pt-3">
                 <div class="tab-pane fade show active" id="pane-single" role="tabpanel" aria-labelledby="tab-single">
                     <form method="POST" action="<?php echo APP_URL; ?>/modules/create" id="moduleCreateForm">
+                        <?php if (!empty($returnCourse)): ?><input type="hidden" name="return_course" value="1"><?php endif; ?>
                         <div class="row g-3">
                             <div class="col-md-8">
                                 <label for="course_id" class="form-label fw-semibold">Course <span class="req">*</span></label>
                                 <select class="form-select" id="course_id" name="course_id" required>
                                     <option value="">Select Course</option>
                                     <?php foreach ($courses as $c): ?>
-                                        <option value="<?php echo htmlspecialchars($c['course_id']); ?>">
+                                        <option value="<?php echo htmlspecialchars($c['course_id']); ?>"<?php echo (($preCourseId ?? '') !== '' && $c['course_id'] === $preCourseId) ? ' selected' : ''; ?>>
                                             <?php echo htmlspecialchars(($c['course_name'] ?? '') . ' (' . $c['course_id'] . ')'); ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -128,7 +129,7 @@
                                 <select class="form-select" id="import_course_id" name="course_id" required>
                                     <option value="">Select Course</option>
                                     <?php foreach ($courses as $c): ?>
-                                        <option value="<?php echo htmlspecialchars($c['course_id']); ?>">
+                                        <option value="<?php echo htmlspecialchars($c['course_id']); ?>"<?php echo (($preCourseId ?? '') !== '' && $c['course_id'] === $preCourseId) ? ' selected' : ''; ?>>
                                             <?php echo htmlspecialchars(($c['course_name'] ?? '') . ' (' . $c['course_id'] . ')'); ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -182,8 +183,12 @@
         });
         versionSelect.disabled = false;
     }
+    var preVersion = <?php echo json_encode(isset($preVersion) ? (string) $preVersion : ''); ?>;
     courseSelect.addEventListener('change', fillVersions);
-    if (courseSelect.value) fillVersions();
+    if (courseSelect.value) {
+        fillVersions();
+        if (preVersion !== '') versionSelect.value = preVersion;
+    }
 
     // Import form versions
     var importCourseSelect = document.getElementById('import_course_id');
@@ -207,7 +212,10 @@
     }
     if (importCourseSelect && importVersionSelect) {
         importCourseSelect.addEventListener('change', fillImportVersions);
-        if (importCourseSelect.value) fillImportVersions();
+        if (importCourseSelect.value) {
+            fillImportVersions();
+            if (preVersion !== '') importVersionSelect.value = preVersion;
+        }
     }
 })();
 </script>

@@ -30,6 +30,11 @@ class GroupController extends Controller {
             $this->redirect('dashboard');
             return false;
         }
+
+        // HOD / IN1-3 need a department; otherwise they would see every department
+        if (!$this->requireDepartmentAssigned('dashboard')) {
+            return false;
+        }
         
         return true;
     }
@@ -199,6 +204,8 @@ class GroupController extends Controller {
                 'departments' => $departments,
                 'academicYears' => $academicYears,
                 'courses' => [],
+                'preCourseId' => trim((string) $this->get('course_id', '')),
+                'preVersion' => $this->get('course_version', '') === '' ? null : (int) $this->get('course_version'),
                 'error' => $_SESSION['error'] ?? null
             ];
             unset($_SESSION['error']);

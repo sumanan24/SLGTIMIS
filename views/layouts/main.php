@@ -28,6 +28,22 @@
                     </div>
                     <div class="nav-right">
                         <div class="user-menu">
+                            <?php
+                            // Head of department: show which department(s) they head
+                            $headedDepartments = [];
+                            if (($_SESSION['user_table'] ?? '') === 'staff') {
+                                require_once BASE_PATH . '/models/UserModel.php';
+                                $headedDepartments = (new UserModel())->getHeadedDepartments((int) $_SESSION['user_id']);
+                            }
+                            $headedNames = implode(', ', array_map(static fn($d) => $d['department_name'], $headedDepartments));
+                            ?>
+                            <?php if (!empty($headedDepartments)): ?>
+                                <a href="<?php echo APP_URL; ?>/departments/view?id=<?php echo urlencode($headedDepartments[0]['department_id']); ?>"
+                                   class="hod-pill" title="Head of Department: <?php echo htmlspecialchars($headedNames); ?>">
+                                    <i class="fas fa-user-tie"></i>
+                                    <span class="hod-pill-text">Head of Department &middot; <?php echo htmlspecialchars($headedNames); ?></span>
+                                </a>
+                            <?php endif; ?>
                             <a href="<?php echo APP_URL; ?>/profile" class="profile-btn">
                                 <i class="fas fa-user"></i> <span class="profile-text">Profile</span>
                             </a>
@@ -49,11 +65,16 @@
                         <span class="user-name">
                                 <i class="fas fa-user-circle"></i> 
                                 <span class="user-name-text"><?php echo htmlspecialchars($_SESSION['user_name'] ?? 'User'); ?></span>
-                            </span>
-                            <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">
+                            </span>                            <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
+                        <?php if (!empty($headedDepartments)): ?>
+                            <a class="sidebar-hod" href="<?php echo APP_URL; ?>/departments/view?id=<?php echo urlencode($headedDepartments[0]['department_id']); ?>">
+                                <i class="fas fa-user-tie"></i>
+                                <span>Head of Department<b><?php echo htmlspecialchars($headedNames); ?></b></span>
+                            </a>
+                        <?php endif; ?>
                         <nav class="sidebar-nav">
                             <?php
                             // Get user role to determine menu access
@@ -167,111 +188,12 @@
                                 </a>
                             </li>
 
-                            <?php if (!empty($canMenuFacilities)):
-                                $facilitiesPages = ['facilities'];
-                                $facUnread = 0;
-                                try {
-                                    require_once BASE_PATH . '/models/FacilitiesTicketModel.php';
-                                    $facUnreadModel = new FacilitiesTicketModel();
-                                    $facStaffId = (string) ($_SESSION['user_name'] ?? '');
-                                    if ($facStaffId !== '') {
-                                        $facUnread = $facUnreadModel->unreadCount($facStaffId);
-                                    }
-                                } catch (Throwable $e) {
-                                    $facUnread = 0;
-                                }
-                            ?>
-                            <li data-nav="facilities" class="menu-item-has-children <?php echo (isset($page) && $page === 'facilities') ? 'active' : ''; ?>">
-                                <a href="<?php echo APP_URL; ?>/facilities/dashboard" class="menu-toggle">
-                                    <i class="fas fa-tools"></i>
-                                    <span>Maintenance</span>
-                                    <?php if ($facUnread > 0): ?><span class="badge bg-danger ms-1"><?php echo (int) $facUnread; ?></span><?php endif; ?>
-                                    <i class="fas fa-chevron-down menu-arrow"></i>
-                                </a>
-                                <ul class="submenu" style="<?php echo (isset($page) && $page === 'facilities') ? 'display: block;' : ''; ?>">
-                                    <li><a href="<?php echo APP_URL; ?>/facilities/dashboard" class="<?php echo (isset($section) && $section === 'dashboard') ? 'active' : ''; ?>"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a></li>
-                                    <li><a href="<?php echo APP_URL; ?>/facilities" class="<?php echo (isset($section) && $section === 'list') ? 'active' : ''; ?>"><i class="fas fa-ticket-alt"></i><span>All Tickets</span></a></li>
-                                    <li><a href="<?php echo APP_URL; ?>/facilities/tasks"><i class="fas fa-tasks"></i><span>My Tasks</span></a></li>
-                                    <li><a href="<?php echo APP_URL; ?>/facilities/create"><i class="fas fa-plus"></i><span>New Request</span></a></li>
-                                    <li><a href="<?php echo APP_URL; ?>/facilities/notifications"><i class="fas fa-bell"></i><span>Notifications</span></a></li>
-                                    <?php if (!empty($canMenuFacilities) && AccessControl::can($uidMenu, 'facilities', 'approve')): ?>
-                                    <li><a href="<?php echo APP_URL; ?>/facilities/reports"><i class="fas fa-file-alt"></i><span>Reports</span></a></li>
-                                    <li><a href="<?php echo APP_URL; ?>/facilities/categories"><i class="fas fa-tags"></i><span>Categories</span></a></li>
-                                    <?php elseif (!empty($isAdminOrADM) || (!empty($userRole) && in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'HOD'], true))): ?>
-                                    <li><a href="<?php echo APP_URL; ?>/facilities/reports"><i class="fas fa-file-alt"></i><span>Reports</span></a></li>
-                                    <?php endif; ?>
-                                </ul>
-                            </li>
-                            <?php endif; ?>
-
-                            <?php if (!empty($canMenuServices)):
-                                $serviceAreas = [];
-                                try {
-                                    require_once BASE_PATH . '/helpers/ServiceAccess.php';
-                                    $serviceAreas = ServiceAccess::actor((int) $uidMenu)['areas'];
-                                } catch (Throwable $e) {
-                                    $serviceAreas = [];
-                                }
-                            ?>
-                            <li data-nav="services" class="menu-item-has-children <?php echo (isset($page) && $page === 'services') ? 'active' : ''; ?>">
-                                <a href="<?php echo APP_URL; ?>/services/dashboard" class="menu-toggle">
-                                    <i class="fas fa-handshake"></i>
-                                    <span>Service Providers</span>
-                                    <i class="fas fa-chevron-down menu-arrow"></i>
-                                </a>
-                                <ul class="submenu" style="<?php echo (isset($page) && $page === 'services') ? 'display: block;' : ''; ?>">
-                                    <li><a href="<?php echo APP_URL; ?>/services/dashboard"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a></li>
-                                    <?php if (in_array('security', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=security"><i class="fas fa-shield-alt"></i><span>Security</span></a></li><?php endif; ?>
-                                    <?php if (in_array('ac', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=ac"><i class="fas fa-snowflake"></i><span>Air Conditioning</span></a></li><?php endif; ?>
-                                    <?php if (in_array('cleaning', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=cleaning"><i class="fas fa-broom"></i><span>Cleaning</span></a></li><?php endif; ?>
-                                    <?php if (in_array('canteen', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=canteen"><i class="fas fa-utensils"></i><span>Canteen</span></a></li><?php endif; ?>
-                                    <?php if (in_array('contracts', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=contracts"><i class="fas fa-file-contract"></i><span>Contracts</span></a></li><?php endif; ?>
-                                    <li><a href="<?php echo APP_URL; ?>/services/reports"><i class="fas fa-file-alt"></i><span>Reports</span></a></li>
-                                    <li><a href="<?php echo APP_URL; ?>/services/notifications"><i class="fas fa-bell"></i><span>Reminders</span></a></li>
-                                </ul>
-                            </li>
-                            <?php endif; ?>
-
-                            <?php if (!empty($canViewDevices)): ?>
-                            <li data-nav="devices" class="menu-item-has-children <?php echo (isset($page) && $page === 'devices') ? 'active' : ''; ?>">
-                                <a href="<?php echo APP_URL; ?>/devices" class="menu-toggle">
-                                    <i class="fas fa-laptop"></i>
-                                    <span>Asset Management</span>
-                                    <i class="fas fa-chevron-down menu-arrow"></i>
-                                </a>
-                                <ul class="submenu" style="<?php echo (isset($page) && $page === 'devices') ? 'display: block;' : ''; ?>">
-                                    <li><a href="<?php echo APP_URL; ?>/devices" class="<?php echo (isset($deviceSection) && $deviceSection === 'dashboard') ? 'active' : ''; ?>"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a></li>
-                                    <li><a href="<?php echo APP_URL; ?>/devices/list"><i class="fas fa-list"></i><span>All Devices</span></a></li>
-                                    <?php if (!empty($canManageDevices)): ?>
-                                    <li><a href="<?php echo APP_URL; ?>/devices/create"><i class="fas fa-plus"></i><span>Add Device</span></a></li>
-                                    <li><a href="<?php echo APP_URL; ?>/devices/assignments"><i class="fas fa-user-check"></i><span>Assignments</span></a></li>
-                                    <li><a href="<?php echo APP_URL; ?>/devices/maintenance"><i class="fas fa-tools"></i><span>Maintenance</span></a></li>
-                                    <?php endif; ?>
-                                    <li><a href="<?php echo APP_URL; ?>/devices/warranty"><i class="fas fa-shield-alt"></i><span>Warranty</span></a></li>
-                                    <li><a href="<?php echo APP_URL; ?>/devices/scan"><i class="fas fa-qrcode"></i><span>QR Scanner</span></a></li>
-                                    <?php if (!empty($canViewDevices)): ?>
-                                    <li><a href="<?php echo APP_URL; ?>/devices/export"><i class="fas fa-file-export"></i><span>Reports / Export</span></a></li>
-                                    <li><a href="<?php echo APP_URL; ?>/devices/audit"><i class="fas fa-history"></i><span>Audit History</span></a></li>
-                                    <?php endif; ?>
-                                </ul>
-                            </li>
-                            <?php endif; ?>
-
-                            <?php if (!empty($canAccessExamsModule)): ?>
-                            <li data-nav="exams">
-                                <a href="<?php echo APP_URL; ?>/exams" class="<?php echo (isset($page) && in_array($page, ['exams', 'exams-marks'], true)) ? 'active' : ''; ?>">
-                                    <i class="fas fa-file-signature"></i>
-                                    <span>Exams</span>
-                                </a>
-                            </li>
-                            <?php endif; ?>
-                            
                             <?php if (!$isSAO): ?>
                             <!-- Deputy Principal Education Branch - Hidden for SAO -->
                             <li data-nav="management" class="menu-item-has-children <?php 
 $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years'];
                             if ($isAdminOrADM) {
-                                $educationPages[] = 'staff-roles';
+                                $educationPages[] = 'staff-roles'; $educationPages[] = 'staff-types';
                             }
                             // HOD staff module enrollment page
                             if ($isHOD) {
@@ -287,7 +209,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                 <ul class="submenu" style="<?php 
                                     $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years'];
                                     if ($isAdminOrADM) {
-                                        $educationPages[] = 'staff-roles';
+                                        $educationPages[] = 'staff-roles'; $educationPages[] = 'staff-types';
                                     }
                                     if ($isHOD) {
                                         $educationPages[] = 'hod-staff-module-enroll';
@@ -302,12 +224,6 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/academic-years" class="<?php echo (isset($page) && $page === 'academic-years') ? 'active' : ''; ?>">
-                                            <i class="fas fa-calendar-alt"></i>
-                                            <span>Academic Years</span>
-                                        </a>
-                                    </li>
                                     <?php if (!empty($canMenuCourses)): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/courses" class="<?php echo (isset($page) && $page === 'courses') ? 'active' : ''; ?>">
@@ -322,6 +238,20 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                             <span>Modules</span>
                                         </a>
                                     </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/academic-years" class="<?php echo (isset($page) && $page === 'academic-years') ? 'active' : ''; ?>">
+                                            <i class="fas fa-calendar-alt"></i>
+                                            <span>Academic Years</span>
+                                        </a>
+                                    </li>
+                                    <?php if (!empty($canMenuStaff)): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/staff" class="<?php echo (isset($page) && $page === 'staff') ? 'active' : ''; ?>">
+                                            <i class="fas fa-chalkboard-teacher"></i>
+                                            <span>Staff</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
                                     <?php if (!empty($canMenuStaffRoles)): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/staff-roles" class="<?php echo (isset($page) && $page === 'staff-roles') ? 'active' : ''; ?>">
@@ -329,12 +259,10 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                             <span>Staff Roles</span>
                                         </a>
                                     </li>
-                                    <?php endif; ?>
-                                    <?php if (!empty($canMenuStaff)): ?>
                                     <li>
-                                        <a href="<?php echo APP_URL; ?>/staff" class="<?php echo (isset($page) && $page === 'staff') ? 'active' : ''; ?>">
-                                            <i class="fas fa-chalkboard-teacher"></i>
-                                            <span>Staff</span>
+                                        <a href="<?php echo APP_URL; ?>/staff-types" class="<?php echo (isset($page) && $page === 'staff-types') ? 'active' : ''; ?>">
+                                            <i class="fas fa-id-badge"></i>
+                                            <span>Staff Types</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
@@ -559,56 +487,6 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                 </ul>
                             </li>
 
-                            <?php if (!empty($hasHostelMenu)): ?>
-                            <li data-nav="hostel" class="menu-item-has-children <?php echo (isset($page) && in_array($page, $hostelPages, true)) ? 'active' : ''; ?>">
-                                <a href="#" class="menu-toggle">
-                                    <i class="fas fa-hotel"></i>
-                                    <span>Hostel</span>
-                                    <i class="fas fa-chevron-down menu-arrow"></i>
-                                </a>
-                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, $hostelPages, true)) ? 'display: block;' : ''; ?>">
-                                    <?php if ($showHostelsRoomsMenu): ?>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/hostels" class="<?php echo (isset($page) && $page === 'hostels') ? 'active' : ''; ?>">
-                                            <i class="fas fa-building"></i>
-                                            <span>Hostels</span>
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/rooms" class="<?php echo (isset($page) && $page === 'rooms') ? 'active' : ''; ?>">
-                                            <i class="fas fa-door-open"></i>
-                                            <span>Rooms</span>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
-                                    <?php if ($showRoomAllocationsMenu): ?>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/room-allocations" class="<?php echo (isset($page) && $page === 'room-allocations') ? 'active' : ''; ?>">
-                                            <i class="fas fa-user-check"></i>
-                                            <span>Room Allocations</span>
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/hostel-report" class="<?php echo (isset($page) && $page === 'hostel-report') ? 'active' : ''; ?>">
-                                            <i class="fas fa-chart-pie"></i>
-                                            <span>Hostel Report</span>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
-                                </ul>
-                            </li>
-                            <?php endif; ?>
-
-                            <?php if (!empty($userRole) && $userRole === 'ADM'): ?>
-                            <!-- ID Card Print (ADM) - Main menu shortcut -->
-                            <li data-nav="id-card-print">
-                                <a href="<?php echo APP_URL; ?>/students/id-card-select" class="<?php echo (isset($page) && $page === 'students-id-card') ? 'active' : ''; ?>">
-                                    <i class="fas fa-id-card"></i>
-                                    <span>ID Card Print</span>
-                                </a>
-                            </li>
-                            <?php endif; ?>
-                            
                             <?php
                             $staffDevicePages = ['staff-attendance-device', 'staff-attendance-device-daily', 'staff-attendance-device-month', 'staff-attendance-device-sync'];
                             $studentAttendancePages = [];
@@ -691,47 +569,6 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             </li>
                             <?php endif; ?>
 
-                            <?php if (!empty($canStaffDeviceAttendanceMenu)): ?>
-                            <li data-nav="staff-attendance">
-                                <a href="<?php echo APP_URL; ?>/attendance/staff-device" class="<?php echo (isset($page) && in_array($page, $staffDevicePages, true)) ? 'active' : ''; ?>">
-                                    <i class="fas fa-id-card"></i>
-                                    <span>Staff Attendance</span>
-                                </a>
-                            </li>
-                            <?php endif; ?>
-                            
-                            <?php if (!empty($canViewPaymentsMenu)): ?>
-                            <li data-nav="payments" class="menu-item-has-children <?php echo (isset($page) && in_array($page, $paymentsPages, true)) ? 'active' : ''; ?>">
-                                <a href="#" class="menu-toggle">
-                                    <i class="fas fa-money-bill-wave"></i>
-                                    <span><?php echo $isADMRole ? 'Payment' : 'Payments'; ?></span>
-                                    <i class="fas fa-chevron-down menu-arrow"></i>
-                                </a>
-                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, $paymentsPages, true)) ? 'display: block;' : ''; ?>">
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/payments" class="<?php echo (isset($page) && $page === 'payments') ? 'active' : ''; ?>">
-                                            <i class="fas fa-list"></i>
-                                            <span>All Payments</span>
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/payments/report" class="<?php echo (isset($page) && $page === 'payments-report') ? 'active' : ''; ?>">
-                                            <i class="fas fa-file-alt"></i>
-                                            <span>Payment Report</span>
-                                        </a>
-                                    </li>
-                                    <?php if (!empty($hasFinanceAccess)): ?>
-                                    <li>
-                                        <a href="<?php echo APP_URL; ?>/payments/create" class="<?php echo (isset($page) && $page === 'payments-create') ? 'active' : ''; ?>">
-                                            <i class="fas fa-plus-circle"></i>
-                                            <span>Add Payment</span>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
-                                </ul>
-                            </li>
-                            <?php endif; ?>
-                            
                             <?php
                             // Build Students Approval menu items based on user role
                             $studentsApprovalPages = [];
@@ -814,28 +651,11 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             </li>
                             <?php endif; ?>
                             
-                            <?php
-                            // Check if user is not a student (staff only)
-                            $isStudent = false;
-                            if (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student') {
-                                $isStudent = true;
-                            }
-                            ?>
-                            <?php if (!empty($hasStaffApprovalAccess)): ?>
-                            <li data-nav="staff-approval">
-                                <a href="<?php echo APP_URL; ?>/circuit-program/approval" class="<?php echo (isset($page) && $page === 'circuit-program-approval') ? 'active' : ''; ?>">
-                                    <i class="fas fa-user-check"></i>
-                                    <span>Staff Approval</span>
-                                </a>
-                            </li>
-                            <?php endif; ?>
-
-                            <?php if (!$isStudent): ?>
-                            <!-- Circuit Program - Staff Only (not students) -->
-                            <li data-nav="circuit-program">
-                                <a href="<?php echo APP_URL; ?>/circuit-program" class="<?php echo (isset($page) && in_array($page, ['circuit-program', 'circuit-program-create', 'circuit-program-view'])) ? 'active' : ''; ?>">
-                                    <i class="fas fa-route"></i>
-                                    <span>Circuit Program</span>
+                            <?php if (!empty($canAccessExamsModule)): ?>
+                            <li data-nav="exams">
+                                <a href="<?php echo APP_URL; ?>/exams" class="<?php echo (isset($page) && in_array($page, ['exams', 'exams-marks'], true)) ? 'active' : ''; ?>">
+                                    <i class="fas fa-file-signature"></i>
+                                    <span>Exams</span>
                                 </a>
                             </li>
                             <?php endif; ?>
@@ -851,6 +671,227 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             <?php endif; ?>
                             
                             
+                            <?php if (!empty($canStaffDeviceAttendanceMenu)): ?>
+                            <li data-nav="staff-attendance">
+                                <a href="<?php echo APP_URL; ?>/attendance/staff-device" class="<?php echo (isset($page) && in_array($page, $staffDevicePages, true)) ? 'active' : ''; ?>">
+                                    <i class="fas fa-id-card"></i>
+                                    <span>Staff Attendance</span>
+                                </a>
+                            </li>
+                            <?php endif; ?>
+                            
+                            <?php
+                            // Check if user is not a student (staff only)
+                            $isStudent = false;
+                            if (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student') {
+                                $isStudent = true;
+                            }
+                            ?>
+
+                            <?php if (!$isStudent): ?>
+                            <!-- Circuit Program - Staff Only (not students) -->
+                            <li data-nav="circuit-program">
+                                <a href="<?php echo APP_URL; ?>/circuit-program" class="<?php echo (isset($page) && in_array($page, ['circuit-program', 'circuit-program-create', 'circuit-program-view'])) ? 'active' : ''; ?>">
+                                    <i class="fas fa-route"></i>
+                                    <span>Circuit Program</span>
+                                </a>
+                            </li>
+                            <?php endif; ?>
+                            
+                            <?php if (!empty($hasStaffApprovalAccess)): ?>
+                            <li data-nav="staff-approval">
+                                <a href="<?php echo APP_URL; ?>/circuit-program/approval" class="<?php echo (isset($page) && $page === 'circuit-program-approval') ? 'active' : ''; ?>">
+                                    <i class="fas fa-user-check"></i>
+                                    <span>Staff Approval</span>
+                                </a>
+                            </li>
+                            <?php endif; ?>
+
+                            <?php if (!empty($hasHostelMenu)): ?>
+                            <li data-nav="hostel" class="menu-item-has-children <?php echo (isset($page) && in_array($page, $hostelPages, true)) ? 'active' : ''; ?>">
+                                <a href="#" class="menu-toggle">
+                                    <i class="fas fa-hotel"></i>
+                                    <span>Hostel</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, $hostelPages, true)) ? 'display: block;' : ''; ?>">
+                                    <?php if ($showHostelsRoomsMenu): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/hostels" class="<?php echo (isset($page) && $page === 'hostels') ? 'active' : ''; ?>">
+                                            <i class="fas fa-building"></i>
+                                            <span>Hostels</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/rooms" class="<?php echo (isset($page) && $page === 'rooms') ? 'active' : ''; ?>">
+                                            <i class="fas fa-door-open"></i>
+                                            <span>Rooms</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
+                                    <?php if ($showRoomAllocationsMenu): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/room-allocations" class="<?php echo (isset($page) && $page === 'room-allocations') ? 'active' : ''; ?>">
+                                            <i class="fas fa-user-check"></i>
+                                            <span>Room Allocations</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/hostel-report" class="<?php echo (isset($page) && $page === 'hostel-report') ? 'active' : ''; ?>">
+                                            <i class="fas fa-chart-pie"></i>
+                                            <span>Hostel Report</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
+                                </ul>
+                            </li>
+                            <?php endif; ?>
+
+                            <?php if (!empty($userRole) && $userRole === 'ADM'): ?>
+                            <!-- ID Card Print (ADM) - Main menu shortcut -->
+                            <li data-nav="id-card-print">
+                                <a href="<?php echo APP_URL; ?>/students/id-card-select" class="<?php echo (isset($page) && $page === 'students-id-card') ? 'active' : ''; ?>">
+                                    <i class="fas fa-id-card"></i>
+                                    <span>ID Card Print</span>
+                                </a>
+                            </li>
+                            <?php endif; ?>
+                            
+                            <?php if (!empty($canViewPaymentsMenu)): ?>
+                            <li data-nav="payments" class="menu-item-has-children <?php echo (isset($page) && in_array($page, $paymentsPages, true)) ? 'active' : ''; ?>">
+                                <a href="#" class="menu-toggle">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                    <span><?php echo $isADMRole ? 'Payment' : 'Payments'; ?></span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="<?php echo (isset($page) && in_array($page, $paymentsPages, true)) ? 'display: block;' : ''; ?>">
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/payments" class="<?php echo (isset($page) && $page === 'payments') ? 'active' : ''; ?>">
+                                            <i class="fas fa-list"></i>
+                                            <span>All Payments</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/payments/report" class="<?php echo (isset($page) && $page === 'payments-report') ? 'active' : ''; ?>">
+                                            <i class="fas fa-file-alt"></i>
+                                            <span>Payment Report</span>
+                                        </a>
+                                    </li>
+                                    <?php if (!empty($hasFinanceAccess)): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/payments/create" class="<?php echo (isset($page) && $page === 'payments-create') ? 'active' : ''; ?>">
+                                            <i class="fas fa-plus-circle"></i>
+                                            <span>Add Payment</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
+                                </ul>
+                            </li>
+                            <?php endif; ?>
+                            
+                            <?php if (!empty($canMenuFacilities)):
+                                $facilitiesPages = ['facilities'];
+                                $facUnread = 0;
+                                try {
+                                    require_once BASE_PATH . '/models/FacilitiesTicketModel.php';
+                                    $facUnreadModel = new FacilitiesTicketModel();
+                                    $facStaffId = (string) ($_SESSION['user_name'] ?? '');
+                                    if ($facStaffId !== '') {
+                                        $facUnread = $facUnreadModel->unreadCount($facStaffId);
+                                    }
+                                } catch (Throwable $e) {
+                                    $facUnread = 0;
+                                }
+                            ?>
+                            <li data-nav="facilities" class="menu-item-has-children <?php echo (isset($page) && $page === 'facilities') ? 'active' : ''; ?>">
+                                <a href="<?php echo APP_URL; ?>/facilities/dashboard" class="menu-toggle">
+                                    <i class="fas fa-tools"></i>
+                                    <span>Maintenance</span>
+                                    <?php if ($facUnread > 0): ?><span class="badge bg-danger ms-1"><?php echo (int) $facUnread; ?></span><?php endif; ?>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="<?php echo (isset($page) && $page === 'facilities') ? 'display: block;' : ''; ?>">
+                                    <?php
+                                    $facSec = isset($section) ? (string) $section : '';
+                                    if (in_array($facSec, ['view', 'assign', 'verify'], true)) { $facSec = 'list'; }
+                                    $facCanApprove = !empty($canMenuFacilities) && AccessControl::can($uidMenu, 'facilities', 'approve');
+                                    $facCanReport = $facCanApprove || !empty($isAdminOrADM) || (!empty($userRole) && in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'HOD'], true));
+                                    $facItems = [
+                                        ['dashboard', '/facilities/dashboard', 'fa-chart-pie', 'Dashboard', true],
+                                        ['create', '/facilities/create', 'fa-plus', 'Create New Ticket', true],
+                                        ['list', '/facilities', 'fa-ticket-alt', 'All Tickets', true],
+                                        ['tasks', '/facilities/tasks', 'fa-user-check', 'My Assigned Tickets', true],
+                                        ['pending', '/facilities?group=pending', 'fa-hourglass-half', 'Pending Tickets', true],
+                                        ['in_progress', '/facilities?group=in_progress', 'fa-spinner', 'In Progress', true],
+                                        ['resolved', '/facilities?group=resolved', 'fa-check-circle', 'Resolved Tickets', true],
+                                        ['closed', '/facilities?group=closed', 'fa-lock', 'Closed Tickets', true],
+                                        ['categories', '/facilities/categories', 'fa-tags', 'Ticket Categories', $facCanApprove],
+                                        ['departments', '/facilities/departments', 'fa-building', 'Departments', $facCanReport],
+                                        ['officers', '/facilities/officers', 'fa-user-cog', 'Assign Officers', !empty($isAdminOrADM)],
+                                        ['reports', '/facilities/reports', 'fa-chart-line', 'Reports & Analytics', $facCanReport],
+                                        ['settings', '/facilities/settings', 'fa-cog', 'Ticket Settings', !empty($isAdminOrADM)],
+                                    ];
+                                    foreach ($facItems as $facItem):
+                                        if (!$facItem[4]) { continue; } ?>
+                                    <li><a href="<?php echo APP_URL . $facItem[1]; ?>" class="<?php echo $facSec === $facItem[0] ? 'active' : ''; ?>"><i class="fas <?php echo $facItem[2]; ?>"></i><span><?php echo htmlspecialchars($facItem[3]); ?></span></a></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </li>
+                            <?php endif; ?>
+
+                            <?php if (!empty($canMenuServices)):
+                                $serviceAreas = [];
+                                try {
+                                    require_once BASE_PATH . '/helpers/ServiceAccess.php';
+                                    $serviceAreas = ServiceAccess::actor((int) $uidMenu)['areas'];
+                                } catch (Throwable $e) {
+                                    $serviceAreas = [];
+                                }
+                            ?>
+                            <li data-nav="services" class="menu-item-has-children <?php echo (isset($page) && $page === 'services') ? 'active' : ''; ?>">
+                                <a href="<?php echo APP_URL; ?>/services/dashboard" class="menu-toggle">
+                                    <i class="fas fa-handshake"></i>
+                                    <span>Service Providers</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="<?php echo (isset($page) && $page === 'services') ? 'display: block;' : ''; ?>">
+                                    <li><a href="<?php echo APP_URL; ?>/services/dashboard"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a></li>
+                                    <?php if (in_array('security', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=security"><i class="fas fa-shield-alt"></i><span>Security</span></a></li><?php endif; ?>
+                                    <?php if (in_array('ac', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=ac"><i class="fas fa-snowflake"></i><span>Air Conditioning</span></a></li><?php endif; ?>
+                                    <?php if (in_array('cleaning', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=cleaning"><i class="fas fa-broom"></i><span>Cleaning</span></a></li><?php endif; ?>
+                                    <?php if (in_array('canteen', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=canteen"><i class="fas fa-utensils"></i><span>Canteen</span></a></li><?php endif; ?>
+                                    <?php if (in_array('contracts', $serviceAreas, true)): ?><li><a href="<?php echo APP_URL; ?>/services/area?area=contracts"><i class="fas fa-file-contract"></i><span>Contracts</span></a></li><?php endif; ?>
+                                    <li><a href="<?php echo APP_URL; ?>/services/reports"><i class="fas fa-file-alt"></i><span>Reports</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/services/notifications"><i class="fas fa-bell"></i><span>Reminders</span></a></li>
+                                </ul>
+                            </li>
+                            <?php endif; ?>
+
+                            <?php if (!empty($canViewDevices)): ?>
+                            <li data-nav="devices" class="menu-item-has-children <?php echo (isset($page) && $page === 'devices') ? 'active' : ''; ?>">
+                                <a href="<?php echo APP_URL; ?>/devices" class="menu-toggle">
+                                    <i class="fas fa-laptop"></i>
+                                    <span>Asset Management</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="<?php echo (isset($page) && $page === 'devices') ? 'display: block;' : ''; ?>">
+                                    <li><a href="<?php echo APP_URL; ?>/devices" class="<?php echo (isset($deviceSection) && $deviceSection === 'dashboard') ? 'active' : ''; ?>"><i class="fas fa-chart-pie"></i><span>Dashboard</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/list"><i class="fas fa-list"></i><span>All Devices</span></a></li>
+                                    <?php if (!empty($canManageDevices)): ?>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/create"><i class="fas fa-plus"></i><span>Add Device</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/assignments"><i class="fas fa-user-check"></i><span>Assignments</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/maintenance"><i class="fas fa-tools"></i><span>Maintenance</span></a></li>
+                                    <?php endif; ?>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/warranty"><i class="fas fa-shield-alt"></i><span>Warranty</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/scan"><i class="fas fa-qrcode"></i><span>QR Scanner</span></a></li>
+                                    <?php if (!empty($canViewDevices)): ?>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/export"><i class="fas fa-file-export"></i><span>Reports / Export</span></a></li>
+                                    <li><a href="<?php echo APP_URL; ?>/devices/audit"><i class="fas fa-history"></i><span>Audit History</span></a></li>
+                                    <?php endif; ?>
+                                </ul>
+                            </li>
+                            <?php endif; ?>
+
                             <?php
                             // Check if user is admin or ADM and show security menu
                             if (isset($_SESSION['user_id'])) {
@@ -946,6 +987,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                 endif;
                             }
                             ?>
+
                         </ul>
                         </nav>
                     </div>

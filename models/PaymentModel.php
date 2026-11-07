@@ -340,6 +340,79 @@ class PaymentModel extends Model {
     }
     
     /**
+     * Figures for the finance dashboard. A payment line is worth pays_amount x quantity.
+     *
+     * @return array{summary: array<string, float|int>, months: list<array{label: string, total: float}>,
+     *               by_type: list<array{name: string, total: float, count: int}>, recent: list<array<string, mixed>>}
+     */
+    public function getFinanceDashboard() {
+        $line = '(p.pays_amount * GREATEST(p.pays_qty, 1))';
+        $summary = [
+            'today_total' => 0.0, 'today_count' => 0,
+            'month_total' => 0.0, 'month_count' => 0,
+            'year_total' => 0.0, 'year_count' => 0,
+            'pending_total' => 0.0, 'pending_count' => 0,
+            'approved_month_total' => 0.0,
+        ];
+
+        $result = $this->db->query("SELECT
+                COALESCE(SUM(CASE WHEN p.pays_date = CURDATE() THEN {$line} END), 0) AS today_total,
+                SUM(p.pays_date = CURDATE()) AS today_count,
+                COALESCE(SUM(CASE WHEN YEAR(p.pays_date) = YEAR(CURDATE()) AND MONTH(p.pays_date) = MONTH(CURDATE()) THEN {$line} END), 0) AS month_total,
+                SUM(YEAR(p.pays_date) = YEAR(CURDATE()) AND MONTH(p.pays_date) = MONTH(CURDATE())) AS month_count,
+                COALESCE(SUM(CASE WHEN YEAR(p.pays_date) = YEAR(CURDATE()) AND p.approved = 1 AND MONTH(p.pays_date) = MONTH(CURDATE()) THEN {$line} END), 0) AS approved_month_total,
+                COALESCE(SUM(CASE WHEN YEAR(p.pays_date) = YEAR(CURDATE()) THEN {$line} END), 0) AS year_total,
+                SUM(YEAR(p.pays_date) = YEAR(CURDATE())) AS year_count,
+                COALESCE(SUM(CASE WHEN p.approved = 0 THEN {$line} END), 0) AS pending_total,
+                SUM(p.approved = 0) AS pending_count
+            FROM `{$this->table}` p");
+        if ($result && ($row = $result->fetch_assoc())) {
+            foreach ($summary as $key => $_) {
+                $summary[$key] = (strpos($key, 'count') !== false) ? (int) $row[$key] : (float) $row[$key];
+            }
+        }
+
+        // Last 6 months, oldest first, with empty months filled in.
+        $totals = [];
+        $result = $this->db->query("SELECT DATE_FORMAT(p.pays_date, '%Y-%m') AS ym, SUM({$line}) AS total
+            FROM `{$this->table}` p
+            WHERE p.pays_date >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 5 MONTH)
+            GROUP BY ym");
+        while ($result && ($row = $result->fetch_assoc())) {
+            $totals[$row['ym']] = (float) $row['total'];
+        }
+        $months = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $ts = strtotime(date('Y-m-01') . " -{$i} month");
+            $months[] = ['label' => date('M Y', $ts), 'total' => $totals[date('Y-m', $ts)] ?? 0.0];
+        }
+
+        $byType = [];
+        $result = $this->db->query("SELECT p.payment_type AS name, SUM({$line}) AS total, COUNT(*) AS cnt
+            FROM `{$this->table}` p
+            WHERE YEAR(p.pays_date) = YEAR(CURDATE()) AND MONTH(p.pays_date) = MONTH(CURDATE())
+            GROUP BY p.payment_type
+            ORDER BY total DESC
+            LIMIT 8");
+        while ($result && ($row = $result->fetch_assoc())) {
+            $byType[] = ['name' => (string) $row['name'], 'total' => (float) $row['total'], 'count' => (int) $row['cnt']];
+        }
+
+        $recent = [];
+        $result = $this->db->query("SELECT p.pays_id, p.student_id, s.student_fullname, p.payment_type, p.payment_reason,
+                p.pays_amount, p.pays_qty, p.pays_date, p.approved
+            FROM `{$this->table}` p
+            LEFT JOIN `student` s ON p.student_id = s.student_id
+            ORDER BY p.pays_date DESC, p.pays_id DESC
+            LIMIT 10");
+        while ($result && ($row = $result->fetch_assoc())) {
+            $recent[] = $row;
+        }
+
+        return ['summary' => $summary, 'months' => $months, 'by_type' => $byType, 'recent' => $recent];
+    }
+
+    /**
      * Distinct payment types already used on recorded payments.
      */
     public function getUsedPaymentTypes() {

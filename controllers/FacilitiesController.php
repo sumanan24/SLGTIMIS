@@ -69,10 +69,17 @@ class FacilitiesController extends Controller {
         }
         $actor = $this->actor();
         $filters = $this->svc->scopeFilters($actor, $this->listFilters());
+        $group = (string) ($filters['group'] ?? '');
+        if (!isset(FacilitiesTicketModel::STATUS_GROUPS[$group])) {
+            unset($filters['group']);
+            $group = '';
+        }
+        $groupTitles = ['pending' => 'Pending Tickets', 'in_progress' => 'In Progress', 'resolved' => 'Resolved Tickets', 'closed' => 'Closed Tickets'];
         $result = $this->svc->model()->search($filters, (int) $this->get('page', 1), 20);
         return $this->view('facilities/index', $this->pack([
-            'title' => 'Facilities Tickets',
-            'section' => 'list',
+            'title' => $group !== '' ? $groupTitles[$group] : 'Facilities Tickets',
+            'heading' => $group !== '' ? $groupTitles[$group] : 'All Tickets',
+            'section' => $group !== '' ? $group : 'list',
             'result' => $result,
             'filters' => $filters,
         ], $actor));
@@ -88,7 +95,8 @@ class FacilitiesController extends Controller {
         $filters['scope_staff_id'] = $actor['staff_id'];
         $result = $this->svc->model()->search($filters, (int) $this->get('page', 1), 20);
         return $this->view('facilities/index', $this->pack([
-            'title' => 'My Assigned Tasks',
+            'title' => 'My Assigned Tickets',
+            'heading' => 'My Assigned Tickets',
             'section' => 'tasks',
             'result' => $result,
             'filters' => $filters,
@@ -114,10 +122,8 @@ class FacilitiesController extends Controller {
         }
         $model = $this->svc->model();
         return $this->view('facilities/settings', $this->pack([
-            'title' => 'Maintenance Settings',
+            'title' => 'Ticket Settings',
             'section' => 'settings',
-            'routes' => $model->routes(),
-            'staff_options' => $model->staffOptions(),
             'sla' => [
                 'low' => $model->slaDays('low'),
                 'medium' => $model->slaDays('medium'),
@@ -156,8 +162,75 @@ class FacilitiesController extends Controller {
         foreach (['unassigned_hours', 'facility_escalate_days', 'director_escalate_days'] as $key) {
             $model->saveSetting($key, (string) max(1, (int) $this->post($key, 1)));
         }
-        $_SESSION['message'] = 'Maintenance settings saved.';
+        $_SESSION['message'] = 'Ticket settings saved.';
         $this->redirect('facilities/settings');
+    }
+
+    /** Assign Officers: which person receives each ticket category. */
+    public function officers() {
+        if (!$this->boot('edit')) {
+            return;
+        }
+        $actor = $this->actor();
+        if (empty($actor['is_admin'])) {
+            $_SESSION['error'] = 'Only a system administrator can assign officers.';
+            $this->redirect('facilities/dashboard');
+            return;
+        }
+        $model = $this->svc->model();
+        return $this->view('facilities/officers', $this->pack([
+            'title' => 'Assign Officers',
+            'section' => 'officers',
+            'routes' => $model->routes(),
+            'staff_options' => $model->staffOptions(),
+        ], $actor));
+    }
+
+    public function officersSave() {
+        if (!$this->boot('edit')) {
+            return;
+        }
+        $actor = $this->actor();
+        if (empty($actor['is_admin'])) {
+            $_SESSION['error'] = 'Only a system administrator can assign officers.';
+            $this->redirect('facilities/dashboard');
+            return;
+        }
+        $model = $this->svc->model();
+        $routes = $this->post('route_staff', []);
+        if (is_array($routes)) {
+            foreach ($routes as $categoryId => $staffId) {
+                $model->saveRouteStaff((int) $categoryId, trim((string) $staffId));
+            }
+        }
+        $_SESSION['message'] = 'Officer assignments saved.';
+        $this->redirect('facilities/officers');
+    }
+
+    /** Tickets by department (officers, monitors, management; a HOD sees only their own department). */
+    public function departments() {
+        if (!$this->boot('view')) {
+            return;
+        }
+        $actor = $this->actor();
+        if (empty($actor['is_officer']) && empty($actor['is_monitor']) && empty($actor['is_hod']) && empty($actor['is_admin'])) {
+            $_SESSION['error'] = 'Department tickets are available to Facilities Officer, HOD, and management.';
+            $this->redirect('facilities');
+            return;
+        }
+        $rows = $this->svc->model()->departmentPerformance();
+        $seeAll = !empty($actor['is_officer']) || !empty($actor['is_monitor']) || !empty($actor['is_admin']);
+        if (!$seeAll) {
+            $own = (string) ($actor['hod_department_id'] ?? '');
+            $rows = array_values(array_filter($rows, static function ($r) use ($own) {
+                return $own !== '' && (string) ($r['department_id'] ?? '') === $own;
+            }));
+        }
+        return $this->view('facilities/departments', $this->pack([
+            'title' => 'Departments',
+            'section' => 'departments',
+            'rows' => $rows,
+        ], $actor));
     }
 
     public function create() {
@@ -488,14 +561,17 @@ class FacilitiesController extends Controller {
         if (!$this->requireOfficer($actor)) {
             return;
         }
+        $model = $this->svc->model();
         return $this->view('facilities/categories', $this->pack([
-            'title' => 'Facility Categories',
+            'title' => 'Ticket Categories',
             'section' => 'categories',
-            'categories' => $this->svc->model()->categories(false),
-            'subcategories' => $this->svc->model()->subcategories(null, false),
+            'rows' => $model->categoriesWithRoutes(),
+            'subcategories' => $model->subcategories(null, false),
+            'staff_options' => $model->staffOptions(),
         ], $actor));
     }
 
+    /** Create or update a category (name, responsible person, order, active) or add a subcategory. */
     public function categorySave() {
         if (!$this->boot('edit')) {
             return;
@@ -504,28 +580,84 @@ class FacilitiesController extends Controller {
         if (!$this->requireOfficer($actor)) {
             return;
         }
+        $model = $this->svc->model();
         $kind = $this->post('kind', 'category');
         if ($kind === 'subcategory') {
-            $this->svc->model()->saveSubcategory([
-                'category_id' => $this->post('category_id'),
-                'name' => trim((string) $this->post('name', '')),
-                'sort_order' => (int) $this->post('sort_order', 100),
-                'is_active' => (int) $this->post('is_active', 1),
-            ], $this->post('id') ?: null);
-        } else {
             $name = trim((string) $this->post('name', ''));
-            $slug = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $name));
-            $this->svc->model()->saveCategory([
+            if ($name === '' || !(int) $this->post('category_id', 0)) {
+                $_SESSION['error'] = 'Choose a category and enter a subcategory name.';
+                $this->redirect('facilities/categories');
+                return;
+            }
+            $model->saveSubcategory([
+                'category_id' => $this->post('category_id'),
                 'name' => $name,
-                'slug' => $slug,
                 'sort_order' => (int) $this->post('sort_order', 100),
                 'is_active' => (int) $this->post('is_active', 1),
             ], $this->post('id') ?: null);
+            $_SESSION['message'] = 'Subcategory saved.';
+            $this->redirect('facilities/categories');
+            return;
         }
-        $_SESSION['message'] = 'Category saved.';
+
+        $id = (int) $this->post('id', 0);
+        $name = trim((string) preg_replace('/\s+/', ' ', (string) $this->post('name', '')));
+        if ($name === '') {
+            $_SESSION['error'] = 'Enter a category name.';
+            $this->redirect('facilities/categories');
+            return;
+        }
+        if (strlen($name) > 120) {
+            $name = substr($name, 0, 120);
+        }
+        if ($model->categoryByName($name, $id)) {
+            $_SESSION['error'] = 'A category named "' . $name . '" already exists.';
+            $this->redirect('facilities/categories');
+            return;
+        }
+        $staffId = trim((string) $this->post('staff_id', ''));
+        $data = [
+            'name' => $name,
+            'slug' => $model->uniqueCategorySlug($name, $id),
+            'sort_order' => max(0, (int) $this->post('sort_order', 100)),
+            'is_active' => (int) $this->post('is_active', 1) ? 1 : 0,
+        ];
+        if ($id > 0) {
+            $model->saveCategory($data, $id);
+            $categoryId = $id;
+        } else {
+            $categoryId = (int) $model->saveCategory($data);
+        }
+        if ($categoryId > 0) {
+            $model->saveRouteStaff($categoryId, $staffId);
+            $this->logActivity($id > 0 ? 'UPDATE' : 'CREATE', 'facilities', $categoryId, ($id > 0 ? 'Updated' : 'Created') . ' ticket category ' . $name);
+        }
+        $_SESSION['message'] = $id > 0 ? 'Category updated.' : 'Category added.';
         $this->redirect('facilities/categories');
     }
 
+    public function categoryDelete() {
+        if (!$this->boot('edit')) {
+            return;
+        }
+        $actor = $this->actor();
+        if (!$this->requireOfficer($actor)) {
+            return;
+        }
+        $id = (int) $this->post('id', 0);
+        $model = $this->svc->model();
+        if ($id <= 0) {
+            $_SESSION['error'] = 'Category not found.';
+        } elseif ($model->categoryTicketCount($id) > 0) {
+            $_SESSION['error'] = 'This category already has tickets, so it cannot be deleted. Set it to Inactive instead.';
+        } elseif ($model->deleteCategory($id)) {
+            $this->logActivity('DELETE', 'facilities', $id, 'Deleted ticket category #' . $id);
+            $_SESSION['message'] = 'Category deleted.';
+        } else {
+            $_SESSION['error'] = 'The category could not be deleted.';
+        }
+        $this->redirect('facilities/categories');
+    }
     public function notifications() {
         if (!$this->boot('view')) {
             return;
@@ -657,7 +789,7 @@ class FacilitiesController extends Controller {
     }
 
     private function listFilters(): array {
-        $keys = ['q', 'status', 'priority', 'category_id', 'department_id', 'staff_id', 'date_from', 'date_to', 'location', 'request_type'];
+        $keys = ['q', 'status', 'group', 'priority', 'category_id', 'department_id', 'staff_id', 'date_from', 'date_to', 'location', 'request_type'];
         $out = [];
         foreach ($keys as $key) {
             $val = trim((string) $this->get($key, ''));

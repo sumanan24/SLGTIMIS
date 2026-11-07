@@ -212,6 +212,11 @@ class StudentController extends Controller {
                 return;
             }
             $studentId = $requested;
+            if (!$this->canAccessStudentRecord($studentId)) {
+                $_SESSION['error'] = 'Access denied. You can only view students of your own department.';
+                $this->redirect('students');
+                return;
+            }
         }
 
         if ($studentId === '') {
@@ -387,6 +392,11 @@ class StudentController extends Controller {
                 return;
             }
             $studentId = $requested;
+            if (!$this->canAccessStudentRecord($studentId)) {
+                $_SESSION['error'] = 'Access denied. You can only view students of your own department.';
+                $this->redirect('students');
+                return;
+            }
         }
         if ($studentId === '') {
             $_SESSION['error'] = 'Student record not found.';
@@ -462,7 +472,8 @@ class StudentController extends Controller {
             $filters = [
                 'search' => $this->get('search', ''),
                 'status' => 'Active',
-                'department_id' => $userDepartmentId ?: '',
+                // No department on the account must never mean "all departments"
+                'department_id' => $userDepartmentId ?: '__none__',
                 'district' => '',
                 'gender' => '',
                 'course_id' => $this->get('course_id', ''),
@@ -495,6 +506,8 @@ class StudentController extends Controller {
         if ($userDepartmentId) {
             $departments = [$departmentModel->getById($userDepartmentId)];
             $departments = array_filter($departments); // Remove null if department not found
+        } elseif ($isDepartmentRestricted) {
+            $departments = [];
         } else {
             $departments = $departmentModel->getAll();
         }
@@ -502,6 +515,8 @@ class StudentController extends Controller {
         // Filter courses by department if user is department-restricted
         if ($userDepartmentId) {
             $courses = $courseModel->getCoursesWithDepartment(['department_id' => $userDepartmentId]);
+        } elseif ($isDepartmentRestricted) {
+            $courses = [];
         } else {
             $courses = $courseModel->all('course_name ASC');
         }
@@ -554,6 +569,9 @@ class StudentController extends Controller {
             $this->redirect('login');
             return;
         }
+        if (!$this->requireDepartmentAssigned('dashboard')) {
+            return;
+        }
         
         $id = $this->get('id', '');
         
@@ -568,6 +586,13 @@ class StudentController extends Controller {
         
         if (!$student) {
             $_SESSION['error'] = 'Student not found.';
+            $this->redirect('students');
+            return;
+        }
+
+        // HOD / IN1-3 may only open students of their own department
+        if (!$this->canAccessStudentRecord($id)) {
+            $_SESSION['error'] = 'Access denied. You can only view students of your own department.';
             $this->redirect('students');
             return;
         }
@@ -3743,6 +3768,11 @@ class StudentController extends Controller {
         // Get HOD's department if user is HOD (but they shouldn't reach here if HOD)
         $hodDepartmentId = $this->getHODDepartment();
         $isHOD = $this->isHOD();
+        if ($isHOD && !$hodDepartmentId) {
+            $_SESSION['error'] = 'Your account has no department assigned. Please contact the administrator.';
+            $this->redirect('students');
+            return;
+        }
         
         // Get filters from GET or POST
         $filters = [

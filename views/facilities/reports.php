@@ -5,13 +5,7 @@ unset($exportQs['officer_all'], $exportQs['scope_staff_id'], $exportQs['hod_scop
 ?>
 <div class="container-fluid px-0 fac-page">
     <div class="card border-0">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="fw-bold mb-0">Reports</h5>
-            <div>
-                <a class="btn btn-sm btn-light" href="<?php echo $base; ?>/export?format=csv&amp;<?php echo $h(http_build_query($exportQs)); ?>">Excel</a>
-                <a class="btn btn-sm btn-light" href="<?php echo $base; ?>/export?format=print&amp;<?php echo $h(http_build_query($exportQs)); ?>" target="_blank">Print</a>
-            </div>
-        </div>
+        <?php $facHeader('Reports & Analytics', 'Ticket statistics, with Excel and print exports.', '<a class="btn btn-sm btn-light" href="' . $base . '/export?format=csv&amp;' . $h(http_build_query($exportQs)) . '"><i class="fas fa-file-excel me-1"></i>Excel</a> <a class="btn btn-sm btn-light" href="' . $base . '/export?format=print&amp;' . $h(http_build_query($exportQs)) . '" target="_blank"><i class="fas fa-print me-1"></i>Print</a>'); ?>
         <div class="card-body">
             <?php $facNav(); $facFlash(); ?>
             <form method="get" action="<?php echo $base; ?>/reports" class="fac-filters">

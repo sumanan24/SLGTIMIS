@@ -160,13 +160,34 @@ class FacilitiesTicketService {
         return $filters;
     }
 
+    /** Short ticket title, e.g. "Electrical - ICT Block, Lab 2". */
+    private function buildTitle(int $categoryId, string $location, string $description): string {
+        $category = '';
+        foreach ($this->model->categories(false) as $cat) {
+            if ((int) $cat['id'] === $categoryId) {
+                $category = trim((string) $cat['name']);
+                break;
+            }
+        }
+        $location = trim($location);
+        $title = trim($category . ($category !== '' && $location !== '' ? ' - ' : '') . $location);
+        if ($title === '') {
+            $title = trim(preg_replace('/\s+/', ' ', $description));
+        }
+        return function_exists('mb_substr') ? mb_substr($title, 0, 200) : substr($title, 0, 200);
+    }
+
     public function createTicket(array $actor, array $input): array {
         $type = (string) ($input['request_type'] ?? 'maintenance');
         if (!isset(self::REQUEST_TYPES[$type])) {
             throw new InvalidArgumentException('Choose a request type.');
         }
-        if (($input['title'] ?? '') === '' || ($input['description'] ?? '') === '' || empty($input['category_id']) || ($input['location'] ?? '') === '' || empty($input['priority'])) {
-            throw new InvalidArgumentException('Title, description, category, location and priority are required.');
+        if (($input['description'] ?? '') === '' || empty($input['category_id']) || ($input['location'] ?? '') === '' || empty($input['priority'])) {
+            throw new InvalidArgumentException('Category, location, priority and description are required.');
+        }
+        // The form has no title box: build a short title from the category and location
+        if (trim((string) ($input['title'] ?? '')) === '') {
+            $input['title'] = $this->buildTitle((int) $input['category_id'], (string) $input['location'], (string) $input['description']);
         }
         if (!isset(self::PRIORITIES[$input['priority']])) {
             throw new InvalidArgumentException('Invalid priority.');
@@ -225,7 +246,11 @@ class FacilitiesTicketService {
         } else {
             $this->notifyOfficers('ticket_created', (int) $id, 'New maintenance request', $seq['ticket_number'] . ' needs a responsible officer.');
         }
-        return $this->model->getDetailed((int) $id);
+        $created = $this->model->getDetailed((int) $id);
+        if ($route['staff_id'] !== '' && $created) {
+            $this->smsResponsible($route['staff_id'], $created, 'new', (string) $actor['staff_id']);
+        }
+        return $created;
     }
 
     public function resolveRoute(int $categoryId): array {
@@ -233,7 +258,10 @@ class FacilitiesTicketService {
         $key = $route['route_key'] ?? 'facility_officer';
         $staffId = trim((string) ($route['staff_id'] ?? ''));
         $departmentId = '';
-        if ($staffId === '') {
+        if ($staffId !== '') {
+            // The person assigned to this category receives the ticket (their department is recorded)
+            $departmentId = $this->model->staffDepartmentId($staffId);
+        } else {
             $found = $this->officerForRoute($key);
             $staffId = $found['staff_id'];
             $departmentId = $found['department_id'];
@@ -361,6 +389,90 @@ class FacilitiesTicketService {
         if ($staffId !== '' && $level < 3) {
             $this->notifyStaff($staffId, $ticketId, 'ticket_escalated', 'Request needs attention', ($row['ticket_number'] ?? '') . ' — ' . $reason);
         }
+    }
+
+    /**
+     * Text the responsible person the ticket details (Mobitel SMS).
+     * Never blocks the ticket: any problem is written to the ticket history instead.
+     */
+    public function smsResponsible(string $staffId, array $ticket, string $reason, string $exceptStaffId = ''): void {
+        $staffId = trim($staffId);
+        $ticketId = (int) ($ticket['id'] ?? 0);
+        if ($staffId === '' || $ticketId <= 0 || $staffId === $exceptStaffId) {
+            return;
+        }
+        try {
+            require_once BASE_PATH . '/services/MobitelSmsService.php';
+            $sms = new MobitelSmsService();
+            $mobile = $this->model->staffPhone($staffId);
+            if ($sms->normalizeSriLankanMobile($mobile) === null) {
+                $this->history($ticketId, $staffId, 'SMS not sent', '', $staffId, 'No valid mobile number on the staff record.');
+                return;
+            }
+            $text = $this->buildSmsText($ticket, $reason);
+            $result = $sms->sendSms($mobile, $text);
+            $this->history(
+                $ticketId,
+                $staffId,
+                $result['ok'] ? 'SMS sent' : 'SMS failed',
+                '',
+                $staffId,
+                $result['ok'] ? 'Gateway accepted the message.' : ('Gateway code ' . $result['result_code'] . ' (' . (string) $result['error'] . ').')
+            );
+        } catch (Throwable $e) {
+            error_log('[FacilitiesSMS] ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * SMS body. $kind: 'new' (ticket received), 'assigned' or 'reassigned'.
+     */
+    public function buildSmsText(array $ticket, string $kind = 'new'): string {
+        $cut = static function (string $v, int $max): string {
+            $v = trim((string) preg_replace('/\s+/', ' ', $v));
+            if (function_exists('mb_strlen')) {
+                return mb_strlen($v) > $max ? mb_substr($v, 0, $max - 3) . '...' : $v;
+            }
+            return strlen($v) > $max ? substr($v, 0, $max - 3) . '...' : $v;
+        };
+        $requester = trim((string) ($ticket['requester_name'] ?? ''));
+        if ($requester === '') {
+            $requester = trim((string) ($ticket['requester_staff_id'] ?? ''));
+        }
+        $department = trim((string) ($ticket['requester_department_name'] ?? ''));
+        if ($department === '') {
+            $department = trim((string) ($ticket['responsible_department_name'] ?? ''));
+        }
+        $created = !empty($ticket['created_at']) ? date('Y-m-d H:i', strtotime((string) $ticket['created_at'])) : date('Y-m-d H:i');
+        $heading = $kind === 'reassigned' ? 'Ticket Reassigned' : ($kind === 'assigned' ? 'Ticket Assigned' : 'New Ticket Notification');
+        $intro = $kind === 'new'
+            ? 'A new ticket has been received.'
+            : 'A ticket has been ' . ($kind === 'reassigned' ? 'reassigned' : 'assigned') . ' to you.';
+        $outro = $kind === 'new'
+            ? 'Please review the request and assign a suitable technician to handle the issue.'
+            : 'Please review the request and take the necessary action.';
+        $lines = [
+            'SLGTI MIS - ' . $heading,
+            '',
+            $intro,
+            '',
+            'Ticket ID: ' . ($ticket['ticket_number'] ?? ''),
+            'Category: ' . $cut((string) ($ticket['category_name'] ?? ''), 40),
+            'Subject: ' . $cut((string) (($ticket['description'] ?? '') !== '' ? $ticket['description'] : ($ticket['title'] ?? '')), 100),
+            'Requested By: ' . $cut($requester, 40),
+            'Department: ' . $cut($department, 50),
+            'Location: ' . $cut((string) ($ticket['location'] ?? ''), 60),
+            'Date: ' . $created,
+            '',
+            $outro,
+        ];
+        if (defined('APP_URL') && !empty($ticket['id'])) {
+            // New tickets link straight to the assign page; assigned tickets link to the ticket itself.
+            $path = $kind === 'new' ? '/facilities/assign?id=' : '/facilities/view?id=';
+            $lines[] = '';
+            $lines[] = ($kind === 'new' ? 'Assign: ' : 'Open: ') . APP_URL . $path . (int) $ticket['id'];
+        }
+        return implode("\n", $lines);
     }
 
     public function notifyStaff(string $staffId, int $ticketId, string $event, string $title, string $message): void {

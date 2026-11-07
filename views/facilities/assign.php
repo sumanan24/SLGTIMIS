@@ -3,7 +3,7 @@ $t = $ticket;
 ?>
 <div class="container-fluid px-0 fac-page">
     <div class="card border-0">
-        <div class="card-header"><h5 class="fw-bold mb-0">Assign work</h5></div>
+        <?php $facHeader('Assign Work', 'Choose who will handle this ticket.'); ?>
         <div class="card-body">
             <?php $facNav(); $facFlash(); ?>
             <p class="fw-bold mb-1"><?php echo $h($t['ticket_number']); ?> · <?php echo $h($t['title']); ?></p>

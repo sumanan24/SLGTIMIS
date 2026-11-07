@@ -73,6 +73,9 @@ class FacilitiesAssignmentService {
         }
         $fresh = $this->model->getDetailed((int) $ticket['id']);
         $this->tickets->notifyWatchers($fresh, $isReassign ? 'ticket_reassigned' : 'ticket_assigned', $action, 'Ticket ' . $ticket['ticket_number'] . ' assigned to ' . $target . '.');
+        if ($staffId !== '' && $fresh) {
+            $this->tickets->smsResponsible($staffId, $fresh, $isReassign ? 'reassigned' : 'assigned', (string) $actor['staff_id']);
+        }
         return $fresh;
     }
 

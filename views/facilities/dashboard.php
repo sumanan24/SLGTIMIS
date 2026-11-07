@@ -10,10 +10,7 @@ $isLead = !empty($actor['is_officer']) || !empty($actor['is_monitor']);
 <?php endif; ?>
 <div class="container-fluid px-0 fac-page">
     <div class="card border-0">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="fw-bold mb-0"><?php echo !empty($actor['is_officer']) ? 'Facilities work' : (!empty($actor['is_monitor']) ? 'Facilities overview' : 'My facilities work'); ?></h5>
-            <a class="btn btn-sm btn-light" href="<?php echo $base; ?>/create">New ticket</a>
-        </div>
+        <?php $facHeader(!empty($actor['is_officer']) ? 'Facilities Work' : (!empty($actor['is_monitor']) ? 'Facilities Overview' : 'My Facilities Work'), 'Summary of maintenance tickets and what needs action.', $facNewBtn); ?>
         <div class="card-body">
             <?php $facNav(); $facFlash(); ?>
 
@@ -24,12 +21,12 @@ $isLead = !empty($actor['is_officer']) || !empty($actor['is_monitor']);
                 <a class="fac-stat" href="<?php echo $base; ?>?status=in_progress"><span>In progress</span><strong><?php echo (int) ($c['in_progress'] ?? 0); ?></strong></a>
                 <a class="fac-stat" href="<?php echo $base; ?>?status=completed_pending_verification"><span>To verify</span><strong><?php echo (int) ($c['pending_verification'] ?? 0); ?></strong></a>
                 <a class="fac-stat is-bad" href="<?php echo $base; ?>?overdue=1"><span>Overdue</span><strong><?php echo (int) ($c['overdue_count'] ?? 0); ?></strong></a>
+                <a class="fac-stat is-warn" href="<?php echo $base; ?>?due_soon=1"><span>Due soon</span><strong><?php echo (int) ($mc['due_soon'] ?? 0); ?></strong></a>
                 <a class="fac-stat is-warn" href="<?php echo $base; ?>?priority=critical"><span>Critical</span><strong><?php echo (int) ($c['critical_count'] ?? 0); ?></strong></a>
-                <a class="fac-stat" href="<?php echo $base; ?>?status=closed"><span>Closed</span><strong><?php echo (int) ($c['closed_count'] ?? 0); ?></strong></a>
-                <a class="fac-stat" href="<?php echo $base; ?>?status=on_hold"><span>On hold</span><strong><?php echo (int) ($c['on_hold'] ?? 0); ?></strong></a>
                 <a class="fac-stat is-warn" href="<?php echo $base; ?>?escalated=1"><span>Escalated</span><strong><?php echo (int) ($c['escalated_count'] ?? 0); ?></strong></a>
+                <a class="fac-stat" href="<?php echo $base; ?>?status=on_hold"><span>On hold</span><strong><?php echo (int) ($c['on_hold'] ?? 0); ?></strong></a>
+                <a class="fac-stat" href="<?php echo $base; ?>?status=closed"><span>Closed</span><strong><?php echo (int) ($c['closed_count'] ?? 0); ?></strong></a>
                 <a class="fac-stat" href="<?php echo $base; ?>/reports"><span>Satisfaction</span><strong><?php echo isset($summary['satisfaction']) && $summary['satisfaction'] !== null ? $h(number_format((float) $summary['satisfaction'], 1)) : '—'; ?></strong></a>
-                <a class="fac-stat" href="<?php echo $base; ?>?due_soon=1"><span>Due soon</span><strong><?php echo (int) ($mc['due_soon'] ?? 0); ?></strong></a>
             </div>
             <?php if (($summary['avg_hours'] ?? null) !== null): ?>
                 <p class="fac-note mb-3">Average time to close: <?php echo $h(number_format((float) $summary['avg_hours'], 1)); ?> hours</p>
@@ -64,14 +61,14 @@ $isLead = !empty($actor['is_officer']) || !empty($actor['is_monitor']);
                     <?php else: ?>
                     <div class="fac-table-wrap">
                         <table class="table table-sm mb-0">
-                            <thead><tr><th>Ticket</th><th>Problem</th><th>Priority</th><th></th></tr></thead>
+                            <thead><tr><th>Ticket</th><th>Problem</th><th>Priority</th><th class="fac-col-act"></th></tr></thead>
                             <tbody>
                             <?php foreach ($tab[1] as $row): ?>
                                 <tr>
-                                    <td><a href="<?php echo $base; ?>/view?id=<?php echo (int) $row['id']; ?>"><?php echo $h($row['ticket_number']); ?></a></td>
+                                    <td class="fac-col-no"><a href="<?php echo $base; ?>/view?id=<?php echo (int) $row['id']; ?>"><?php echo $h($row['ticket_number']); ?></a></td>
                                     <td><?php echo $h($row['title']); ?></td>
                                     <td><?php echo $badgePriority($row['current_priority']); ?></td>
-                                    <td class="text-end">
+                                    <td class="text-end text-nowrap">
                                         <?php if ($key === 'new'): ?>
                                             <a class="btn btn-sm btn-primary" href="<?php echo $base; ?>/assign?id=<?php echo (int) $row['id']; ?>">Assign</a>
                                         <?php elseif ($key === 'pending'): ?>
@@ -91,6 +88,12 @@ $isLead = !empty($actor['is_officer']) || !empty($actor['is_monitor']);
             </div>
             <?php endif; ?>
 
+            <?php if ($isLead): ?>
+            <div class="row g-3 mb-3 fac-charts">
+                <div class="col-lg-6"><div class="fac-chart-box"><h6>Tickets by status</h6><div class="fac-chart-canvas"><canvas id="facStatusChart"></canvas></div></div></div>
+                <div class="col-lg-6"><div class="fac-chart-box"><h6>Created vs closed (this year)</h6><div class="fac-chart-canvas"><canvas id="facTrendChart"></canvas></div></div></div>
+            </div>
+            <?php endif; ?>
             <div class="fac-section">
                 <h6><?php echo $isLead ? 'Recent tickets' : 'My work'; ?></h6>
                 <?php if (empty($mine['rows'])): ?>
@@ -98,15 +101,15 @@ $isLead = !empty($actor['is_officer']) || !empty($actor['is_monitor']);
                 <?php else: ?>
                 <div class="fac-table-wrap">
                     <table class="table table-sm mb-0">
-                        <thead><tr><th>Ticket</th><th>Problem</th><th>Status</th><th>Deadline</th><th></th></tr></thead>
+                        <thead><tr><th>Ticket</th><th>Problem</th><th>Status</th><th>Deadline</th><th class="fac-col-act"></th></tr></thead>
                         <tbody>
                         <?php foreach ($mine['rows'] as $row): ?>
                             <tr>
-                                <td><?php echo $h($row['ticket_number']); ?></td>
+                                <td class="fac-col-no"><?php echo $h($row['ticket_number']); ?></td>
                                 <td><?php echo $h($row['title']); ?></td>
                                 <td><?php echo $badgeStatus($row['status']); ?></td>
                                 <td><?php echo $dueLabel($row); ?></td>
-                                <td class="text-end">
+                                <td class="text-end text-nowrap">
                                     <?php if (($row['responsible_staff_id'] ?? '') === ($actor['staff_id'] ?? '') && in_array($row['status'], ['assigned', 'accepted', 'in_progress', 'reopened'], true)): ?>
                                         <a class="btn btn-sm btn-primary" href="<?php echo $base; ?>/view?id=<?php echo (int) $row['id']; ?>#progress">Update</a>
                                     <?php else: ?>
@@ -121,32 +124,27 @@ $isLead = !empty($actor['is_officer']) || !empty($actor['is_monitor']);
                 <?php endif; ?>
             </div>
 
-            <?php if ($isLead): ?>
-            <div class="row g-3 mb-3">
-                <div class="col-lg-6"><div class="fac-chart-box"><h6>Status</h6><canvas id="facStatusChart" height="160"></canvas></div></div>
-                <div class="col-lg-6"><div class="fac-chart-box"><h6>This year</h6><canvas id="facTrendChart" height="160"></canvas></div></div>
-            </div>
-            <?php if (!empty($summary['departments'])): ?>
+            <?php if ($isLead && !empty($summary['departments'])): ?>
             <div class="fac-section">
                 <h6>Departments</h6>
                 <div class="fac-table-wrap">
                     <table class="table table-sm mb-0">
-                        <thead><tr><th>Department</th><th>Total</th><th>Done</th><th>Open</th><th>Overdue</th></tr></thead>
+                        <thead><tr><th>Department</th><th class="text-end">Total</th><th class="text-end">Done</th><th class="text-end">Open</th><th class="text-end">Overdue</th></tr></thead>
                         <tbody>
                         <?php foreach ($summary['departments'] as $row): ?>
                             <tr>
                                 <td><?php echo $h($row['department_name'] ?: $row['department_id']); ?></td>
-                                <td><?php echo (int) $row['total']; ?></td>
-                                <td><?php echo (int) $row['completed']; ?></td>
-                                <td><?php echo (int) $row['pending']; ?></td>
-                                <td><?php echo (int) $row['overdue']; ?></td>
+                                <td class="text-end text-nowrap"><?php echo (int) $row['total']; ?></td>
+                                <td class="text-end text-nowrap"><?php echo (int) $row['completed']; ?></td>
+                                <td class="text-end text-nowrap"><?php echo (int) $row['pending']; ?></td>
+                                <td class="text-end text-nowrap"><?php echo (int) $row['overdue']; ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
             </div>
-            <?php endif; endif; ?>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -159,7 +157,7 @@ $isLead = !empty($actor['is_officer']) || !empty($actor['is_monitor']);
     new Chart(document.getElementById('facStatusChart'), {
         type: 'doughnut',
         data: { labels: Object.keys(statusData), datasets: [{ data: Object.values(statusData), backgroundColor: ['#94a3b8','#8b5cf6','#3b82f6','#f59e0b','#fb923c','#22c55e','#0f766e','#ef4444'] }] },
-        options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
     });
     new Chart(document.getElementById('facTrendChart'), {
         type: 'line',
@@ -170,7 +168,7 @@ $isLead = !empty($actor['is_officer']) || !empty($actor['is_monitor']);
                 { label: 'Closed', data: monthly.map(r => +r.closed_count), borderColor: '#0f766e', tension: 0.25 }
             ]
         },
-        options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
     });
 })();
 </script>
