@@ -28,6 +28,20 @@ class BackupHelper {
     }
 
     /**
+     * Statement placed at the top of every dump so it also imports on MySQL 8.4+.
+     *
+     * MySQL 8.4 turned on restrict_fk_on_non_standard_key, which rejects a foreign key that points at a
+     * column that is not a full PRIMARY/UNIQUE key (e.g. assessments_type.module_id -> module.module_id,
+     * while module's key is (module_id, course_id)). Older servers accept those keys, so the dump can
+     * contain them. Without this line the import stops with error 6125 and `module` is never created.
+     *
+     * The /*!80400 comment only runs on servers >= 8.4, and the change lasts for the import session only.
+     */
+    private const IMPORT_COMPAT_PRELUDE =
+        "-- Import compatibility: allow foreign keys on non-unique columns (MySQL 8.4+ rejects them by default).\n"
+        . "/*!80400 SET @OLD_RESTRICT_FK_ON_NON_STANDARD_KEY=@@SESSION.restrict_fk_on_non_standard_key, SESSION restrict_fk_on_non_standard_key=0 */;\n";
+
+    /**
      * Build a full SQL dump (tables, data, views, triggers, routines, events).
      */
     public static function generateSqlDump(mysqli $conn, string $dbName): string {
@@ -52,6 +66,7 @@ class BackupHelper {
         $sql .= '-- Database: ' . $dbName . "\n";
         $sql .= '-- MySQL Version: ' . $conn->server_info . "\n\n";
         $sql .= "SET NAMES utf8mb4;\n";
+        $sql .= self::IMPORT_COMPAT_PRELUDE;
         $sql .= "SET FOREIGN_KEY_CHECKS=0;\n";
         $sql .= "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n";
         $sql .= "SET time_zone = \"+00:00\";\n\n";
@@ -162,6 +177,20 @@ class BackupHelper {
             'CREATE ',
             $sql
         );
+
+        // Let the dump import on MySQL 8.4+ (see IMPORT_COMPAT_PRELUDE); skip if already present.
+        if (strpos($sql, 'restrict_fk_on_non_standard_key') === false) {
+            $sql = preg_replace(
+                '/^(\/\*!40014 SET @OLD_FOREIGN_KEY_CHECKS[^\r\n]*\r?\n)/m',
+                '$1' . self::IMPORT_COMPAT_PRELUDE,
+                $sql,
+                1,
+                $inserted
+            );
+            if (!$inserted) {
+                $sql = self::IMPORT_COMPAT_PRELUDE . "\n" . $sql;
+            }
+        }
 
         return ltrim($sql);
     }
