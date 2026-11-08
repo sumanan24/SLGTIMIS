@@ -37,21 +37,13 @@ class DashboardController extends Controller {
             $staffModel = $this->model('StaffModel');
             $courseModel = $this->model('CourseModel');
             
-            // Get academic years and set default to last one
-            $academicYears = $studentModel->getAcademicYears();
-            $selectedAcademicYear = $this->get('academic_year', '');
+            // The dashboard totals cover every academic year (no year filter). Year-wise figures are
+            // in the "Students by academic year" table.
+            $academicYears = [];
+            $selectedAcademicYear = '';
             
-            // If no academic year selected, use the last one
-            if (empty($selectedAcademicYear) && !empty($academicYears)) {
-                $selectedAcademicYear = $academicYears[0]; // First one is the latest (DESC order)
-            }
-            
-            // Same count as the Students page: Following + Internship for the selected year.
-            if (!empty($selectedAcademicYear)) {
-                $totalStudents = $studentModel->getTotalStudents(['academic_year' => $selectedAcademicYear]);
-            } else {
-                $totalStudents = $studentModel->getTotalStudents([]);
-            }
+            // Same count as the Students page: Following + Internship across all years.
+            $totalStudents = $studentModel->getTotalStudents([]);
             $totalStaff = $staffModel->count();
             $totalCourses = $courseModel->count();
             $recentStudents = $studentModel->getRecentStudents(5);
@@ -67,6 +59,44 @@ class DashboardController extends Controller {
             $provinceStats = $studentModel->getStudentsByProvince($selectedAcademicYear);
             $enrollStatusCounts = $studentModel->getStudentsByEnrollStatus($selectedAcademicYear);
             $totalStudentsByYear = $totalStudents;
+
+            // Overview panels: year-wise students, hostel availability, staff by category.
+            // Each loads on its own so one failing query never blanks the whole dashboard.
+            require_once BASE_PATH . '/core/AccessControl.php';
+            $uid = (int) $_SESSION['user_id'];
+            $overviewErrors = [];
+
+            $yearWiseStudents = [];
+            $studyModeTotals = ['full_time' => 0, 'part_time' => 0];
+            if (AccessControl::can($uid, 'students', 'view')) {
+                try {
+                    $overviewModel = $this->model('DashboardOverviewModel');
+                    $studyModeTotals = $overviewModel->getStudyModeTotals();
+                    $yearWiseStudents = $overviewModel->getStudentsByAcademicYear();
+                } catch (Throwable $e) {
+                    error_log('DashboardController year-wise students: ' . $e->getMessage());
+                    $overviewErrors['students'] = 'Unable to load the academic year breakdown.';
+                }
+            }
+
+            $hostelOverview = ['hostels' => [], 'totals' => []];
+            try {
+                $hostelOverview = $this->buildHostelOverview($this->model('RoomModel')->getOccupancyReport());
+            } catch (Throwable $e) {
+                error_log('DashboardController hostel overview: ' . $e->getMessage());
+                $overviewErrors['hostel'] = 'Unable to load hostel availability.';
+            }
+
+            $canViewStaff = AccessControl::can($uid, 'staff', 'view');
+            $staffBreakdown = null;
+            if ($canViewStaff) {
+                try {
+                    $staffBreakdown = $this->model('DashboardOverviewModel')->getStaffBreakdown();
+                } catch (Throwable $e) {
+                    error_log('DashboardController staff breakdown: ' . $e->getMessage());
+                    $overviewErrors['staff'] = 'Unable to load the staff breakdown.';
+                }
+            }
             
             // Final deduplication check - ensure each student appears only once
             $uniqueStudents = [];
@@ -99,6 +129,15 @@ class DashboardController extends Controller {
                 'enrollStatusCounts' => $enrollStatusCounts,
                 'academicYears' => $academicYears,
                 'selectedAcademicYear' => $selectedAcademicYear,
+                'yearWiseStudents' => $yearWiseStudents,
+                'studyModeTotals' => $studyModeTotals,
+                'canViewStudents' => AccessControl::can($uid, 'students', 'view'),
+                'hostelOverview' => $hostelOverview,
+                'canViewStaff' => $canViewStaff,
+                'canViewCourses' => AccessControl::can($uid, 'courses', 'view'),
+                'canViewDepartments' => AccessControl::can($uid, 'departments', 'view'),
+                'staffBreakdown' => $staffBreakdown,
+                'overviewErrors' => $overviewErrors,
             ];
             
             return $this->view('dashboard/index', $data);
@@ -116,6 +155,73 @@ class DashboardController extends Controller {
                 ]);
             }
         }
+    }
+
+    /**
+     * Group the per-room occupancy rows into hostels with totals.
+     *
+     * @param list<array<string, mixed>> $rooms Rows from RoomModel::getOccupancyReport()
+     * @return array{hostels: list<array<string, mixed>>, totals: array<string, int|float>}
+     */
+    private function buildHostelOverview(array $rooms): array {
+        $hostels = [];
+        $totals = ['hostels' => 0, 'rooms' => 0, 'capacity' => 0, 'allocated' => 0, 'available' => 0];
+
+        foreach ($rooms as $room) {
+            $hostelId = (string) ($room['hostel_id'] ?? '');
+            if ($hostelId === '') {
+                continue; // room not linked to a hostel
+            }
+            if (!isset($hostels[$hostelId])) {
+                $hostels[$hostelId] = [
+                    'id' => $hostelId,
+                    'name' => (string) ($room['hostel_name'] ?? ''),
+                    'gender' => (string) ($room['hostel_gender'] ?? ''),
+                    'location' => (string) ($room['location'] ?? ''),
+                    'blocks' => [],
+                    'rooms' => 0, 'capacity' => 0, 'allocated' => 0, 'available' => 0,
+                    'full_rooms' => 0, 'room_list' => [],
+                ];
+            }
+            $capacity = (int) $room['capacity'];
+            $allocated = (int) $room['allocated'];
+            $available = max(0, $capacity - $allocated);
+            $block = (string) ($room['block_name'] ?? '');
+
+            $h = &$hostels[$hostelId];
+            $h['blocks'][$block] = true;
+            $h['rooms']++;
+            $h['capacity'] += $capacity;
+            $h['allocated'] += $allocated;
+            $h['available'] += $available;
+            if ($available === 0) {
+                $h['full_rooms']++;
+            }
+            $h['room_list'][] = [
+                'block' => $block,
+                'room' => (string) ($room['room_no'] ?? ''),
+                'capacity' => $capacity,
+                'allocated' => $allocated,
+                'available' => $available,
+            ];
+            unset($h);
+
+            $totals['rooms']++;
+            $totals['capacity'] += $capacity;
+            $totals['allocated'] += $allocated;
+            $totals['available'] += $available;
+        }
+
+        foreach ($hostels as &$h) {
+            $h['blocks'] = count($h['blocks']);
+            $h['occupancy'] = $h['capacity'] > 0 ? round($h['allocated'] / $h['capacity'] * 100) : 0;
+        }
+        unset($h);
+
+        $totals['hostels'] = count($hostels);
+        $totals['occupancy'] = $totals['capacity'] > 0 ? round($totals['allocated'] / $totals['capacity'] * 100) : 0;
+
+        return ['hostels' => array_values($hostels), 'totals' => $totals];
     }
 
     private function financeDashboard() {
@@ -162,6 +268,15 @@ class DashboardController extends Controller {
             'enrollStatusCounts' => [],
             'academicYears' => [],
             'selectedAcademicYear' => '',
+            'yearWiseStudents' => [],
+            'studyModeTotals' => ['full_time' => 0, 'part_time' => 0],
+            'canViewStudents' => false,
+            'hostelOverview' => ['hostels' => [], 'totals' => []],
+            'canViewStaff' => false,
+            'canViewCourses' => false,
+            'canViewDepartments' => false,
+            'staffBreakdown' => null,
+            'overviewErrors' => [],
             'error' => 'Unable to load some dashboard statistics. ' . $e->getMessage(),
         ];
     }

@@ -295,7 +295,7 @@ $avatarPalette = [
     font-weight: 600;
     color: var(--dept-text);
     line-height: 1.35;
-    word-break: break-word;
+    overflow-wrap: break-word;
 }
 .dept-id-chip {
     display: inline-flex;
@@ -353,16 +353,7 @@ a.dept-count:hover { background: #d4e4f8; color: #083a72; }
     color: #fff;
 }
 
-/* ---------- Tablet: hide index column, tighten spacing ---------- */
-@media (max-width: 991.98px) {
-    .dept-table .col-num { display: none; }
-    .dept-table thead th,
-    .dept-table tbody td { padding: 0.75rem 0.75rem; }
-    .dept-table .col-actions { width: auto; }
-    .dept-actions .btn .lbl { display: none; }
-}
-
-/* ---------- Mobile: each row becomes a labelled card ---------- */
+/* ---------- Phone / small screens (page chrome follows the screen) ---------- */
 @media (max-width: 767.98px) {
     .dept-page.container-fluid {
         padding-left: 0.75rem !important;
@@ -370,9 +361,49 @@ a.dept-count:hover { background: #d4e4f8; color: #083a72; }
     }
     .dept-page .dept-head .btn { width: 100%; }
     .dept-page .dept-toolbar { flex-direction: column; }
+    .dept-page .dept-toolbar .dept-search { flex: 0 0 auto; width: 100%; }
     .dept-page .dept-toolbar .btn { width: 100%; }
+    .head-type-grid { grid-template-columns: 1fr; }
+}
 
+/* ---------- Responsive table ----------
+   The table adapts to the width it actually has (the 280px sidebar takes space on desktop),
+   not to the screen width:  full table > 1450px, compact table 901-1450px, cards <= 900px. */
+.dept-table-host { container: dept-table / inline-size; }
+.dept-name-wrap { min-width: 0; }
+.dept-name-sub {
+    display: none;
+    margin-top: 0.1rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--dept-muted);
+}
+.dept-table .col-name { min-width: 14rem; }
+
+/* Compact table: drop # and ID columns, icon-only actions */
+@container dept-table (max-width: 1450px) {
+    .dept-table { min-width: 0; }
+    .dept-table .col-num,
+    .dept-table .col-id { display: none; }
+    .dept-name-sub { display: block; }
+    .dept-table thead th,
+    .dept-table tbody td { padding: 0.7rem 0.6rem; }
+    .dept-table .col-name { min-width: 11rem; }
+    .dept-table .col-cat { width: auto; }
+    .dept-table .col-head { min-width: 10rem; }
+    .dept-table .col-count { width: 4.5rem; }
+    .dept-table .col-actions { width: auto; }
+    .dept-actions { gap: 0.3rem; }
+    .dept-actions .btn .lbl { display: none; }
+    .dept-actions .btn i { margin-right: 0 !important; }
+    .dept-actions .btn { min-width: 34px; padding-left: 0.5rem; padding-right: 0.5rem; }
+}
+
+/* Cards: each row becomes a labelled card; several cards per row when there is room */
+@container dept-table (max-width: 900px) {
     .dept-table-wrap { background: transparent; border: 0; box-shadow: none; overflow: visible; }
+    .dept-table-scroll { overflow: visible; }
     .dept-table thead {
         position: absolute;
         width: 1px; height: 1px;
@@ -380,15 +411,24 @@ a.dept-count:hover { background: #d4e4f8; color: #083a72; }
         clip: rect(0 0 0 0);
     }
     .dept-table { min-width: 0; }
-    .dept-actions .btn .lbl { display: inline; }
-    .dept-table, .dept-table tbody, .dept-table tr, .dept-table td { display: block; width: 100%; }
+    .dept-table,
+    .dept-table tbody,
+    .dept-table tr,
+    .dept-table td { display: block; width: 100%; }
+    .dept-table tbody {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 18.5rem), 1fr));
+        gap: 0.85rem;
+    }
     .dept-table tbody tr {
+        display: flex;
+        flex-direction: column;
         background: #fff;
         border: 1px solid var(--dept-border);
         border-radius: 0.75rem;
         box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
-        margin-bottom: 0.85rem;
         overflow: hidden;
+        min-width: 0;
     }
     .dept-table tbody td,
     .dept-table tbody tr:nth-child(even) td,
@@ -413,25 +453,33 @@ a.dept-count:hover { background: #d4e4f8; color: #083a72; }
         color: var(--dept-muted);
         text-align: left;
     }
-    .dept-table td.col-name {
+    .dept-table tbody td.col-num { display: none; }
+    .dept-table tbody td.col-id { display: flex; }
+    .dept-name-sub { display: none; }
+    .dept-table tbody tr:hover td.col-name,
+    .dept-table tbody td.col-name {
         background: var(--dept-soft);
         padding: 0.85rem 1rem;
         text-align: left;
+        justify-content: flex-start;
     }
     .dept-table td.col-name::before { display: none; }
-    .dept-table td.col-actions {
+    .dept-table tbody td.col-actions {
         border-bottom: 0;
         padding: 0.75rem 1rem;
         justify-content: stretch;
+        margin-top: auto;
     }
     .dept-table td.col-actions::before { display: none; }
+    .dept-table .col-name,
     .dept-table .col-id, .dept-table .col-cat, .dept-table .col-head,
     .dept-table .col-count, .dept-table .col-actions { width: 100%; min-width: 0; }
     .dept-table .dept-head-cell { text-align: right; }
     .dept-table .dept-head-meta { justify-content: flex-end; }
-    .dept-actions { display: flex; flex-wrap: wrap; width: 100%; }
-    .dept-actions .btn { flex: 1 1 30%; }
-    .head-type-grid { grid-template-columns: 1fr; }
+    .dept-actions { display: flex; flex-wrap: wrap; width: 100%; gap: 0.4rem; }
+    .dept-actions .btn { flex: 1 1 calc(50% - 0.4rem); }
+    .dept-actions .btn .lbl { display: inline; }
+    .dept-actions .btn i { margin-right: 0.25rem !important; }
 }
 @media (max-width: 575.98px) {
     .dept-page .dept-title { font-size: 1.2rem; }
@@ -489,7 +537,7 @@ a.dept-count:hover { background: #d4e4f8; color: #083a72; }
         <div class="dept-search">
             <i class="fas fa-search" aria-hidden="true"></i>
             <input type="text" name="search" class="form-control" value="<?php echo $h($search); ?>"
-                   placeholder="Search by department ID or name" autocomplete="off">
+                   placeholder="Search ID or name" autocomplete="off">
         </div>
         <button type="submit" class="btn btn-primary">
             <i class="fas fa-filter me-1"></i>Search
@@ -510,13 +558,14 @@ a.dept-count:hover { background: #d4e4f8; color: #083a72; }
     </div>
 
     <?php if (!empty($departments)): ?>
+        <div class="dept-table-host">
         <div class="dept-table-wrap">
             <div class="dept-table-scroll">
                 <table class="dept-table">
                     <thead>
                         <tr>
                             <th scope="col" class="col-num">#</th>
-                            <th scope="col">Department</th>
+                            <th scope="col" class="col-name">Department</th>
                             <th scope="col" class="col-id">ID</th>
                             <th scope="col" class="col-cat">Category</th>
                             <th scope="col" class="col-head">Head of Department</th>
@@ -548,7 +597,10 @@ a.dept-count:hover { background: #d4e4f8; color: #083a72; }
                                         <span class="dept-avatar" style="background: <?php echo $palette[1]; ?>; color: <?php echo $palette[0]; ?>;">
                                             <?php echo $h($initials); ?>
                                         </span>
-                                        <a class="dept-name text-decoration-none" href="<?php echo APP_URL; ?>/departments/view?id=<?php echo urlencode($deptId); ?>" title="View department details"><?php echo $h($deptName); ?></a>
+                                        <div class="dept-name-wrap">
+                                            <a class="dept-name text-decoration-none" href="<?php echo APP_URL; ?>/departments/view?id=<?php echo urlencode($deptId); ?>" title="View department details"><?php echo $h($deptName); ?></a>
+                                            <span class="dept-name-sub"><?php echo $h($deptId); ?></span>
+                                        </div>
                                     </div>
                                 </td>
                                 <td class="col-id" data-label="ID">
@@ -620,6 +672,7 @@ a.dept-count:hover { background: #d4e4f8; color: #083a72; }
                     </tbody>
                 </table>
             </div>
+        </div>
         </div>
 
         <?php if ($totalPages > 1): ?>
