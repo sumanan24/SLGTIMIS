@@ -3,7 +3,7 @@
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
             <h4 class="mb-0"><i class="fas fa-users-cog me-2"></i>User Management</h4>
             <div class="d-flex flex-wrap gap-2">
-                <a href="<?php echo APP_URL; ?>/admin/backup-db" class="btn btn-light btn-sm fw-bold" download>
+                <a href="<?php echo APP_URL; ?>/admin/backup-db" class="btn btn-light btn-sm fw-bold">
                     <i class="fas fa-download me-1 text-primary"></i> SQL to PC
                 </a>
                 <a href="<?php echo APP_URL; ?>/admin/backup-files" class="btn btn-outline-light btn-sm fw-bold" download>

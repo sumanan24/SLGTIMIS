@@ -963,7 +963,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                     </li>
                                     <li class="menu-divider-submenu"></li>
                                     <li>
-                                        <a href="<?php echo APP_URL; ?>/admin/backup-db" class="<?php echo (isset($page) && $page === 'admin-backup-db') ? 'active' : ''; ?>" download>
+                                        <a href="<?php echo APP_URL; ?>/admin/backup-db" class="<?php echo (isset($page) && $page === 'admin-backup-db') ? 'active' : ''; ?>">
                                             <i class="fas fa-database"></i>
                                             <span>SQL Backup (PC)</span>
                                         </a>

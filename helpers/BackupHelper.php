@@ -150,6 +150,149 @@ class BackupHelper {
     }
 
     /**
+     * Memory-safe backup: run mysqldump straight into a temp file, then copy it line by line
+     * (applying the same import fixes as sanitizeSqlForImport) into a second temp file.
+     * A full database can be tens of MB, so it is never held in PHP memory as one string.
+     *
+     * @return string|null Path of the finished .sql temp file (caller must unlink it), or null when
+     *                     mysqldump is unavailable or fails (use generateSqlDump() as a fallback).
+     */
+    public static function tryMysqldumpToFile(string $dbName): ?string {
+        $mysqldump = self::findMysqldumpBinary();
+        if ($mysqldump === null) {
+            return null;
+        }
+
+        $cnfPath = self::writeMysqlClientDefaultsFile();
+        if ($cnfPath === null) {
+            return null;
+        }
+
+        $rawPath = tempnam(sys_get_temp_dir(), 'slgti_dump_raw_');
+        $cleanPath = tempnam(sys_get_temp_dir(), 'slgti_dump_');
+        if ($rawPath === false || $cleanPath === false) {
+            @unlink($cnfPath);
+            return null;
+        }
+
+        try {
+            $cmd = escapeshellarg($mysqldump)
+                . ' --defaults-extra-file=' . escapeshellarg($cnfPath)
+                . ' --routines --triggers --events --single-transaction --hex-blob'
+                . ' --default-character-set=utf8mb4 --set-gtid-purged=OFF --column-statistics=0'
+                . ' --result-file=' . escapeshellarg($rawPath)
+                . ' ' . escapeshellarg($dbName);
+
+            $proc = @proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            if (!is_resource($proc)) {
+                @unlink($cleanPath);
+                return null;
+            }
+            fclose($pipes[0]);
+            stream_get_contents($pipes[1]);
+            $stderr = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $exitCode = proc_close($proc);
+
+            if ($exitCode !== 0 || !is_file($rawPath) || filesize($rawPath) === 0) {
+                error_log('BackupHelper::tryMysqldumpToFile failed (exit ' . $exitCode . '): ' . trim((string) $stderr));
+                @unlink($cleanPath);
+                return null;
+            }
+
+            if (!self::sanitizeDumpFile($rawPath, $cleanPath)) {
+                @unlink($cleanPath);
+                return null;
+            }
+
+            return $cleanPath;
+        } finally {
+            @unlink($cnfPath);
+            @unlink($rawPath);
+        }
+    }
+
+    /**
+     * Line-by-line version of sanitizeSqlForImport() for large dump files.
+     *
+     * @return bool true when the output file looks like a real dump (contains CREATE TABLE)
+     */
+    public static function sanitizeDumpFile(string $inPath, string $outPath): bool {
+        $in = @fopen($inPath, 'rb');
+        $out = @fopen($outPath, 'wb');
+        if ($in === false || $out === false) {
+            if (is_resource($in)) {
+                fclose($in);
+            }
+            if (is_resource($out)) {
+                fclose($out);
+            }
+            return false;
+        }
+
+        $started = false;          // skip any mysqldump warnings printed before the real header
+        $preludeDone = false;
+        $hasCreateTable = false;
+
+        while (($line = fgets($in)) !== false) {
+            if (!$started) {
+                if (!preg_match('/^(--\s*MySQL dump|\/\*!40101 SET @OLD_CHARACTER_SET)/i', $line)) {
+                    continue;
+                }
+                $started = true;
+            }
+
+            // GTID can break restore on another server when privileges differ
+            if (preg_match('/^SET\s+@@GLOBAL\.GTID_PURGED\s*=/i', $line)) {
+                continue;
+            }
+
+            // DEFINER often missing on a new PC / new MySQL user
+            if (stripos($line, 'DEFINER') !== false) {
+                $line = preg_replace('/CREATE\s+DEFINER\s*=\s*`[^`]+`@`[^`]+`\s+/i', 'CREATE ', $line);
+            }
+
+            if (!$hasCreateTable && strncmp($line, 'CREATE TABLE', 12) === 0) {
+                $hasCreateTable = true;
+            }
+
+            fwrite($out, $line);
+
+            // Let the dump import on MySQL 8.4+ (see IMPORT_COMPAT_PRELUDE).
+            if (!$preludeDone && strpos($line, '/*!40014 SET @OLD_FOREIGN_KEY_CHECKS') === 0) {
+                fwrite($out, self::IMPORT_COMPAT_PRELUDE);
+                $preludeDone = true;
+            }
+        }
+
+        fclose($in);
+        fclose($out);
+
+        return $started && $hasCreateTable;
+    }
+
+    /**
+     * Send a finished file to the browser as a download, then delete it and stop the script.
+     */
+    public static function streamFileDownloadAndExit(string $path, string $downloadName, string $mimeType): void {
+        $size = (int) filesize($path);
+        @set_time_limit(0);
+        self::beginBrowserDownload($downloadName, $mimeType, $size);
+
+        $fh = fopen($path, 'rb');
+        if ($fh !== false) {
+            while (!feof($fh)) {
+                echo fread($fh, 1048576);
+                flush();
+            }
+            fclose($fh);
+        }
+        @unlink($path);
+        exit;
+    }
+
+    /**
      * Remove mysqldump CLI warnings and other junk so SQL imports on another PC/phpMyAdmin.
      */
     public static function sanitizeSqlForImport(string $sql): string {

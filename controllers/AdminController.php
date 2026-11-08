@@ -377,22 +377,29 @@ class AdminController extends Controller {
         try {
             require_once BASE_PATH . '/helpers/BackupHelper.php';
 
+            // A full dump is tens of MB: allow time/memory and stream it from a temp file.
+            @set_time_limit(0);
+            @ini_set('memory_limit', '512M');
+
             $dbName = DB_NAME;
-            $sql = BackupHelper::tryMysqldump($dbName);
-            if ($sql === null) {
+            $filePath = BackupHelper::tryMysqldumpToFile($dbName);
+            if ($filePath === null) {
+                // mysqldump unavailable: build the dump in PHP, then sanitise and stream it from a file.
                 $conn = Database::getInstance()->getConnection();
-                $sql = BackupHelper::generateSqlDump($conn, $dbName);
+                $sql = BackupHelper::sanitizeSqlForImport(BackupHelper::generateSqlDump($conn, $dbName));
+                $filePath = tempnam(sys_get_temp_dir(), 'slgti_dump_');
+                if ($filePath === false || file_put_contents($filePath, $sql) === false) {
+                    throw new RuntimeException('Could not write the temporary backup file.');
+                }
+                unset($sql);
             }
-            $sql = BackupHelper::sanitizeSqlForImport($sql);
 
             require_once BASE_PATH . '/core/ActivityLogger.php';
             $activityLogger = new ActivityLogger();
             $activityLogger->log('database_backup', 'Full database backup downloaded by admin', 'success');
 
             $filename = 'backup_' . $dbName . '_' . date('Y-m-d_H-i-s') . '.sql';
-            BackupHelper::beginBrowserDownload($filename, 'application/sql', strlen($sql));
-            echo $sql;
-            exit;
+            BackupHelper::streamFileDownloadAndExit($filePath, $filename, 'application/sql');
         } catch (Exception $e) {
             $_SESSION['error'] = 'Backup failed: ' . $e->getMessage();
             $this->redirect('admin/users');
