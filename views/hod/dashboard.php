@@ -754,7 +754,9 @@
                     <p class="mb-2">Department Dashboard - Viewing your department's statistics</p>
                     <?php
                     require_once BASE_PATH . '/models/UserModel.php';
-                    $dashHeaded = (new UserModel())->getHeadedDepartments((int) ($_SESSION['user_id'] ?? 0));
+                    // Assigned heads get the detailed "Department assignment" card below; this line is
+                    // only the fallback for a HOD post without an explicit assignment.
+                    $dashHeaded = empty($assignments) ? (new UserModel())->getHeadedDepartments((int) ($_SESSION['user_id'] ?? 0)) : [];
                     foreach ($dashHeaded as $dh): ?>
                         <p class="mb-2"><i class="fas fa-user-tie me-2"></i><strong>Head of Department</strong> &mdash; <?php echo htmlspecialchars($dh['department_name']); ?><?php echo $dh['head_type_label'] !== '' ? ' (' . htmlspecialchars($dh['head_type_label']) . ')' : ''; ?></p>
                     <?php endforeach; ?>
@@ -818,6 +820,95 @@
         </div>
     </div>
     
+    <?php
+    $e = static function ($v) { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); };
+    $typeBadge = ['permanent' => '#0f766e', 'acting' => '#b45309', 'cover_up' => '#7c3aed'];
+    $dashUrl = APP_URL . '/hod/dashboard';
+    $yearQs = !empty($selectedAcademicYear) ? '&academic_year=' . urlencode($selectedAcademicYear) : '';
+    ?>
+    <style>
+        .assign-card { border-radius: 14px; border: 1px solid #e2e8f0; background: #fff; box-shadow: 0 2px 10px rgba(15,23,42,.06); margin-bottom: 1.5rem; width: 100%; }
+        .assign-card .assign-head { background: linear-gradient(135deg, #001f3f 0%, #003366 100%); color: #fff; padding: 1rem 1.25rem; font-weight: 600; border-radius: 14px 14px 0 0; }
+        .assign-card .assign-body { padding: 1.25rem; }
+        .assign-item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; padding: .85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: .6rem; background: #f8fafc; }
+        .assign-item.is-active { border-color: #003366; background: #eef4fb; box-shadow: inset 4px 0 0 #003366; }
+        .assign-type { display: inline-block; padding: .2rem .65rem; border-radius: 999px; color: #fff; font-size: .75rem; font-weight: 600; margin-left: .4rem; }
+        .assign-meta { color: #64748b; font-size: .85rem; }
+        .dept-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
+        .dept-actions .btn { border-radius: 8px; }
+        .cm-table th, .cm-table td { vertical-align: middle; }
+        @media (max-width: 768px) { .assign-card .assign-body { padding: .75rem .6rem; } .assign-item { padding: .7rem .6rem; } }
+    </style>
+
+    <?php if (!empty($error)): ?>
+    <div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i><?php echo $e($error); ?></div>
+    <?php endif; ?>
+
+    <?php if (!empty($department)): ?>
+    <!-- Department assignment (Permanent / Acting / Cover-up) + department information shortcuts -->
+    <div class="assign-card">
+        <div class="assign-head"><i class="fas fa-user-tie me-2"></i>Department Assignment &amp; Information</div>
+        <div class="assign-body">
+            <?php if (!empty($assignments) || !empty($ownDepartment)): ?>
+                <?php foreach ($assignments as $a): ?>
+                <div class="assign-item <?php echo !empty($a['active']) ? 'is-active' : ''; ?>">
+                    <div>
+                        <strong><?php echo $e($a['department_name']); ?></strong>
+                        <?php if ($a['head_type_label'] !== ''): ?>
+                            <span class="assign-type" style="background: <?php echo $typeBadge[$a['head_type']] ?? '#475569'; ?>;"><?php echo $e($a['head_type_label']); ?> Head</span>
+                        <?php endif; ?>
+                        <div class="assign-meta">
+                            <?php echo $e($a['department_id']); ?>
+                            <?php if (!empty($a['start_date'])): ?> &middot; Since <?php echo $e(date('d M Y', strtotime($a['start_date']))); ?><?php endif; ?>
+                            <?php if (!empty($a['remarks'])): ?> &middot; <?php echo $e($a['remarks']); ?><?php endif; ?>
+                        </div>
+                    </div>
+                    <?php if (!empty($a['active'])): ?>
+                        <span class="badge bg-success"><i class="fas fa-check me-1"></i>Viewing</span>
+                    <?php else: ?>
+                        <a class="btn btn-sm btn-outline-primary" href="<?php echo $dashUrl . '?department_id=' . urlencode($a['department_id']) . $yearQs; ?>">View this department</a>
+                    <?php endif; ?>
+                </div>
+                <?php endforeach; ?>
+                <?php if (!empty($ownDepartment)): ?>
+                <div class="assign-item <?php echo !empty($ownDepartment['active']) ? 'is-active' : ''; ?>">
+                    <div>
+                        <strong><?php echo $e($ownDepartment['department_name']); ?></strong>
+                        <span class="assign-type" style="background:#475569;">My department</span>
+                        <div class="assign-meta"><?php echo $e($ownDepartment['department_id']); ?> &middot; Department on your staff record</div>
+                    </div>
+                    <?php if (!empty($ownDepartment['active'])): ?>
+                        <span class="badge bg-success"><i class="fas fa-check me-1"></i>Viewing</span>
+                    <?php else: ?>
+                        <a class="btn btn-sm btn-outline-secondary" href="<?php echo $dashUrl . '?department_id=' . urlencode($ownDepartment['department_id']) . $yearQs; ?>">View this department</a>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+            <?php endif; ?>
+
+            <div class="dept-actions">
+                <a class="btn btn-primary btn-sm" href="<?php echo APP_URL; ?>/departments/view?id=<?php echo urlencode($department['department_id']); ?>">
+                    <i class="fas fa-info-circle me-1"></i>Department Information
+                </a>
+                <a class="btn btn-outline-primary btn-sm" href="<?php echo APP_URL; ?>/courses?department_id=<?php echo urlencode($department['department_id']); ?>">
+                    <i class="fas fa-book me-1"></i>Courses
+                </a>
+                <a class="btn btn-outline-primary btn-sm" href="<?php echo APP_URL; ?>/modules?department_id=<?php echo urlencode($department['department_id']); ?>">
+                    <i class="fas fa-cubes me-1"></i>Course Modules
+                </a>
+                <?php if (!empty($canManageCourses)): ?>
+                <a class="btn btn-outline-secondary btn-sm" href="<?php echo APP_URL; ?>/modules/create">
+                    <i class="fas fa-plus me-1"></i>Add Module
+                </a>
+                <a class="btn btn-outline-secondary btn-sm" href="<?php echo APP_URL; ?>/hod/staff-module-enroll">
+                    <i class="fas fa-user-cog me-1"></i>Staff Module Enrollment
+                </a>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Main Stats Cards - Department Only (if user has department) -->
     <?php if (!empty($department)): ?>
     <div class="row g-4 mb-4">
@@ -874,6 +965,63 @@
     </div>
     <?php endif; ?>
     
+    <!-- Courses & Modules - Department Only -->
+    <?php if (!empty($department)): ?>
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="card dashboard-chart-card">
+                <div class="chart-card-header">
+                    <i class="fas fa-cubes me-2"></i>Courses &amp; Modules - <?php echo $e($department['department_name'] ?? 'Department'); ?>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($courseModuleRows)): ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm cm-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Course</th>
+                                    <th>NVQ</th>
+                                    <th>Status</th>
+                                    <th class="text-center">Modules</th>
+                                    <th class="text-center">Groups</th>
+                                    <th class="text-end">Options</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($courseModuleRows as $cr): ?>
+                                <tr>
+                                    <td>
+                                        <strong><?php echo $e($cr['course_name']); ?></strong>
+                                        <div class="text-muted small"><?php echo $e($cr['course_id']); ?></div>
+                                    </td>
+                                    <td><?php echo $cr['course_nvq_level'] !== '' ? 'Level ' . $e($cr['course_nvq_level']) : '-'; ?></td>
+                                    <td><span class="badge bg-<?php echo $cr['course_status'] === 'active' ? 'success' : ($cr['course_status'] === 'draft' ? 'warning text-dark' : 'secondary'); ?>"><?php echo $e(ucfirst($cr['course_status'])); ?></span></td>
+                                    <td class="text-center"><span class="badge" style="background:#003366;"><?php echo (int) $cr['modules']; ?></span></td>
+                                    <td class="text-center"><?php echo (int) $cr['groups']; ?></td>
+                                    <td class="text-end" style="white-space: nowrap;">
+                                        <a class="btn btn-sm btn-outline-primary" href="<?php echo APP_URL; ?>/modules?course_id=<?php echo urlencode($cr['course_id']); ?>" title="View the modules of this course"><i class="fas fa-cubes"></i> Modules</a>
+                                        <a class="btn btn-sm btn-outline-secondary" href="<?php echo APP_URL; ?>/courses/manage?id=<?php echo urlencode($cr['course_id']); ?>" title="Course workspace"><i class="fas fa-sliders-h"></i> Manage</a>
+                                        <?php if (!empty($canManageCourses)): ?>
+                                        <a class="btn btn-sm btn-outline-success" href="<?php echo APP_URL; ?>/modules/create?course_id=<?php echo urlencode($cr['course_id']); ?>" title="Add a module"><i class="fas fa-plus"></i></a>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php else: ?>
+                    <div class="text-center py-4">
+                        <i class="fas fa-book-open fa-3x text-muted mb-3"></i>
+                        <p class="text-muted mb-0">No courses found in this department.</p>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Course Enrollment - Department Only -->
     <?php if (!empty($department_id) && !empty($courseEnrollmentByDepartment) && isset($courseEnrollmentByDepartment[$department_id])): ?>
     <?php $dept = $courseEnrollmentByDepartment[$department_id]; ?>

@@ -634,6 +634,7 @@ class FacilitiesTicketModel extends Model {
             'facilities_assignments', 'facilities_progress_updates', 'facilities_evidence',
             'facilities_comments', 'facilities_status_history', 'facilities_priority_history',
             'facilities_deadline_history', 'facilities_verifications', 'facilities_activity',
+            'facilities_procurement',
         ];
         if (!in_array($table, $allowed, true)) {
             return [];
@@ -655,6 +656,7 @@ class FacilitiesTicketModel extends Model {
             'facilities_comments', 'facilities_status_history', 'facilities_priority_history',
             'facilities_deadline_history', 'facilities_verifications', 'facilities_activity',
             'facilities_notifications', 'facilities_escalations', 'facilities_feedback', 'facilities_materials',
+            'facilities_procurement',
         ];
         if (!in_array($table, $allowed, true)) {
             return false;
@@ -664,6 +666,35 @@ class FacilitiesTicketModel extends Model {
         $id = $this->create($data);
         $this->table = $old;
         return $id;
+    }
+
+    /** Update one row of a child table by its id (procurement requests). */
+    public function updateChild(string $table, int $id, array $data): bool {
+        if ($table !== 'facilities_procurement') {
+            return false;
+        }
+        $old = $this->table;
+        $this->table = $table;
+        $ok = $this->update($id, $data);
+        $this->table = $old;
+        return (bool) $ok;
+    }
+
+    /** Procurement request that is still open (requested or ordered) for a ticket, or null. */
+    public function openProcurement(int $ticketId): ?array {
+        $stmt = $this->db->prepare("SELECT * FROM `facilities_procurement` WHERE `ticket_id` = ? AND `status` IN ('requested','ordered') ORDER BY `id` DESC LIMIT 1");
+        $stmt->bind_param('i', $ticketId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
+    }
+
+    public function procurementById(int $id): ?array {
+        $stmt = $this->db->prepare('SELECT * FROM `facilities_procurement` WHERE `id` = ? LIMIT 1');
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
     }
 
     public function updateTicket(int $id, array $data): bool {

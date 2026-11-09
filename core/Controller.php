@@ -150,37 +150,89 @@ class Controller {
             return null;
         }
         
-        // HOD: use existing method (fall back to the department they are assigned to head)
+        $uid = (int) $_SESSION['user_id'];
+
+        // HOD: their own post's department (fall back to the department they are assigned to head)
         if ($userRole === 'HOD') {
-            return $userModel->getHODDepartment($_SESSION['user_id'])
-                ?: ($userModel->getHeadedDepartmentId($_SESSION['user_id']) ?: $userModel->getStaffDepartmentId($_SESSION['user_id']));
+            $own = $userModel->getHODDepartment($uid)
+                ?: ($userModel->getHeadedDepartmentId($uid) ?: $userModel->getStaffDepartmentId($uid));
+            return $this->pickActiveDepartment($userModel, $uid, $own);
         }
 
-        // Lecturers: their own department, or the one they head
-        if (in_array($userRole, self::LECTURER_ROLES, true)) {
-            return $userModel->getStaffDepartmentId($_SESSION['user_id'])
-                ?: $userModel->getHeadedDepartmentId($_SESSION['user_id']);
-        }
-        
-        // IN1, IN2, IN3: get department from staff table
-        if (in_array($userRole, ['IN1', 'IN2', 'IN3'])) {
-            $user = $userModel->find($_SESSION['user_id']);
-            if (!$user || !isset($user['user_name'])) {
-                return null;
-            }
-            
-            $staffModel = $this->model('StaffModel');
-            $staff = $staffModel->find($user['user_name']);
-            return $staff ? ($staff['department_id'] ?? null) : null;
+        // Lecturers and IN1-IN3: a Permanent / Acting / Cover-up head assignment takes priority over
+        // the department on their staff record. They can switch back from the dashboard.
+        if (in_array($userRole, self::LECTURER_ROLES, true) || in_array($userRole, ['IN1', 'IN2', 'IN3'], true)) {
+            $own = $userModel->getStaffDepartmentId($uid);
+            $headed = $userModel->getHeadedDepartmentIds($uid);
+            $default = $headed[0] ?? $own;
+            return $this->pickActiveDepartment($userModel, $uid, $default ?: null, $own);
         }
 
         // Anyone else who is the assigned head of a department sees that department only
         // (institute-wide roles such as DIR / REG / FIN keep their full view).
         if (!in_array($userRole, self::INSTITUTE_WIDE_ROLES, true)) {
-            return $userModel->getHeadedDepartmentId($_SESSION['user_id']);
+            $headed = $userModel->getHeadedDepartmentIds($uid);
+            return $this->pickActiveDepartment($userModel, $uid, $headed[0] ?? null);
         }
         
         return null;
+    }
+
+    /**
+     * Departments the current user may work in: every department they are assigned to head
+     * (Permanent, Acting or Cover-up) plus the one on their own staff record.
+     *
+     * @return list<string>
+     */
+    protected function getSelectableDepartmentIds($userModel, int $uid, ?string ...$extra): array {
+        $ids = $userModel->getHeadedDepartmentIds($uid);
+        foreach ($extra as $e) {
+            if ($e !== null && trim($e) !== '') {
+                $ids[] = trim($e);
+            }
+        }
+        $own = $userModel->getStaffDepartmentId($uid);
+        if ($own) {
+            $ids[] = $own;
+        }
+        if ($userModel->isHOD($uid)) {
+            $hodDept = $userModel->getHODDepartment($uid);
+            if ($hodDept) {
+                $ids[] = (string) $hodDept;
+            }
+        }
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * Use the department chosen on the dashboard (session) when it is one the user may work in,
+     * otherwise the default.
+     */
+    private function pickActiveDepartment($userModel, int $uid, ?string $default, ?string $own = null): ?string {
+        $chosen = trim((string) ($_SESSION['active_department_id'] ?? ''));
+        if ($chosen !== '' && in_array($chosen, $this->getSelectableDepartmentIds($userModel, $uid, $default, $own), true)) {
+            return $chosen;
+        }
+        return $default;
+    }
+
+    /**
+     * Switch the department the user is working in (dashboard selector). Returns false when the
+     * user is not allowed to work in that department.
+     */
+    protected function setActiveDepartment(string $departmentId): bool {
+        if (!isset($_SESSION['user_id'])) {
+            return false;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        $departmentId = trim($departmentId);
+        if ($departmentId === '' || !in_array($departmentId, $this->getSelectableDepartmentIds($userModel, $uid), true)) {
+            return false;
+        }
+        $_SESSION['active_department_id'] = $departmentId;
+        return true;
     }
 
     /** Lecturer positions: their data views are limited to their own department. */
@@ -202,8 +254,13 @@ class Controller {
         if ($role === 'HOD') {
             return true;
         }
-        return !in_array($role, self::INSTITUTE_WIDE_ROLES, true)
-            && $userModel->getHeadedDepartmentId($_SESSION['user_id']) !== null;
+        if (in_array($role, self::INSTITUTE_WIDE_ROLES, true)) {
+            return false;
+        }
+        // Only for the department they actually head (not their own department when it is a different one).
+        $active = $this->getUserDepartment();
+        return $active !== null
+            && in_array($active, $userModel->getHeadedDepartmentIds((int) $_SESSION['user_id']), true);
     }
 
     /**

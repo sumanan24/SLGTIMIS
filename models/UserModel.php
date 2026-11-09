@@ -465,6 +465,38 @@ class UserModel extends Model {
     }
 
     /**
+     * Ids of every department this staff login is assigned to head (Permanent, Acting or Cover-up).
+     * Real assignments only (department.head_staff_id); no fallback to the staff member's own department.
+     *
+     * @return list<string>
+     */
+    public function getHeadedDepartmentIds($userId): array {
+        $ids = [];
+        try {
+            $user = $this->find($userId);
+            if (!$user || ($user['user_table'] ?? '') !== 'staff' || empty($user['user_name'])) {
+                return [];
+            }
+            $stmt = $this->db->prepare("SELECT `department_id` FROM `department` WHERE `head_staff_id` = ? ORDER BY `department_name`");
+            if (!$stmt) {
+                return [];
+            }
+            $stmt->bind_param('s', $user['user_name']);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            while ($res && ($row = $res->fetch_assoc())) {
+                $id = trim((string) $row['department_id']);
+                if ($id !== '') {
+                    $ids[] = $id;
+                }
+            }
+        } catch (Throwable $e) {
+            return [];
+        }
+        return $ids;
+    }
+
+    /**
      * Departments this staff login heads, for display ("Head of Department - ICT").
      * Based on department.head_staff_id; a HOD position without an assignment falls back to
      * the staff member's own department.

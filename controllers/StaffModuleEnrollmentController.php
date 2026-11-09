@@ -30,7 +30,8 @@ class StaffModuleEnrollmentController extends Controller
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $allowedRoles = ['HOD', 'IN1', 'IN2', 'IN3'];
 
-        if (!in_array($userRole, $allowedRoles)) {
+        // Assigned heads (Permanent / Acting / Cover-up) may enroll staff for the department they head.
+        if (!in_array($userRole, $allowedRoles) && !$this->isDepartmentManager()) {
             $_SESSION['error'] = 'Access denied. Only HOD and department instructors can enroll staff to modules.';
             $this->redirect('dashboard');
             return;

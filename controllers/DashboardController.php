@@ -21,7 +21,8 @@ class DashboardController extends Controller {
         
         // HOD, instructors and lecturers only see their own department
         require_once BASE_PATH . '/models/UserModel.php';
-        if ($this->isDepartmentRestricted() || (new UserModel())->usesDepartmentDashboard((int) $_SESSION['user_id'])) {
+        // (also anyone assigned as Permanent / Acting / Cover-up head of a department)
+        if ($this->isDepartmentScoped() || (new UserModel())->usesDepartmentDashboard((int) $_SESSION['user_id'])) {
             $this->redirect('hod/dashboard');
             return;
         }

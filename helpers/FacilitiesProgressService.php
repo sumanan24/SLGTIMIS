@@ -69,6 +69,9 @@ class FacilitiesProgressService {
         if (trim($description) === '') {
             throw new InvalidArgumentException('Completion description is required.');
         }
+        if ($this->model->openProcurement((int) $ticket['id']) !== null) {
+            throw new RuntimeException('Procurement is still open. Record the goods receipt or cancel the request before submitting completion.');
+        }
         $hasEvidence = $this->model->hasCompletionEvidence((int) $ticket['id']);
         if (!$hasEvidence && empty($actor['is_officer'])) {
             throw new RuntimeException('Upload at least one completion evidence file before submitting.');

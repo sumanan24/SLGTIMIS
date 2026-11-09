@@ -27,9 +27,21 @@ class HODDashboardController extends Controller {
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $allowedRoles = ['HOD', 'IN1', 'IN2', 'IN3', 'LE1', 'LE2', 'SLE', 'FIN', 'ACC', 'DIR', 'REG'];
         
-        if (!in_array($userRole, $allowedRoles)) {
+        // Anyone assigned as Permanent / Acting / Cover-up head of a department may open it too.
+        $headedIds = $userModel->getHeadedDepartmentIds((int) $_SESSION['user_id']);
+        if (!in_array($userRole, $allowedRoles) && empty($headedIds)) {
             $_SESSION['error'] = 'Access denied. This dashboard is only available for authorized roles.';
             $this->redirect('dashboard');
+            return;
+        }
+
+        // Department switcher (a head can hold more than one department, e.g. own post + Acting).
+        $requestedDepartment = trim((string) $this->get('department_id', ''));
+        if ($requestedDepartment !== '') {
+            if (!$this->setActiveDepartment($requestedDepartment)) {
+                $_SESSION['error'] = 'You are not assigned to that department.';
+            }
+            $this->redirect('hod/dashboard' . (($ay = trim((string) $this->get('academic_year', ''))) !== '' ? '?academic_year=' . urlencode($ay) : ''));
             return;
         }
         
@@ -75,6 +87,8 @@ class HODDashboardController extends Controller {
             $totalStaff = 0;
             $recentStudents = [];
             $departmentEnrollment = [];
+            $departmentCourses = [];
+            $courseModuleRows = [];
             $departmentNVQStats = [];
             $departmentGenderStats = [];
             $departmentReligionStats = [];
@@ -95,6 +109,20 @@ class HODDashboardController extends Controller {
                 // Get department courses
                 $departmentCourses = $courseModel->getCoursesWithDepartment(['department_id' => $userDepartmentId]);
                 $totalCourses = count($departmentCourses);
+
+                // Courses with their module counts (for the Courses & Modules section)
+                $workspaceCounts = $courseModel->getWorkspaceCounts(array_column($departmentCourses, 'course_id'));
+                foreach ($departmentCourses as $c) {
+                    $cid = (string) ($c['course_id'] ?? '');
+                    $courseModuleRows[] = [
+                        'course_id' => $cid,
+                        'course_name' => $c['course_name'] ?? $cid,
+                        'course_nvq_level' => $c['course_nvq_level'] ?? '',
+                        'course_status' => $c['course_status'] ?? 'active',
+                        'modules' => $workspaceCounts[$cid]['modules'] ?? 0,
+                        'groups' => $workspaceCounts[$cid]['groups'] ?? 0,
+                    ];
+                }
                 
                 // Get department staff count
                 $totalStaff = $staffModel->getTotalStaff('', $userDepartmentId);
@@ -139,7 +167,56 @@ class HODDashboardController extends Controller {
                 }
             }
             
+            // Department assignments (Permanent / Acting / Cover-up) of this login
+            $assignments = [];
+            $labels = DepartmentModel::headTypes();
+            foreach ($headedIds as $hid) {
+                $row = $departmentModel->getById($hid);
+                if (!$row) {
+                    continue;
+                }
+                $type = strtolower((string) ($row['head_type'] ?? ''));
+                $assignments[] = [
+                    'department_id' => (string) $row['department_id'],
+                    'department_name' => (string) ($row['department_name'] ?? $hid),
+                    'head_type' => $type,
+                    'head_type_label' => $labels[$type] ?? '',
+                    'start_date' => $row['head_start_date'] ?? null,
+                    'remarks' => $row['head_remarks'] ?? null,
+                    'active' => ((string) $row['department_id'] === (string) $userDepartmentId),
+                ];
+            }
+            // Own department (staff record) as a switch target when it differs from the assigned ones
+            $ownDepartment = null;
+            $ownId = $userModel->getStaffDepartmentId((int) $_SESSION['user_id']);
+            if ($ownId && !in_array($ownId, $headedIds, true) && !empty($assignments)) {
+                $ownRow = $departmentModel->getById($ownId);
+                if ($ownRow) {
+                    $ownDepartment = [
+                        'department_id' => (string) $ownRow['department_id'],
+                        'department_name' => (string) ($ownRow['department_name'] ?? $ownId),
+                        'active' => ((string) $ownRow['department_id'] === (string) $userDepartmentId),
+                    ];
+                }
+            }
+            $activeAssignment = null;
+            foreach ($assignments as $a) {
+                if ($a['active']) {
+                    $activeAssignment = $a;
+                    break;
+                }
+            }
+
+            $flashError = $_SESSION['error'] ?? null;
+            unset($_SESSION['error']);
+
             $data = [
+                'error' => $flashError,
+                'assignments' => $assignments,
+                'ownDepartment' => $ownDepartment,
+                'activeAssignment' => $activeAssignment,
+                'courseModuleRows' => $courseModuleRows,
+                'canManageCourses' => $this->isDepartmentManager(),
                 'title' => 'Department Dashboard',
                 'page' => 'dashboard',
                 'user_name' => $_SESSION['user_name'] ?? 'User',

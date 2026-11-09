@@ -8,9 +8,11 @@ class FacilitiesController extends Controller {
     private $progress;
     private $verify;
     private $reports;
+    private $proc;
 
     public function __construct() {
         parent::__construct();
+        require_once BASE_PATH . '/helpers/FacilitiesProcurementService.php';
         require_once BASE_PATH . '/helpers/FacilitiesTicketService.php';
         require_once BASE_PATH . '/helpers/FacilitiesAssignmentService.php';
         require_once BASE_PATH . '/helpers/FacilitiesProgressService.php';
@@ -21,6 +23,7 @@ class FacilitiesController extends Controller {
         $this->progress = new FacilitiesProgressService();
         $this->verify = new FacilitiesVerificationService();
         $this->reports = new FacilitiesReportService();
+        $this->proc = new FacilitiesProcurementService();
     }
 
     public function dashboard() {
@@ -274,7 +277,48 @@ class FacilitiesController extends Controller {
         if (!empty($actor['is_monitor']) || !empty($actor['is_officer'])) {
             $this->logActivity('VIEW', 'facilities', $ticket['id'], $actor['name'] . ' viewed ' . $ticket['ticket_number']);
         }
-        return $this->view('facilities/show', $this->detailData($actor, $ticket, 'Ticket ' . $ticket['ticket_number']));
+        $data = $this->detailData($actor, $ticket, 'Ticket ' . $ticket['ticket_number']);
+        $data['roadmap'] = $this->buildRoadmap($data);
+        return $this->view('facilities/show', $data);
+    }
+
+    /**
+     * Road map (Create > Review > Assign > Procurement & Work > Verify > Close) for the ticket detail page.
+     */
+    private function buildRoadmap(array $data): array {
+        require_once BASE_PATH . '/helpers/FacilitiesRoadmap.php';
+        $t = $data['ticket'];
+        $history = $this->svc->model()->children('facilities_status_history', (int) $t['id'], 'changed_at ASC, id ASC');
+
+        $ids = [(string) ($t['requester_staff_id'] ?? ''), (string) ($t['responsible_staff_id'] ?? ''), (string) ($t['closed_by'] ?? '')];
+        foreach ($history as $r) {
+            $ids[] = (string) ($r['changed_by'] ?? '');
+        }
+        foreach (($data['assignments'] ?? []) as $r) {
+            $ids[] = (string) ($r['assigned_by'] ?? '');
+            $ids[] = (string) ($r['staff_id'] ?? '');
+        }
+        foreach (($data['procurements'] ?? []) as $r) {
+            foreach (['requested_by', 'ordered_by', 'received_by', 'cancelled_by'] as $k) {
+                $ids[] = (string) ($r[$k] ?? '');
+            }
+        }
+        $names = $this->svc->model()->staffNamesByIds($ids);
+
+        return FacilitiesRoadmap::build(
+            $t,
+            $history,
+            $data['assignments'] ?? [],
+            $data['team'] ?? [],
+            $data['evidence'] ?? [],
+            $data['materials'] ?? [],
+            $data['progress_rows'] ?? [],
+            $data['verifications'] ?? [],
+            $names,
+            $data['labels']['statuses'] ?? [],
+            (string) ($data['labels']['routes'][$t['routed_role'] ?? ''] ?? ''),
+            $data['procurements'] ?? []
+        );
     }
 
     public function assign() {
@@ -416,6 +460,35 @@ class FacilitiesController extends Controller {
         $this->ticketAction(function ($actor, $ticket) {
             $this->verify->reopen($actor, $ticket, (string) $this->post('reason', ''));
             $_SESSION['message'] = 'Ticket reopened.';
+        });
+    }
+
+    /** Materials / items are not available: raise a procurement request (optional stage). */
+    public function procureRequest() {
+        $this->ticketAction(function ($actor, $ticket) {
+            $this->proc->request($actor, $ticket, (string) $this->post('items', ''), (string) $this->post('reason', ''));
+            $_SESSION['message'] = 'Procurement request submitted.';
+        });
+    }
+
+    public function procureOrder() {
+        $this->ticketAction(function ($actor, $ticket) {
+            $this->proc->markOrdered($actor, $ticket, (int) $this->post('procurement_id', 0), (string) $this->post('supplier', ''), (string) $this->post('expected_date', ''), (string) $this->post('remarks', ''));
+            $_SESSION['message'] = 'Order recorded.';
+        });
+    }
+
+    public function procureReceive() {
+        $this->ticketAction(function ($actor, $ticket) {
+            $this->proc->markReceived($actor, $ticket, (int) $this->post('procurement_id', 0), (string) $this->post('remarks', ''));
+            $_SESSION['message'] = 'Goods receipt recorded.';
+        });
+    }
+
+    public function procureCancel() {
+        $this->ticketAction(function ($actor, $ticket) {
+            $this->proc->cancel($actor, $ticket, (int) $this->post('procurement_id', 0), (string) $this->post('reason', ''));
+            $_SESSION['message'] = 'Procurement request cancelled.';
         });
     }
 
@@ -862,6 +935,9 @@ class FacilitiesController extends Controller {
             'feedback' => $this->svc->model()->feedbackFor($id),
             'materials' => $this->svc->model()->children('facilities_materials', $id, 'recorded_at ASC'),
             'escalations' => $this->svc->model()->children('facilities_escalations', $id, 'created_at ASC'),
+            'procurements' => $this->svc->model()->children('facilities_procurement', $id, 'requested_at ASC, id ASC'),
+            'can_request_procurement' => $this->proc->canRequest($actor, $ticket),
+            'can_process_procurement' => $this->proc->canProcess($actor, $ticket),
             'can_feedback' => $this->svc->canFeedback($actor, $ticket),
             'can_assign' => $this->svc->canAssign($actor, $ticket),
             'can_work' => $this->svc->canWork($actor, $ticket),

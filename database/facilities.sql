@@ -268,3 +268,26 @@ CREATE TABLE IF NOT EXISTS `facilities_activity` (
   PRIMARY KEY (`id`),
   KEY `idx_fac_act_ticket` (`ticket_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Optional procurement: only created when materials / items for a ticket are not available.
+-- status: requested -> ordered -> received (or cancelled)
+CREATE TABLE IF NOT EXISTS `facilities_procurement` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `ticket_id` INT UNSIGNED NOT NULL,
+  `items` TEXT NOT NULL,
+  `reason` VARCHAR(255) DEFAULT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'requested',
+  `supplier` VARCHAR(160) DEFAULT NULL,
+  `expected_date` DATE DEFAULT NULL,
+  `requested_by` VARCHAR(64) NOT NULL,
+  `requested_at` DATETIME NOT NULL,
+  `ordered_by` VARCHAR(64) DEFAULT NULL,
+  `ordered_at` DATETIME DEFAULT NULL,
+  `received_by` VARCHAR(64) DEFAULT NULL,
+  `received_at` DATETIME DEFAULT NULL,
+  `cancelled_by` VARCHAR(64) DEFAULT NULL,
+  `cancelled_at` DATETIME DEFAULT NULL,
+  `remarks` TEXT,
+  PRIMARY KEY (`id`),
+  KEY `idx_fac_proc_ticket` (`ticket_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -35,7 +35,10 @@
                                 require_once BASE_PATH . '/models/UserModel.php';
                                 $headedDepartments = (new UserModel())->getHeadedDepartments((int) $_SESSION['user_id']);
                             }
-                            $headedNames = implode(', ', array_map(static fn($d) => $d['department_name'], $headedDepartments));
+                            $headedNames = implode(', ', array_map(
+                                static fn($d) => $d['department_name'] . (($d['head_type'] ?? '') !== '' && $d['head_type'] !== 'permanent' ? ' (' . $d['head_type_label'] . ')' : ''),
+                                $headedDepartments
+                            ));
                             ?>
                             <?php if (!empty($headedDepartments)): ?>
                                 <a href="<?php echo APP_URL; ?>/departments/view?id=<?php echo urlencode($headedDepartments[0]['department_id']); ?>"
@@ -127,6 +130,9 @@
                                 $canViewPaymentsMenu = $userModel->canViewPaymentsList($_SESSION['user_id']);
                             }
                             $isADMRole = ($userRole === 'ADM');
+                            // HOD and assigned (Permanent / Acting / Cover-up) department heads
+                            $canStaffModuleEnroll = $isHOD
+                                || (!empty($headedDepartments) && !in_array($userRole, ['ADM', 'DIR', 'DPI', 'DPA', 'REG', 'SAO', 'FIN', 'ACC', 'HRO', 'MHF', 'EXAM'], true));
                             if (!isset($canProcessBusSeasonMenu)) {
                                 $canProcessBusSeasonMenu = false;
                             }
@@ -196,7 +202,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                 $educationPages[] = 'staff-roles'; $educationPages[] = 'staff-types';
                             }
                             // HOD staff module enrollment page
-                            if ($isHOD) {
+                            if ($canStaffModuleEnroll) {
                                 $educationPages[] = 'hod-staff-module-enroll';
                             }
                             echo (isset($page) && in_array($page, $educationPages)) ? 'active' : ''; 
@@ -211,7 +217,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                     if ($isAdminOrADM) {
                                         $educationPages[] = 'staff-roles'; $educationPages[] = 'staff-types';
                                     }
-                                    if ($isHOD) {
+                                    if ($canStaffModuleEnroll) {
                                         $educationPages[] = 'hod-staff-module-enroll';
                                     }
                                     echo (isset($page) && in_array($page, $educationPages)) ? 'display: block;' : ''; 
@@ -266,7 +272,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    <?php if ($isHOD): ?>
+                                    <?php if ($canStaffModuleEnroll): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/hod/staff-module-enroll" class="<?php echo (isset($page) && $page === 'hod-staff-module-enroll') ? 'active' : ''; ?>">
                                             <i class="fas fa-user-cog"></i>
