@@ -1016,28 +1016,39 @@ body.logged-in {
     overflow-x: hidden;
 }
 
-/* ADM role: primary sidebar order (Dashboard first; unknown items after known ones) */
-.sidebar-menu-adm {
+/*
+ * Sidebar order for every role (items a role cannot see are simply not rendered):
+ * Dashboard > academic setup > students (info, attendance, approval, exams, hostel, payment)
+ * > staff (diary, attendance, approval) > assets, maintenance, service providers > Administration.
+ */
+.sidebar-menu-ordered {
     display: flex;
     flex-direction: column;
     min-width: 0;
 }
 
-.sidebar-menu-adm > li { order: 50; }
-.sidebar-menu-adm > li[data-nav="dashboard"] { order: 1; }
-.sidebar-menu-adm > li[data-nav="devices"] { order: 2; }
-.sidebar-menu-adm > li[data-nav="management"] { order: 3; }
-.sidebar-menu-adm > li[data-nav="student-info"] { order: 4; }
-.sidebar-menu-adm > li[data-nav="hostel"] { order: 5; }
-.sidebar-menu-adm > li[data-nav="student-attendance"] { order: 6; }
-.sidebar-menu-adm > li[data-nav="staff-attendance"] { order: 7; }
-.sidebar-menu-adm > li[data-nav="payments"] { order: 8; }
-.sidebar-menu-adm > li[data-nav="student-approval"] { order: 9; }
-.sidebar-menu-adm > li[data-nav="staff-approval"] { order: 10; }
-.sidebar-menu-adm > li[data-nav="instructor-diary"] { order: 11; }
-.sidebar-menu-adm > li[data-nav="exams"] { order: 20; }
-.sidebar-menu-adm > li[data-nav="admin-divider"],
-.sidebar-menu-adm > li[data-nav="administration"] { order: 21; }
+.sidebar-menu-ordered > li { order: 150; }
+.sidebar-menu-ordered > li[data-nav="dashboard"] { order: 10; }
+.sidebar-menu-ordered > li[data-nav="management"] { order: 20; }
+.sidebar-menu-ordered > li[data-nav="staff"] { order: 25; }
+.sidebar-menu-ordered > li[data-nav="student-info"] { order: 30; }
+.sidebar-menu-ordered > li[data-nav="student-attendance"] { order: 40; }
+.sidebar-menu-ordered > li[data-nav="student-approval"] { order: 50; }
+.sidebar-menu-ordered > li[data-nav="exams"] { order: 60; }
+.sidebar-menu-ordered > li[data-nav="hostel"] { order: 70; }
+.sidebar-menu-ordered > li[data-nav="payments"] { order: 80; }
+.sidebar-menu-ordered > li[data-nav="id-card-print"] { order: 85; }
+.sidebar-menu-ordered > li[data-nav="instructor-diary"] { order: 90; }
+.sidebar-menu-ordered > li[data-nav="staff-attendance"] { order: 100; }
+.sidebar-menu-ordered > li[data-nav="circuit-program"] { order: 105; }
+.sidebar-menu-ordered > li[data-nav="staff-approval"] { order: 110; }
+.sidebar-menu-ordered > li[data-nav="devices"] { order: 120; }
+.sidebar-menu-ordered > li[data-nav="facilities"] { order: 130; }
+.sidebar-menu-ordered > li[data-nav="services"] { order: 140; }
+.sidebar-menu-ordered > li[data-nav="admin-divider"] { order: 200; }
+.sidebar-menu-ordered > li[data-nav="administration"] { order: 210; }
+
+/* ADM role: these shortcuts are hidden */
 .sidebar-menu-adm > li[data-nav="id-card-print"],
 .sidebar-menu-adm > li[data-nav="circuit-program"] {
     display: none;

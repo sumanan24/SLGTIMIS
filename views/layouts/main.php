@@ -180,7 +180,7 @@
                             $hasStaffApprovalAccess = $isADMRole;
                             ?>
                             
-                            <ul class="sidebar-menu<?php echo $isADMRole ? ' sidebar-menu-adm' : ''; ?>">
+                            <ul class="sidebar-menu sidebar-menu-ordered<?php echo $isADMRole ? ' sidebar-menu-adm' : ''; ?>">
                             <li data-nav="dashboard">
                                 <a href="<?php echo APP_URL; ?>/<?php echo ($isHOD) ? 'hod/dashboard' : 'dashboard'; ?>" class="<?php echo (isset($page) && $page === 'dashboard') ? 'active' : ''; ?>">
                                     <i class="fas fa-tachometer-alt"></i>
