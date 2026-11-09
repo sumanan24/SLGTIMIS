@@ -33,7 +33,7 @@
                     <form method="GET" action="<?php echo APP_URL; ?>/hostels" class="row g-3">
                         <div class="col-md-10">
                             <input type="text" name="search" class="form-control" 
-                                   placeholder="Search by name, location, or gender..." 
+                                   placeholder="Search by name, address, or gender..." 
                                    value="<?php echo htmlspecialchars($search ?? ''); ?>">
                         </div>
                         <div class="col-md-2">
@@ -65,9 +65,13 @@
                         <thead class="table-light">
                             <tr>
                                 <th class="fw-bold">Name</th>
-                                <th class="fw-bold">Location</th>
+                                <th class="fw-bold">Address</th>
                                 <th class="fw-bold">Gender</th>
-                                <th class="fw-bold">Capacity</th>
+                                <th class="fw-bold text-end">Flats</th>
+                                <th class="fw-bold text-end">Rooms</th>
+                                <th class="fw-bold text-end">Capacity (Beds)</th>
+                                <th class="fw-bold text-end">Occupied</th>
+                                <th class="fw-bold text-end">Available</th>
                                 <th class="fw-bold">Status</th>
                                 <th class="fw-bold text-end">Actions</th>
                             </tr>
@@ -76,29 +80,49 @@
                             <?php foreach ($hostels as $hostel): ?>
                                 <tr>
                                     <td><span class="fw-semibold text-primary"><?php echo htmlspecialchars($hostel['name'] ?? 'N/A'); ?></span></td>
-                                    <td><?php echo htmlspecialchars($hostel['location'] ?? 'N/A'); ?></td>
+                                    <td><?php echo htmlspecialchars($hostel['address'] ?? 'N/A'); ?></td>
                                     <td>
                                         <span class="badge bg-info bg-opacity-10 text-info">
                                             <?php echo htmlspecialchars($hostel['gender'] ?? 'N/A'); ?>
                                         </span>
                                     </td>
-                                    <td><?php echo number_format($hostel['capacity'] ?? 0); ?></td>
+                                    <td class="text-end"><?php echo number_format($hostel['flat_count'] ?? 0); ?></td>
+                                    <td class="text-end"><?php echo number_format($hostel['room_count'] ?? 0); ?></td>
+                                    <td class="text-end fw-semibold"><?php echo number_format($hostel['capacity'] ?? 0); ?></td>
+                                    <td class="text-end"><?php echo number_format($hostel['occupied'] ?? 0); ?></td>
+                                    <td class="text-end">
+                                        <span class="badge <?php echo ((int) ($hostel['available'] ?? 0) > 0) ? 'bg-success' : 'bg-danger'; ?> bg-opacity-10 <?php echo ((int) ($hostel['available'] ?? 0) > 0) ? 'text-success' : 'text-danger'; ?>">
+                                            <?php echo number_format($hostel['available'] ?? 0); ?>
+                                        </span>
+                                    </td>
                                     <td>
-                                        <span class="badge <?php echo (($hostel['status'] ?? 'active') === 'active') ? 'bg-success' : 'bg-secondary'; ?>">
-                                            <?php echo htmlspecialchars(ucfirst($hostel['status'] ?? 'active')); ?>
+                                        <span class="badge <?php echo !empty($hostel['active']) ? 'bg-success' : 'bg-secondary'; ?>">
+                                            <?php echo !empty($hostel['active']) ? 'Active' : 'Inactive'; ?>
                                         </span>
                                     </td>
                                     <td class="text-end">
                                         <?php if (isset($isAdminOrADM) && $isAdminOrADM): ?>
                                         <div class="btn-group" role="group">
+                                            <a href="<?php echo APP_URL; ?>/rooms?hostel_id=<?php echo urlencode($hostel['id'] ?? ''); ?>"
+                                               class="btn btn-sm btn-outline-info" title="View rooms">
+                                                <i class="fas fa-door-open"></i>
+                                            </a>
                                             <a href="<?php echo APP_URL; ?>/hostels/edit?id=<?php echo urlencode($hostel['id'] ?? ''); ?>" 
                                                class="btn btn-sm btn-outline-primary" title="Edit">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            <a href="<?php echo APP_URL; ?>/hostels/delete?id=<?php echo urlencode($hostel['id'] ?? ''); ?>" 
-                                               class="btn btn-sm btn-outline-danger" title="Delete">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
+                                            <?php if ((int) ($hostel['occupied'] ?? 0) > 0): ?>
+                                                <a href="<?php echo APP_URL; ?>/hostels/delete?id=<?php echo urlencode($hostel['id'] ?? ''); ?>"
+                                                   class="btn btn-sm btn-outline-secondary"
+                                                   title="Occupied (<?php echo (int) $hostel['occupied']; ?> students) - cannot be deleted. Click to see why.">
+                                                    <i class="fas fa-lock"></i>
+                                                </a>
+                                            <?php else: ?>
+                                                <a href="<?php echo APP_URL; ?>/hostels/delete?id=<?php echo urlencode($hostel['id'] ?? ''); ?>" 
+                                                   class="btn btn-sm btn-outline-danger" title="Delete">
+                                                    <i class="fas fa-trash"></i>
+                                                </a>
+                                            <?php endif; ?>
                                         </div>
                                         <?php else: ?>
                                         <span class="text-muted small">View Only</span>

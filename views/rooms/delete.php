@@ -6,10 +6,18 @@
                     <h5 class="mb-0 fw-bold"><i class="fas fa-trash me-2"></i>Delete Room</h5>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        <strong>Warning:</strong> This action cannot be undone. Make sure this room has no active allocations.
-                    </div>
+                    <?php $blocked = !empty($allocations['active']); ?>
+                    <?php if ($blocked): ?>
+                        <div class="alert alert-danger">
+                            <i class="fas fa-ban me-2"></i>
+                            <strong>Cannot delete:</strong> <?php echo (int) $allocations['active']; ?> student(s) are currently allocated to this room. Move or release them first.
+                        </div>
+                    <?php else: ?>
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Warning:</strong> This action cannot be undone. This room has no students<?php echo !empty($allocations['total']) ? '; its ' . (int) $allocations['total'] . ' past allocation record(s) will be deleted with it' : ''; ?>.
+                        </div>
+                    <?php endif; ?>
                     
                     <p>Are you sure you want to delete the following room?</p>
                     
@@ -45,7 +53,7 @@
                             <a href="<?php echo APP_URL; ?>/rooms" class="btn btn-secondary">
                                 <i class="fas fa-times me-2"></i>Cancel
                             </a>
-                            <button type="submit" class="btn btn-danger">
+                            <button type="submit" class="btn btn-danger" <?php echo $blocked ? 'disabled' : ''; ?>>
                                 <i class="fas fa-trash me-2"></i>Delete Room
                             </button>
                         </div>

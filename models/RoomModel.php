@@ -16,7 +16,7 @@ class RoomModel extends Model {
     public function getRooms($page = 1, $perPage = 20, $filters = []) {
         $offset = ($page - 1) * $perPage;
         
-        $sql = "SELECT r.*, h.name as hostel_name, b.name as block_name,
+        $sql = "SELECT r.*, h.name as hostel_name, b.hostel_id as hostel_id, b.name as block_name,
                 (SELECT COUNT(*) FROM hostel_allocations WHERE room_id = r.id AND status = 'active') as occupied_beds
                 FROM `{$this->table}` r
                 LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
@@ -45,7 +45,7 @@ class RoomModel extends Model {
             $types .= 's';
         }
         
-        $sql .= " ORDER BY h.name, b.name, r.room_no ASC LIMIT ? OFFSET ?";
+        $sql .= " ORDER BY h.name, b.name, CAST(r.room_no AS UNSIGNED), r.room_no ASC LIMIT ? OFFSET ?";
         $params[] = $perPage;
         $params[] = $offset;
         $types .= 'ii';
@@ -241,23 +241,47 @@ class RoomModel extends Model {
     }
     
     /**
-     * Delete room
+     * Allocation records (all / active) of one room.
+     *
+     * @return array ['total' => int, 'active' => int]
      */
-    public function deleteRoom($id) {
-        // Check if room has active allocations
-        $allocModel = new RoomAllocationModel();
-        $allocations = $allocModel->where('room_id', $id);
-        $activeAllocations = array_filter($allocations, function($alloc) {
-            return $alloc['status'] === 'active';
-        });
-        
-        if (!empty($activeAllocations)) {
-            return false; // Cannot delete room with active allocations
-        }
-        
-        return $this->delete($id);
+    public function getAllocationCounts($roomId): array {
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) AS total, COALESCE(SUM(status = 'active'), 0) AS active FROM `hostel_allocations` WHERE room_id = ?"
+        );
+        $stmt->bind_param('s', $roomId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc() ?: [];
+        return ['total' => (int) ($row['total'] ?? 0), 'active' => (int) ($row['active'] ?? 0)];
     }
 
+    /**
+     * Delete room. Refused (false + $reason) only while students are currently allocated; past allocation records are deleted with it.
+     */
+    public function deleteRoom($id, &$reason = null) {
+        $alloc = $this->getAllocationCounts($id);
+        if ($alloc['active'] > 0) {
+            $reason = $alloc['active'] . ' student(s) are currently allocated to this room. Move or release them first.';
+            return false;
+        }
+        // Past (left / cancelled) allocation records are removed together with the room
+        $conn = $this->db->getConnection();
+        $conn->begin_transaction();
+        try {
+            $stmt = $this->db->prepare("DELETE FROM `hostel_allocations` WHERE `room_id` = ? AND `status` <> 'active'");
+            $stmt->bind_param('s', $id);
+            $stmt->execute();
+            if (!$this->delete($id)) {
+                throw new RuntimeException('delete failed');
+            }
+            $conn->commit();
+            return true;
+        } catch (Throwable $e) {
+            $conn->rollback();
+            $reason = 'The room could not be deleted. Please try again.';
+            return false;
+        }
+    }
     /**
      * Room occupancy for the hostel allocated / available report.
      * Occupancy filter is applied by the caller after available beds are calculated.

@@ -1,6 +1,6 @@
 <div class="container-fluid px-4 py-3">
     <div class="row justify-content-center">
-        <div class="col-lg-8">
+        <div class="col-lg-9">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0 fw-bold"><i class="fas fa-plus me-2"></i>Create Hostel</h5>
@@ -25,16 +25,16 @@
                             </div>
                             
                             <div class="col-md-6 mb-3">
-                                <label for="location" class="form-label fw-semibold">
-                                    Location <span class="text-danger">*</span>
+                                <label for="address" class="form-label fw-semibold">
+                                    Address / Location <span class="text-danger">*</span>
                                 </label>
-                                <input type="text" class="form-control" id="location" name="location" 
-                                       required maxlength="200">
+                                <input type="text" class="form-control" id="address" name="address" 
+                                       required maxlength="255">
                             </div>
                         </div>
                         
                         <div class="row">
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-6 mb-3">
                                 <label for="gender" class="form-label fw-semibold">
                                     Gender <span class="text-danger">*</span>
                                 </label>
@@ -46,15 +46,7 @@
                                 </select>
                             </div>
                             
-                            <div class="col-md-4 mb-3">
-                                <label for="capacity" class="form-label fw-semibold">
-                                    Capacity <span class="text-danger">*</span>
-                                </label>
-                                <input type="number" class="form-control" id="capacity" name="capacity" 
-                                       required min="1" value="1">
-                            </div>
-                            
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-6 mb-3">
                                 <label for="status" class="form-label fw-semibold">Status</label>
                                 <select class="form-select" id="status" name="status">
                                     <option value="active" selected>Active</option>
@@ -62,12 +54,8 @@
                                 </select>
                             </div>
                         </div>
-                        
-                        <div class="mb-3">
-                            <label for="description" class="form-label fw-semibold">Description</label>
-                            <textarea class="form-control" id="description" name="description" 
-                                      rows="3" maxlength="500"></textarea>
-                        </div>
+
+                        <?php $initialFlatRows = 1; include BASE_PATH . '/views/hostels/partials/flats_form.php'; ?>
                         
                         <div class="d-flex justify-content-end gap-2 mt-4">
                             <a href="<?php echo APP_URL; ?>/hostels" class="btn btn-secondary">
@@ -83,4 +71,3 @@
         </div>
     </div>
 </div>
-

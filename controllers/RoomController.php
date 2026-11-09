@@ -39,9 +39,25 @@ class RoomController extends Controller {
             $filters['block_id'] = $blockId;
         }
         
-        $rooms = $roomModel->getRooms($page, 20, $filters);
-        $total = $roomModel->getTotalRooms($filters);
-        $totalPages = ceil($total / 20);
+        // Hostel-wise table: load every matching room (no paging) and group by hostel
+        $rooms = $roomModel->getRooms(1, 5000, $filters);
+        $total = count($rooms);
+        $totalPages = 1;
+        $page = 1;
+
+        $hostelGroups = [];
+        foreach ($rooms as $room) {
+            $key = (string) ($room['hostel_id'] ?? 0);
+            if (!isset($hostelGroups[$key])) {
+                $hostelGroups[$key] = ['id' => $key, 'name' => $room['hostel_name'] ?? 'Unknown hostel', 'rooms' => [], 'flats' => [], 'capacity' => 0, 'occupied' => 0];
+            }
+            $g = &$hostelGroups[$key];
+            $g['rooms'][] = $room;
+            $g['flats'][$room['block_name'] ?? ''] = true;
+            $g['capacity'] += (int) ($room['capacity'] ?? 0);
+            $g['occupied'] += (int) ($room['occupied_beds'] ?? 0);
+            unset($g);
+        }
         $hostels = $hostelModel->getAll();
         
         // Get blocks for selected hostel
@@ -54,6 +70,7 @@ class RoomController extends Controller {
             'title' => 'Rooms',
             'page' => 'rooms',
             'rooms' => $rooms,
+            'hostelGroups' => array_values($hostelGroups),
             'currentPage' => $page,
             'totalPages' => $totalPages,
             'total' => $total,
@@ -275,12 +292,13 @@ class RoomController extends Controller {
         }
         
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $result = $roomModel->deleteRoom($id);
+            $reason = null;
+            $result = $roomModel->deleteRoom($id, $reason);
             
             if ($result) {
                 $_SESSION['message'] = 'Room deleted successfully.';
             } else {
-                $_SESSION['error'] = 'Cannot delete room. It may have active allocations.';
+                $_SESSION['error'] = 'Cannot delete room. ' . ($reason ?: 'Please try again.');
             }
             
             $this->redirect('rooms');
@@ -288,7 +306,8 @@ class RoomController extends Controller {
             $data = [
                 'title' => 'Delete Room',
                 'page' => 'rooms',
-                'room' => $room
+                'room' => $room,
+                'allocations' => $roomModel->getAllocationCounts($id)
             ];
             return $this->view('rooms/delete', $data);
         }

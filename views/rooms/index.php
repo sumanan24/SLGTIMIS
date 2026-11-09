@@ -44,7 +44,7 @@
                         <div class="col-md-6">
                             <label class="form-label">Search</label>
                             <input type="text" name="search" class="form-control" 
-                                   placeholder="Search by room number or type..." 
+                                   placeholder="Search by room number..." 
                                    value="<?php echo htmlspecialchars($search ?? ''); ?>">
                         </div>
                         <div class="col-md-2">
@@ -67,138 +67,96 @@
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <div class="text-muted small">
                     <i class="fas fa-info-circle me-1"></i>
-                    Showing <strong><?php echo count($rooms); ?></strong> of <strong><?php echo number_format($total); ?></strong> rooms
+                    <strong><?php echo number_format($total); ?></strong> rooms in <strong><?php echo count($hostelGroups); ?></strong> hostel(s)
                 </div>
             </div>
 
             <?php if (!empty($rooms)): ?>
-                <div class="row g-4">
-                    <?php foreach ($rooms as $room): 
-                        $occupied = $room['occupied_beds'] ?? 0;
-                        $capacity = $room['capacity'] ?? 0;
-                        $available = $room['available_beds'] ?? 0;
-                        $occupancyPercent = $capacity > 0 ? ($occupied / $capacity) * 100 : 0;
-                        $statusClass = (($room['status'] ?? 'active') === 'active') ? 'success' : 'secondary';
-                    ?>
-                        <div class="col-md-6 col-lg-4">
-                            <div class="card shadow-sm border-0 h-100">
-                                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="mb-0 fw-bold">
-                                            <i class="fas fa-door-open me-2"></i>
-                                            Room <?php echo htmlspecialchars($room['room_no'] ?? 'N/A'); ?>
-                                        </h6>
-                                        <small class="opacity-75">
-                                            <?php echo htmlspecialchars($room['block_name'] ?? 'N/A'); ?>
-                                        </small>
-                                    </div>
-                                    <span class="badge bg-light text-dark">
-                                        <?php echo htmlspecialchars($room['hostel_name'] ?? 'N/A'); ?>
-                                    </span>
-                                </div>
-                                <div class="card-body">
-                                    <div class="mb-3">
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <span class="text-muted small">Capacity</span>
-                                            <span class="fw-bold"><?php echo number_format($capacity); ?> beds</span>
-                                        </div>
-                                        <div class="progress" style="height: 8px;">
-                                            <div class="progress-bar 
-                                                <?php echo $occupancyPercent >= 100 ? 'bg-danger' : ($occupancyPercent >= 80 ? 'bg-warning' : 'bg-success'); ?>" 
-                                                role="progressbar" 
-                                                style="width: <?php echo min($occupancyPercent, 100); ?>%"
-                                                aria-valuenow="<?php echo $occupancyPercent; ?>" 
-                                                aria-valuemin="0" 
-                                                aria-valuemax="100">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-6">
-                                            <div class="text-center p-2 bg-warning bg-opacity-10 rounded">
-                                                <div class="fw-bold text-warning"><?php echo number_format($occupied); ?></div>
-                                                <small class="text-muted">Occupied</small>
-                                            </div>
-                                        </div>
-                                        <div class="col-6">
-                                            <div class="text-center p-2 bg-success bg-opacity-10 rounded">
-                                                <div class="fw-bold text-success"><?php echo number_format($available); ?></div>
-                                                <small class="text-muted">Available</small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <?php if (!empty($room['room_type'])): ?>
-                                        <div class="mb-2">
-                                            <small class="text-muted">Type:</small>
-                                            <span class="badge bg-info bg-opacity-10 text-info">
-                                                <?php echo htmlspecialchars($room['room_type']); ?>
-                                            </span>
-                                        </div>
-                                    <?php endif; ?>
-                                    
-                                    <div class="mb-2">
-                                        <small class="text-muted">Status:</small>
-                                        <span class="badge bg-<?php echo $statusClass; ?>">
-                                            <?php echo htmlspecialchars(ucfirst($room['status'] ?? 'active')); ?>
-                                        </span>
-                                    </div>
-                                    
-                                    <?php if (!empty($room['description'])): ?>
-                                        <div class="mt-2">
-                                            <small class="text-muted"><?php echo htmlspecialchars(substr($room['description'], 0, 50)); ?><?php echo strlen($room['description']) > 50 ? '...' : ''; ?></small>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                                <div class="card-footer bg-transparent border-top">
-                                    <?php if (isset($isAdminOrADM) && $isAdminOrADM): ?>
-                                    <div class="d-flex justify-content-end gap-2">
-                                        <a href="<?php echo APP_URL; ?>/rooms/edit?id=<?php echo urlencode($room['id'] ?? ''); ?>" 
-                                           class="btn btn-sm btn-outline-primary" title="Edit">
-                                            <i class="fas fa-edit me-1"></i>Edit
-                                        </a>
-                                        <a href="<?php echo APP_URL; ?>/rooms/delete?id=<?php echo urlencode($room['id'] ?? ''); ?>" 
-                                           class="btn btn-sm btn-outline-danger" title="Delete">
-                                            <i class="fas fa-trash me-1"></i>Delete
-                                        </a>
-                                    </div>
-                                    <?php else: ?>
-                                    <div class="text-center">
-                                        <small class="text-muted">View Only</small>
-                                    </div>
-                                    <?php endif; ?>
-                                </div>
+                <?php foreach ($hostelGroups as $group):
+                    $gCap = (int) $group['capacity'];
+                    $gOcc = (int) $group['occupied'];
+                    $gAvail = max(0, $gCap - $gOcc);
+                ?>
+                    <div class="card border mb-4 shadow-sm">
+                        <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <h6 class="mb-0 fw-bold text-primary">
+                                <i class="fas fa-building me-2"></i><?php echo htmlspecialchars($group['name']); ?>
+                            </h6>
+                            <div class="small text-muted">
+                                <span class="me-3">Flats: <strong><?php echo count($group['flats']); ?></strong></span>
+                                <span class="me-3">Rooms: <strong><?php echo count($group['rooms']); ?></strong></span>
+                                <span class="me-3">Capacity: <strong><?php echo number_format($gCap); ?></strong></span>
+                                <span class="me-3">Occupied: <strong><?php echo number_format($gOcc); ?></strong></span>
+                                <span>Available: <strong class="<?php echo $gAvail > 0 ? 'text-success' : 'text-danger'; ?>"><?php echo number_format($gAvail); ?></strong></span>
                             </div>
                         </div>
-                    <?php endforeach; ?>
-                </div>
-                
-                <!-- Pagination -->
-                <?php if ($totalPages > 1): ?>
-                    <nav aria-label="Page navigation" class="mt-4">
-                        <ul class="pagination justify-content-center">
-                            <?php if ($currentPage > 1): ?>
-                                <li class="page-item">
-                                    <a class="page-link" href="?page=<?php echo $currentPage - 1; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?><?php echo !empty($hostel_id) ? '&hostel_id=' . urlencode($hostel_id) : ''; ?>">Previous</a>
-                                </li>
-                            <?php endif; ?>
-                            
-                            <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                                <li class="page-item <?php echo $i == $currentPage ? 'active' : ''; ?>">
-                                    <a class="page-link" href="?page=<?php echo $i; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?><?php echo !empty($hostel_id) ? '&hostel_id=' . urlencode($hostel_id) : ''; ?>"><?php echo $i; ?></a>
-                                </li>
-                            <?php endfor; ?>
-                            
-                            <?php if ($currentPage < $totalPages): ?>
-                                <li class="page-item">
-                                    <a class="page-link" href="?page=<?php echo $currentPage + 1; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?><?php echo !empty($hostel_id) ? '&hostel_id=' . urlencode($hostel_id) : ''; ?>">Next</a>
-                                </li>
-                            <?php endif; ?>
-                        </ul>
-                    </nav>
-                <?php endif; ?>
-            <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width:50px">#</th>
+                                        <th>Flat</th>
+                                        <th>Room No.</th>
+                                        <th class="text-end">Capacity</th>
+                                        <th class="text-end">Occupied</th>
+                                        <th class="text-end">Available</th>
+                                        <th style="min-width:130px">Occupancy</th>
+                                        <?php if (!empty($isAdminOrADM)): ?><th class="text-end">Actions</th><?php endif; ?>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($group['rooms'] as $i => $room):
+                                        $capacity = (int) ($room['capacity'] ?? 0);
+                                        $occupied = (int) ($room['occupied_beds'] ?? 0);
+                                        $available = max(0, $capacity - $occupied);
+                                        $pct = $capacity > 0 ? min(100, ($occupied / $capacity) * 100) : 0;
+                                        $barClass = $pct >= 100 ? 'bg-danger' : ($pct >= 80 ? 'bg-warning' : 'bg-success');
+                                    ?>
+                                        <tr>
+                                            <td class="text-muted"><?php echo $i + 1; ?></td>
+                                            <td><?php echo htmlspecialchars($room['block_name'] ?? 'N/A'); ?></td>
+                                            <td class="fw-semibold"><?php echo htmlspecialchars($room['room_no'] ?? 'N/A'); ?></td>
+                                            <td class="text-end"><?php echo number_format($capacity); ?></td>
+                                            <td class="text-end"><?php echo number_format($occupied); ?></td>
+                                            <td class="text-end">
+                                                <span class="badge <?php echo $available > 0 ? 'bg-success text-success' : 'bg-danger text-danger'; ?> bg-opacity-10">
+                                                    <?php echo number_format($available); ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <div class="progress flex-grow-1" style="height:8px;">
+                                                        <div class="progress-bar <?php echo $barClass; ?>" role="progressbar" style="width: <?php echo round($pct); ?>%"></div>
+                                                    </div>
+                                                    <small class="text-muted"><?php echo round($pct); ?>%</small>
+                                                </div>
+                                            </td>
+                                            <?php if (!empty($isAdminOrADM)): ?>
+                                                <td class="text-end text-nowrap">
+                                                    <a href="<?php echo APP_URL; ?>/rooms/edit?id=<?php echo urlencode($room['id'] ?? ''); ?>" class="btn btn-sm btn-outline-primary" title="Edit">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <a href="<?php echo APP_URL; ?>/rooms/delete?id=<?php echo urlencode($room['id'] ?? ''); ?>" class="btn btn-sm btn-outline-danger" title="Delete">
+                                                        <i class="fas fa-trash"></i>
+                                                    </a>
+                                                </td>
+                                            <?php endif; ?>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                                <tfoot class="table-light fw-semibold">
+                                    <tr>
+                                        <td colspan="3" class="text-end">Total</td>
+                                        <td class="text-end"><?php echo number_format($gCap); ?></td>
+                                        <td class="text-end"><?php echo number_format($gOcc); ?></td>
+                                        <td class="text-end"><?php echo number_format($gAvail); ?></td>
+                                        <td colspan="<?php echo !empty($isAdminOrADM) ? 2 : 1; ?>"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                <?php endforeach; ?>            <?php else: ?>
                 <div class="text-center py-5">
                     <i class="fas fa-door-open fa-3x text-muted mb-3"></i>
                     <p class="text-muted">No rooms found.</p>

@@ -46,6 +46,31 @@ class HostelController extends Controller {
         return $this->view('hostels/index', $data);
     }
     
+    /**
+     * Read the hostel fields from the form (hostels table: name, gender, address, active).
+     */
+    private function hostelFormData(): array {
+        return [
+            'name' => trim((string) $this->post('name', '')),
+            'address' => trim((string) $this->post('address', '')),
+            'gender' => (string) $this->post('gender', ''),
+            'active' => $this->post('status', 'active') === 'inactive' ? 0 : 1,
+        ];
+    }
+
+    /** Flat rows posted by the form (flat_name[], flat_rooms[], flat_beds[]). */
+    private function postedFlats(array $existingNames = []): array {
+        $names = $this->post('flat_name', []);
+        $rooms = $this->post('flat_rooms', []);
+        $beds = $this->post('flat_beds', []);
+        return $this->model('HostelModel')->cleanFlats(
+            is_array($names) ? $names : [],
+            is_array($rooms) ? $rooms : [],
+            is_array($beds) ? $beds : [],
+            $existingNames
+        );
+    }
+
     public function create() {
         // Check authentication
         if (!isset($_SESSION['user_id'])) {
@@ -60,37 +85,22 @@ class HostelController extends Controller {
         
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hostelModel = $this->model('HostelModel');
-            
-            $data = [
-                'name' => trim($this->post('name', '')),
-                'location' => trim($this->post('location', '')),
-                'gender' => $this->post('gender', ''),
-                'capacity' => (int)$this->post('capacity', 0),
-                'description' => trim($this->post('description', '')),
-                'status' => $this->post('status', 'active')
-            ];
+            $data = $this->hostelFormData();
             
             // Validation
-            if (empty($data['name']) || empty($data['location']) || empty($data['gender'])) {
-                $_SESSION['error'] = 'Name, Location, and Gender are required.';
+            if ($data['name'] === '' || $data['address'] === '' || $data['gender'] === '') {
+                $_SESSION['error'] = 'Name, Address, and Gender are required.';
                 $this->redirect('hostels/create');
                 return;
             }
             
-            if ($data['capacity'] < 1) {
-                $_SESSION['error'] = 'Capacity must be at least 1.';
-                $this->redirect('hostels/create');
-                return;
-            }
-            
-            // Create hostel
-            $result = $hostelModel->createHostel($data);
-            
-            if ($result) {
-                $_SESSION['message'] = 'Hostel created successfully.';
+            try {
+                $flats = $this->postedFlats();
+                $hostelModel->createHostelWithFlats($data, $flats);
+                $_SESSION['message'] = 'Hostel created successfully' . ($flats ? ' with ' . count($flats) . ' flat(s).' : '. You can add flats later by editing the hostel.');
                 $this->redirect('hostels');
-            } else {
-                $_SESSION['error'] = 'Failed to create hostel.';
+            } catch (Throwable $e) {
+                $_SESSION['error'] = $e instanceof InvalidArgumentException ? $e->getMessage() : 'Failed to create hostel. ' . $e->getMessage();
                 $this->redirect('hostels/create');
             }
         } else {
@@ -132,37 +142,28 @@ class HostelController extends Controller {
             return;
         }
         
+        $flatRows = $hostelModel->getFlats($id);
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $data = [
-                'name' => trim($this->post('name', '')),
-                'location' => trim($this->post('location', '')),
-                'gender' => $this->post('gender', ''),
-                'capacity' => (int)$this->post('capacity', 0),
-                'description' => trim($this->post('description', '')),
-                'status' => $this->post('status', 'active')
-            ];
+            $data = $this->hostelFormData();
             
             // Validation
-            if (empty($data['name']) || empty($data['location']) || empty($data['gender'])) {
-                $_SESSION['error'] = 'Name, Location, and Gender are required.';
+            if ($data['name'] === '' || $data['address'] === '' || $data['gender'] === '') {
+                $_SESSION['error'] = 'Name, Address, and Gender are required.';
                 $this->redirect('hostels/edit?id=' . urlencode($id));
                 return;
             }
             
-            if ($data['capacity'] < 1) {
-                $_SESSION['error'] = 'Capacity must be at least 1.';
-                $this->redirect('hostels/edit?id=' . urlencode($id));
-                return;
-            }
-            
-            // Update hostel
-            $result = $hostelModel->updateHostel($id, $data);
-            
-            if ($result) {
-                $_SESSION['message'] = 'Hostel updated successfully.';
+            try {
+                $arr = function ($key) { $v = $this->post($key, []); return is_array($v) ? $v : []; };
+                $removeIds = $arr('remove_flat');
+                $edits = $hostelModel->cleanFlatEdits($arr('edit_flat_id'), $arr('edit_flat_name'), $arr('edit_flat_rooms'), $arr('edit_flat_beds'), $removeIds, $flatRows);
+                $flats = $this->postedFlats(array_column($edits, 'name'));
+                $hostelModel->updateHostelWithFlats($id, $data, $flats, $edits, $removeIds);
+                $_SESSION['message'] = 'Hostel updated successfully' . ($flats ? '; ' . count($flats) . ' flat(s) added.' : '.');
                 $this->redirect('hostels');
-            } else {
-                $_SESSION['error'] = 'Failed to update hostel.';
+            } catch (Throwable $e) {
+                $_SESSION['error'] = $e instanceof InvalidArgumentException ? $e->getMessage() : 'Failed to update hostel. ' . $e->getMessage();
                 $this->redirect('hostels/edit?id=' . urlencode($id));
             }
         } else {
@@ -170,14 +171,14 @@ class HostelController extends Controller {
                 'title' => 'Edit Hostel',
                 'page' => 'hostels',
                 'hostel' => $hostel,
+                'flats' => $flatRows,
                 'error' => $_SESSION['error'] ?? null
             ];
             unset($_SESSION['error']);
             return $this->view('hostels/edit', $data);
         }
     }
-    
-    public function delete() {
+        public function delete() {
         // Check authentication
         if (!isset($_SESSION['user_id'])) {
             $this->redirect('login');
@@ -206,12 +207,13 @@ class HostelController extends Controller {
         }
         
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $result = $hostelModel->deleteHostel($id);
+            $reason = null;
+            $result = $hostelModel->deleteHostel($id, $reason);
             
             if ($result) {
                 $_SESSION['message'] = 'Hostel deleted successfully.';
             } else {
-                $_SESSION['error'] = 'Cannot delete hostel. It may have rooms assigned.';
+                $_SESSION['error'] = 'Cannot delete hostel. ' . ($reason ?: 'Please try again.');
             }
             
             $this->redirect('hostels');
@@ -219,7 +221,10 @@ class HostelController extends Controller {
             $data = [
                 'title' => 'Delete Hostel',
                 'page' => 'hostels',
-                'hostel' => $hostel
+                'hostel' => $hostel,
+                'allocations' => $hostelModel->getAllocationCounts($id),
+                'flats' => $hostelModel->getFlats($id),
+                'rooms' => $this->model('RoomModel')->getRooms(1, 5000, ['hostel_id' => $id])
             ];
             return $this->view('hostels/delete', $data);
         }
