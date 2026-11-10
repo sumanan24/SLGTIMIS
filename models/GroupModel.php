@@ -13,6 +13,171 @@ class GroupModel extends Model {
     public function __construct() {
         parent::__construct();
         $this->ensureCourseVersionColumn();
+        require_once BASE_PATH . '/helpers/SchedulingSchema.php';
+        SchedulingSchema::ensure();
+    }
+
+    /**
+     * Append one row to the permanent group membership history.
+     */
+    public function logHistory($studentId, $groupId, $action, $fromGroupId = null, $toGroupId = null, $performedBy = '', $remarks = '') {
+        $sql = "INSERT INTO `group_student_history`
+                (`student_id`, `group_id`, `action`, `from_group_id`, `to_group_id`, `performed_by`, `remarks`)
+                VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return false;
+        }
+        $studentId = (string) $studentId;
+        $groupId = (int) $groupId;
+        $action = (string) $action;
+        $fromGroupId = $fromGroupId === null ? null : (int) $fromGroupId;
+        $toGroupId = $toGroupId === null ? null : (int) $toGroupId;
+        $performedBy = (string) $performedBy;
+        $remarks = mb_substr((string) $remarks, 0, 255);
+        $stmt->bind_param('sisiiss', $studentId, $groupId, $action, $fromGroupId, $toGroupId, $performedBy, $remarks);
+        return $stmt->execute();
+    }
+
+    /**
+     * Membership history of a group (joined / left / transferred), newest first.
+     */
+    public function getHistoryForGroup($groupId, $limit = 200) {
+        $sql = "SELECT h.*, s.student_fullname, gf.name AS from_group_name, gt.name AS to_group_name
+                FROM `group_student_history` h
+                LEFT JOIN `student` s ON s.student_id = h.student_id
+                LEFT JOIN `groups` gf ON gf.id = h.from_group_id
+                LEFT JOIN `groups` gt ON gt.id = h.to_group_id
+                WHERE h.group_id = ?
+                ORDER BY h.created_at DESC, h.id DESC
+                LIMIT " . (int) $limit;
+        $stmt = $this->db->prepare($sql);
+        $groupId = (int) $groupId;
+        $stmt->bind_param('i', $groupId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $rows = [];
+        while ($result && ($row = $result->fetch_assoc())) {
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
+    /**
+     * Active group of a student (a student belongs to one active group at a time).
+     */
+    public function getActiveGroupOfStudent($studentId) {
+        $sql = "SELECT g.* FROM `group_students` gs
+                INNER JOIN `groups` g ON g.id = gs.group_id
+                WHERE gs.student_id = ? AND gs.status = 'active'
+                ORDER BY gs.enrolled_at DESC LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $studentId = (string) $studentId;
+        $stmt->bind_param('s', $studentId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
+    }
+
+    /**
+     * Groups a student can be moved to: same department, active, not the current group.
+     */
+    public function getTransferTargets($groupId) {
+        $group = $this->getByIdWithDetails((int) $groupId);
+        if (!$group || empty($group['department_id'])) {
+            return [];
+        }
+        $sql = "SELECT g.id, g.name, g.group_code, g.academic_year, c.course_name
+                FROM `{$this->table}` g
+                INNER JOIN `course` c ON c.course_id = g.course_id
+                WHERE c.department_id = ? AND g.status = 'active' AND g.id <> ?
+                ORDER BY g.academic_year DESC, g.name ASC";
+        $stmt = $this->db->prepare($sql);
+        $dept = (string) $group['department_id'];
+        $gid = (int) $groupId;
+        $stmt->bind_param('si', $dept, $gid);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $rows = [];
+        while ($result && ($row = $result->fetch_assoc())) {
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
+    /**
+     * Move one active student from one group to another and keep the history of both sides.
+     * Returns null on success or an error message.
+     */
+    public function transferStudent($studentId, $fromGroupId, $toGroupId, $performedBy = '', $remarks = '') {
+        $studentId = (string) $studentId;
+        $fromGroupId = (int) $fromGroupId;
+        $toGroupId = (int) $toGroupId;
+        if ($fromGroupId === $toGroupId) {
+            return 'Choose a different group.';
+        }
+        $from = $this->getByIdWithDetails($fromGroupId);
+        $to = $this->getByIdWithDetails($toGroupId);
+        if (!$from || !$to) {
+            return 'Group not found.';
+        }
+        if ((string) $from['department_id'] !== (string) $to['department_id']) {
+            return 'Students can only be transferred between groups of the same department.';
+        }
+        if (($to['status'] ?? '') !== 'active') {
+            return 'The target group is not active.';
+        }
+        $conn = $this->db->getConnection();
+        $conn->begin_transaction();
+        try {
+            $stmt = $conn->prepare("DELETE FROM `group_students` WHERE `group_id` = ? AND `student_id` = ? AND `status` = 'active'");
+            $stmt->bind_param('is', $fromGroupId, $studentId);
+            $stmt->execute();
+            if ($stmt->affected_rows < 1) {
+                throw new RuntimeException('The student is not an active member of the source group.');
+            }
+            $stmt->close();
+            $stmt = $conn->prepare("INSERT INTO `group_students` (`group_id`, `student_id`, `enrolled_at`, `status`)
+                VALUES (?, ?, NOW(), 'active')
+                ON DUPLICATE KEY UPDATE `status` = 'active', `enrolled_at` = NOW()");
+            $stmt->bind_param('is', $toGroupId, $studentId);
+            if (!$stmt->execute()) {
+                throw new RuntimeException('Could not add the student to the target group.');
+            }
+            $stmt->close();
+            $this->logHistory($studentId, $fromGroupId, 'transfer_out', $fromGroupId, $toGroupId, $performedBy, $remarks);
+            $this->logHistory($studentId, $toGroupId, 'transfer_in', $fromGroupId, $toGroupId, $performedBy, $remarks);
+            $conn->commit();
+            return null;
+        } catch (Throwable $e) {
+            $conn->rollback();
+            return $e instanceof RuntimeException ? $e->getMessage() : 'Transfer failed.';
+        }
+    }
+
+    public function groupCodeExists($code, $excludeId = 0) {
+        $sql = "SELECT 1 FROM `{$this->table}` WHERE `group_code` = ? AND `id` <> ? LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $code = (string) $code;
+        $excludeId = (int) $excludeId;
+        $stmt->bind_param('si', $code, $excludeId);
+        $stmt->execute();
+        return $stmt->get_result()->num_rows > 0;
+    }
+
+    /**
+     * Suggested unique group code: COURSE-YEAR-NN.
+     */
+    public function suggestGroupCode($courseId, $academicYear) {
+        $base = strtoupper(preg_replace('/[^A-Za-z0-9]+/', '', (string) $courseId)) . '-' . preg_replace('/[^0-9]/', '', (string) $academicYear);
+        $base = trim($base, '-');
+        for ($i = 1; $i < 100; $i++) {
+            $code = substr($base . '-' . str_pad((string) $i, 2, '0', STR_PAD_LEFT), 0, 30);
+            if (!$this->groupCodeExists($code)) {
+                return $code;
+            }
+        }
+        return substr($base . '-' . time(), 0, 30);
     }
 
     /**
@@ -190,15 +355,19 @@ class GroupModel extends Model {
     /**
      * Add students to group
      */
-    public function addStudentToGroupQuiet(int $groupId, string $studentId): bool {
+    public function addStudentToGroupQuiet(int $groupId, string $studentId, string $performedBy = ''): bool {
         $sql = "INSERT IGNORE INTO `group_students` (`group_id`, `student_id`, `enrolled_at`, `status`)
                 VALUES (?, ?, NOW(), 'active')";
         $stmt = $this->db->prepare($sql);
         $stmt->bind_param('is', $groupId, $studentId);
-        return $stmt->execute();
+        $ok = $stmt->execute();
+        if ($ok && $stmt->affected_rows > 0) {
+            $this->logHistory($studentId, $groupId, 'joined', null, null, $performedBy);
+        }
+        return $ok;
     }
 
-    public function addStudentsToGroup($groupId, $studentIds) {
+    public function addStudentsToGroup($groupId, $studentIds, $performedBy = '') {
         $conn = $this->db->getConnection();
         $conn->autocommit(false);
         
@@ -211,6 +380,9 @@ class GroupModel extends Model {
                 $stmt->bind_param("is", $groupId, $studentId);
                 if (!$stmt->execute()) {
                     throw new Exception("Failed to add student: " . $stmt->error);
+                }
+                if ($stmt->affected_rows > 0) {
+                    $this->logHistory($studentId, $groupId, 'joined', null, null, $performedBy);
                 }
             }
             
@@ -229,12 +401,15 @@ class GroupModel extends Model {
     /**
      * Remove student from group
      */
-    public function removeStudentFromGroup($groupId, $studentId) {
+    public function removeStudentFromGroup($groupId, $studentId, $performedBy = '', $remarks = '') {
         $sql = "DELETE FROM `group_students` WHERE `group_id` = ? AND `student_id` = ?";
         $stmt = $this->db->prepare($sql);
         $stmt->bind_param("is", $groupId, $studentId);
-        
-        return $stmt->execute();
+        $ok = $stmt->execute();
+        if ($ok && $stmt->affected_rows > 0) {
+            $this->logHistory($studentId, (int) $groupId, 'left', (int) $groupId, null, $performedBy, $remarks);
+        }
+        return $ok;
     }
     
     /**

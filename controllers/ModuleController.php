@@ -6,14 +6,14 @@
 class ModuleController extends Controller {
 
     /**
-     * Optional semester 1–12 (null if not set).
+     * Optional semester: only 1 or 2 are allowed (null if not set or invalid).
      */
     private function normalizeSemester($raw) {
         if ($raw === null || $raw === '') {
             return null;
         }
         $n = (int)$raw;
-        return ($n >= 1 && $n <= 12) ? $n : null;
+        return ($n === 1 || $n === 2) ? $n : null;
     }
 
     private function normalizeCredit($raw) {

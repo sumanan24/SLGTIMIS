@@ -745,78 +745,36 @@
 </style>
 
 <div class="dashboard-container">
-    <!-- Welcome Card with Department Info and Academic Year Filter -->
-    <div class="card dashboard-welcome-card">
-        <div class="card-body">
-            <div class="d-flex align-items-start align-items-md-center justify-content-between flex-wrap gap-3">
-                <div class="flex-grow-1">
-                    <h1 class="mb-2">Welcome, <?php echo htmlspecialchars($user_name ?? 'User'); ?>!</h1>
-                    <p class="mb-2">Department Dashboard - Viewing your department's statistics</p>
-                    <?php
-                    require_once BASE_PATH . '/models/UserModel.php';
-                    // Assigned heads get the detailed "Department assignment" card below; this line is
-                    // only the fallback for a HOD post without an explicit assignment.
-                    $dashHeaded = empty($assignments) ? (new UserModel())->getHeadedDepartments((int) ($_SESSION['user_id'] ?? 0)) : [];
-                    foreach ($dashHeaded as $dh): ?>
-                        <p class="mb-2"><i class="fas fa-user-tie me-2"></i><strong>Head of Department</strong> &mdash; <?php echo htmlspecialchars($dh['department_name']); ?><?php echo $dh['head_type_label'] !== '' ? ' (' . htmlspecialchars($dh['head_type_label']) . ')' : ''; ?></p>
-                    <?php endforeach; ?>
-                    <?php if (!empty($department)): ?>
-                    <div class="mt-2">
-                        <span class="department-badge">
-                            <i class="fas fa-building me-2"></i>
-                            <?php echo htmlspecialchars($department['department_name'] ?? 'Department'); ?>
-                        </span>
-                    </div>
-                    <?php if (!empty($department['department_id'])): ?>
-                    <div class="department-info-box">
-                        <small class="text-muted d-block mb-1">
-                            <i class="fas fa-info-circle me-1"></i>
-                            <strong>Department ID:</strong> <?php echo htmlspecialchars($department['department_id']); ?>
-                        </small>
-                        <?php if (!empty($department['department_description'])): ?>
-                        <small class="text-muted d-block">
-                            <?php echo htmlspecialchars($department['department_description']); ?>
-                        </small>
-                        <?php endif; ?>
-                    </div>
-                    <?php endif; ?>
-                    <?php else: ?>
-                    <div class="mt-2">
-                        <span class="badge bg-secondary">
-                            <i class="fas fa-info-circle me-2"></i>
-                            Administrative View - All Departments
-                        </span>
-                    </div>
-                    <?php endif; ?>
-                </div>
-                <div class="d-flex align-items-center gap-3 flex-shrink-0">
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <label for="academicYearFilter" class="mb-0 fw-semibold" style="font-size: 0.9rem; white-space: nowrap;">Academic Year:</label>
-                        <select id="academicYearFilter" class="form-select form-select-sm" style="min-width: 180px;">
-                            <option value="">All Years</option>
-                            <?php foreach ($academicYears as $year): ?>
-                                <option value="<?php echo htmlspecialchars($year); ?>" <?php echo ($selectedAcademicYear === $year) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($year); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="d-none d-md-block flex-shrink-0">
-                        <i class="fas fa-chart-line fa-3x opacity-30"></i>
-                    </div>
-                </div>
-            </div>
-            <?php if (!empty($selectedAcademicYear)): ?>
-                <div class="mt-3 pt-3 border-top">
-                    <small>
-                        <i class="fas fa-info-circle me-1"></i>
-                        Showing statistics for Academic Year: <strong><?php echo htmlspecialchars($selectedAcademicYear); ?></strong>
-                        <?php if (!empty($totalStudentsByYear)): ?>
-                            (<?php echo number_format($totalStudentsByYear); ?> students in your department)
-                        <?php endif; ?>
-                    </small>
-                </div>
+    <!-- Department and academic year selector -->
+    <?php
+    require_once BASE_PATH . '/models/UserModel.php';
+    // Assigned heads get the detailed "Department assignment" card below; this line is
+    // only the fallback for a HOD post without an explicit assignment.
+    $dashHeaded = empty($assignments) ? (new UserModel())->getHeadedDepartments((int) ($_SESSION['user_id'] ?? 0)) : [];
+    ?>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+        <div>
+            <?php if (!empty($department)): ?>
+                <span class="department-badge">
+                    <i class="fas fa-building me-2"></i><?php echo htmlspecialchars($department['department_name'] ?? 'Department'); ?>
+                </span>
+            <?php else: ?>
+                <span class="badge bg-secondary"><i class="fas fa-info-circle me-2"></i>All Departments</span>
             <?php endif; ?>
+            <?php foreach ($dashHeaded as $dh): ?>
+                <div class="mt-2 small text-muted"><i class="fas fa-user-tie me-2"></i>Head of Department &mdash; <?php echo htmlspecialchars($dh['department_name']); ?><?php echo $dh['head_type_label'] !== '' ? ' (' . htmlspecialchars($dh['head_type_label']) . ')' : ''; ?></div>
+            <?php endforeach; ?>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <label for="academicYearFilter" class="mb-0 fw-semibold" style="font-size: 0.9rem; white-space: nowrap;">Academic Year:</label>
+            <select id="academicYearFilter" class="form-select form-select-sm" style="min-width: 180px;">
+                <option value="">All Years</option>
+                <?php foreach ($academicYears as $year): ?>
+                    <option value="<?php echo htmlspecialchars($year); ?>" <?php echo ($selectedAcademicYear === $year) ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($year); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
         </div>
     </div>
     
@@ -912,24 +870,7 @@
     <!-- Main Stats Cards - Department Only (if user has department) -->
     <?php if (!empty($department)): ?>
     <div class="row g-4 mb-4">
-        <div class="col-md-4">
-            <div class="card dashboard-stats-card" style="border-left-color: #001f3f;">
-                <div class="card-body p-4 d-flex flex-column">
-                    <div class="d-flex align-items-start justify-content-between flex-grow-1">
-                        <div class="flex-grow-1">
-                            <div class="stats-card-label">Total Students</div>
-                            <div class="stats-card-value"><?php echo number_format($totalStudents); ?></div>
-                            <div class="stats-card-subtitle">Active Students in <?php echo htmlspecialchars($department['department_name'] ?? 'Department'); ?></div>
-                        </div>
-                        <div class="stats-card-icon flex-shrink-0 ms-3">
-                            <i class="fas fa-user-graduate"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-4">
+        <div class="col-md-6">
             <div class="card dashboard-stats-card" style="border-left-color: #1e3a5f;">
                 <div class="card-body p-4 d-flex flex-column">
                     <div class="d-flex align-items-start justify-content-between flex-grow-1">
@@ -946,7 +887,7 @@
             </div>
         </div>
         
-        <div class="col-md-4">
+        <div class="col-md-6">
             <div class="card dashboard-stats-card" style="border-left-color: #1e3a5f;">
                 <div class="card-body p-4 d-flex flex-column">
                     <div class="d-flex align-items-start justify-content-between flex-grow-1">
@@ -965,6 +906,164 @@
     </div>
     <?php endif; ?>
     
+    <!-- Student status counts + my work (modules, timetable, programmes, tickets) -->
+    <?php
+    $my = $my ?? ['staff_id' => '', 'modules' => [], 'timetable' => [], 'programs' => [], 'tickets' => [], 'ticket_total' => 0];
+    $dayNames = [1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday', 7 => 'Sunday'];
+    $today = (int) date('N');
+    $humanize = static function ($v) { return ucwords(str_replace('_', ' ', (string) $v)); };
+    $prioClass = ['critical' => 'danger', 'urgent' => 'danger', 'high' => 'warning text-dark', 'medium' => 'info text-dark', 'low' => 'secondary'];
+    ?>
+    <?php if (!empty($department) && !empty($studentStatusCounts)): ?>
+    <style>
+        .enr-card { border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; padding: 1rem 1.1rem; height: 100%; box-shadow: 0 2px 8px rgba(15,23,42,.05); }
+        .enr-card .enr-label { color: #64748b; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+        .enr-card .enr-total { color: #001f3f; font-size: 1.9rem; font-weight: 700; line-height: 1.2; }
+        .enr-card .enr-modes { display: flex; gap: .5rem; margin-top: .6rem; }
+        .enr-card .enr-mode { flex: 1; text-align: center; background: #f8fafc; border-radius: 8px; padding: .35rem .25rem; font-size: .75rem; color: #64748b; }
+        .enr-card .enr-mode strong { display: block; color: #0f172a; font-size: 1rem; }
+    </style>
+    <div class="row g-3 mb-4">
+        <?php foreach ([
+            'total' => ['Total Students (Following + Internship)', '#001f3f'],
+            'following' => ['Following', '#0f766e'],
+            'internship' => ['Internship', '#b45309'],
+            'completed' => ['Completed', '#475569'],
+        ] as $k => [$lbl, $clr]): ?>
+        <?php $c = $studentStatusCounts[$k] ?? ['total' => 0, 'full' => 0, 'part' => 0]; ?>
+        <div class="col-6 col-lg-3">
+            <div class="enr-card" style="border-top: 3px solid <?php echo $clr; ?>;">
+                <div class="enr-label"><?php echo $e($lbl); ?></div>
+                <div class="enr-total" style="color: <?php echo $clr; ?>;"><?php echo number_format($c['total']); ?></div>
+                <div class="enr-modes">
+                    <div class="enr-mode"><strong><?php echo number_format($c['full']); ?></strong>Full time</div>
+                    <div class="enr-mode"><strong><?php echo number_format($c['part']); ?></strong>Part time</div>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($my['staff_id'])): ?>
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="card dashboard-chart-card h-100">
+                <div class="chart-card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-cubes me-2"></i>My Assigned Modules<?php echo !empty($selectedAcademicYear) ? ' &middot; ' . $e($selectedAcademicYear) : ''; ?></span>
+                    <span class="badge bg-light text-dark"><?php echo count($my['modules']); ?></span>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($my['modules'])): ?>
+                        <p class="text-muted text-center py-4 mb-0">No modules assigned.</p>
+                    <?php else: ?>
+                    <div class="table-responsive" style="max-height: 320px;">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light"><tr><th>Module</th><th>Course</th></tr></thead>
+                            <tbody>
+                                <?php foreach ($my['modules'] as $mm): ?>
+                                <tr>
+                                    <td><strong><?php echo $e($mm['module_name'] ?? $mm['module_id']); ?></strong><div class="text-muted small"><?php echo $e($mm['module_id']); ?></div></td>
+                                    <td><?php echo $e($mm['course_name'] ?? $mm['course_id']); ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card dashboard-chart-card h-100">
+                <div class="chart-card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-calendar-week me-2"></i>My Time Table</span>
+                    <span class="badge bg-light text-dark"><?php echo count($my['timetable']); ?></span>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($my['timetable'])): ?>
+                        <p class="text-muted text-center py-4 mb-0">No classes scheduled.</p>
+                    <?php else: ?>
+                    <div class="table-responsive" style="max-height: 320px;">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light"><tr><th>Day</th><th>Period</th><th>Group</th><th>Subject</th><th>Room</th></tr></thead>
+                            <tbody>
+                                <?php foreach ($my['timetable'] as $tt): ?>
+                                <tr class="<?php echo (int) $tt['weekday'] === $today ? 'table-primary' : ''; ?>">
+                                    <td><?php echo $e($dayNames[(int) $tt['weekday']] ?? ''); ?><?php echo (int) $tt['weekday'] === $today ? ' <span class="badge bg-primary">Today</span>' : ''; ?></td>
+                                    <td><?php echo $e(str_replace('P', '', (string) $tt['period'])); ?></td>
+                                    <td><a href="<?php echo APP_URL; ?>/groups/timetable?id=<?php echo (int) $tt['group_id']; ?>"><?php echo $e($tt['group_name'] ?? '-'); ?></a></td>
+                                    <td><?php echo $e(($tt['module_name'] ?? '') !== '' ? $tt['module_name'] : ($tt['subject'] ?? '-')); ?></td>
+                                    <td><?php echo $e($tt['classroom'] ?? '-'); ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card dashboard-chart-card h-100">
+                <div class="chart-card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-route me-2"></i>Upcoming Programmes</span>
+                    <a class="btn btn-sm btn-light" href="<?php echo APP_URL; ?>/circuit-program">View all</a>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($my['programs'])): ?>
+                        <p class="text-muted text-center py-4 mb-0">No upcoming programmes.</p>
+                    <?php else: ?>
+                    <ul class="list-group list-group-flush">
+                        <?php foreach ($my['programs'] as $pg): ?>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div>
+                                <a href="<?php echo APP_URL; ?>/circuit-program/view?id=<?php echo (int) $pg['program_id']; ?>"><strong><?php echo $e($pg['destination']); ?></strong></a>
+                                <?php if (!empty($pg['purpose'])): ?><div class="text-muted small"><?php echo $e($pg['purpose']); ?></div><?php endif; ?>
+                            </div>
+                            <div class="text-end">
+                                <div class="small fw-semibold"><?php echo $e(date('d M Y', strtotime($pg['date']))); ?></div>
+                                <span class="badge bg-<?php echo ($pg['status'] ?? '') === 'approved' ? 'success' : 'warning text-dark'; ?>"><?php echo $e($humanize($pg['status'] ?? 'pending')); ?></span>
+                            </div>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card dashboard-chart-card h-100">
+                <div class="chart-card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-ticket-alt me-2"></i>Assigned Tickets<?php echo $my['ticket_total'] > 0 ? ' (' . (int) $my['ticket_total'] . ')' : ''; ?></span>
+                    <a class="btn btn-sm btn-light" href="<?php echo APP_URL; ?>/facilities/tasks">View all</a>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($my['tickets'])): ?>
+                        <p class="text-muted text-center py-4 mb-0">No tickets assigned.</p>
+                    <?php else: ?>
+                    <ul class="list-group list-group-flush">
+                        <?php foreach ($my['tickets'] as $tk): ?>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div>
+                                <a href="<?php echo APP_URL; ?>/facilities/view?id=<?php echo (int) $tk['id']; ?>"><strong><?php echo $e($tk['ticket_number']); ?></strong></a>
+                                <span class="ms-1"><?php echo $e($tk['title']); ?></span>
+                                <div class="text-muted small"><?php echo $e($humanize($tk['status'])); ?><?php echo !empty($tk['deadline']) ? ' &middot; Due ' . $e($tk['deadline']) : ''; ?></div>
+                            </div>
+                            <span class="badge bg-<?php echo $prioClass[$tk['current_priority'] ?? ''] ?? 'secondary'; ?>"><?php echo $e($humanize($tk['current_priority'] ?? '')); ?></span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Courses & Modules - Department Only -->
     <?php if (!empty($department)): ?>
     <div class="row g-4 mb-4">
@@ -1162,198 +1261,6 @@
     </div>
     <?php endif; ?>
     
-    <!-- Recent Students - Department Only -->
-    <?php if (!empty($department_id)): ?>
-        <?php if (!empty($recentStudents)): ?>
-        <div class="row g-4 mb-4">
-            <div class="col-12">
-                <div class="card dashboard-chart-card">
-                    <div class="chart-card-header">
-                        <i class="fas fa-users me-2"></i>Recent Students in <?php echo htmlspecialchars($department['department_name'] ?? 'Department'); ?>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Student ID</th>
-                                        <th>Full Name</th>
-                                        <th>Email</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($recentStudents as $student): ?>
-                                    <tr>
-                                        <td>
-                                            <a href="<?php echo APP_URL; ?>/students/view?id=<?php echo urlencode($student['student_id']); ?>" class="text-decoration-none">
-                                                <?php echo htmlspecialchars($student['student_id']); ?>
-                                            </a>
-                                        </td>
-                                        <td><?php echo htmlspecialchars($student['student_fullname']); ?></td>
-                                        <td><?php echo htmlspecialchars($student['student_email']); ?></td>
-                                        <td>
-                                            <span class="badge bg-success">
-                                                <?php echo htmlspecialchars($student['student_status'] ?? 'Active'); ?>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <?php else: ?>
-        <div class="row g-4 mb-4">
-            <div class="col-12">
-                <div class="card dashboard-chart-card">
-                    <div class="chart-card-header">
-                        <i class="fas fa-users me-2"></i>Recent Students in <?php echo htmlspecialchars($department['department_name'] ?? 'Department'); ?>
-                    </div>
-                    <div class="card-body">
-                        <div class="text-center py-4">
-                            <i class="fas fa-user-graduate fa-3x text-muted mb-3"></i>
-                            <p class="text-muted">No recent students found in this department.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <?php endif; ?>
-    <?php endif; ?>
-    
-    <!-- Hostel Information - Visible to HOD, IN1, IN2, IN3, FIN, ACC, DIR, REG -->
-    <?php if (!empty($hostelStats)): ?>
-    <div class="row g-4 mb-4">
-        <div class="col-12">
-            <div class="card dashboard-chart-card">
-                <div class="chart-card-header">
-                    <i class="fas fa-bed me-2"></i>Hostel Information
-                </div>
-                <div class="card-body">
-                    <!-- Hostel Summary Statistics -->
-                    <div class="row g-3 mb-4">
-                        <div class="col-6 col-md-3">
-                            <div class="card" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-left: 4px solid #0ea5e9;">
-                                <div class="card-body text-center p-3">
-                                    <div class="h4 mb-1" style="color: #0ea5e9; font-weight: 700;"><?php echo number_format($hostelStats['total_hostels'] ?? 0); ?></div>
-                                    <div class="small text-muted">Total Hostels</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-6 col-md-3">
-                            <div class="card" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-left: 4px solid #22c55e;">
-                                <div class="card-body text-center p-3">
-                                    <div class="h4 mb-1" style="color: #22c55e; font-weight: 700;"><?php echo number_format($hostelStats['total_rooms'] ?? 0); ?></div>
-                                    <div class="small text-muted">Total Rooms</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-6 col-md-3">
-                            <div class="card" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 4px solid #f59e0b;">
-                                <div class="card-body text-center p-3">
-                                    <div class="h4 mb-1" style="color: #f59e0b; font-weight: 700;"><?php echo number_format($hostelStats['total_capacity'] ?? 0); ?></div>
-                                    <div class="small text-muted">Total Capacity</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-6 col-md-3">
-                            <div class="card" style="background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%); border-left: 4px solid #ec4899;">
-                                <div class="card-body text-center p-3">
-                                    <div class="h4 mb-1" style="color: #ec4899; font-weight: 700;"><?php echo number_format($hostelStats['total_occupied'] ?? 0); ?></div>
-                                    <div class="small text-muted">Occupied Beds</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <?php if (!empty($department_id)): ?>
-                    <div class="alert alert-info mb-4">
-                        <i class="fas fa-info-circle me-2"></i>
-                        <strong>Department Students in Hostels:</strong> <?php echo number_format($hostelStats['department_students'] ?? 0); ?> students from <?php echo htmlspecialchars($department['department_name'] ?? 'your department'); ?>
-                    </div>
-                    <?php endif; ?>
-                    
-                    <!-- Hostel Details Table -->
-                    <?php if (!empty($hostelStats['hostels'])): ?>
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Hostel Name</th>
-                                    <th>Location</th>
-                                    <th>Gender</th>
-                                    <th class="text-center">Rooms</th>
-                                    <th class="text-center">Capacity</th>
-                                    <th class="text-center">Occupied</th>
-                                    <th class="text-center">Available</th>
-                                    <th class="text-center">Occupancy Rate</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($hostelStats['hostels'] as $hostel): ?>
-                                <tr>
-                                    <td><strong><?php echo htmlspecialchars($hostel['name']); ?></strong></td>
-                                    <td><?php echo htmlspecialchars($hostel['location']); ?></td>
-                                    <td>
-                                        <span class="badge" style="background: <?php echo $hostel['gender'] === 'Male' ? '#3b82f6' : ($hostel['gender'] === 'Female' ? '#ec4899' : '#6b7280'); ?>;">
-                                            <?php echo htmlspecialchars($hostel['gender']); ?>
-                                        </span>
-                                    </td>
-                                    <td class="text-center"><?php echo number_format($hostel['room_count']); ?></td>
-                                    <td class="text-center"><?php echo number_format($hostel['capacity']); ?></td>
-                                    <td class="text-center">
-                                        <span class="badge bg-success"><?php echo number_format($hostel['occupied']); ?></span>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-info"><?php echo number_format($hostel['available']); ?></span>
-                                    </td>
-                                    <td class="text-center">
-                                        <div class="progress" style="height: 20px;">
-                                            <div class="progress-bar <?php echo $hostel['occupancy_rate'] >= 90 ? 'bg-danger' : ($hostel['occupancy_rate'] >= 70 ? 'bg-warning' : 'bg-success'); ?>" 
-                                                 role="progressbar" 
-                                                 style="width: <?php echo $hostel['occupancy_rate']; ?>%"
-                                                 aria-valuenow="<?php echo $hostel['occupancy_rate']; ?>" 
-                                                 aria-valuemin="0" 
-                                                 aria-valuemax="100">
-                                                <?php echo $hostel['occupancy_rate']; ?>%
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                            <tfoot class="table-light">
-                                <tr>
-                                    <th colspan="3">Total</th>
-                                    <th class="text-center"><?php echo number_format($hostelStats['total_rooms']); ?></th>
-                                    <th class="text-center"><?php echo number_format($hostelStats['total_capacity']); ?></th>
-                                    <th class="text-center"><?php echo number_format($hostelStats['total_occupied']); ?></th>
-                                    <th class="text-center"><?php echo number_format($hostelStats['total_available']); ?></th>
-                                    <th class="text-center">
-                                        <?php 
-                                        $overallOccupancy = $hostelStats['total_capacity'] > 0 ? round(($hostelStats['total_occupied'] / $hostelStats['total_capacity']) * 100, 1) : 0;
-                                        echo $overallOccupancy . '%';
-                                        ?>
-                                    </th>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                    <?php else: ?>
-                    <div class="text-center py-4">
-                        <i class="fas fa-bed fa-3x text-muted mb-3"></i>
-                        <p class="text-muted">No hostel information available.</p>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
 </div>
 
 <script>

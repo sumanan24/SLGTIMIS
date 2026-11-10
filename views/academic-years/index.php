@@ -1,4 +1,7 @@
-<?php $yearCount = count($years ?? []); ?>
+<?php
+$yearCount = count($years ?? []);
+$showCounts = isset($studentCounts) && $studentCounts !== null;
+?>
 <style>
 .academic-years-page-wrap {
     --ay-text: #0f172a;
@@ -82,11 +85,36 @@
     border-collapse: separate;
     border-spacing: 0;
 }
-.academic-years-table col.col-no { width: 64px; }
-.academic-years-table col.col-year { width: 150px; }
-.academic-years-table col.col-semester { width: 235px; }
-.academic-years-table col.col-status { width: 120px; }
-.academic-years-table col.col-actions { width: 116px; }
+.academic-years-table.has-counts { min-width: 960px; }
+.academic-years-table col.col-no { width: 56px; }
+.academic-years-table col.col-year { width: 120px; }
+.academic-years-table col.col-semester { width: auto; }
+.academic-years-table col.col-status { width: 100px; }
+.academic-years-table col.col-actions { width: 100px; }
+.academic-years-table col.col-count { width: 84px; }
+.academic-years-table th.col-count,
+.academic-years-table td.col-count { text-align: center; padding-left: 0.5rem; padding-right: 0.5rem; }
+.academic-years-table .col-count-first { border-left: 1px solid var(--ay-border); }
+.academic-years-table thead th.col-group {
+    text-align: center;
+    border-left: 1px solid var(--ay-border);
+    border-bottom: 1px solid var(--ay-border);
+    color: #001f3f;
+}
+.academic-years-table thead tr.ay-subhead th { padding-top: 0.45rem; padding-bottom: 0.45rem; }
+.academic-years-table thead th[rowspan] { vertical-align: middle; }
+.academic-years-table td.col-count strong { color: #001f3f; }
+.academic-years-page-wrap .ay-dept {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.65rem;
+    color: #001f3f;
+    background: #dbe7f3;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
 .academic-years-table thead th {
     padding: 0.7rem 1rem;
     vertical-align: middle;
@@ -201,7 +229,12 @@
     <div class="ay-panel">
         <div class="ay-panel-head">
             <h2 class="ay-panel-title">Academic year records</h2>
-            <span class="ay-count"><?php echo number_format($yearCount); ?></span>
+            <span class="d-flex align-items-center gap-2">
+                <?php if ($showCounts && !empty($deptName)): ?>
+                    <span class="ay-dept"><i class="fas fa-building"></i><?php echo htmlspecialchars($deptName); ?></span>
+                <?php endif; ?>
+                <span class="ay-count"><?php echo number_format($yearCount); ?></span>
+            </span>
         </div>
         <?php if (isset($message) || isset($error)): ?>
         <div class="ay-alerts">
@@ -224,24 +257,39 @@
 
         <?php if (!empty($years)): ?>
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle academic-years-table">
+                    <table class="table table-hover align-middle academic-years-table<?php echo $showCounts ? ' has-counts' : ''; ?>">
                         <colgroup>
                             <col class="col-no">
                             <col class="col-year">
                             <col class="col-semester">
                             <col class="col-semester">
                             <col class="col-status">
+                            <?php if ($showCounts): ?>
+                            <col class="col-count"><col class="col-count"><col class="col-count"><col class="col-count">
+                            <?php endif; ?>
                             <col class="col-actions">
                         </colgroup>
                         <thead>
+                            <?php $rs = $showCounts ? ' rowspan="2"' : ''; ?>
                             <tr>
-                                <th class="col-no">No</th>
-                                <th class="col-year">Academic year</th>
-                                <th>1st semester</th>
-                                <th>2nd semester</th>
-                                <th class="col-status">Status</th>
-                                <th class="col-actions">Actions</th>
+                                <th class="col-no"<?php echo $rs; ?>>No</th>
+                                <th class="col-year"<?php echo $rs; ?>>Academic year</th>
+                                <th<?php echo $rs; ?>>1st semester</th>
+                                <th<?php echo $rs; ?>>2nd semester</th>
+                                <th class="col-status"<?php echo $rs; ?>>Status</th>
+                                <?php if ($showCounts): ?>
+                                <th class="col-group" colspan="4">Students<?php echo !empty($deptName) ? ' &middot; ' . htmlspecialchars($deptName) : ''; ?></th>
+                                <?php endif; ?>
+                                <th class="col-actions"<?php echo $rs; ?>>Actions</th>
                             </tr>
+                            <?php if ($showCounts): ?>
+                            <tr class="ay-subhead">
+                                <th class="col-count col-count-first">Total</th>
+                                <th class="col-count">Following</th>
+                                <th class="col-count">Internship</th>
+                                <th class="col-count">Completed</th>
+                            </tr>
+                            <?php endif; ?>
                         </thead>
                         <tbody>
                             <?php $n = 1; foreach ($years as $row): ?>
@@ -268,6 +316,13 @@
                                             <?php echo htmlspecialchars($row['academic_year_status'] ?? 'Active'); ?>
                                         </span>
                                     </td>
+                                    <?php if ($showCounts): ?>
+                                        <?php $c = $studentCounts[$row['academic_year']] ?? ['total' => 0, 'following' => 0, 'internship' => 0, 'completed' => 0]; ?>
+                                        <td class="col-count col-count-first"><strong><?php echo number_format($c['total']); ?></strong></td>
+                                        <td class="col-count"><?php echo number_format($c['following']); ?></td>
+                                        <td class="col-count"><?php echo number_format($c['internship']); ?></td>
+                                        <td class="col-count"><?php echo number_format($c['completed']); ?></td>
+                                    <?php endif; ?>
                                     <td class="col-actions academic-years-actions">
                                         <?php if (!empty($isADM)): ?>
                                         <div class="btn-group btn-group-sm" role="group">

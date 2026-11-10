@@ -87,6 +87,24 @@ $onlyDeptId = $onlyDept['department_id'] ?? '';
               </div>
 
               <div class="col-md-4">
+                <label for="group_code" class="form-label fw-semibold">Group Code</label>
+                <input type="text" class="form-control" id="group_code" name="group_code" maxlength="30" placeholder="Auto-generated if left blank">
+              </div>
+              <div class="col-md-4">
+                <label for="batch" class="form-label fw-semibold">Batch / Intake</label>
+                <input type="text" class="form-control" id="batch" name="batch" maxlength="30" placeholder="e.g., 2026 Intake 1">
+              </div>
+              <div class="col-md-4">
+                <label for="instructor_staff_id" class="form-label fw-semibold">Group Instructor</label>
+                <select class="form-select" id="instructor_staff_id" name="instructor_staff_id">
+                  <option value="">Not assigned</option>
+                  <?php foreach (($instructors ?? []) as $ins): ?>
+                    <option value="<?php echo htmlspecialchars((string) $ins['staff_id']); ?>"><?php echo htmlspecialchars((string) $ins['staff_name'] . ' (' . $ins['staff_id'] . ')'); ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+
+              <div class="col-md-4">
                 <label for="status" class="form-label fw-semibold">Status <span class="req">*</span></label>
                 <select class="form-select" id="status" name="status" required>
                   <option value="active" selected>Active</option>

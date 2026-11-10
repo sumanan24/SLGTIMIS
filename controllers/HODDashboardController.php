@@ -60,9 +60,6 @@ class HODDashboardController extends Controller {
             $staffModel = $this->model('StaffModel');
             $courseModel = $this->model('CourseModel');
             $departmentModel = $this->model('DepartmentModel');
-            $hostelModel = $this->model('HostelModel');
-            $roomAllocationModel = $this->model('RoomAllocationModel');
-            
             // Get department information if user has a department
             if ($userDepartmentId) {
                 $department = $departmentModel->getById($userDepartmentId);
@@ -85,7 +82,6 @@ class HODDashboardController extends Controller {
             $totalStudentsByYear = 0;
             $totalCourses = 0;
             $totalStaff = 0;
-            $recentStudents = [];
             $departmentEnrollment = [];
             $departmentCourses = [];
             $courseModuleRows = [];
@@ -127,9 +123,6 @@ class HODDashboardController extends Controller {
                 // Get department staff count
                 $totalStaff = $staffModel->getTotalStaff('', $userDepartmentId);
                 
-                // Get recent students in department
-                $recentStudents = $this->getDepartmentRecentStudents($studentModel, $userDepartmentId, $selectedAcademicYear, 5);
-                
                 // Get course enrollment for department only
                 $courseEnrollment = $studentModel->getCourseEnrollmentByDepartment($selectedAcademicYear);
                 // Filter to show only user's department
@@ -151,20 +144,6 @@ class HODDashboardController extends Controller {
                 
                 // Get district stats for department
                 $departmentDistrictStats = $this->getDepartmentDistrictStats($studentModel, $userDepartmentId, $selectedAcademicYear);
-            }
-            
-            // Get hostel information (for HOD, IN1, IN2, IN3, FIN, ACC, DIR, REG)
-            $hostelStats = $this->getHostelStatistics($hostelModel, $roomAllocationModel, $userDepartmentId, $selectedAcademicYear);
-            
-            // Final deduplication check - ensure each student appears only once
-            $uniqueStudents = [];
-            $seenIds = [];
-            foreach ($recentStudents as $student) {
-                $id = $student['student_id'] ?? null;
-                if ($id && !in_array($id, $seenIds)) {
-                    $uniqueStudents[] = $student;
-                    $seenIds[] = $id;
-                }
             }
             
             // Department assignments (Permanent / Acting / Cover-up) of this login
@@ -210,7 +189,53 @@ class HODDashboardController extends Controller {
             $flashError = $_SESSION['error'] ?? null;
             unset($_SESSION['error']);
 
+            // Department student counts by enrolment status
+            $studentStatusCounts = [];
+            if ($userDepartmentId) {
+                try {
+                    $studentStatusCounts = $this->getDepartmentEnrollmentBreakdown($userDepartmentId, $selectedAcademicYear);
+                } catch (Throwable $ex) {
+                    error_log('HODDashboard status counts: ' . $ex->getMessage());
+                }
+            }
+
+            // "My work": modules, timetable, upcoming programmes and tickets of the logged-in staff member
+            $my = ['staff_id' => '', 'modules' => [], 'timetable' => [], 'programs' => [], 'tickets' => [], 'ticket_total' => 0];
+            $loginRow = $userModel->find((int) $_SESSION['user_id']);
+            if ($loginRow && ($loginRow['user_table'] ?? '') === 'staff' && !empty($loginRow['user_name'])) {
+                $my['staff_id'] = (string) $loginRow['user_name'];
+                $sid = $my['staff_id'];
+                try {
+                    $my['modules'] = $this->model('StaffModuleEnrollmentModel')->getByStaff($sid, (string) $selectedAcademicYear);
+                } catch (Throwable $ex) {
+                    error_log('HODDashboard modules: ' . $ex->getMessage());
+                }
+                try {
+                    $my['timetable'] = $this->model('GroupTimetableModel')->listByStaff($sid);
+                } catch (Throwable $ex) {
+                    error_log('HODDashboard timetable: ' . $ex->getMessage());
+                }
+                try {
+                    $my['programs'] = $this->model('CircuitProgramModel')->upcomingForStaff($sid, 5);
+                } catch (Throwable $ex) {
+                    error_log('HODDashboard programs: ' . $ex->getMessage());
+                }
+                try {
+                    $res = $this->model('FacilitiesTicketModel')->search(['assigned_to_me' => 1, 'scope_staff_id' => $sid], 1, 100);
+                    $closed = ['closed', 'cancelled', 'rejected'];
+                    $open = array_values(array_filter($res['rows'] ?? [], static function ($r) use ($closed) {
+                        return !in_array($r['status'] ?? '', $closed, true);
+                    }));
+                    $my['ticket_total'] = count($open);
+                    $my['tickets'] = array_slice($open, 0, 5);
+                } catch (Throwable $ex) {
+                    error_log('HODDashboard tickets: ' . $ex->getMessage());
+                }
+            }
+
             $data = [
+                'studentStatusCounts' => $studentStatusCounts,
+                'my' => $my,
                 'error' => $flashError,
                 'assignments' => $assignments,
                 'ownDepartment' => $ownDepartment,
@@ -227,13 +252,11 @@ class HODDashboardController extends Controller {
                 'totalStaff' => $totalStaff,
                 'totalCourses' => $totalCourses,
                 'courses' => $departmentCourses,
-                'recentStudents' => array_values($uniqueStudents),
                 'courseEnrollmentByDepartment' => $departmentEnrollment,
                 'nvqStatsByDepartment' => $departmentNVQStats,
                 'genderStats' => $departmentGenderStats,
                 'religionStats' => $departmentReligionStats,
                 'districtStats' => $departmentDistrictStats,
-                'hostelStats' => $hostelStats,
                 'academicYears' => $academicYears,
                 'selectedAcademicYear' => $selectedAcademicYear
             ];
@@ -249,6 +272,57 @@ class HODDashboardController extends Controller {
         }
     }
     
+    /**
+     * Distinct students of a department for an academic year, each split into full time and part time.
+     * "total" = current students (Following + Internship, same rule as StudentModel::getTotalStudents);
+     * Completed students are counted separately and are not part of the total.
+     *
+     * @return array<string, array{total:int, full:int, part:int}>
+     */
+    private function getDepartmentEnrollmentBreakdown($departmentId, $academicYear = null) {
+        $out = [];
+        foreach (['total', 'following', 'internship', 'completed'] as $k) {
+            $out[$k] = ['total' => 0, 'full' => 0, 'part' => 0];
+        }
+        $full = "LOWER(TRIM(se.`course_mode`)) LIKE 'full%'";
+        $part = "LOWER(TRIM(se.`course_mode`)) LIKE 'part%'";
+        $cols = [];
+        foreach (['total' => "se.`student_enroll_status` IN ('Following', 'Internship')", 'following' => "se.`student_enroll_status` = 'Following'", 'internship' => "se.`student_enroll_status` = 'Internship'", 'completed' => "se.`student_enroll_status` = 'Completed'"] as $k => $cond) {
+            $cols[] = "COUNT(DISTINCT CASE WHEN {$cond} THEN se.`student_id` END) AS {$k}_total";
+            $cols[] = "COUNT(DISTINCT CASE WHEN {$cond} AND {$full} THEN se.`student_id` END) AS {$k}_full";
+            $cols[] = "COUNT(DISTINCT CASE WHEN {$cond} AND {$part} THEN se.`student_id` END) AS {$k}_part";
+        }
+        $sql = "SELECT " . implode(', ', $cols) . "
+                FROM `student_enroll` se
+                INNER JOIN `course` c ON c.`course_id` = se.`course_id`
+                WHERE c.`department_id` = ?";
+        $params = [$departmentId];
+        $types = 's';
+        if (!empty($academicYear)) {
+            $sql .= " AND se.`academic_year` = ?";
+            $params[] = $academicYear;
+            $types .= 's';
+        }
+        $stmt = Database::getInstance()->prepare($sql);
+        if (!$stmt) {
+            return $out;
+        }
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if ($row) {
+            foreach (array_keys($out) as $k) {
+                $out[$k] = [
+                    'total' => (int) $row[$k . '_total'],
+                    'full' => (int) $row[$k . '_full'],
+                    'part' => (int) $row[$k . '_part'],
+                ];
+            }
+        }
+        return $out;
+    }
+
     /**
      * Get gender statistics for HOD's department
      */
