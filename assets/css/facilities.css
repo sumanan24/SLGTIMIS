@@ -886,3 +886,6 @@ a.fac-stat:hover { border-color: #9bb0c7; background: #fcfdff; }
     .fac-sj .form-select, .fac-sj .form-control, .fac-support .form-select, .fac-support .form-control { font-size: 16px; min-height: 42px; }
 }
 @media print { .fac-support-inbox { display: none; } }
+/* Assign page: numbered steps and the secondary "get help" box below the form */
+.fac-step { display: inline-flex; align-items: center; justify-content: center; width: 1.45rem; height: 1.45rem; margin-right: 0.5rem; border-radius: 50%; background: var(--fac-navy, #0b2a4a); color: #fff; font-size: 0.75rem; font-weight: 700; vertical-align: middle; }
+.fac-support-after { margin-top: 1.25rem; }

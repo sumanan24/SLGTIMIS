@@ -399,14 +399,14 @@ class UserModel extends Model {
         if ($this->isAdminOrADM($userId)) {
             return true;
         }
-        return $this->isHRO($userId);
+        return $this->isHRO($userId) || $this->getUserRole($userId) === 'MA2';
     }
 
     /**
      * Side nav: dashboard, daily, month, sync (not limited to dashboard + month only).
      */
     public function hasFullStaffDeviceAttendanceNav($userId) {
-        return $this->isAdminOrADM($userId) || $this->isHRO($userId);
+        return $this->isAdminOrADM($userId) || $this->isHRO($userId) || $this->getUserRole($userId) === 'MA2';
     }
 
     /**
@@ -637,7 +637,7 @@ class UserModel extends Model {
 
     /**
      * Staff device attendance: dashboard + month report (embedded app).
-     * Daily / sync: Admin/ADM and HRO via canManageStaffDeviceSyncDaily().
+     * Daily / sync: Admin/ADM, HRO and MA2 via canManageStaffDeviceSyncDaily().
      * DIR, REG, FIN, ACC, HOD: dashboard + month only (limited side nav).
      */
     public function canViewStaffDeviceDashboardMonth($userId) {
@@ -645,7 +645,7 @@ class UserModel extends Model {
             return true;
         }
         $role = $this->getUserRole($userId);
-        return in_array($role, ['DIR', 'REG', 'FIN', 'ACC', 'HOD'], true);
+        return in_array($role, ['MA2', 'DIR', 'REG', 'FIN', 'ACC', 'HOD'], true);
     }
     
     /**

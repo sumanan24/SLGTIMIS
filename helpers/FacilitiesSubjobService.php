@@ -26,8 +26,11 @@ class FacilitiesSubjobService {
         'cancelled' => 'Cancelled',
     ];
 
-    /** Ticket statuses in which support can be requested (the main job is running). */
-    const REQUESTABLE = ['assigned', 'accepted', 'in_progress', 'reopened', 'waiting_support'];
+    /**
+     * Ticket statuses in which support can be requested: the main job is running, or the HOD / officer has just
+     * received the ticket (new / under review) and wants help from another department before assigning it.
+     */
+    const REQUESTABLE = ['new', 'under_review', 'assigned', 'accepted', 'in_progress', 'reopened', 'waiting_support'];
 
     private $tickets;
     private $model;

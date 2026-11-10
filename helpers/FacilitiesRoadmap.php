@@ -381,6 +381,8 @@ class FacilitiesRoadmap {
             $summary = $terminal['label'];
         } elseif ($isClosed) {
             $summary = 'Closed';
+        } elseif ($status === 'waiting_support') {
+            $summary = 'Waiting for support from another department';
         } else {
             switch ($currentKey) {
                 case 'review':

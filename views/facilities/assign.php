@@ -7,14 +7,14 @@ $requesterName = $t['requester_name'] ?? $t['requester_staff_id'] ?? '';
 <div class="container-fluid px-0 fac-page">
     <div class="card border-0">
         <?php $facHeader(
-            $isReassign ? 'Reassign Ticket' : 'Assign Ticket',
-            $isReassign ? 'Select another person or team to handle this ticket.' : 'Select the person or team who will handle this ticket.'
+            $isReassign ? 'Reassign' : 'Assign',
+            'Choose staff.'
         ); ?>
         <div class="card-body">
             <?php $facNav(); $facFlash(); ?>
 
             <div class="fac-section">
-                <h6>Ticket Details</h6>
+                <h6>Ticket</h6>
                 <p class="fw-bold mb-1"><?php echo $h($t['ticket_number']); ?> <?php echo $badgePriority($t['current_priority'] ?? ''); ?> <?php echo $badgeStatus($t['status'] ?? ''); ?></p>
                 <p class="fac-help mb-2">
                     <?php echo $h($t['category_name'] ?? ''); ?>
@@ -27,8 +27,20 @@ $requesterName = $t['requester_name'] ?? $t['requester_staff_id'] ?? '';
 
             <?php if ($isReassign): ?>
                 <div class="fac-notice mb-3">
-                    This ticket is currently assigned to <strong><?php echo $h($currentAssignee !== '' ? $currentAssignee : 'another person'); ?></strong>.
-                    The new assignee will receive an SMS notification.
+                    Current: <strong><?php echo $h($currentAssignee !== '' ? $currentAssignee : 'another person'); ?></strong>
+                </div>
+            <?php endif; ?>
+
+            <?php
+            $sjs = $subjobs ?? [];
+            $sjLabels = $subjob_labels ?? [];
+            $sjOpen = array_filter($sjs, static function ($r) { return in_array($r['status'], ['requested', 'assigned'], true); });
+            ?>
+            <?php if ($sjOpen): ?>
+                <div class="fac-notice mb-3">
+                    <i class="fas fa-hourglass-half me-1"></i>
+                    <strong>Waiting for support</strong> (<?php echo count($sjOpen); ?>)
+                    <a href="<?php echo $base; ?>/view?id=<?php echo (int) $t['id']; ?>#support">View</a>
                 </div>
             <?php endif; ?>
 
@@ -37,7 +49,7 @@ $requesterName = $t['requester_name'] ?? $t['requester_staff_id'] ?? '';
                 <input type="hidden" name="assignment_type" id="facType" value="staff">
 
                 <div class="fac-section">
-                    <h6>Assignee</h6>
+                    <h6><span class="fac-step">1</span>Assignee</h6>
                     <div class="row g-3 mb-2" id="facDeptBox">
                         <div class="col-md-6">
                             <label class="form-label" for="facDept">Department</label>
@@ -59,13 +71,13 @@ $requesterName = $t['requester_name'] ?? $t['requester_staff_id'] ?? '';
                             <?php endif; ?>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label" for="facSearch">Find a person</label>
-                            <input type="search" class="form-control" id="facSearch" placeholder="Type a name..." autocomplete="off">
+                            <label class="form-label" for="facSearch">Search</label>
+                            <input type="search" class="form-control" id="facSearch" placeholder="Name" autocomplete="off">
                         </div>
                     </div>
 
                     <div id="facStaffBox">
-                        <label class="form-label">Staff Members <span class="text-danger">*</span></label>
+                        <label class="form-label">Staff <span class="text-danger">*</span></label>
                         <div id="facChips" class="d-flex flex-wrap gap-2 mb-2"></div>
                         <div id="facStaffList" class="fac-staff-list" role="group" aria-label="Staff members"></div>
                         <div id="facIds"></div>
@@ -74,40 +86,89 @@ $requesterName = $t['requester_name'] ?? $t['requester_staff_id'] ?? '';
 
                     <div class="form-check mt-3" id="facVendorToggleBox">
                         <input class="form-check-input" type="checkbox" id="facVendorToggle">
-                        <label class="form-check-label" for="facVendorToggle">Hand over to an external vendor instead (closes the ticket)</label>
+                        <label class="form-check-label" for="facVendorToggle">External vendor</label>
                     </div>
                     <div id="facVendorBox" class="mt-3" hidden>
-                        <label class="form-label" for="facVendorReason">Reason for Closing <span class="text-danger">*</span></label>
-                        <textarea class="form-control" name="vendor_reason" id="facVendorReason" rows="3" minlength="10" required placeholder="Why is this ticket being handed to an external vendor?"></textarea>
-                        <div class="form-text">The ticket will be closed with this reason.</div>
+                        <label class="form-label" for="facVendorReason">Reason <span class="text-danger">*</span></label>
+                        <textarea class="form-control" name="vendor_reason" id="facVendorReason" rows="3" minlength="10" required placeholder="Reason"></textarea>
+                        <div class="form-text">The ticket will be closed.</div>
                     </div>
                 </div>
                 <div id="facWorkBox">
                     <div class="fac-section">
-                        <h6>Schedule</h6>
+                        <h6><span class="fac-step">2</span>Instructions</h6>
+                        <textarea class="form-control" name="instructions" id="facInstr" rows="3" placeholder="Optional"></textarea>
+                    </div>
+
+                    <div class="fac-section">
+                        <h6><span class="fac-step">3</span>Schedule</h6>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label" for="facStart">Start Date</label>
+                                <label class="form-label" for="facStart">Start</label>
                                 <input type="date" class="form-control" name="start_date" id="facStart" value="<?php echo date('Y-m-d'); ?>">
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label" for="facFinish">Expected Completion</label>
+                                <label class="form-label" for="facFinish">Finish</label>
                                 <input type="date" class="form-control" name="expected_completion_date" id="facFinish">
                             </div>
                         </div>
                     </div>
-
-                    <div class="fac-section">
-                        <h6>Instructions</h6>
-                        <textarea class="form-control" name="instructions" id="facInstr" rows="3" placeholder="Describe what needs to be done (optional)."></textarea>
-                    </div>
                 </div>
                 <div class="d-flex gap-2">
-                    <button class="btn btn-primary" id="facSubmit" type="submit">Assign Ticket</button>
+                    <button class="btn btn-primary" id="facSubmit" type="submit">Assign</button>
                     <a class="btn btn-outline-secondary" href="<?php echo $base; ?>/view?id=<?php echo (int) $t['id']; ?>">Cancel</a>
                 </div>
             </form>
+
+            <?php if ($sjs || !empty($can_request_subjob)): ?>
+            <div class="fac-support fac-support-after">
+                <div class="fac-support-head">
+                    <h6><i class="fas fa-people-arrows me-2"></i>Support</h6>
+                    <?php if ($sjOpen): ?>
+                        <span class="fac-support-wait"><i class="fas fa-hourglass-half"></i> Waiting (<?php echo count($sjOpen); ?>)</span>
+                    <?php endif; ?>
+                </div>
+                <?php foreach ($sjs as $sj): ?>
+                    <a class="fac-sj-line" href="<?php echo $base; ?>/view?id=<?php echo (int) $t['id']; ?>#support">
+                        <span class="fac-sj-line-main">
+                            <strong><?php echo $h($sj['department_name']); ?></strong>
+                            <small><?php echo $h($sj['description']); ?></small>
+                        </span>
+                        <span class="fac-sj-line-meta">
+                            <span class="fac-sj-chip fac-sj-chip-<?php echo $h($sj['status']); ?>"><?php echo $h($sjLabels[$sj['status']] ?? $sj['status']); ?></span>
+                            <?php if (!empty($sj['assigned_name'])): ?><small><?php echo $h($sj['assigned_name']); ?></small><?php endif; ?>
+                        </span>
+                    </a>
+                <?php endforeach; ?>
+                <?php if (!empty($can_request_subjob)): ?>
+                <details class="fac-road-more fac-road-request" <?php echo $sjs ? '' : 'open'; ?>>
+                    <summary><i class="fas fa-plus me-1"></i>Request support</summary>
+                    <form method="post" action="<?php echo $base; ?>/subjob-request" class="mt-2">
+                        <input type="hidden" name="id" value="<?php echo (int) $t['id']; ?>">
+                        <div class="row g-2">
+                            <div class="col-md-5">
+                                <label class="form-label" for="facSupDept">Department <span class="text-danger">*</span></label>
+                                <select class="form-select" id="facSupDept" name="department_id" required>
+                                    <option value="">Choose</option>
+                                    <?php foreach ($departments as $dp):
+                                        if ((string) $dp['department_id'] === (string) ($t['responsible_department_id'] ?? '') || (!empty($lock_department) && (string) $dp['department_id'] === (string) ($selected_department ?? ''))) { continue; } ?>
+                                        <option value="<?php echo $h($dp['department_id']); ?>"><?php echo $h($dp['department_name']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-7">
+                                <label class="form-label" for="facSupDesc">Details <span class="text-danger">*</span></label>
+                                <textarea class="form-control" id="facSupDesc" name="description" rows="2" maxlength="1000" required placeholder="Details"></textarea>
+                            </div>
+                        </div>
+                        <p class="fac-note mt-2 mb-2">The ticket waits until the support is done.</p>
+                        <button class="btn btn-sm btn-primary">Send</button>
+                    </form>
+                </details>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -115,8 +176,8 @@ $requesterName = $t['requester_name'] ?? $t['requester_staff_id'] ?? '';
 (function () {
     var isReassign = <?php echo $isReassign ? 'true' : 'false'; ?>;
     var currentStaff = <?php echo json_encode((string) ($t['responsible_staff_id'] ?? '')); ?>;
-    var baseLabel = <?php echo json_encode($isReassign ? 'Reassign Ticket' : 'Assign Ticket'); ?>;
-    var teamLabel = <?php echo json_encode($isReassign ? 'Reassign to Team' : 'Assign to Team'); ?>;
+    var baseLabel = <?php echo json_encode('Assign'); ?>;
+    var teamLabel = <?php echo json_encode('Assign'); ?>;
 
     var typeInp = document.getElementById('facType');
     var dept = document.getElementById('facDept');
@@ -181,7 +242,7 @@ $requesterName = $t['requester_name'] ?? $t['requester_staff_id'] ?? '';
         if (message || !shown) {
             var m = document.createElement('div');
             m.className = 'fac-staff-empty';
-            m.textContent = message || (q ? 'No one matches "' + search.value.trim() + '".' : 'No staff found in this department.');
+            m.textContent = message || (q ? 'No match.' : 'No staff.');
             listBox.appendChild(m);
         }
         renderSelection();
@@ -215,10 +276,10 @@ $requesterName = $t['requester_name'] ?? $t['requester_staff_id'] ?? '';
         var n = selected.size;
         typeInp.value = vendorMode ? 'vendor' : (n > 1 ? 'team' : 'staff');
         countEl.textContent = n === 0
-            ? 'Tick one or more people. One person is assigned directly; two or more form a team and the first ticked is the lead.'
-            : (n === 1 ? '1 person selected.' : n + ' people selected as a team. The first one ticked is the team lead.');
+            ? 'Tick one or more.'
+            : (n === 1 ? '1 selected' : n + ' selected, first is lead');
         if (!vendorMode) {
-            submitBtn.textContent = n > 1 ? teamLabel + ' (' + n + ')' : baseLabel;
+            submitBtn.textContent = baseLabel;
         }
     }
 
@@ -228,7 +289,7 @@ $requesterName = $t['requester_name'] ?? $t['requester_staff_id'] ?? '';
         setEnabled(staffBox, !vendorMode);
         setEnabled(vendorBox, vendorMode);
         setEnabled(workBox, !vendorMode);
-        submitBtn.textContent = vendorMode ? 'Close Ticket' : baseLabel;
+        submitBtn.textContent = vendorMode ? 'Close' : baseLabel;
         submitBtn.className = 'btn ' + (vendorMode ? 'btn-danger' : 'btn-primary');
         renderSelection();
     }
@@ -248,12 +309,12 @@ $requesterName = $t['requester_name'] ?? $t['requester_staff_id'] ?? '';
 
     form.addEventListener('submit', function (e) {
         if (vendorMode) {
-            if (!confirm('This will close the ticket. Do you want to continue?')) { e.preventDefault(); }
+            if (!confirm('Close this ticket?')) { e.preventDefault(); }
             return;
         }
         if (selected.size < 1) {
             e.preventDefault();
-            alert('Please tick at least one staff member.');
+            alert('Select staff.');
         }
     });
 
