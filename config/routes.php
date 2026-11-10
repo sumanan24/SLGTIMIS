@@ -58,6 +58,8 @@ return [
     'students/import-images' => 'StudentController@importImages',
     'students/upload-images' => 'StudentController@uploadImages',
     'students/export-excel' => 'StudentController@exportExcel',
+    'students/envelopes' => 'StudentController@envelopes',
+    'students/bulk-sms' => 'StudentController@bulkSms',
     // Student ID card (ADM only)
     'students/id-card-select' => 'StudentController@idCardSelect',
     'students/id-card' => 'StudentController@idCard',

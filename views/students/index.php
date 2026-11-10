@@ -68,6 +68,19 @@ $staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsa
                 <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#exportModal">
                     <i class="fas fa-file-excel me-1"></i>Export to Excel
                 </button>
+                <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#envelopeModal">
+                    <i class="fas fa-envelope me-1"></i>Download Envelopes
+                </button>
+                <?php
+                $smsQuery = http_build_query(array_filter([
+                    'academic_year' => $filters['academic_year'] ?? '',
+                    'department_id' => $filters['department_id'] ?? '',
+                    'course_id' => $filters['course_id'] ?? '',
+                ], 'strlen'));
+                ?>
+                <a href="<?php echo APP_URL; ?>/students/bulk-sms<?php echo $smsQuery !== '' ? '?' . $smsQuery : ''; ?>" class="btn btn-info btn-sm">
+                    <i class="fas fa-sms me-1"></i>Bulk SMS
+                </a>
                 <?php endif; ?>
                 </div>
             </div>
@@ -219,6 +232,9 @@ $staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsa
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
+                                <?php if (!empty($canExport)): ?>
+                                <th style="width: 40px;"><input type="checkbox" class="form-check-input" id="envSelectAll" title="Select all on this page for envelopes"></th>
+                                <?php endif; ?>
                                 <th class="fw-bold" style="width: 60px;">No</th>
                                 <th class="fw-bold" style="width: 80px;">Photo</th>
                                 <th class="fw-bold">Student ID</th>
@@ -238,6 +254,9 @@ $staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsa
                                 $waDigits = StudentModel::digitsForWhatsAppMe($student);
                             ?>
                                 <tr>
+                                    <?php if (!empty($canExport)): ?>
+                                    <td><input type="checkbox" class="form-check-input env-select" value="<?php echo htmlspecialchars($student['student_id']); ?>" title="Select for envelope"></td>
+                                    <?php endif; ?>
                                     <td class="text-muted"><?php echo $rowNumber++; ?></td>
                                     <td>
                                         <?php if ($profileImageUrl): ?>
@@ -748,6 +767,150 @@ function deselectAllColumns() {
         checkbox.checked = false;
     });
 }
+</script>
+
+<!-- Envelope Modal -->
+<div class="modal fade" id="envelopeModal" tabindex="-1" aria-labelledby="envelopeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="envelopeModalLabel">
+                    <i class="fas fa-envelope me-2"></i>Download Student Envelopes
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="<?php echo APP_URL; ?>/students/envelopes" id="envelopeForm">
+                <div class="modal-body">
+                    <p class="small text-muted mb-3">
+                        Creates a PDF with one envelope per student (name and address), ready to print on DL envelopes (220 &times; 110 mm).
+                        Only current students (Following and Internship) are included.
+                    </p>
+                    <div id="envSelectedInfo" class="alert alert-info py-2 small d-none"></div>
+                    <div id="envFilterFields">
+                        <div class="mb-3">
+                            <label for="env_academic_year" class="form-label small fw-bold">Academic Year <span class="text-danger">*</span></label>
+                            <select class="form-select form-select-sm" id="env_academic_year" name="academic_year">
+                                <option value="">Select academic year</option>
+                                <?php foreach ($academicYears as $year): ?>
+                                    <option value="<?php echo htmlspecialchars($year); ?>"
+                                            <?php echo (isset($filters['academic_year']) && $filters['academic_year'] === $year) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($year); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php if (!isset($isHOD) || !$isHOD): ?>
+                        <div class="mb-3">
+                            <label for="env_department_id" class="form-label small fw-bold">Department</label>
+                            <select class="form-select form-select-sm" id="env_department_id" name="department_id">
+                                <option value="">All Departments</option>
+                                <?php foreach ($departments as $dept): ?>
+                                    <option value="<?php echo htmlspecialchars($dept['department_id']); ?>"
+                                            <?php echo (isset($filters['department_id']) && $filters['department_id'] === $dept['department_id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($dept['department_name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php endif; ?>
+                        <div class="mb-1">
+                            <label for="env_course_id" class="form-label small fw-bold">Course</label>
+                            <select class="form-select form-select-sm" id="env_course_id" name="course_id">
+                                <option value="">All Courses</option>
+                                <?php foreach ($courses as $course): ?>
+                                    <option value="<?php echo htmlspecialchars($course['course_id']); ?>"
+                                            data-department="<?php echo htmlspecialchars($course['department_id'] ?? ''); ?>"
+                                            <?php echo (isset($filters['course_id']) && $filters['course_id'] === $course['course_id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($course['course_name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="envIdFields"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Cancel
+                    </button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-download me-1"></i>Download PDF
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var modalEl = document.getElementById('envelopeModal');
+    var form = document.getElementById('envelopeForm');
+    var selectAll = document.getElementById('envSelectAll');
+    var info = document.getElementById('envSelectedInfo');
+    var filterFields = document.getElementById('envFilterFields');
+    var idFields = document.getElementById('envIdFields');
+    var yearSelect = document.getElementById('env_academic_year');
+    var deptSelect = document.getElementById('env_department_id');
+    var courseSelect = document.getElementById('env_course_id');
+
+    function ticked() {
+        return Array.prototype.slice.call(document.querySelectorAll('.env-select:checked'));
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            document.querySelectorAll('.env-select').forEach(function(cb) { cb.checked = selectAll.checked; });
+        });
+    }
+
+    // Show only the courses of the chosen department
+    if (deptSelect && courseSelect) {
+        deptSelect.addEventListener('change', function() {
+            Array.prototype.forEach.call(courseSelect.options, function(opt) {
+                var d = opt.getAttribute('data-department');
+                opt.hidden = !!(opt.value && deptSelect.value && d !== deptSelect.value);
+            });
+            if (courseSelect.selectedOptions[0] && courseSelect.selectedOptions[0].hidden) {
+                courseSelect.value = '';
+            }
+        });
+    }
+
+    if (modalEl) {
+        modalEl.addEventListener('show.bs.modal', function() {
+            var n = ticked().length;
+            if (n > 0) {
+                info.classList.remove('d-none');
+                info.innerHTML = '<i class="fas fa-check-circle me-1"></i><strong>' + n + '</strong> student' + (n === 1 ? '' : 's') +
+                    ' ticked on this page. Envelopes will be created for these students only.';
+                filterFields.classList.add('d-none');
+            } else {
+                info.classList.add('d-none');
+                filterFields.classList.remove('d-none');
+            }
+        });
+    }
+
+    if (form) {
+        form.addEventListener('submit', function(ev) {
+            idFields.innerHTML = '';
+            var rows = ticked();
+            if (rows.length > 0) {
+                rows.forEach(function(cb) {
+                    var h = document.createElement('input');
+                    h.type = 'hidden';
+                    h.name = 'student_ids[]';
+                    h.value = cb.value;
+                    idFields.appendChild(h);
+                });
+            } else if (yearSelect && !yearSelect.value) {
+                ev.preventDefault();
+                alert('Please select an academic year, or tick the students you want envelopes for.');
+            }
+        });
+    }
+});
 </script>
 <?php endif; ?>
 

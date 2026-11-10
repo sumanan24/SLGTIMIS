@@ -3737,6 +3737,436 @@ class StudentController extends Controller {
     }
     
     /**
+     * Bulk SMS audience filters, always limited to the current register
+     * (Following + Internship) and to the user's own department when restricted.
+     *
+     * @param array<string,mixed> $src GET or POST data
+     * @return array<string,mixed>
+     */
+    private function bulkSmsFilters(array $src): array {
+        $userDepartmentId = $this->getUserDepartment();
+        $restricted = $this->isDepartmentRestricted();
+        return [
+            'status' => $restricted ? 'Active' : '',
+            'department_id' => $restricted
+                ? ($userDepartmentId ?: '__none__')
+                : ($userDepartmentId ?: trim((string) ($src['department_id'] ?? ''))),
+            'course_id' => trim((string) ($src['course_id'] ?? '')),
+            'academic_year' => trim((string) ($src['academic_year'] ?? '')),
+            'current_enrollment' => true,
+        ];
+    }
+
+    /** First valid Sri Lankan mobile on the student record (phone, then WhatsApp), or null. */
+    private function studentSmsNumber(array $student, MobitelSmsService $sms): ?string {
+        foreach (['student_phone', 'student_whatsapp'] as $key) {
+            $n = $sms->normalizeSriLankanMobile((string) ($student[$key] ?? ''));
+            if ($n !== null) {
+                return $n;
+            }
+        }
+        return null;
+    }
+
+    /** Bulk SMS is for the same audience as the Excel export (ADM, SAO, HOD). */
+    private function requireBulkSmsAccess(): bool {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        if (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student') {
+            $this->redirect('student/dashboard');
+            return false;
+        }
+        if (!$this->requireModule('students', 'view')) {
+            return false;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        if ($userModel->getUserRole($uid) !== 'ADM' && !$userModel->isSAO($uid) && !$this->isHOD()) {
+            $_SESSION['error'] = 'Access denied. Only ADM, SAO, and HOD users can send bulk SMS.';
+            $this->redirect('students');
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Bulk SMS page: pick academic year / department, review students and phone
+     * numbers, write one common message and send it.
+     * URL: /students/bulk-sms
+     */
+    public function bulkSms() {
+        if (!$this->requireBulkSmsAccess()) {
+            return;
+        }
+        require_once BASE_PATH . '/services/MobitelSmsService.php';
+        $sms = new MobitelSmsService();
+
+        if (empty($_SESSION['bulk_sms_csrf'])) {
+            $_SESSION['bulk_sms_csrf'] = bin2hex(random_bytes(32));
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $this->bulkSmsSend($sms);
+            return;
+        }
+
+        $studentModel = $this->model('StudentModel');
+        $departmentModel = $this->model('DepartmentModel');
+        $courseModel = $this->model('CourseModel');
+        $userDepartmentId = $this->getUserDepartment();
+        $restricted = $this->isDepartmentRestricted();
+
+        $filters = $this->bulkSmsFilters($_GET);
+        $rows = [];
+        $withNumber = 0;
+        if ($filters['academic_year'] !== '') {
+            $students = $studentModel->getStudents(1, 100000, $filters);
+            usort($students, static function ($a, $b) {
+                return strcasecmp((string) ($a['student_id'] ?? ''), (string) ($b['student_id'] ?? ''));
+            });
+            foreach ($students as $s) {
+                $number = $this->studentSmsNumber($s, $sms);
+                if ($number !== null) {
+                    $withNumber++;
+                }
+                $rows[] = [
+                    'student_id' => (string) ($s['student_id'] ?? ''),
+                    'name' => trim((string) ($s['student_fullname'] ?? '')),
+                    'phone' => trim((string) ($s['student_phone'] ?? '')) !== ''
+                        ? trim((string) $s['student_phone'])
+                        : trim((string) ($s['student_whatsapp'] ?? '')),
+                    'valid' => $number !== null,
+                ];
+            }
+        }
+
+        if ($userDepartmentId) {
+            $departments = array_filter([$departmentModel->getById($userDepartmentId)]);
+            $courses = $courseModel->getCoursesWithDepartment(['department_id' => $userDepartmentId]);
+        } elseif ($restricted) {
+            $departments = [];
+            $courses = [];
+        } else {
+            $departments = $departmentModel->getAll();
+            $courses = $courseModel->all('course_name ASC');
+        }
+
+        $result = $_SESSION['bulk_sms_result'] ?? null;
+        unset($_SESSION['bulk_sms_result']);
+
+        $data = [
+            'title' => 'Bulk SMS',
+            'page' => 'students',
+            'filters' => $filters,
+            'rows' => $rows,
+            'withNumber' => $withNumber,
+            'departments' => $departments,
+            'courses' => $courses,
+            'academicYears' => $studentModel->getAcademicYears(),
+            'isHOD' => $restricted,
+            'csrfToken' => (string) $_SESSION['bulk_sms_csrf'],
+            'smsMissing' => $sms->missingSettings(),
+            'result' => $result,
+            'draft' => (string) ($_SESSION['bulk_sms_draft'] ?? ''),
+            'draftNumbers' => (string) ($_SESSION['bulk_sms_numbers'] ?? ''),
+            'error' => $_SESSION['error'] ?? null,
+        ];
+        unset($_SESSION['error'], $_SESSION['bulk_sms_draft'], $_SESSION['bulk_sms_numbers']);
+        return $this->view('students/bulk_sms', $data);
+    }
+
+    private function bulkSmsSend(MobitelSmsService $sms): void {
+        $filters = $this->bulkSmsFilters($_POST);
+        $back = 'students/bulk-sms?' . http_build_query(array_filter([
+            'academic_year' => $filters['academic_year'],
+            'department_id' => $_POST['department_id'] ?? '',
+            'course_id' => $filters['course_id'],
+        ], 'strlen'));
+
+        $sent = (string) $this->post('csrf_token', '');
+        if ($sent === '' || !hash_equals((string) $_SESSION['bulk_sms_csrf'], $sent)) {
+            $_SESSION['error'] = 'Your session expired. Please try again.';
+            $this->redirect($back);
+            return;
+        }
+
+        $message = trim(str_replace("\r\n", "\n", (string) $this->post('message', '')));
+        $_SESSION['bulk_sms_draft'] = $message;
+        $_SESSION['bulk_sms_numbers'] = trim((string) $this->post('extra_numbers', ''));
+        if ($message === '') {
+            $_SESSION['error'] = 'Write the SMS message first.';
+            $this->redirect($back);
+            return;
+        }
+        if (mb_strlen($message, 'UTF-8') > 600) {
+            $_SESSION['error'] = 'The message is too long (maximum 600 characters).';
+            $this->redirect($back);
+            return;
+        }
+        if ($sms->missingSettings() !== []) {
+            $_SESSION['error'] = 'The SMS gateway is not configured on the server.';
+            $this->redirect($back);
+            return;
+        }
+
+        // Numbers typed by hand (comma, space or new-line separated).
+        $numbers = [];
+        $badTyped = [];
+        foreach (preg_split('/[\s,;]+/', (string) $this->post('extra_numbers', ''), -1, PREG_SPLIT_NO_EMPTY) as $raw) {
+            $n = $sms->normalizeSriLankanMobile($raw);
+            if ($n === null) {
+                $badTyped[] = $raw;
+            } else {
+                $numbers[$n] = $n;
+            }
+        }
+        $typedCount = count($numbers);
+        if ($badTyped !== []) {
+            $_SESSION['error'] = 'Not a valid Sri Lankan mobile number: ' . implode(', ', array_slice($badTyped, 0, 5))
+                . (count($badTyped) > 5 ? ' ...' : '') . '. Use a format like 0771234567. Nothing was sent.';
+            $this->redirect($back);
+            return;
+        }
+
+        // Ticked students. The filtered query is the allow-list, so posted IDs can never
+        // go outside the user's own scope.
+        $ids = $this->post('student_ids', []);
+        $ids = is_array($ids) ? array_flip(array_map('strval', $ids)) : [];
+        $skipped = 0;
+        if ($ids !== []) {
+            if ($filters['academic_year'] === '') {
+                $_SESSION['error'] = 'Select an academic year.';
+                $this->redirect($back);
+                return;
+            }
+            $students = $this->model('StudentModel')->getStudents(1, 100000, $filters);
+            foreach ($students as $s) {
+                if (!isset($ids[(string) ($s['student_id'] ?? '')])) {
+                    continue;
+                }
+                $n = $this->studentSmsNumber($s, $sms);
+                if ($n === null) {
+                    $skipped++;
+                } else {
+                    $numbers[$n] = $n;
+                }
+            }
+        }
+        if ($numbers === []) {
+            $_SESSION['error'] = 'Tick at least one student with a mobile number, or type a number to send to.';
+            $this->redirect($back);
+            return;
+        }
+
+        // Release the session lock while the gateway works.
+        $by = (string) ($_SESSION['user_name'] ?? $_SESSION['user_id']);
+        session_write_close();
+        $res = $sms->sendBulk(array_values($numbers), $message);
+        error_log('[BulkSMS] by=' . $by . ' recipients=' . count($numbers) . ' typed=' . $typedCount . ' accepted=' . $res['accepted'] . ' failed=' . $res['failed']);
+        @session_start();
+
+        if ($res['accepted'] > 0) {
+            unset($_SESSION['bulk_sms_draft'], $_SESSION['bulk_sms_numbers']);
+        }
+        $_SESSION['bulk_sms_result'] = [
+            'accepted' => $res['accepted'],
+            'failed' => $res['failed'],
+            'skipped' => $skipped,
+            'codes' => $res['codes'],
+            'error' => $res['error'],
+        ];
+        $this->redirect($back);
+    }
+
+    /**
+     * Download printable envelopes (PDF, one DL envelope per student) with the
+     * student's name and postal address.
+     *
+     * POST: student_ids[] (ticked rows; takes priority) or academic_year /
+     * department_id / course_id / group_id (all current students in that selection).
+     * Same audience as the Excel export (ADM, SAO, HOD) and always limited to the
+     * current register (Following + Internship), as on the Students page.
+     */
+    public function envelopes(): void {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        if (!$this->requireModule('students', 'view')) {
+            return;
+        }
+
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        $isADM = ($userModel->getUserRole($uid) === 'ADM');
+        if (!$isADM && !$userModel->isSAO($uid) && !$this->isHOD()) {
+            $_SESSION['error'] = 'Access denied. Only ADM, SAO, and HOD users can download envelopes.';
+            $this->redirect('students');
+            return;
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->redirect('students');
+            return;
+        }
+
+        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
+        if (!ExamPdfHelper::dompdfAvailable()) {
+            $_SESSION['error'] = 'PDF engine not installed. Run: composer install.';
+            $this->redirect('students');
+            return;
+        }
+        ExamPdfHelper::prepareBulkPdfJob();
+
+        $userDepartmentId = $this->getUserDepartment();
+        $restricted = $this->isDepartmentRestricted();
+        $filters = [
+            'status' => $restricted ? 'Active' : '',
+            'department_id' => $restricted
+                ? ($userDepartmentId ?: '__none__')
+                : ($userDepartmentId ?: trim((string) $this->post('department_id', ''))),
+            'course_id' => trim((string) $this->post('course_id', '')),
+            'academic_year' => trim((string) $this->post('academic_year', '')),
+            'group_id' => trim((string) $this->post('group_id', '')),
+            'current_enrollment' => true,
+        ];
+
+        $ids = $this->post('student_ids', []);
+        $ids = is_array($ids)
+            ? array_values(array_unique(array_filter(array_map('trim', array_map('strval', $ids)), 'strlen')))
+            : [];
+
+        if (empty($ids)) {
+            if ($filters['academic_year'] === '') {
+                $_SESSION['error'] = 'Select an academic year, or tick the students you want envelopes for.';
+                $this->redirect('students');
+                return;
+            }
+        } else {
+            // Ticked students win over the form filters; only the department limit stays.
+            $filters['course_id'] = '';
+            $filters['academic_year'] = '';
+            $filters['group_id'] = '';
+            if (!$restricted && !$userDepartmentId) {
+                $filters['department_id'] = '';
+            }
+        }
+
+        $studentModel = $this->model('StudentModel');
+        // The filtered query is the allow-list, so ticked IDs can never escape the user's department.
+        $students = $studentModel->getStudents(1, 100000, $filters);
+        if (!empty($ids)) {
+            $wanted = array_flip($ids);
+            $students = array_values(array_filter($students, static function ($s) use ($wanted) {
+                return isset($wanted[(string) ($s['student_id'] ?? '')]);
+            }));
+        }
+        if (empty($students)) {
+            $_SESSION['error'] = 'No students found for the selected criteria.';
+            $this->redirect('students');
+            return;
+        }
+
+        usort($students, static function ($a, $b) {
+            return strcasecmp((string) ($a['student_id'] ?? ''), (string) ($b['student_id'] ?? ''));
+        });
+
+        $clean = static function ($v): string {
+            return trim(preg_replace('/\s+/u', ' ', (string) ($v ?? '')));
+        };
+        $envelopes = [];
+        foreach ($students as $s) {
+            $name = trim($clean($s['student_title'] ?? '') . ' ' . $clean($s['student_fullname'] ?? ''));
+            $lines = [];
+            foreach (preg_split('/\r\n|\r|\n/', (string) ($s['student_address'] ?? '')) as $part) {
+                $part = $clean($part);
+                if ($part !== '') {
+                    $lines[] = $part;
+                }
+            }
+            $district = $clean($s['student_district'] ?? '');
+            $zip = $clean($s['student_zip'] ?? '');
+            $last = trim($district . ($zip !== '' ? ' ' . $zip : ''));
+            if ($last !== '') {
+                $lines[] = $last;
+            }
+            $envelopes[] = ['name' => $name, 'lines' => $lines];
+        }
+
+        $viewPath = BASE_PATH . '/views/students/pdf/envelope.php';
+        $headerFile = BASE_PATH . '/assets/img/envelope_header.png';
+        if (!is_file($viewPath)) {
+            $_SESSION['error'] = 'Envelope template missing.';
+            $this->redirect('students');
+            return;
+        }
+
+        $e = static function ($v): string {
+            return htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
+        };
+        $headerImage = is_file($headerFile) ? str_replace('\\', '/', $headerFile) : '';
+
+        // DL envelope, landscape: 220 x 110 mm (1 mm = 72/25.4 pt)
+        $mmToPt = 72 / 25.4;
+        $paper = [0, 0, 220 * $mmToPt, 110 * $mmToPt];
+
+        $label = preg_replace('/[^A-Za-z0-9_-]+/', '_', $filters['academic_year'] !== '' ? $filters['academic_year'] : 'selected');
+        $filename = 'student_envelopes_' . $label . '_' . date('Ymd_His') . '.pdf';
+
+        // Chunk method: render a small batch of envelopes per Dompdf job, then merge the
+        // chunks into one PDF. Rendering a whole academic year in one go is too slow.
+        $chunkSize = 25;
+        $chunks = array_chunk($envelopes, $chunkSize);
+        $renderChunk = function (array $batch) use ($viewPath, $headerImage, $e, $paper): string {
+            extract(['envelopes' => $batch, 'headerImage' => $headerImage, 'e' => $e], EXTR_SKIP);
+            ob_start();
+            include $viewPath;
+            $inner = (string) ob_get_clean();
+            $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Envelopes</title></head><body>' . $inner . '</body></html>';
+            return ExamPdfHelper::renderPdfBytes($html, $paper, 'portrait');
+        };
+
+        ExamPdfHelper::prepareBulkPdfJob();
+        // Release the session lock: a long PDF job must not block the user's other requests
+        // (a blocked request is what ends in "Maximum execution time" on session_start()).
+        session_write_close();
+        try {
+            if (count($chunks) === 1) {
+                $bytes = $renderChunk($chunks[0]);
+                while (ob_get_level() > 0) {
+                    ob_end_clean();
+                }
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: attachment; filename="' . $filename . '"');
+                header('Content-Length: ' . strlen($bytes));
+                echo $bytes;
+                exit;
+            }
+
+            $pdfChunks = [];
+            foreach ($chunks as $batch) {
+                if (function_exists('set_time_limit')) {
+                    @set_time_limit(120); // restart the clock for every chunk
+                }
+                $pdfChunks[] = $renderChunk($batch);
+            }
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            ExamPdfHelper::streamMergedPdfBytes($pdfChunks, $filename);
+        } catch (Throwable $ex) {
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                @session_start();
+            }
+            $_SESSION['error'] = 'Could not build the envelope PDF: ' . $ex->getMessage();
+            $this->redirect('students');
+        }
+    }
+
+    /**
      * Export students to Excel/CSV
      * Only accessible by ADM and SAO users
      */

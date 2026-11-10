@@ -50,6 +50,85 @@ class MobitelSmsService {
     }
 
     /**
+     * Send one message to many recipients over a single gateway session, in batches.
+     * Numbers are normalised and de-duplicated. Messages with non-GSM characters
+     * (for example Tamil or Sinhala) go through the Unicode call automatically.
+     * A gateway answer applies to a whole batch, so counts are per recipient of that batch.
+     *
+     * @param string[] $mobileNumbers
+     * @return array{ok:bool,accepted:int,failed:int,invalid:int,codes:array<string,int>,error:?string}
+     */
+    public function sendBulk(array $mobileNumbers, string $message, int $batchSize = 50): array {
+        $result = ['ok' => false, 'accepted' => 0, 'failed' => 0, 'invalid' => 0, 'codes' => [], 'error' => null];
+
+        $configError = $this->configurationError();
+        if ($configError !== null) {
+            $result['error'] = 'config:' . $configError;
+            return $result;
+        }
+
+        $valid = [];
+        foreach ($mobileNumbers as $number) {
+            $msisdn = $this->toGatewayMsisdn((string) $number);
+            if ($msisdn === null) {
+                $result['invalid']++;
+                continue;
+            }
+            $valid[$msisdn] = $msisdn;
+        }
+        $valid = array_values($valid);
+        if ($valid === []) {
+            $result['error'] = 'no_valid_numbers';
+            return $result;
+        }
+
+        $unicode = preg_match('/[^\x00-\x7F]/', $message) === 1;
+        $batchSize = max(1, min(100, $batchSize));
+        $alias = $this->alias();
+        $session = null;
+        try {
+            $session = createSession('', $this->username(), $this->password(), '');
+            if (!$this->sessionIsUsable($session)) {
+                $this->log('auth_failed', '', 'no_session');
+                $result['error'] = 'auth_failed';
+                $result['failed'] = count($valid);
+                return $result;
+            }
+            foreach (array_chunk($valid, $batchSize) as $batch) {
+                if (function_exists('set_time_limit')) {
+                    @set_time_limit(120);
+                }
+                try {
+                    $code = $unicode
+                        ? sendMessagesMultiLang($session, $alias, $message, $batch, 0)
+                        : sendMessages($session, $alias, $message, $batch, 0);
+                    $parsed = $this->validateResponse($code);
+                } catch (Throwable $e) {
+                    $this->log('connection', '', $this->safeFault($e));
+                    $parsed = $this->failure('soap', 'connection');
+                }
+                $this->log($parsed['ok'] ? 'bulk_accepted' : 'bulk_rejected', '', $parsed['result_code'] . ' x' . count($batch));
+                if ($parsed['ok']) {
+                    $result['accepted'] += count($batch);
+                } else {
+                    $result['failed'] += count($batch);
+                    $key = (string) $parsed['result_code'];
+                    $result['codes'][$key] = ($result['codes'][$key] ?? 0) + count($batch);
+                }
+            }
+        } catch (Throwable $e) {
+            $this->log('connection', '', $this->safeFault($e));
+            $result['error'] = 'connection';
+            $result['failed'] = count($valid) - $result['accepted'];
+        } finally {
+            $this->closeSession($session);
+        }
+
+        $result['ok'] = $result['accepted'] > 0 && $result['failed'] === 0;
+        return $result;
+    }
+
+    /**
      * Official serviceTest. This checks that the SOAP service answers.
      * It does not prove the API password is accepted.
      *
