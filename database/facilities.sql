@@ -291,3 +291,30 @@ CREATE TABLE IF NOT EXISTS `facilities_procurement` (
   PRIMARY KEY (`id`),
   KEY `idx_fac_proc_ticket` (`ticket_id`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Support jobs: the assignee asks ANOTHER department for help. That department's HOD receives it, assigns a person
+-- of their own department, the person completes it and the main job continues.
+-- status: requested -> assigned -> completed   (or declined / cancelled)
+-- prev_status: status of the main ticket before it went to "waiting_support" (restored when all support jobs are finished)
+CREATE TABLE IF NOT EXISTS `facilities_subjobs` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `ticket_id` INT UNSIGNED NOT NULL,
+  `department_id` VARCHAR(16) NOT NULL,
+  `description` TEXT NOT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'requested',
+  `prev_status` VARCHAR(40) DEFAULT NULL,
+  `requested_by` VARCHAR(64) NOT NULL,
+  `requested_at` DATETIME NOT NULL,
+  `received_by` VARCHAR(64) DEFAULT NULL,
+  `received_at` DATETIME DEFAULT NULL,
+  `assigned_staff_id` VARCHAR(64) DEFAULT NULL,
+  `assigned_by` VARCHAR(64) DEFAULT NULL,
+  `assigned_at` DATETIME DEFAULT NULL,
+  `instructions` VARCHAR(500) DEFAULT NULL,
+  `completed_by` VARCHAR(64) DEFAULT NULL,
+  `completed_at` DATETIME DEFAULT NULL,
+  `closing_note` TEXT,
+  PRIMARY KEY (`id`),
+  KEY `idx_fac_sub_ticket` (`ticket_id`, `status`),
+  KEY `idx_fac_sub_dept` (`department_id`, `status`),
+  KEY `idx_fac_sub_staff` (`assigned_staff_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

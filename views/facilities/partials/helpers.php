@@ -33,19 +33,21 @@ $error = $error ?? null;
 $facNav = static function () use ($base, $section, $unread, $actor, $h) {
     // Same order as the Maintenance sidebar menu
     $canReport = !empty($actor['is_officer']) || !empty($actor['is_monitor']) || !empty($actor['is_hod']) || !empty($actor['is_admin']);
+    // Only Admin / ADM see the full menu; everyone else gets Dashboard, Create New, All Tickets and My Assigned Tickets
+    $isAdm = !empty($actor['is_admin']);
     $items = [
         'dashboard' => ['Dashboard', $base . '/dashboard', 'fa-chart-pie', true],
         'create' => ['Create New Ticket', $base . '/create', 'fa-plus', true],
         'list' => ['All Tickets', $base, 'fa-ticket-alt', true],
         'tasks' => ['My Assigned Tickets', $base . '/tasks', 'fa-user-check', true],
-        'pending' => ['Pending Tickets', $base . '?group=pending', 'fa-hourglass-half', true],
-        'in_progress' => ['In Progress', $base . '?group=in_progress', 'fa-spinner', true],
-        'resolved' => ['Resolved Tickets', $base . '?group=resolved', 'fa-check-circle', true],
-        'closed' => ['Closed Tickets', $base . '?group=closed', 'fa-lock', true],
-        'categories' => ['Ticket Categories', $base . '/categories', 'fa-tags', !empty($actor['is_officer'])],
-        'departments' => ['Departments', $base . '/departments', 'fa-building', $canReport],
+        'pending' => ['Pending Tickets', $base . '?group=pending', 'fa-hourglass-half', $isAdm],
+        'in_progress' => ['In Progress', $base . '?group=in_progress', 'fa-spinner', $isAdm],
+        'resolved' => ['Resolved Tickets', $base . '?group=resolved', 'fa-check-circle', $isAdm],
+        'closed' => ['Closed Tickets', $base . '?group=closed', 'fa-lock', $isAdm],
+        'categories' => ['Ticket Categories', $base . '/categories', 'fa-tags', $isAdm && !empty($actor['is_officer'])],
+        'departments' => ['Departments', $base . '/departments', 'fa-building', $isAdm && $canReport],
         'officers' => ['Assign Officers', $base . '/officers', 'fa-user-cog', !empty($actor['is_admin'])],
-        'reports' => ['Reports & Analytics', $base . '/reports', 'fa-chart-line', $canReport],
+        'reports' => ['Reports & Analytics', $base . '/reports', 'fa-chart-line', $isAdm && $canReport],
         'settings' => ['Ticket Settings', $base . '/settings', 'fa-cog', !empty($actor['is_admin'])],
     ];
     // Ticket detail / assign / verify screens belong to the All Tickets tab

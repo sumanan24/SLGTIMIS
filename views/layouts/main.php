@@ -822,19 +822,21 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                     if (in_array($facSec, ['view', 'assign', 'verify'], true)) { $facSec = 'list'; }
                                     $facCanApprove = !empty($canMenuFacilities) && AccessControl::can($uidMenu, 'facilities', 'approve');
                                     $facCanReport = $facCanApprove || !empty($isAdminOrADM) || (!empty($userRole) && in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'HOD'], true));
+                                    // Only Admin / ADM see the full Maintenance menu; everyone else gets the four basics
+                                    $facIsAdm = !empty($isAdminOrADM);
                                     $facItems = [
                                         ['dashboard', '/facilities/dashboard', 'fa-chart-pie', 'Dashboard', true],
                                         ['create', '/facilities/create', 'fa-plus', 'Create New Ticket', true],
                                         ['list', '/facilities', 'fa-ticket-alt', 'All Tickets', true],
                                         ['tasks', '/facilities/tasks', 'fa-user-check', 'My Assigned Tickets', true],
-                                        ['pending', '/facilities?group=pending', 'fa-hourglass-half', 'Pending Tickets', true],
-                                        ['in_progress', '/facilities?group=in_progress', 'fa-spinner', 'In Progress', true],
-                                        ['resolved', '/facilities?group=resolved', 'fa-check-circle', 'Resolved Tickets', true],
-                                        ['closed', '/facilities?group=closed', 'fa-lock', 'Closed Tickets', true],
-                                        ['categories', '/facilities/categories', 'fa-tags', 'Ticket Categories', $facCanApprove],
-                                        ['departments', '/facilities/departments', 'fa-building', 'Departments', $facCanReport],
+                                        ['pending', '/facilities?group=pending', 'fa-hourglass-half', 'Pending Tickets', $facIsAdm],
+                                        ['in_progress', '/facilities?group=in_progress', 'fa-spinner', 'In Progress', $facIsAdm],
+                                        ['resolved', '/facilities?group=resolved', 'fa-check-circle', 'Resolved Tickets', $facIsAdm],
+                                        ['closed', '/facilities?group=closed', 'fa-lock', 'Closed Tickets', $facIsAdm],
+                                        ['categories', '/facilities/categories', 'fa-tags', 'Ticket Categories', $facIsAdm && $facCanApprove],
+                                        ['departments', '/facilities/departments', 'fa-building', 'Departments', $facIsAdm && $facCanReport],
                                         ['officers', '/facilities/officers', 'fa-user-cog', 'Assign Officers', !empty($isAdminOrADM)],
-                                        ['reports', '/facilities/reports', 'fa-chart-line', 'Reports & Analytics', $facCanReport],
+                                        ['reports', '/facilities/reports', 'fa-chart-line', 'Reports & Analytics', $facIsAdm && $facCanReport],
                                         ['settings', '/facilities/settings', 'fa-cog', 'Ticket Settings', !empty($isAdminOrADM)],
                                     ];
                                     foreach ($facItems as $facItem):

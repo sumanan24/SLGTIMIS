@@ -10,7 +10,7 @@ $id = (int) $t['id'];
             <p><?php echo $badgeStatus($t['status']); ?> <?php echo $badgePriority($t['current_priority']); ?></p>
             <h6 class="fw-bold"><?php echo $h($t['title']); ?></h6>
             <p><?php echo nl2br($h($t['description'])); ?></p>
-            <p class="fac-note">Assigned to <?php echo $h($t['responsible_name'] ?? '—'); ?> · Deadline <?php echo $h($t['deadline'] ?? '—'); ?></p>
+            <p class="fac-note">Assigned to <?php echo $h($t['responsible_name'] ?? '—'); ?></p>
 
             <div class="fac-section">
                 <h6>What they did</h6>
@@ -47,8 +47,6 @@ $id = (int) $t['id'];
                     <summary class="fac-note">If the work is not good enough</summary>
                     <label class="form-label mt-2">What must be corrected?</label>
                     <textarea class="form-control mb-2" name="required_correction"></textarea>
-                    <label class="form-label">New deadline</label>
-                    <input type="date" class="form-control" name="new_deadline" style="max-width:200px">
                 </details>
                 <button class="btn btn-success" name="decision" value="approve">Approve</button>
                 <button class="btn btn-outline-danger" name="decision" value="return">Send back</button>

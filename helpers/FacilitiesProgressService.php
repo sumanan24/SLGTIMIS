@@ -31,6 +31,7 @@ class FacilitiesProgressService {
         if (!$this->tickets->canWork($actor, $ticket)) {
             throw new RuntimeException('Only the assigned person can start this work.');
         }
+        $this->requireNoOpenSupport($ticket);
         $this->tickets->changeStatus($actor, $ticket, FacilitiesTicketService::ST_PROGRESS, 'Work started');
         $pct = max(10, (int) $ticket['progress_percent']);
         $this->model->updateTicket((int) $ticket['id'], ['progress_percent' => $pct]);
@@ -48,6 +49,7 @@ class FacilitiesProgressService {
         if (trim($update) === '') {
             throw new InvalidArgumentException('Enter a work update.');
         }
+        $this->requireNoOpenSupport($ticket);
         $old = (int) $ticket['progress_percent'];
         $status = $ticket['status'];
         if ($status === FacilitiesTicketService::ST_ACCEPTED || $status === FacilitiesTicketService::ST_ASSIGNED) {
@@ -69,6 +71,7 @@ class FacilitiesProgressService {
         if (trim($description) === '') {
             throw new InvalidArgumentException('Completion description is required.');
         }
+        $this->requireNoOpenSupport($ticket);
         if ($this->model->openProcurement((int) $ticket['id']) !== null) {
             throw new RuntimeException('Procurement is still open. Record the goods receipt or cancel the request before submitting completion.');
         }
@@ -88,6 +91,13 @@ class FacilitiesProgressService {
         $this->tickets->notifyOfficers('completion_submitted', (int) $ticket['id'], 'Completion submitted', $ticket['ticket_number'] . ' is awaiting verification.');
         $this->tickets->notifyWatchers($fresh, 'completion_submitted', 'Work completed', $ticket['ticket_number'] . ' is awaiting verification.');
         return $fresh;
+    }
+
+    /** The main job is paused while another department's support job is open. */
+    private function requireNoOpenSupport(array $ticket): void {
+        if ($this->model->openSubjobs((int) $ticket['id'])) {
+            throw new RuntimeException('The main job is waiting for a support job from another department. Continue after the support job is completed.');
+        }
     }
 
     private function addProgress(array $actor, array $ticket, int $percent, string $update, string $remarks): void {

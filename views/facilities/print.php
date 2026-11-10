@@ -6,7 +6,7 @@ $t = $ticket; ?>
     <p><strong><?php echo $h($t['title']); ?></strong></p>
     <p><?php echo nl2br($h($t['description'])); ?></p>
     <p>Requester: <?php echo $h($t['requester_name'] ?? ''); ?> · Location: <?php echo $h($t['location']); ?></p>
-    <p>Assigned: <?php echo $h($t['responsible_name'] ?? ''); ?> · Deadline: <?php echo $h($t['deadline'] ?? ''); ?></p>
+    <p>Assigned: <?php echo $h($t['responsible_name'] ?? ''); ?></p>
     <h6>Timeline</h6>
     <ul>
         <?php foreach ($timeline as $ev): ?>

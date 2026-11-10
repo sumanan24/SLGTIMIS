@@ -64,6 +64,29 @@ $hasMore = ($filters['category_id'] ?? '') !== '' || ($filters['department_id'] 
                     </div>
                 </div>
             </form>
+            <?php if (($section ?? '') === 'tasks' && !empty($support_rows)): ?>
+            <div class="fac-support fac-support-inbox">
+                <div class="fac-support-head">
+                    <h6><i class="fas fa-people-arrows me-2"></i>Support jobs from other departments</h6>
+                    <span class="fac-support-wait"><?php echo count($support_rows); ?> waiting</span>
+                </div>
+                <?php foreach ($support_rows as $sj):
+                    $mineAssigned = (string) ($sj['assigned_staff_id'] ?? '') === (string) ($actor['staff_id'] ?? '');
+                ?>
+                <a class="fac-sj-line" href="<?php echo $base; ?>/view?id=<?php echo (int) $sj['ticket_id']; ?>#support">
+                    <span class="fac-sj-line-main">
+                        <strong><?php echo $h($sj['ticket_number']); ?></strong>
+                        <?php echo $h($sj['ticket_title']); ?>
+                        <small><?php echo $h($sj['description']); ?></small>
+                    </span>
+                    <span class="fac-sj-line-meta">
+                        <span class="fac-sj-chip fac-sj-chip-<?php echo $h($sj['status']); ?>"><?php echo $mineAssigned ? 'Assigned to you' : ($sj['status'] === 'requested' ? 'Assign a person' : 'Assigned: ' . $h($sj['assigned_name'] ?: $sj['assigned_staff_id'])); ?></span>
+                        <small>From <?php echo $h($sj['requested_name'] ?: $sj['requested_by']); ?></small>
+                    </span>
+                </a>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
             <p class="fac-note mb-2"><?php echo (int) $result['total']; ?> ticket(s)
                 · <a href="<?php echo $base; ?>?overdue=1">Overdue</a>
                 · <a href="<?php echo $base; ?>?due_soon=1">Due soon</a>
@@ -71,18 +94,17 @@ $hasMore = ($filters['category_id'] ?? '') !== '' || ($filters['department_id'] 
             </p>
             <div class="fac-table-wrap">
                 <table class="table table-sm mb-0">
-                    <thead><tr><th>Ticket</th><th>Problem</th><th>Priority</th><th>Status</th><th>Assigned</th><th>Deadline</th><th class="text-end">Action</th></tr></thead>
+                    <thead><tr><th>Ticket</th><th>Problem</th><th>Priority</th><th>Status</th><th>Assigned</th><th class="text-end">Action</th></tr></thead>
                     <tbody>
                     <?php if (empty($result['rows'])): ?>
-                        <tr><td colspan="7"><div class="fac-empty">No tickets match this search.</div></td></tr>
+                        <tr><td colspan="6"><div class="fac-empty">No tickets match this search.</div></td></tr>
                     <?php else: foreach ($result['rows'] as $row): ?>
-                        <tr>
+                        <tr class="fac-row fac-row-<?php echo $h($row['status']); ?>">
                             <td><a href="<?php echo $base; ?>/view?id=<?php echo (int) $row['id']; ?>"><?php echo $h($row['ticket_number']); ?></a></td>
                             <td><?php echo $h($row['title']); ?><div class="small text-muted"><?php echo $h($row['location']); ?></div></td>
                             <td><?php echo $badgePriority($row['current_priority']); ?></td>
-                            <td><?php echo $badgeStatus($row['status']); ?></td>
+                            <td><?php echo $badgeStatus($row['status']); ?><div><?php echo $dueLabel($row); ?></div></td>
                             <td><?php echo $h($row['responsible_name'] ?? $row['responsible_staff_id'] ?? '—'); ?></td>
-                            <td><?php echo $h($row['deadline'] ?? '—'); ?><div><?php echo $dueLabel($row); ?></div></td>
                             <td class="text-end text-nowrap">
                                 <?php if (!empty($row['can_assign'])):
                                     $isAssigned = !empty($row['responsible_staff_id']) || !empty($row['responsible_department_id']); ?>

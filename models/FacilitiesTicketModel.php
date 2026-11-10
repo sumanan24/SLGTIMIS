@@ -9,7 +9,7 @@ class FacilitiesTicketModel extends Model {
     /** Status groups used by the Pending / In Progress / Resolved / Closed ticket views. */
     public const STATUS_GROUPS = [
         'pending' => ['new', 'under_review', 'assigned', 'accepted', 'reopened', 'on_hold'],
-        'in_progress' => ['in_progress'],
+        'in_progress' => ['in_progress', 'waiting_support'],
         'resolved' => ['completed_pending_verification', 'verified'],
         'closed' => ['closed', 'cancelled', 'rejected'],
     ];
@@ -424,23 +424,33 @@ class FacilitiesTicketModel extends Model {
             $where[] = 't.escalation_level > 0';
         }
         if (!empty($filters['assigned_to_me']) && !empty($filters['scope_staff_id'])) {
-            $where[] = '(t.responsible_staff_id = ? OR EXISTS (SELECT 1 FROM `facilities_assignments` tm WHERE tm.ticket_id = t.id AND tm.is_current = 1 AND tm.staff_id = ?))';
-            array_push($params, $filters['scope_staff_id'], $filters['scope_staff_id']);
-            $types .= 'ss';
+            // Own work, plus support jobs given to the person (or waiting for their department's HOD)
+            $mine = '(t.responsible_staff_id = ? OR EXISTS (SELECT 1 FROM `facilities_assignments` tm WHERE tm.ticket_id = t.id AND tm.is_current = 1 AND tm.staff_id = ?)
+                OR EXISTS (SELECT 1 FROM `facilities_subjobs` sj WHERE sj.ticket_id = t.id AND sj.status IN (\'requested\',\'assigned\') AND sj.assigned_staff_id = ?)';
+            array_push($params, $filters['scope_staff_id'], $filters['scope_staff_id'], $filters['scope_staff_id']);
+            $types .= 'sss';
+            if (!empty($filters['support_dept'])) {
+                $mine .= ' OR EXISTS (SELECT 1 FROM `facilities_subjobs` sh WHERE sh.ticket_id = t.id AND sh.status IN (\'requested\',\'assigned\') AND sh.department_id = ?)';
+                $params[] = $filters['support_dept'];
+                $types .= 's';
+            }
+            $where[] = $mine . ')';
         }
         if (!empty($filters['scope_staff_id']) && empty($filters['officer_all'])) {
             $sid = $filters['scope_staff_id'];
             $dept = $filters['scope_department_id'] ?? '';
             if (!empty($filters['hod_scope']) && $dept !== '') {
                 $where[] = '(t.requester_staff_id = ? OR t.responsible_staff_id = ? OR t.routed_staff_id = ? OR t.requester_department_id = ? OR t.responsible_department_id = ?
-                    OR EXISTS (SELECT 1 FROM `facilities_assignments` ta WHERE ta.ticket_id = t.id AND ta.is_current = 1 AND ta.staff_id = ?))';
-                array_push($params, $sid, $sid, $sid, $dept, $dept, $sid);
-                $types .= 'ssssss';
+                    OR EXISTS (SELECT 1 FROM `facilities_assignments` ta WHERE ta.ticket_id = t.id AND ta.is_current = 1 AND ta.staff_id = ?)
+                    OR EXISTS (SELECT 1 FROM `facilities_subjobs` sj WHERE sj.ticket_id = t.id AND (sj.department_id = ? OR sj.assigned_staff_id = ?)))';
+                array_push($params, $sid, $sid, $sid, $dept, $dept, $sid, $dept, $sid);
+                $types .= 'ssssssss';
             } else {
                 $where[] = '(t.requester_staff_id = ? OR t.responsible_staff_id = ? OR t.routed_staff_id = ?
-                    OR EXISTS (SELECT 1 FROM `facilities_assignments` ta WHERE ta.ticket_id = t.id AND ta.is_current = 1 AND ta.staff_id = ?))';
-                array_push($params, $sid, $sid, $sid, $sid);
-                $types .= 'ssss';
+                    OR EXISTS (SELECT 1 FROM `facilities_assignments` ta WHERE ta.ticket_id = t.id AND ta.is_current = 1 AND ta.staff_id = ?)
+                    OR EXISTS (SELECT 1 FROM `facilities_subjobs` sj WHERE sj.ticket_id = t.id AND sj.assigned_staff_id = ?))';
+                array_push($params, $sid, $sid, $sid, $sid, $sid);
+                $types .= 'sssss';
             }
         }
     }
@@ -656,7 +666,7 @@ class FacilitiesTicketModel extends Model {
             'facilities_comments', 'facilities_status_history', 'facilities_priority_history',
             'facilities_deadline_history', 'facilities_verifications', 'facilities_activity',
             'facilities_notifications', 'facilities_escalations', 'facilities_feedback', 'facilities_materials',
-            'facilities_procurement',
+            'facilities_procurement', 'facilities_subjobs',
         ];
         if (!in_array($table, $allowed, true)) {
             return false;
@@ -670,7 +680,7 @@ class FacilitiesTicketModel extends Model {
 
     /** Update one row of a child table by its id (procurement requests). */
     public function updateChild(string $table, int $id, array $data): bool {
-        if ($table !== 'facilities_procurement') {
+        if (!in_array($table, ['facilities_procurement', 'facilities_subjobs'], true)) {
             return false;
         }
         $old = $this->table;
@@ -697,6 +707,101 @@ class FacilitiesTicketModel extends Model {
         return $row ?: null;
     }
 
+    // ---- Support jobs (a job given to ANOTHER department) -----------------------------------------
+
+    private const SUBJOB_SELECT = "SELECT j.*, d.department_name, rq.staff_name AS requested_name, rc.staff_name AS received_name,
+            asg.staff_name AS assigned_name, asg.staff_position AS assigned_position, cb.staff_name AS completed_name
+        FROM `facilities_subjobs` j
+        LEFT JOIN `department` d ON d.department_id = j.department_id
+        LEFT JOIN `staff` rq ON rq.staff_id = j.requested_by
+        LEFT JOIN `staff` rc ON rc.staff_id = j.received_by
+        LEFT JOIN `staff` asg ON asg.staff_id = j.assigned_staff_id
+        LEFT JOIN `staff` cb ON cb.staff_id = j.completed_by";
+
+    /** All support jobs of one ticket, oldest first. */
+    public function subjobs(int $ticketId): array {
+        $stmt = $this->db->prepare(self::SUBJOB_SELECT . ' WHERE j.ticket_id = ? ORDER BY j.id ASC');
+        $stmt->bind_param('i', $ticketId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $rows = [];
+        while ($row = $res->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
+    public function subjobById(int $id): ?array {
+        $stmt = $this->db->prepare(self::SUBJOB_SELECT . ' WHERE j.id = ? LIMIT 1');
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
+    }
+
+    /** Support jobs of a ticket that are not finished yet (requested or assigned). */
+    public function openSubjobs(int $ticketId): array {
+        return array_values(array_filter($this->subjobs($ticketId), static function ($r) {
+            return in_array($r['status'], ['requested', 'assigned'], true);
+        }));
+    }
+
+    /** True when the person is the assigned person of a support job of this ticket, or the HOD of the department it was sent to. */
+    public function hasSubjobAccess(int $ticketId, string $staffId, string $hodDepartmentId = ''): bool {
+        if ($ticketId <= 0 || $staffId === '') {
+            return false;
+        }
+        $stmt = $this->db->prepare('SELECT 1 FROM `facilities_subjobs` WHERE `ticket_id` = ? AND (`assigned_staff_id` = ? OR (? <> \'\' AND `department_id` = ?)) LIMIT 1');
+        $stmt->bind_param('isss', $ticketId, $staffId, $hodDepartmentId, $hodDepartmentId);
+        $stmt->execute();
+        return (bool) $stmt->get_result()->fetch_assoc();
+    }
+
+    /** staff_id of every HOD of a department. */
+    public function hodStaffIds(string $departmentId): array {
+        $stmt = $this->db->prepare("SELECT `staff_id` FROM `staff` WHERE `department_id` = ? AND `staff_position` = 'HOD'");
+        $stmt->bind_param('s', $departmentId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $ids = [];
+        while ($row = $res->fetch_assoc()) {
+            $ids[] = (string) $row['staff_id'];
+        }
+        return $ids;
+    }
+
+    /** Open support jobs waiting for a person: given to them, or sent to the department they head. */
+    public function subjobsForPerson(string $staffId, string $hodDepartmentId = ''): array {
+        $sql = "SELECT j.*, d.department_name, rq.staff_name AS requested_name, rc.staff_name AS received_name,
+                asg.staff_name AS assigned_name, asg.staff_position AS assigned_position, cb.staff_name AS completed_name,
+                t.ticket_number, t.title AS ticket_title, t.location AS ticket_location, t.current_priority AS ticket_priority
+            FROM `facilities_subjobs` j
+            JOIN `facilities_tickets` t ON t.id = j.ticket_id
+            LEFT JOIN `department` d ON d.department_id = j.department_id
+            LEFT JOIN `staff` rq ON rq.staff_id = j.requested_by
+            LEFT JOIN `staff` rc ON rc.staff_id = j.received_by
+            LEFT JOIN `staff` asg ON asg.staff_id = j.assigned_staff_id
+            LEFT JOIN `staff` cb ON cb.staff_id = j.completed_by
+            WHERE j.status IN ('requested','assigned') AND (j.assigned_staff_id = ? OR (? <> '' AND j.department_id = ?))
+            ORDER BY j.requested_at ASC, j.id ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param('sss', $staffId, $hodDepartmentId, $hodDepartmentId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $rows = [];
+        while ($row = $res->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        return $rows;
+    }
+
+    public function departmentName(string $departmentId): string {
+        $stmt = $this->db->prepare('SELECT `department_name` FROM `department` WHERE `department_id` = ? LIMIT 1');
+        $stmt->bind_param('s', $departmentId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return (string) ($row['department_name'] ?? '');
+    }
     public function updateTicket(int $id, array $data): bool {
         return $this->update($id, $data);
     }
@@ -713,7 +818,8 @@ class FacilitiesTicketModel extends Model {
      * Uses six "?" placeholders, all bound to the same staff id.
      */
     private const RELATED_TICKET_SQL = "(t.requester_staff_id = ? OR t.responsible_staff_id = ? OR t.routed_staff_id = ?
-        OR EXISTS (SELECT 1 FROM `facilities_assignments` a WHERE a.ticket_id = t.id AND (a.staff_id = ? OR a.assigned_by = ?)))";
+        OR EXISTS (SELECT 1 FROM `facilities_assignments` a WHERE a.ticket_id = t.id AND (a.staff_id = ? OR a.assigned_by = ?))
+        OR LEFT(n.event_type, 7) = 'subjob_')";
 
     /** Notices for the logged-in person, only for tickets that are related to them. */
     public function notificationsFor(string $staffId, int $limit = 30): array {

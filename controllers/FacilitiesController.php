@@ -9,10 +9,12 @@ class FacilitiesController extends Controller {
     private $verify;
     private $reports;
     private $proc;
+    private $sub;
 
     public function __construct() {
         parent::__construct();
         require_once BASE_PATH . '/helpers/FacilitiesProcurementService.php';
+        require_once BASE_PATH . '/helpers/FacilitiesSubjobService.php';
         require_once BASE_PATH . '/helpers/FacilitiesTicketService.php';
         require_once BASE_PATH . '/helpers/FacilitiesAssignmentService.php';
         require_once BASE_PATH . '/helpers/FacilitiesProgressService.php';
@@ -24,6 +26,7 @@ class FacilitiesController extends Controller {
         $this->verify = new FacilitiesVerificationService();
         $this->reports = new FacilitiesReportService();
         $this->proc = new FacilitiesProcurementService();
+        $this->sub = new FacilitiesSubjobService();
     }
 
     public function dashboard() {
@@ -96,6 +99,10 @@ class FacilitiesController extends Controller {
         $filters = $this->svc->scopeFilters($actor, $this->listFilters());
         $filters['assigned_to_me'] = 1;
         $filters['scope_staff_id'] = $actor['staff_id'];
+        $supportDept = (!empty($actor['is_hod']) && !empty($actor['hod_department_id'])) ? (string) $actor['hod_department_id'] : '';
+        if ($supportDept !== '') {
+            $filters['support_dept'] = $supportDept;
+        }
         $result = $this->markAssignable($this->svc->model()->search($filters, (int) $this->get('page', 1), 20), $actor);
         return $this->view('facilities/index', $this->pack([
             'title' => 'My Assigned Tickets',
@@ -103,6 +110,8 @@ class FacilitiesController extends Controller {
             'section' => 'tasks',
             'result' => $result,
             'filters' => $filters,
+            // Support jobs other departments asked of this person / their department
+            'support_rows' => $this->svc->model()->subjobsForPerson((string) $actor['staff_id'], $supportDept),
         ], $actor));
     }
 
@@ -274,6 +283,18 @@ class FacilitiesController extends Controller {
         if (!$ticket) {
             return;
         }
+        // HOD opens a new ticket of their department: it becomes Viewed (yellow)
+        try {
+            $ticket = $this->svc->markViewedByHod($actor, $ticket);
+        } catch (Throwable $e) {
+            // viewing must never fail because of the status update
+        }
+        // The HOD of a department that was asked for support opens the ticket: the request is marked as received
+        try {
+            $this->sub->markReceivedByHod($actor, $ticket);
+        } catch (Throwable $e) {
+            // viewing must never fail because of this
+        }
         if (!empty($actor['is_monitor']) || !empty($actor['is_officer'])) {
             $this->logActivity('VIEW', 'facilities', $ticket['id'], $actor['name'] . ' viewed ' . $ticket['ticket_number']);
         }
@@ -337,7 +358,12 @@ class FacilitiesController extends Controller {
         if ($ticket['status'] === 'new') {
             $ticket = $this->verify->review($actor, $ticket);
         }
-        $deptId = $this->get('department_id', $ticket['responsible_department_id'] ?? '');
+        // Everyone except an admin picks from their own department only; an admin starts on the ticket's department and may switch
+        $ownDept = $this->ownDepartmentId($actor);
+        $lockDepartment = $this->isHodOnly($actor) && $ownDept !== '';
+        $deptId = $lockDepartment
+            ? $ownDept
+            : $this->get('department_id', ($ticket['responsible_department_id'] ?? '') !== '' ? $ticket['responsible_department_id'] : $ownDept);
         // Suggest a deadline that is not already in the past (keeps the current one if it is still ahead)
         $suggested = date('Y-m-d', strtotime('+' . max(1, $this->svc->model()->slaDays((string) ($ticket['current_priority'] ?? 'medium'))) . ' days'));
         if (!empty($ticket['deadline']) && $ticket['deadline'] >= date('Y-m-d')) {
@@ -347,6 +373,7 @@ class FacilitiesController extends Controller {
             'suggested_deadline' => $suggested,
             'picker' => $this->svc->model()->staffPickerRows($deptId ?: null),
             'selected_department' => $deptId,
+            'lock_department' => $lockDepartment,
         ]));
     }
 
@@ -492,6 +519,42 @@ class FacilitiesController extends Controller {
         });
     }
 
+    /** Ask ANOTHER department for a support job (the main job pauses until it is done). */
+    public function subjobRequest() {
+        $this->ticketAction(function ($actor, $ticket) {
+            $this->sub->request($actor, $ticket, (string) $this->post('department_id', ''), (string) $this->post('description', ''));
+            $_SESSION['message'] = 'Support request sent to the HOD of that department.';
+        });
+    }
+
+    /** The HOD of the supporting department gives the support job to a person of their own department. */
+    public function subjobAssign() {
+        $this->ticketAction(function ($actor, $ticket) {
+            $this->sub->assign($actor, $ticket, (int) $this->post('subjob_id', 0), (string) $this->post('staff_id', ''), (string) $this->post('instructions', ''));
+            $_SESSION['message'] = 'Support job assigned.';
+        });
+    }
+
+    public function subjobComplete() {
+        $this->ticketAction(function ($actor, $ticket) {
+            $this->sub->complete($actor, $ticket, (int) $this->post('subjob_id', 0), (string) $this->post('note', ''));
+            $_SESSION['message'] = 'Support job completed. The main job can continue.';
+        });
+    }
+
+    public function subjobDecline() {
+        $this->ticketAction(function ($actor, $ticket) {
+            $this->sub->decline($actor, $ticket, (int) $this->post('subjob_id', 0), (string) $this->post('reason', ''));
+            $_SESSION['message'] = 'Support job declined.';
+        });
+    }
+
+    public function subjobCancel() {
+        $this->ticketAction(function ($actor, $ticket) {
+            $this->sub->cancel($actor, $ticket, (int) $this->post('subjob_id', 0), (string) $this->post('reason', ''));
+            $_SESSION['message'] = 'Support job cancelled.';
+        });
+    }
     public function hold() {
         $this->officerAction(function ($actor, $ticket) {
             $this->verify->hold($actor, $ticket, (string) $this->post('reason', 'On hold'));
@@ -767,8 +830,23 @@ class FacilitiesController extends Controller {
         if (!$this->boot('edit')) {
             return;
         }
-        $rows = $this->svc->model()->staffPickerRows($this->get('department_id') ?: null);
+        $actor = $this->actor();
+        $deptId = $this->get('department_id') ?: null;
+        if ($this->isHodOnly($actor) && $this->ownDepartmentId($actor) !== '') {
+            $deptId = $this->ownDepartmentId($actor);
+        }
+        $rows = $this->svc->model()->staffPickerRows($deptId);
         $this->json(['ok' => true, 'rows' => $rows]);
+    }
+
+    /** Everyone except an administrator may assign only to staff of their own department. */
+    private function isHodOnly(array $actor): bool {
+        return empty($actor['is_admin']);
+    }
+
+    /** The department of the signed-in person (the HOD's own department for a HOD). */
+    private function ownDepartmentId(array $actor): string {
+        return (string) (($actor['hod_department_id'] ?? '') !== '' && $actor['hod_department_id'] !== null ? $actor['hod_department_id'] : ($actor['department_id'] ?? ''));
     }
 
     public function printTicket() {
@@ -920,7 +998,21 @@ class FacilitiesController extends Controller {
 
     private function detailData(array $actor, array $ticket, string $title, array $extra = []): array {
         $id = (int) $ticket['id'];
-        return $this->pack(array_merge([
+        // Support jobs (other departments helping with this ticket) and what the current person may do with each
+        $subjobs = $this->svc->model()->subjobs($id);
+        $subjobPerm = [];
+        $subjobStaff = [];
+        foreach ($subjobs as $sj) {
+            $handle = $this->sub->canHandle($actor, $sj) && $this->sub->isOpen($sj);
+            $subjobPerm[(int) $sj['id']] = [
+                'handle' => $handle,
+                'complete' => $this->sub->canComplete($actor, $sj),
+                'cancel' => $this->sub->canCancel($actor, $ticket, $sj),
+            ];
+            if ($handle && !isset($subjobStaff[$sj['department_id']])) {
+                $subjobStaff[$sj['department_id']] = $this->svc->model()->staffPickerRows((string) $sj['department_id']);
+            }
+        }        return $this->pack(array_merge([
             'title' => $title,
             'section' => 'view',
             'ticket' => $ticket,
@@ -936,7 +1028,11 @@ class FacilitiesController extends Controller {
             'materials' => $this->svc->model()->children('facilities_materials', $id, 'recorded_at ASC'),
             'escalations' => $this->svc->model()->children('facilities_escalations', $id, 'created_at ASC'),
             'procurements' => $this->svc->model()->children('facilities_procurement', $id, 'requested_at ASC, id ASC'),
-            'can_request_procurement' => $this->proc->canRequest($actor, $ticket),
+            'subjobs' => $subjobs,
+            'subjob_labels' => FacilitiesSubjobService::LABELS,
+            'can_request_subjob' => $this->sub->canRequest($actor, $ticket),
+            'subjob_perm' => $subjobPerm,
+            'subjob_staff' => $subjobStaff,            'can_request_procurement' => $this->proc->canRequest($actor, $ticket),
             'can_process_procurement' => $this->proc->canProcess($actor, $ticket),
             'can_feedback' => $this->svc->canFeedback($actor, $ticket),
             'can_assign' => $this->svc->canAssign($actor, $ticket),

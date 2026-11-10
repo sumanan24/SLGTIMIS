@@ -64,7 +64,7 @@ $isLead = !empty($actor['is_officer']) || !empty($actor['is_monitor']);
                             <thead><tr><th>Ticket</th><th>Problem</th><th>Priority</th><th class="fac-col-act"></th></tr></thead>
                             <tbody>
                             <?php foreach ($tab[1] as $row): ?>
-                                <tr>
+                                <tr class="fac-row fac-row-<?php echo $h($row['status'] ?? ''); ?>">
                                     <td class="fac-col-no"><a href="<?php echo $base; ?>/view?id=<?php echo (int) $row['id']; ?>"><?php echo $h($row['ticket_number']); ?></a></td>
                                     <td><?php echo $h($row['title']); ?></td>
                                     <td><?php echo $badgePriority($row['current_priority']); ?></td>
@@ -101,14 +101,13 @@ $isLead = !empty($actor['is_officer']) || !empty($actor['is_monitor']);
                 <?php else: ?>
                 <div class="fac-table-wrap">
                     <table class="table table-sm mb-0">
-                        <thead><tr><th>Ticket</th><th>Problem</th><th>Status</th><th>Deadline</th><th class="fac-col-act"></th></tr></thead>
+                        <thead><tr><th>Ticket</th><th>Problem</th><th>Status</th><th class="fac-col-act"></th></tr></thead>
                         <tbody>
                         <?php foreach ($mine['rows'] as $row): ?>
-                            <tr>
+                            <tr class="fac-row fac-row-<?php echo $h($row['status'] ?? ''); ?>">
                                 <td class="fac-col-no"><?php echo $h($row['ticket_number']); ?></td>
                                 <td><?php echo $h($row['title']); ?></td>
-                                <td><?php echo $badgeStatus($row['status']); ?></td>
-                                <td><?php echo $dueLabel($row); ?></td>
+                                <td><?php echo $badgeStatus($row['status']); ?><div><?php echo $dueLabel($row); ?></div></td>
                                 <td class="text-end text-nowrap">
                                     <?php if (($row['responsible_staff_id'] ?? '') === ($actor['staff_id'] ?? '') && in_array($row['status'], ['assigned', 'accepted', 'in_progress', 'reopened'], true)): ?>
                                         <a class="btn btn-sm btn-primary" href="<?php echo $base; ?>/view?id=<?php echo (int) $row['id']; ?>#progress">Update</a>

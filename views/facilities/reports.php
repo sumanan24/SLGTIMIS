@@ -51,18 +51,17 @@ unset($exportQs['officer_all'], $exportQs['scope_staff_id'], $exportQs['hod_scop
             </div>
             <div class="fac-table-wrap">
                 <table class="table table-sm mb-0">
-                    <thead><tr><th>Ticket</th><th>Problem</th><th>Priority</th><th>Status</th><th>Assigned</th><th>Deadline</th></tr></thead>
+                    <thead><tr><th>Ticket</th><th>Problem</th><th>Priority</th><th>Status</th><th>Assigned</th></tr></thead>
                     <tbody>
                     <?php if (empty($rows)): ?>
-                        <tr><td colspan="6"><div class="fac-empty">No tickets for this filter.</div></td></tr>
+                        <tr><td colspan="5"><div class="fac-empty">No tickets for this filter.</div></td></tr>
                     <?php else: foreach ($rows as $row): ?>
                         <tr>
                             <td><a href="<?php echo $base; ?>/view?id=<?php echo (int) $row['id']; ?>"><?php echo $h($row['ticket_number']); ?></a></td>
                             <td><?php echo $h($row['title']); ?></td>
                             <td><?php echo $badgePriority($row['current_priority']); ?></td>
-                            <td><?php echo $badgeStatus($row['status']); ?></td>
+                            <td><?php echo $badgeStatus($row['status']); ?><div><?php echo $dueLabel($row); ?></div></td>
                             <td><?php echo $h($row['responsible_name'] ?? ''); ?></td>
-                            <td><?php echo $h($row['deadline'] ?? ''); ?> <?php echo $dueLabel($row); ?></td>
                         </tr>
                     <?php endforeach; endif; ?>
                     </tbody>

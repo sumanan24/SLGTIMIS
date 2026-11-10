@@ -15,6 +15,8 @@ class FacilitiesTicketService {
     const ST_HOLD = 'on_hold';
     const ST_REOPENED = 'reopened';
     const ST_CANCELLED = 'cancelled';
+    /** The main job is paused while another department does a support job for it. */
+    const ST_SUPPORT = 'waiting_support';
 
     const PRIORITIES = ['low' => 'Low', 'medium' => 'Medium', 'high' => 'High', 'urgent' => 'Urgent', 'critical' => 'Critical'];
     const REQUEST_TYPES = [
@@ -30,8 +32,8 @@ class FacilitiesTicketService {
         'facility_officer' => 'Facility Officer',
     ];
     const STATUSES = [
-        'new' => 'New',
-        'under_review' => 'Pending Review',
+        'new' => 'Not Viewed',
+        'under_review' => 'Viewed',
         'assigned' => 'Assigned',
         'accepted' => 'Acknowledged',
         'in_progress' => 'In Progress',
@@ -40,6 +42,7 @@ class FacilitiesTicketService {
         'closed' => 'Closed',
         'rejected' => 'Rejected',
         'on_hold' => 'On Hold',
+        'waiting_support' => 'Waiting for Support',
         'reopened' => 'Reopened',
         'cancelled' => 'Cancelled',
     ];
@@ -98,6 +101,11 @@ class FacilitiesTicketService {
             return true;
         }
         if ($sid !== '' && !empty($ticket['id']) && $this->model->isOnTicketTeam((int) $ticket['id'], $sid)) {
+            return true;
+        }
+        // Another department's support job: the person it is assigned to, and the HOD of the department it was sent to
+        $supportDept = (!empty($actor['is_hod']) && $actor['hod_department_id']) ? (string) $actor['hod_department_id'] : '';
+        if ($sid !== '' && !empty($ticket['id']) && $this->model->hasSubjobAccess((int) $ticket['id'], $sid, $supportDept)) {
             return true;
         }
         if (!empty($actor['is_hod']) && $actor['hod_department_id']) {
@@ -167,6 +175,7 @@ class FacilitiesTicketService {
         if (!empty($actor['is_hod']) && $actor['hod_department_id']) {
             $filters['hod_scope'] = 1;
             $filters['scope_department_id'] = $actor['hod_department_id'];
+            $filters['support_dept'] = $actor['hod_department_id'];
         }
         return $filters;
     }
@@ -517,9 +526,6 @@ class FacilitiesTicketService {
         if ($lead['phone'] !== '') {
             $lines[] = 'Contact: ' . $lead['phone'];
         }
-        if (!empty($ticket['deadline'])) {
-            $lines[] = ($kind === 'received' ? 'Expected By: ' : 'Deadline: ') . substr((string) $ticket['deadline'], 0, 10);
-        }
         if (defined('APP_URL') && !empty($ticket['id'])) {
             $lines[] = '';
             $lines[] = 'Track: ' . APP_URL . '/facilities/view?id=' . (int) $ticket['id'];
@@ -603,6 +609,17 @@ class FacilitiesTicketService {
         $this->statusHistory((int) $ticket['id'], $from, $to, $actor['staff_id'], $remarks);
         $this->history((int) $ticket['id'], $actor['staff_id'], 'Status Changed', $from, $to, $remarks);
         return $this->model->getDetailed((int) $ticket['id']);
+    }
+
+    /**
+     * A HOD opening a ticket of their department marks it as Viewed (New -> Viewed). Nothing else changes.
+     * Returns the (possibly refreshed) ticket.
+     */
+    public function markViewedByHod(array $actor, array $ticket): array {
+        if (empty($actor['is_hod']) || ($ticket['status'] ?? '') !== self::ST_NEW || !$this->canManage($actor, $ticket)) {
+            return $ticket;
+        }
+        return $this->changeStatus($actor, $ticket, self::ST_REVIEW, 'Viewed by HOD');
     }
 
     public function changePriority(array $actor, array $ticket, string $priority, string $reason): array {

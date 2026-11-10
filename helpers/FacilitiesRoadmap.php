@@ -119,7 +119,6 @@ class FacilitiesRoadmap {
                 [count($team) > 1 ? 'Team' : 'Assigned to', $hasAssignment ? $who : ''],
                 ['Assigned by', $hasAssignment ? $name($assignActor) : ''],
                 ['Start date', (string) ($t['start_date'] ?? '')],
-                ['Deadline', (string) ($t['deadline'] ?? '')],
                 ['Instructions', trim((string) ($latestAssign['instructions'] ?? ''))],
             ], static function ($f) { return trim((string) $f[1]) !== ''; })),
             'files' => [], 'items' => [],
@@ -229,6 +228,8 @@ class FacilitiesRoadmap {
             }
             if ($procureOpen) {
                 $workNote = 'On hold pending procurement.';
+            } elseif ($status === 'waiting_support') {
+                $workNote = 'Paused: waiting for a support job from another department.';
             } elseif ($status === 'on_hold') {
                 $workNote = 'Ticket is on hold.';
             } elseif ($status === 'reopened') {
@@ -395,7 +396,9 @@ class FacilitiesRoadmap {
                         : 'Procurement requested';
                     break;
                 case 'work':
-                    if ($status === 'on_hold') {
+                    if ($status === 'waiting_support') {
+                        $summary = 'Waiting for support from another department';
+                    } elseif ($status === 'on_hold') {
                         $summary = 'On hold';
                     } elseif ($status === 'reopened') {
                         $summary = 'Reopened';

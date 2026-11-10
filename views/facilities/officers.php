@@ -9,14 +9,14 @@
                 <div class="fac-section">
                     <h6>Category routing</h6>
                     <div class="fac-table-wrap">
-                        <table class="table table-sm mb-0">
+                        <table class="table table-sm mb-0 fac-officers-table">
                             <thead><tr><th>Category</th><th>Routes to</th><th>Specific officer</th></tr></thead>
                             <tbody>
                             <?php foreach ($routes as $route): ?>
                                 <tr>
-                                    <td><?php echo $h($route['category_name']); ?></td>
-                                    <td><?php echo $h($labels['routes'][$route['route_key']] ?? $route['route_key']); ?></td>
-                                    <td>
+                                    <td data-label="Category" class="fac-officers-cat"><?php echo $h($route['category_name']); ?></td>
+                                    <td data-label="Routes to"><?php echo $h($labels['routes'][$route['route_key']] ?? $route['route_key']); ?></td>
+                                    <td data-label="Specific officer">
                                         <select class="form-select form-select-sm" name="route_staff[<?php echo (int) $route['category_id']; ?>]">
                                             <option value="">Automatic</option>
                                             <?php foreach ($staff_options as $staff): ?>

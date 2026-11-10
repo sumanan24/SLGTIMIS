@@ -6,7 +6,7 @@ $place = trim(($t['building'] ?? '') . ' ' . ($t['floor'] ?? '') . ' ' . ($t['ro
 ?>
 <div class="container-fluid px-0 fac-page">
     <div class="card border-0">
-        <?php $facHeader($t['ticket_number'], (string) $t['title'], $badgeStatus($t['status']) . ' ' . $badgePriority($t['current_priority'])); ?>
+        <?php $facHeader($t['ticket_number'], (string) $t['title'], $badgeStatus($t['status']) . ' ' . $badgePriority($t['current_priority']) . ' ' . $dueLabel($t)); ?>
         <div class="card-body">
             <?php $facNav(); $facFlash(); ?>
 
@@ -90,7 +90,7 @@ $place = trim(($t['building'] ?? '') . ' ' . ($t['floor'] ?? '') . ' ' . ($t['ro
                             <?php if (!empty($st['facts'])): ?>
                             <dl class="fac-road-facts">
                                 <?php foreach ($st['facts'] as $f): ?>
-                                <div><dt><?php echo $h($f[0]); ?></dt><dd><?php echo nl2br($h($f[1])); ?><?php if ($f[0] === 'Deadline' && !empty($st['due'])) { echo ' ' . $dueLabel($t); } ?></dd></div>
+                                <div><dt><?php echo $h($f[0]); ?></dt><dd><?php echo nl2br($h($f[1])); ?></dd></div>
                                 <?php endforeach; ?>
                             </dl>
                             <?php endif; ?>
@@ -216,6 +216,142 @@ $place = trim(($t['building'] ?? '') . ' ' . ($t['floor'] ?? '') . ' ' . ($t['ro
             </script>
             <?php endif; ?>
 
+            <?php
+            $sjs = $subjobs ?? [];
+            $sjPerm = $subjob_perm ?? [];
+            $sjStaff = $subjob_staff ?? [];
+            $sjLabel = $subjob_labels ?? [];
+            $fmtSj = static function ($d) { return $d ? date('d M Y, H:i', strtotime((string) $d)) : ''; };
+            $sjOpenCount = 0;
+            foreach ($sjs as $sjRow) { if (in_array($sjRow['status'], ['requested', 'assigned'], true)) { $sjOpenCount++; } }
+            if ($sjs || !empty($can_request_subjob)):
+            ?>
+            <section class="fac-support" id="support" aria-label="Support from other departments">
+                <div class="fac-support-head">
+                    <h6><i class="fas fa-people-arrows me-2"></i>Support from other departments</h6>
+                    <?php if ($sjOpenCount > 0): ?>
+                        <span class="fac-support-wait"><i class="fas fa-hourglass-half"></i> Main job is waiting for <?php echo (int) $sjOpenCount; ?> support job<?php echo $sjOpenCount > 1 ? 's' : ''; ?></span>
+                    <?php elseif ($sjs): ?>
+                        <span class="fac-support-ok"><i class="fas fa-circle-check"></i> No support job is waiting</span>
+                    <?php endif; ?>
+                </div>
+
+                <?php if (!empty($can_request_subjob)): ?>
+                <details class="fac-road-more fac-road-request" <?php echo $sjs ? '' : 'open'; ?>>
+                    <summary><i class="fas fa-plus me-1"></i>Ask another department for support</summary>
+                    <form method="post" action="<?php echo $base; ?>/subjob-request" class="mt-2">
+                        <input type="hidden" name="id" value="<?php echo $id; ?>">
+                        <div class="row g-2">
+                            <div class="col-md-5">
+                                <label class="form-label">Department <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm" name="department_id" required>
+                                    <option value="">Select department</option>
+                                    <?php foreach (($departments ?? []) as $dp):
+                                        if ((string) $dp['department_id'] === (string) ($t['responsible_department_id'] ?? '')) { continue; } ?>
+                                        <option value="<?php echo $h($dp['department_id']); ?>"><?php echo $h($dp['department_name']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-7">
+                                <label class="form-label">What do you need from them? <span class="text-danger">*</span></label>
+                                <textarea class="form-control form-control-sm" name="description" rows="2" maxlength="1000" required placeholder="Describe the support job"></textarea>
+                            </div>
+                        </div>
+                        <p class="fac-note mt-2 mb-2">The HOD of that department receives this request and assigns a person. The main job is marked <strong>Waiting for Support</strong> until the support job is completed.</p>
+                        <button class="btn btn-sm btn-primary">Send support request</button>
+                    </form>
+                </details>
+                <?php endif; ?>
+
+                <?php foreach ($sjs as $sj):
+                    $sid = (int) $sj['id'];
+                    $perm = $sjPerm[$sid] ?? [];
+                    $isOpenSj = in_array($sj['status'], ['requested', 'assigned'], true);
+                ?>
+                <div class="fac-sj is-<?php echo $h($sj['status']); ?>">
+                    <div class="fac-sj-top">
+                        <strong><i class="fas fa-building me-1"></i><?php echo $h($sj['department_name']); ?></strong>
+                        <span class="fac-sj-chip fac-sj-chip-<?php echo $h($sj['status']); ?>"><?php echo $h($sjLabel[$sj['status']] ?? $sj['status']); ?></span>
+                    </div>
+                    <p class="fac-sj-desc"><?php echo nl2br($h($sj['description'])); ?></p>
+                    <dl class="fac-road-facts">
+                        <div><dt>Requested by</dt><dd><?php echo $h($sj['requested_name'] ?: $sj['requested_by']); ?> &middot; <?php echo $h($fmtSj($sj['requested_at'])); ?></dd></div>
+                        <?php if (!empty($sj['received_at'])): ?>
+                        <div><dt>Received by HOD</dt><dd><?php echo $h($sj['received_name'] ?: $sj['received_by']); ?> &middot; <?php echo $h($fmtSj($sj['received_at'])); ?></dd></div>
+                        <?php elseif ($sj['status'] === 'requested'): ?>
+                        <div><dt>Received by HOD</dt><dd>Not opened yet</dd></div>
+                        <?php endif; ?>
+                        <?php if (!empty($sj['assigned_staff_id'])): ?>
+                        <div><dt>Assigned to</dt><dd><?php echo $h($sj['assigned_name'] ?: $sj['assigned_staff_id']); ?><?php echo !empty($sj['assigned_position']) ? ' (' . $h($sj['assigned_position']) . ')' : ''; ?> &middot; <?php echo $h($fmtSj($sj['assigned_at'])); ?></dd></div>
+                        <?php endif; ?>
+                        <?php if (!empty($sj['instructions'])): ?>
+                        <div><dt>HOD note</dt><dd><?php echo nl2br($h($sj['instructions'])); ?></dd></div>
+                        <?php endif; ?>
+                        <?php if (!$isOpenSj && !empty($sj['completed_at'])): ?>
+                        <div><dt><?php echo $h($sjLabel[$sj['status']] ?? 'Closed'); ?></dt><dd><?php echo $h($sj['completed_name'] ?: $sj['completed_by']); ?> &middot; <?php echo $h($fmtSj($sj['completed_at'])); ?></dd></div>
+                        <?php endif; ?>
+                        <?php if (!empty($sj['closing_note'])): ?>
+                        <div><dt><?php echo $sj['status'] === 'completed' ? 'Work done' : 'Reason'; ?></dt><dd><?php echo nl2br($h($sj['closing_note'])); ?></dd></div>
+                        <?php endif; ?>
+                    </dl>
+
+                    <?php if (!empty($perm['handle'])): ?>
+                    <form method="post" action="<?php echo $base; ?>/subjob-assign" class="fac-road-form">
+                        <input type="hidden" name="id" value="<?php echo $id; ?>">
+                        <input type="hidden" name="subjob_id" value="<?php echo $sid; ?>">
+                        <h6><?php echo $sj['status'] === 'assigned' ? 'Change the person' : 'Assign a person of ' . $h($sj['department_name']); ?></h6>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <select class="form-select form-select-sm" name="staff_id" required>
+                                    <option value="">Select staff member</option>
+                                    <?php foreach (($sjStaff[$sj['department_id']] ?? []) as $sp): ?>
+                                        <option value="<?php echo $h($sp['staff_id']); ?>" <?php echo (string) $sp['staff_id'] === (string) ($sj['assigned_staff_id'] ?? '') ? 'selected' : ''; ?>>
+                                            <?php echo $h($sp['staff_name']); ?><?php echo !empty($sp['staff_position']) ? ' - ' . $h($sp['staff_position']) : ''; ?> (<?php echo (int) $sp['open_tickets']; ?> open)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6"><input class="form-control form-control-sm" name="instructions" maxlength="500" placeholder="Note for the person (optional)" value="<?php echo $h($sj['instructions'] ?? ''); ?>"></div>
+                        </div>
+                        <button class="btn btn-sm btn-primary mt-2"><?php echo $sj['status'] === 'assigned' ? 'Save' : 'Assign'; ?></button>
+                    </form>
+                    <details class="fac-road-more">
+                        <summary>Decline this request</summary>
+                        <form method="post" action="<?php echo $base; ?>/subjob-decline" class="d-flex gap-2 flex-wrap mt-2">
+                            <input type="hidden" name="id" value="<?php echo $id; ?>">
+                            <input type="hidden" name="subjob_id" value="<?php echo $sid; ?>">
+                            <input class="form-control form-control-sm" name="reason" placeholder="Reason" required style="max-width:320px">
+                            <button class="btn btn-sm btn-outline-danger">Decline</button>
+                        </form>
+                    </details>
+                    <?php endif; ?>
+
+                    <?php if (!empty($perm['complete'])): ?>
+                    <form method="post" action="<?php echo $base; ?>/subjob-complete" class="fac-road-form">
+                        <input type="hidden" name="id" value="<?php echo $id; ?>">
+                        <input type="hidden" name="subjob_id" value="<?php echo $sid; ?>">
+                        <h6>Complete the support job</h6>
+                        <textarea class="form-control form-control-sm" name="note" rows="2" maxlength="1000" required placeholder="Describe the work that was done"></textarea>
+                        <button class="btn btn-sm btn-success mt-2"><i class="fas fa-check me-1"></i>Mark support job completed</button>
+                    </form>
+                    <?php endif; ?>
+
+                    <?php if (!empty($perm['cancel'])): ?>
+                    <details class="fac-road-more">
+                        <summary>Cancel this support request</summary>
+                        <form method="post" action="<?php echo $base; ?>/subjob-cancel" class="d-flex gap-2 flex-wrap mt-2">
+                            <input type="hidden" name="id" value="<?php echo $id; ?>">
+                            <input type="hidden" name="subjob_id" value="<?php echo $sid; ?>">
+                            <input class="form-control form-control-sm" name="reason" placeholder="Reason" required style="max-width:320px">
+                            <button class="btn btn-sm btn-outline-danger">Cancel request</button>
+                        </form>
+                    </details>
+                    <?php endif; ?>
+                </div>
+                <?php endforeach; ?>
+            </section>
+            <?php endif; ?>
+
             <div class="fac-actions">
                 <?php if (!empty($can_assign) && !empty($t['responsible_staff_id'])): ?>
                     <a class="btn btn-sm btn-outline-primary" href="<?php echo $base; ?>/assign?id=<?php echo $id; ?>">Reassign</a>
@@ -297,17 +433,6 @@ $place = trim(($t['building'] ?? '') . ' ' . ($t['floor'] ?? '') . ' ' . ($t['ro
                     </div>
                     <?php endif; ?>
 
-                    <?php if (!empty($can_work) && empty($actor['is_officer'])): ?>
-                    <form method="post" action="<?php echo $base; ?>/deadline" class="fac-section">
-                        <input type="hidden" name="id" value="<?php echo $id; ?>">
-                        <h6>Deadline extension</h6>
-                        <div class="d-flex gap-2 flex-wrap">
-                            <input type="date" class="form-control form-control-sm" name="deadline" required style="max-width:160px">
-                            <input class="form-control form-control-sm" name="reason" placeholder="Reason" required>
-                            <button class="btn btn-sm btn-outline-primary">Request extension</button>
-                        </div>
-                    </form>
-                    <?php endif; ?>
 
                     <div class="fac-section">
                         <h6>Progress updates</h6>
@@ -404,15 +529,7 @@ $place = trim(($t['building'] ?? '') . ' ' . ($t['floor'] ?? '') . ' ' . ($t['ro
                                 <button class="btn btn-sm btn-outline-primary">Update</button>
                             </form>
                         </div>
-                        <div class="col-md-4">
-                            <form method="post" action="<?php echo $base; ?>/deadline" class="fac-section">
-                                <input type="hidden" name="id" value="<?php echo $id; ?>">
-                                <h6>Deadline</h6>
-                                <input type="date" class="form-control form-control-sm mb-2" name="deadline" value="<?php echo $h($t['deadline'] ?? ''); ?>" required>
-                                <input class="form-control form-control-sm mb-2" name="reason" placeholder="Reason" required>
-                                <button class="btn btn-sm btn-outline-primary">Update</button>
-                            </form>
-                        </div>
+
                         <div class="col-md-4">
                             <div class="fac-section">
                                 <?php if (!empty($can_close)): ?>

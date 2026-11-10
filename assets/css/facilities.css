@@ -200,13 +200,13 @@ a.fac-stat:hover { border-color: #9bb0c7; background: #fcfdff; }
 .fac-p-urgent { background: #ffedd5; color: #9a3412; }
 .fac-p-critical { background: #fee2e2; color: #991b1b; }
 
-.fac-s-new { background: #e8eef6; color: var(--fac-navy); }
-.fac-s-under_review { background: #ede9fe; color: #5b21b6; }
-.fac-s-assigned, .fac-s-accepted { background: #dbeafe; color: #1e3a8a; }
-.fac-s-in_progress { background: #fef3c7; color: #92400e; }
-.fac-s-completed_pending_verification { background: #ffe4c7; color: #9a3412; }
+/* Ticket progress colours: Not viewed = red, Viewed = yellow, Assigned / in work = orange, Completed = green */
+.fac-s-new { background: #fee2e2; color: #b91c1c; }
+.fac-s-under_review { background: #fef9c3; color: #854d0e; }
+.fac-s-assigned, .fac-s-accepted, .fac-s-in_progress { background: #ffedd5; color: #c2410c; }
+.fac-s-completed_pending_verification { background: #ffedd5; color: #c2410c; }
 .fac-s-verified { background: #dcfce7; color: #166534; }
-.fac-s-closed { background: #d1fae5; color: #065f46; }
+.fac-s-closed { background: #dcfce7; color: #166534; }
 .fac-s-rejected, .fac-s-cancelled { background: #fee2e2; color: #991b1b; }
 .fac-s-on_hold { background: #e2e8f0; color: #334155; }
 .fac-s-reopened { background: #fce7f3; color: #9d174d; }
@@ -705,3 +705,184 @@ a.fac-stat:hover { border-color: #9bb0c7; background: #fcfdff; }
 .fac-road-more[open] > summary::after { content: "\f077"; }
 .fac-road-request { border: 1px dashed #c4b5fd; border-radius: 8px; padding: .5rem .7rem; background: #faf5ff; }
 @media print { .fac-road-more, .fac-road-forms { display: none; } }
+
+/* Create ticket: Low / Medium / High radio buttons */
+.fac-priority-radios { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; max-width: 26rem; }
+.fac-priority-opt { margin: 0; cursor: pointer; position: relative; display: block; }
+.fac-priority-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.fac-priority-opt span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.5rem 0.75rem;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    background: #fff;
+    color: #475569;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.fac-priority-opt:hover span { border-color: #94a3b8; }
+.fac-priority-opt input:focus-visible + span { outline: 2px solid #3b82f6; outline-offset: 2px; }
+.fac-priority-low input:checked + span { background: #dcfce7; border-color: #16a34a; color: #166534; }
+.fac-priority-medium input:checked + span { background: #fef3c7; border-color: #d97706; color: #92400e; }
+.fac-priority-high input:checked + span { background: #fee2e2; border-color: #dc2626; color: #991b1b; }
+
+/* ===== Create ticket: phone, tablet, laptop, large screens, touch, keyboard ===== */
+.fac-create { width: 100%; padding-bottom: env(safe-area-inset-bottom, 0); }
+.fac-create .fac-head-text { flex: 1 1 14rem; }
+.fac-create .fac-who-line,
+.fac-create .fac-who-line * { overflow-wrap: anywhere; }
+.fac-create .form-control,
+.fac-create .form-select { min-height: 44px; touch-action: manipulation; }
+.fac-create .fac-submit .btn { min-height: 44px; }
+.fac-create .fac-file-info { font-weight: 600; color: #166534; word-break: break-all; }
+.fac-create .fac-file-info.is-error { color: #b91c1c; }
+.fac-create .fac-file-info[hidden] { display: none; }
+.fac-create .form-control:invalid:not(:placeholder-shown):not(:focus) { border-color: #dc2626; }
+
+/* Large monitors: a little more room, still a readable line length */
+@media (min-width: 1600px) {
+    .fac-create.fac-page { max-width: 1240px; }
+}
+
+/* Tablets and small laptops */
+@media (max-width: 991.98px) {
+    .fac-create .card-body { padding: 1rem; }
+}
+
+/* Large phones / small tablets in portrait */
+@media (max-width: 767.98px) {
+    .fac-create .fac-head { padding: 0.85rem 1rem; }
+    .fac-create .fac-head h5 { font-size: 1.05rem; }
+    .fac-create .fac-priority-radios { max-width: none; }
+}
+
+/* Phones */
+@media (max-width: 575.98px) {
+    .fac-create .card { border-radius: 10px; }
+    .fac-create .card-body { padding: 0.85rem; }
+    /* 16px stops iOS Safari zooming the page when a field gets focus */
+    .fac-create .form-control,
+    .fac-create .form-select { font-size: 16px; }
+    .fac-create .form-label { font-size: 0.85rem; }
+    .fac-create .fac-who-line { padding: 0.6rem 0.75rem; }
+    .fac-create .fac-submit { flex-direction: column-reverse; align-items: stretch; }
+    .fac-create .fac-submit .btn { width: 100%; }
+    .fac-create .fac-head-actions { width: 100%; justify-content: flex-start; }
+}
+
+/* Very small phones (older Android / iPhone SE) */
+@media (max-width: 359.98px) {
+    .fac-create .card-body { padding: 0.7rem; }
+    .fac-create .fac-priority-opt span { padding: 0.5rem 0.25rem; font-size: 0.82rem; }
+    .fac-create .fac-nav-a { padding: 0.3rem 0.65rem; }
+}
+
+/* Phones turned sideways: keep the header compact */
+@media (max-height: 480px) and (orientation: landscape) {
+    .fac-create .fac-head { padding: 0.55rem 1rem; }
+    .fac-create .fac-head p { display: none; }
+    .fac-create .card-body { padding-top: 0.75rem; }
+}
+
+/* Touch screens: finger-sized targets */
+@media (pointer: coarse) {
+    .fac-create .fac-nav-a,
+    .fac-create .fac-bell { min-height: 44px; }
+    .fac-create .fac-priority-opt span { min-height: 48px; }
+}
+
+/* Keyboard / assistive tech and user preferences */
+@media (prefers-reduced-motion: reduce) {
+    .fac-create *, .fac-create *::before, .fac-create *::after { transition: none !important; animation: none !important; }
+}
+@media (forced-colors: active) {
+    .fac-priority-opt input:checked + span { outline: 3px solid Highlight; outline-offset: -3px; }
+}
+@media print {
+    .fac-create .fac-submit { display: none !important; }
+}
+
+/* Coloured edge on ticket rows (same colours as the status badge) */
+.fac-page .table tr.fac-row > td:first-child { border-left: 4px solid transparent; }
+.fac-page .table tr.fac-row-new > td:first-child { border-left-color: #dc2626; }
+.fac-page .table tr.fac-row-under_review > td:first-child { border-left-color: #eab308; }
+.fac-page .table tr.fac-row-assigned > td:first-child,
+.fac-page .table tr.fac-row-accepted > td:first-child,
+.fac-page .table tr.fac-row-in_progress > td:first-child,
+.fac-page .table tr.fac-row-completed_pending_verification > td:first-child { border-left-color: #f97316; }
+.fac-page .table tr.fac-row-verified > td:first-child,
+.fac-page .table tr.fac-row-closed > td:first-child { border-left-color: #16a34a; }
+.fac-page .table tr.fac-row-new { background: #fff7f7; }
+/* Assign Officers table: roomy cells so the dropdown never touches the border */
+.fac-officers-table th,
+.fac-officers-table td { padding: 0.6rem 0.85rem; }
+.fac-officers-table td:last-child { min-width: 14rem; }
+.fac-officers-table .form-select { min-width: 12rem; }
+/* Phones: each category becomes a small card instead of a sideways-scrolling table */
+@media (max-width: 575.98px) {
+    .fac-officers-table thead { display: none; }
+    .fac-officers-table, .fac-officers-table tbody, .fac-officers-table tr, .fac-officers-table td { display: block; width: 100%; }
+    .fac-officers-table tr { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--fac-border); }
+    .fac-officers-table tr:last-child { border-bottom: 0; }
+    .fac-officers-table td { padding: 0.2rem 0; border: 0; min-width: 0; }
+    .fac-officers-table td:last-child { min-width: 0; }
+    .fac-officers-table td::before { content: attr(data-label); display: block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--fac-muted); }
+    .fac-officers-table td.fac-officers-cat { font-weight: 700; color: var(--fac-navy); }
+    .fac-officers-table td.fac-officers-cat::before { display: none; }
+    .fac-officers-table .form-select { min-width: 0; font-size: 16px; min-height: 44px; margin-top: 0.15rem; }
+}
+/* Assign page: tick-box staff list */
+.fac-staff-list { border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; max-height: 300px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.fac-staff-row { display: flex; align-items: center; gap: 0.75rem; min-height: 46px; margin: 0; padding: 0.45rem 0.85rem; border-bottom: 1px solid #eef2f7; cursor: pointer; }
+.fac-staff-row:last-child { border-bottom: 0; }
+.fac-staff-row:hover { background: #f7f9fc; }
+.fac-staff-row.is-on { background: #eaf1fb; }
+.fac-staff-row .form-check-input { flex: 0 0 auto; width: 1.15rem; height: 1.15rem; margin: 0; cursor: pointer; }
+.fac-staff-info { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.fac-staff-info strong { font-size: 0.9rem; color: var(--fac-navy); overflow-wrap: anywhere; }
+.fac-staff-info small { font-size: 0.75rem; color: var(--fac-muted); }
+.fac-staff-empty { padding: 1rem; text-align: center; font-size: 0.85rem; color: var(--fac-muted); }
+@media (max-width: 575.98px) {
+    .fac-staff-list { max-height: 55vh; }
+    .fac-page #facSearch { font-size: 16px; }
+}
+/* Support jobs: another department helps with the main job */
+.fac-s-waiting_support { background: #ede9fe; color: #5b21b6; }
+.fac-page .table tr.fac-row-waiting_support > td:first-child { border-left-color: #7c3aed; }
+.fac-page .table tr.fac-row-waiting_support { background: #faf8ff; }
+.fac-support { margin: 1rem 0; padding: 0.85rem 1rem; border: 1px solid #ddd6fe; border-radius: 12px; background: #faf8ff; }
+.fac-support-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.6rem; }
+.fac-support-head h6 { margin: 0; font-weight: 700; color: #4c1d95; }
+.fac-support-wait, .fac-support-ok { font-size: 0.78rem; font-weight: 700; padding: 0.2rem 0.65rem; border-radius: 999px; }
+.fac-support-wait { background: #ede9fe; color: #5b21b6; }
+.fac-support-ok { background: #dcfce7; color: #166534; }
+.fac-sj { margin-top: 0.7rem; padding: 0.75rem 0.9rem; border: 1px solid #e5e7eb; border-left: 4px solid #7c3aed; border-radius: 10px; background: #fff; }
+.fac-sj.is-assigned { border-left-color: #f97316; }
+.fac-sj.is-completed { border-left-color: #16a34a; }
+.fac-sj.is-declined, .fac-sj.is-cancelled { border-left-color: #94a3b8; }
+.fac-sj-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.fac-sj-desc { margin: 0.35rem 0 0.5rem; font-size: 0.9rem; }
+.fac-sj-chip { display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 0.18rem 0.6rem; border-radius: 999px; background: #ede9fe; color: #5b21b6; }
+.fac-sj-chip-assigned { background: #ffedd5; color: #c2410c; }
+.fac-sj-chip-completed { background: #dcfce7; color: #166534; }
+.fac-sj-chip-declined, .fac-sj-chip-cancelled { background: #e2e8f0; color: #334155; }
+.fac-sj .fac-road-form { margin-top: 0.6rem; }
+.fac-support-inbox { margin-top: 0.25rem; }
+.fac-sj-line { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.55rem 0.7rem; margin-top: 0.4rem; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; color: inherit; text-decoration: none; }
+.fac-sj-line:hover { border-color: #a78bfa; background: #fdfcff; }
+.fac-sj-line-main { display: flex; flex-direction: column; min-width: 0; }
+.fac-sj-line-main small, .fac-sj-line-meta small { color: #64748b; overflow: hidden; text-overflow: ellipsis; }
+.fac-sj-line-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.15rem; flex-shrink: 0; }
+@media (max-width: 575.98px) {
+    .fac-support { padding: 0.7rem; }
+    .fac-sj-line { flex-direction: column; align-items: flex-start; }
+    .fac-sj-line-meta { align-items: flex-start; }
+    .fac-sj .form-select, .fac-sj .form-control, .fac-support .form-select, .fac-support .form-control { font-size: 16px; min-height: 42px; }
+}
+@media print { .fac-support-inbox { display: none; } }

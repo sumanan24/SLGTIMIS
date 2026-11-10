@@ -27,70 +27,71 @@ $requesterName = $t['requester_name'] ?? $t['requester_staff_id'] ?? '';
 
             <?php if ($isReassign): ?>
                 <div class="fac-notice mb-3">
-                    This ticket is currently assigned to <strong><?php echo $h($currentAssignee !== '' ? $currentAssignee : 'another person'); ?></strong><?php echo !empty($t['deadline']) ? ' (deadline: ' . $h($t['deadline']) . ')' : ''; ?>.
+                    This ticket is currently assigned to <strong><?php echo $h($currentAssignee !== '' ? $currentAssignee : 'another person'); ?></strong>.
                     The new assignee will receive an SMS notification.
                 </div>
             <?php endif; ?>
 
             <form method="post" action="<?php echo $base; ?>/assign-save" id="facAssignForm">
                 <input type="hidden" name="id" value="<?php echo (int) $t['id']; ?>">
+                <input type="hidden" name="assignment_type" id="facType" value="staff">
 
                 <div class="fac-section">
                     <h6>Assignee</h6>
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label" for="facType">Assign To</label>
-                            <select class="form-select" name="assignment_type" id="facType">
-                                <option value="staff">Staff member</option>
-                                <option value="team">Team (2 or more staff)</option>
-                                <option value="vendor">External vendor</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4" id="facDeptBox">
+                    <div class="row g-3 mb-2" id="facDeptBox">
+                        <div class="col-md-6">
                             <label class="form-label" for="facDept">Department</label>
-                            <select class="form-select" id="facDept">
-                                <option value="">All departments</option>
-                                <?php foreach ($departments as $d): ?>
-                                    <option value="<?php echo $h($d['department_id']); ?>" <?php echo (($selected_department ?? '') === $d['department_id']) ? 'selected' : ''; ?>><?php echo $h($d['department_name']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                            <?php if (!empty($lock_department)):
+                                $lockName = '';
+                                foreach ($departments as $d) {
+                                    if ((string) $d['department_id'] === (string) $selected_department) { $lockName = (string) $d['department_name']; break; }
+                                } ?>
+                                <input type="hidden" id="facDept" value="<?php echo $h($selected_department); ?>">
+                                <div class="form-control-plaintext fw-semibold"><i class="fas fa-building me-2 text-muted"></i><?php echo $h($lockName !== '' ? $lockName : $selected_department); ?></div>
+                                <div class="form-text">Your own department.</div>
+                            <?php else: ?>
+                                <select class="form-select" id="facDept">
+                                    <option value="">All departments</option>
+                                    <?php foreach ($departments as $d): ?>
+                                        <option value="<?php echo $h($d['department_id']); ?>" <?php echo (($selected_department ?? '') === $d['department_id']) ? 'selected' : ''; ?>><?php echo $h($d['department_name']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php endif; ?>
                         </div>
-                        <div class="col-md-4" id="facStaffBox">
-                            <label class="form-label" for="facStaff">Staff Member <span class="text-danger">*</span></label>
-                            <select class="form-select" name="staff_id" id="facStaff" required>
-                                <option value="">Select a staff member</option>
-                            </select>
+                        <div class="col-md-6">
+                            <label class="form-label" for="facSearch">Find a person</label>
+                            <input type="search" class="form-control" id="facSearch" placeholder="Type a name..." autocomplete="off">
                         </div>
                     </div>
 
-                    <div id="facTeamBox" class="mt-3" hidden>
-                        <label class="form-label">Team Members <span class="text-danger">*</span></label>
-                        <div id="facTeamChips" class="d-flex flex-wrap gap-2 mb-2"></div>
-                        <div id="facTeamList" class="border rounded p-2" style="max-height:240px;overflow:auto;"></div>
-                        <div id="facTeamIds"></div>
-                        <div class="form-text mt-1" id="facTeamCount">Select at least 2 staff members. The first one selected is the team lead.</div>
+                    <div id="facStaffBox">
+                        <label class="form-label">Staff Members <span class="text-danger">*</span></label>
+                        <div id="facChips" class="d-flex flex-wrap gap-2 mb-2"></div>
+                        <div id="facStaffList" class="fac-staff-list" role="group" aria-label="Staff members"></div>
+                        <div id="facIds"></div>
+                        <div class="form-text mt-1" id="facCount"></div>
                     </div>
 
+                    <div class="form-check mt-3" id="facVendorToggleBox">
+                        <input class="form-check-input" type="checkbox" id="facVendorToggle">
+                        <label class="form-check-label" for="facVendorToggle">Hand over to an external vendor instead (closes the ticket)</label>
+                    </div>
                     <div id="facVendorBox" class="mt-3" hidden>
                         <label class="form-label" for="facVendorReason">Reason for Closing <span class="text-danger">*</span></label>
                         <textarea class="form-control" name="vendor_reason" id="facVendorReason" rows="3" minlength="10" required placeholder="Why is this ticket being handed to an external vendor?"></textarea>
                         <div class="form-text">The ticket will be closed with this reason.</div>
                     </div>
                 </div>
-
                 <div id="facWorkBox">
                     <div class="fac-section">
                         <h6>Schedule</h6>
                         <div class="row g-3">
-                            <div class="col-md-4">
+                            <div class="col-md-6">
                                 <label class="form-label" for="facStart">Start Date</label>
                                 <input type="date" class="form-control" name="start_date" id="facStart" value="<?php echo date('Y-m-d'); ?>">
                             </div>
-                            <div class="col-md-4">
-                                <label class="form-label" for="facDeadline">Deadline <span class="text-danger">*</span></label>
-                                <input type="date" class="form-control" name="deadline" id="facDeadline" required min="<?php echo date('Y-m-d'); ?>" value="<?php echo $h($suggested_deadline ?? ''); ?>">
-                            </div>
-                            <div class="col-md-4">
+
+                            <div class="col-md-6">
                                 <label class="form-label" for="facFinish">Expected Completion</label>
                                 <input type="date" class="form-control" name="expected_completion_date" id="facFinish">
                             </div>
@@ -112,146 +113,151 @@ $requesterName = $t['requester_name'] ?? $t['requester_staff_id'] ?? '';
 </div>
 <script>
 (function () {
-    const isReassign = <?php echo $isReassign ? 'true' : 'false'; ?>;
-    const currentStaff = <?php echo json_encode((string) ($t['responsible_staff_id'] ?? '')); ?>;
-    const labels = { staff: <?php echo json_encode($isReassign ? 'Reassign Ticket' : 'Assign Ticket'); ?>, team: <?php echo json_encode($isReassign ? 'Reassign to Team' : 'Assign to Team'); ?>, vendor: 'Close Ticket' };
+    var isReassign = <?php echo $isReassign ? 'true' : 'false'; ?>;
+    var currentStaff = <?php echo json_encode((string) ($t['responsible_staff_id'] ?? '')); ?>;
+    var baseLabel = <?php echo json_encode($isReassign ? 'Reassign Ticket' : 'Assign Ticket'); ?>;
+    var teamLabel = <?php echo json_encode($isReassign ? 'Reassign to Team' : 'Assign to Team'); ?>;
 
-    const typeSel = document.getElementById('facType');
-    const dept = document.getElementById('facDept');
-    const staffSel = document.getElementById('facStaff');
-    const deptBox = document.getElementById('facDeptBox');
-    const staffBox = document.getElementById('facStaffBox');
-    const teamBox = document.getElementById('facTeamBox');
-    const vendorBox = document.getElementById('facVendorBox');
-    const workBox = document.getElementById('facWorkBox');
-    const teamList = document.getElementById('facTeamList');
-    const teamChips = document.getElementById('facTeamChips');
-    const teamIds = document.getElementById('facTeamIds');
-    const teamCount = document.getElementById('facTeamCount');
-    const submitBtn = document.getElementById('facSubmit');
-    const form = document.getElementById('facAssignForm');
+    var typeInp = document.getElementById('facType');
+    var dept = document.getElementById('facDept');
+    var search = document.getElementById('facSearch');
+    var deptBox = document.getElementById('facDeptBox');
+    var staffBox = document.getElementById('facStaffBox');
+    var listBox = document.getElementById('facStaffList');
+    var chips = document.getElementById('facChips');
+    var idsBox = document.getElementById('facIds');
+    var countEl = document.getElementById('facCount');
+    var vendorToggle = document.getElementById('facVendorToggle');
+    var vendorBox = document.getElementById('facVendorBox');
+    var workBox = document.getElementById('facWorkBox');
+    var submitBtn = document.getElementById('facSubmit');
+    var form = document.getElementById('facAssignForm');
 
-    let rows = <?php echo json_encode(array_values($picker ?? [])); ?>;
-    const selected = new Map(); // staff_id -> name (insertion order = lead first)
+    var rows = <?php echo json_encode(array_values($picker ?? [])); ?>;
+    var selected = new Map(); // staff_id -> name; the first one is the lead
+    var vendorMode = false;
 
-    function label(p) {
-        return (p.staff_name || p.staff_id) + ' (' + (p.open_tickets || 0) + ' open, ' + (p.overdue || 0) + ' overdue)';
-    }
-    function show(box, on) {
+    function setEnabled(box, on) {
         box.hidden = !on;
         box.querySelectorAll('input, select, textarea').forEach(function (el) { el.disabled = !on; });
     }
 
-    function renderStaff(message) {
-        const keep = staffSel.value;
-        staffSel.innerHTML = '';
-        const first = document.createElement('option');
-        first.value = '';
-        first.textContent = message || (rows.length ? 'Select a staff member' : 'No staff found');
-        staffSel.appendChild(first);
-        rows.forEach(function (p) {
-            if (isReassign && String(p.staff_id) === currentStaff) { return; }
-            const o = document.createElement('option');
-            o.value = p.staff_id;
-            o.textContent = label(p);
-            if (String(p.staff_id) === keep) { o.selected = true; }
-            staffSel.appendChild(o);
-        });
-    }
-
-    function renderTeam(message) {
-        teamList.innerHTML = '';
-        if (message || !rows.length) {
-            const m = document.createElement('div');
-            m.className = 'text-muted small';
-            m.textContent = message || 'No staff found in this department.';
-            teamList.appendChild(m);
-        }
-        rows.forEach(function (p) {
-            const id = String(p.staff_id);
-            const wrap = document.createElement('label');
-            wrap.className = 'd-flex align-items-center gap-2 py-1';
-            wrap.style.cursor = 'pointer';
-            const cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.className = 'form-check-input mt-0';
-            cb.checked = selected.has(id);
-            cb.addEventListener('change', function () {
-                if (cb.checked) { selected.set(id, p.staff_name || id); } else { selected.delete(id); }
-                renderSelection();
+    function renderList(message) {
+        listBox.innerHTML = '';
+        var q = search.value.trim().toLowerCase();
+        var shown = 0;
+        if (!message) {
+            rows.forEach(function (p) {
+                var id = String(p.staff_id);
+                if (isReassign && id === currentStaff) { return; }
+                var name = p.staff_name || id;
+                var text = (name + ' ' + id + ' ' + (p.staff_position || '')).toLowerCase();
+                if (q && text.indexOf(q) < 0) { return; }
+                shown++;
+                var row = document.createElement('label');
+                row.className = 'fac-staff-row' + (selected.has(id) ? ' is-on' : '');
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.className = 'form-check-input';
+                cb.checked = selected.has(id);
+                cb.addEventListener('change', function () {
+                    if (cb.checked) { selected.set(id, name); } else { selected.delete(id); }
+                    row.classList.toggle('is-on', cb.checked);
+                    renderSelection();
+                });
+                var info = document.createElement('span');
+                info.className = 'fac-staff-info';
+                var strong = document.createElement('strong');
+                strong.textContent = name;
+                var small = document.createElement('small');
+                small.textContent = (p.staff_position ? p.staff_position + ' · ' : '') + (p.open_tickets || 0) + ' open' + (parseInt(p.overdue || 0, 10) > 0 ? ', ' + p.overdue + ' overdue' : '');
+                info.appendChild(strong);
+                info.appendChild(small);
+                row.appendChild(cb);
+                row.appendChild(info);
+                listBox.appendChild(row);
             });
-            const txt = document.createElement('span');
-            txt.textContent = label(p);
-            wrap.appendChild(cb);
-            wrap.appendChild(txt);
-            teamList.appendChild(wrap);
-        });
+        }
+        if (message || !shown) {
+            var m = document.createElement('div');
+            m.className = 'fac-staff-empty';
+            m.textContent = message || (q ? 'No one matches "' + search.value.trim() + '".' : 'No staff found in this department.');
+            listBox.appendChild(m);
+        }
         renderSelection();
     }
 
     function renderSelection() {
-        teamChips.innerHTML = '';
-        teamIds.innerHTML = '';
-        let i = 0;
+        chips.innerHTML = '';
+        idsBox.innerHTML = '';
+        var i = 0;
         selected.forEach(function (name, id) {
-            const chip = document.createElement('span');
+            var chip = document.createElement('span');
             chip.className = 'badge bg-primary d-inline-flex align-items-center gap-1';
-            chip.textContent = name + (i === 0 ? ' (lead)' : '');
-            const x = document.createElement('button');
+            chip.textContent = name + (selected.size > 1 && i === 0 ? ' (lead)' : '');
+            var x = document.createElement('button');
             x.type = 'button';
             x.className = 'btn-close btn-close-white';
             x.style.fontSize = '0.55rem';
             x.setAttribute('aria-label', 'Remove ' + name);
-            x.addEventListener('click', function () { selected.delete(id); renderTeam(); });
+            x.addEventListener('click', function () { selected.delete(id); renderList(); });
             chip.appendChild(x);
-            teamChips.appendChild(chip);
-            const h = document.createElement('input');
-            h.type = 'hidden';
-            h.name = 'team_staff_ids[]';
-            h.value = id;
-            teamIds.appendChild(h);
+            chips.appendChild(chip);
+            if (!vendorMode) {
+                var h = document.createElement('input');
+                h.type = 'hidden';
+                h.name = 'team_staff_ids[]';
+                h.value = id;
+                idsBox.appendChild(h);
+            }
             i++;
         });
-        const n = selected.size;
-        teamCount.textContent = n === 0 ? 'Select at least 2 staff members. The first one selected is the team lead.' : (n === 1 ? '1 member selected. Select at least one more.' : n + ' members selected.');
-        teamCount.className = 'form-text mt-1 ' + (n === 1 ? 'text-danger' : '');
+        var n = selected.size;
+        typeInp.value = vendorMode ? 'vendor' : (n > 1 ? 'team' : 'staff');
+        countEl.textContent = n === 0
+            ? 'Tick one or more people. One person is assigned directly; two or more form a team and the first ticked is the lead.'
+            : (n === 1 ? '1 person selected.' : n + ' people selected as a team. The first one ticked is the team lead.');
+        if (!vendorMode) {
+            submitBtn.textContent = n > 1 ? teamLabel + ' (' + n + ')' : baseLabel;
+        }
     }
 
-    function renderAll(message) { renderStaff(message); renderTeam(message); }
-
-    function applyType() {
-        const type = typeSel.value;
-        show(deptBox, type !== 'vendor');
-        show(staffBox, type === 'staff');
-        show(teamBox, type === 'team');
-        show(vendorBox, type === 'vendor');
-        show(workBox, type !== 'vendor');
-        submitBtn.textContent = labels[type] || labels.staff;
-        submitBtn.className = 'btn ' + (type === 'vendor' ? 'btn-danger' : 'btn-primary');
+    function applyVendor() {
+        vendorMode = vendorToggle.checked;
+        setEnabled(deptBox, !vendorMode);
+        setEnabled(staffBox, !vendorMode);
+        setEnabled(vendorBox, vendorMode);
+        setEnabled(workBox, !vendorMode);
+        submitBtn.textContent = vendorMode ? 'Close Ticket' : baseLabel;
+        submitBtn.className = 'btn ' + (vendorMode ? 'btn-danger' : 'btn-primary');
+        renderSelection();
     }
 
     dept.addEventListener('change', function () {
-        renderAll('Loading staff...');
+        selected.clear();
+        rows = [];
+        renderList('Loading staff...');
         fetch('<?php echo $base; ?>/staff-options?department_id=' + encodeURIComponent(dept.value), { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
-            .then(function (d) { rows = d.rows || []; renderAll(rows.length ? '' : 'No staff found in this department'); })
-            .catch(function () { rows = []; renderAll('Staff could not be loaded. Please try again.'); });
+            .then(function (d) { rows = d.rows || []; renderList(); })
+            .catch(function () { rows = []; renderList('Staff could not be loaded. Please try again.'); });
     });
-    typeSel.addEventListener('change', applyType);
+    search.addEventListener('input', function () { renderList(); });
+    search.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); } });
+    vendorToggle.addEventListener('change', applyVendor);
 
     form.addEventListener('submit', function (e) {
-        const type = typeSel.value;
-        if (type === 'team' && selected.size < 2) {
-            e.preventDefault();
-            alert('Please select at least two staff members for a team.');
+        if (vendorMode) {
+            if (!confirm('This will close the ticket. Do you want to continue?')) { e.preventDefault(); }
             return;
         }
-        if (type === 'vendor' && !confirm('This will close the ticket. Do you want to continue?')) {
+        if (selected.size < 1) {
             e.preventDefault();
+            alert('Please tick at least one staff member.');
         }
     });
 
-    renderAll();
-    applyType();
+    renderList();
+    applyVendor();
 })();
 </script>

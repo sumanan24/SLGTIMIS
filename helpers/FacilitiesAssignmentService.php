@@ -24,6 +24,20 @@ class FacilitiesAssignmentService {
             return $this->closeWithVendor($actor, $ticket, $input);
         }
 
+        // The form sends every ticked person as team_staff_ids[]: one person = direct assignment, two or more = team
+        if ($type !== 'vendor') {
+            $picked = array_values(array_unique(array_filter(array_map(static function ($v) {
+                return trim((string) $v);
+            }, (array) ($input['team_staff_ids'] ?? [])), static function ($v) {
+                return $v !== '';
+            })));
+            if ($picked) {
+                $type = count($picked) > 1 ? 'team' : 'staff';
+                $input['team_staff_ids'] = $picked;
+                $input['staff_id'] = $picked[0];
+            }
+        }
+
         // Who will do the work: one staff member, or a team of two or more
         if ($type === 'team') {
             $rawIds = $input['team_staff_ids'] ?? [];
@@ -48,8 +62,25 @@ class FacilitiesAssignmentService {
                 throw new InvalidArgumentException('One of the selected staff members could not be found.');
             }
         }
+        // Everyone except an admin can only give work to people of their own department
+        if (empty($actor['is_admin'])) {
+            $own = (string) (($actor['hod_department_id'] ?? '') ?: ($actor['department_id'] ?? ''));
+            if ($own !== '') {
+                foreach ($ids as $id) {
+                    if ((string) $this->model->staffDepartmentId($id) !== $own) {
+                        throw new InvalidArgumentException('You can assign this ticket only to staff of your own department.');
+                    }
+                }
+            }
+        }
         if (empty($input['deadline'])) {
-            throw new InvalidArgumentException('Please enter a deadline.');
+            // No deadline is asked on the form: keep the current one while it is still ahead, otherwise use the priority's completion time
+            if (!empty($ticket['deadline']) && substr((string) $ticket['deadline'], 0, 10) >= date('Y-m-d')) {
+                $input['deadline'] = substr((string) $ticket['deadline'], 0, 10);
+            } else {
+                $days = max(1, (int) $this->model->slaDays((string) ($ticket['current_priority'] ?? 'medium')));
+                $input['deadline'] = date('Y-m-d', strtotime('+' . $days . ' days'));
+            }
         }
         $leadId = $ids[0];
         $deptId = $this->model->staffDepartmentId($leadId);
@@ -83,8 +114,10 @@ class FacilitiesAssignmentService {
             ]);
         }
         $oldDeadline = $ticket['deadline'];
+        // A ticket that is waiting for another department's support job stays paused after a reassignment
+        $newStatus = $this->model->openSubjobs((int) $ticket['id']) ? FacilitiesTicketService::ST_SUPPORT : FacilitiesTicketService::ST_ASSIGNED;
         $this->model->updateTicket((int) $ticket['id'], [
-            'status' => FacilitiesTicketService::ST_ASSIGNED,
+            'status' => $newStatus,
             'assignment_type' => $type,
             'responsible_staff_id' => $leadId,
             'responsible_department_id' => $deptId !== '' ? $deptId : ($ticket['responsible_department_id'] ?? null),
@@ -96,7 +129,7 @@ class FacilitiesAssignmentService {
         $isReassign = !empty($ticket['responsible_staff_id']) || !empty($ticket['responsible_department_id']);
         $action = $isReassign ? 'Reassigned' : 'Assigned';
         $target = implode(', ', $ids);
-        $this->tickets->statusHistory((int) $ticket['id'], $ticket['status'], FacilitiesTicketService::ST_ASSIGNED, $actor['staff_id'], $instructions);
+        $this->tickets->statusHistory((int) $ticket['id'], $ticket['status'], $newStatus, $actor['staff_id'], $instructions);
         $this->tickets->history((int) $ticket['id'], $actor['staff_id'], $action, $ticket['responsible_staff_id'] ?? '', $target, $instructions);
         if ((string) $oldDeadline !== (string) $input['deadline']) {
             $this->recordDeadline($ticket, $actor, $input['deadline'], $isReassign ? 'Reassignment deadline' : 'Initial assignment deadline');
