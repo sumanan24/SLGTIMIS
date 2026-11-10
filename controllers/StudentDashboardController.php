@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Student Dashboard Controller
  */
@@ -183,30 +183,47 @@ class StudentDashboardController extends Controller {
             return;
         }
 
+        $dl = rtrim(APP_URL, '/') . '/student/forms/download?form=';
         $forms = [
             [
                 'key' => 'student-application',
                 'title' => 'Student Application Form',
-                'description' => 'A4 application PDF filled with your login student details (2 pages).',
-                'icon' => 'fa-file-pdf',
+                'description' => 'Your full application details, pre-filled from your student profile.',
+                'icon' => 'fa-file-alt',
+                'pages' => '2 pages',
+                'submit_to' => 'Student Affairs Office',
                 'action_label' => 'Download PDF',
-                'url' => rtrim(APP_URL, '/') . '/student/forms/download?form=student-application',
+                'url' => $dl . 'student-application',
             ],
             [
                 'key' => 'hostel-request',
                 'title' => 'Hostel Request Form',
-                'description' => 'Request hostel admission or renewal. Filled with your profile and current room, if you already have one. Print, sign, and submit to the hostel office.',
+                'description' => 'Request hostel admission, renewal or a change of room.',
                 'icon' => 'fa-bed',
+                'pages' => '1 page',
+                'submit_to' => 'Hostel Office',
                 'action_label' => 'Download PDF',
-                'url' => rtrim(APP_URL, '/') . '/student/forms/download?form=hostel-request',
+                'url' => $dl . 'hostel-request',
             ],
             [
                 'key' => 'bus-season-request',
                 'title' => 'Bus Season Request Form',
-                'description' => 'Apply for a bus season ticket. Filled with your profile and your latest route, if you already have a request. Print, sign, and submit to the Student Affairs Office.',
+                'description' => 'Apply for a monthly bus season ticket for your route.',
                 'icon' => 'fa-bus',
+                'pages' => '1 page',
+                'submit_to' => 'Student Affairs Office',
                 'action_label' => 'Download PDF',
-                'url' => rtrim(APP_URL, '/') . '/student/forms/download?form=bus-season-request',
+                'url' => $dl . 'bus-season-request',
+            ],
+            [
+                'key' => 'family-income',
+                'title' => 'Family Income Confirmation',
+                'description' => 'Declare family annual income below Rs. 500,000 for the Rs. 7,500 monthly student allowance. Needs Grama Niladhari certification.',
+                'icon' => 'fa-file-signature',
+                'pages' => '1 page',
+                'submit_to' => 'Branch Principal',
+                'action_label' => 'Download PDF',
+                'url' => $dl . 'family-income',
             ],
         ];
 
@@ -226,7 +243,7 @@ class StudentDashboardController extends Controller {
         }
 
         $form = strtolower(trim((string) $this->get('form', '')));
-        $allowed = ['student-application', 'application', 'hostel-request', 'bus-season-request'];
+        $allowed = ['student-application', 'application', 'hostel-request', 'bus-season-request', 'family-income'];
         if (!in_array($form, $allowed, true)) {
             $_SESSION['error'] = 'Requested form was not found.';
             $this->redirect('student/forms');
@@ -259,6 +276,11 @@ class StudentDashboardController extends Controller {
 
         if ($form === 'student-application' || $form === 'application') {
             StudentSampleFormsPdfHelper::streamStudentApplicationBlank(true, $student, $enrollment, $application);
+            return;
+        }
+
+        if ($form === 'family-income') {
+            StudentSampleFormsPdfHelper::streamFamilyIncomeForm(true, $student, $enrollment, $application);
             return;
         }
 
@@ -397,4 +419,3 @@ class StudentDashboardController extends Controller {
         return $this->view('student/payments', $data);
     }
 }
-

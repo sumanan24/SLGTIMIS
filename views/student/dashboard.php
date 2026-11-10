@@ -1,9 +1,19 @@
 <?php
-$e = static fn (?string $s): string => htmlspecialchars((string) ($s ?? ''), ENT_QUOTES, 'UTF-8');
-$dash = static function (?string $s): string {
+/**
+ * Student portal dashboard.
+ * Data comes from StudentDashboardController::index().
+ */
+$e = static fn ($s): string => htmlspecialchars((string) ($s ?? ''), ENT_QUOTES, 'UTF-8');
+$dash = static function ($s): string {
     $s = trim((string) $s);
     return $s === '' ? '—' : htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 };
+$fmtDate = static function ($s): string {
+    $s = trim((string) $s);
+    $ts = $s !== '' ? strtotime($s) : false;
+    return $ts ? date('d M Y', $ts) : '';
+};
+
 $recentPayments = $recentPayments ?? [];
 $busSeasonPayments = $busSeasonPayments ?? [];
 $currentGroup = $currentGroup ?? null;
@@ -17,397 +27,455 @@ require_once BASE_PATH . '/models/StudentModel.php';
 $studentModelHelper = new StudentModel();
 $profileImageUrl = $studentModelHelper->getProfileImagePath($student);
 
+// Header facts
+$fullName = trim((string) ($student['student_fullname'] ?? ''));
+$hour = (int) date('G');
+$greeting = $hour < 12 ? 'Good morning' : ($hour < 17 ? 'Good afternoon' : 'Good evening');
+
 $modeRaw = (string) ($currentEnrollment['course_mode'] ?? '');
 $modeLabel = $modeRaw === 'Part' || strcasecmp($modeRaw, 'Part Time') === 0
     ? 'Part Time'
-    : ($modeRaw === 'Full' || strcasecmp($modeRaw, 'Full Time') === 0 ? 'Full Time' : ($modeRaw !== '' ? $modeRaw : '—'));
+    : ($modeRaw === 'Full' || strcasecmp($modeRaw, 'Full Time') === 0 ? 'Full Time' : ($modeRaw !== '' ? $modeRaw : ''));
 $status = (string) ($student['student_status'] ?? 'Active');
 $statusClass = strcasecmp($status, 'Active') === 0 ? 'success' : 'warning';
 $enrollStatus = (string) ($currentEnrollment['student_enroll_status'] ?? '');
-$phone = $student['student_phone'] ?? '';
-$phone = ($phone === '' || $phone === '0') ? '' : (string) $phone;
-$addressParts = array_filter([
+$courseName = (string) ($currentEnrollment['course_name'] ?? $currentEnrollment['course_id'] ?? '');
+$phone = (string) ($student['student_phone'] ?? '');
+$phone = ($phone === '0') ? '' : $phone;
+$address = implode(', ', array_filter([
     trim((string) ($student['student_address'] ?? '')),
     trim((string) ($student['student_district'] ?? '')),
     trim((string) ($student['student_provice'] ?? '')),
-]);
-$address = $addressParts !== [] ? implode(', ', $addressParts) : '';
+]));
+
+// Attendance
+$attendancePercentage = (float) ($attendancePercentage ?? 0);
+$presentDays = (int) ($presentDays ?? 0);
+$absentDays = (int) ($absentDays ?? 0);
+$holidayDays = (int) ($holidayDays ?? 0);
+$totalDays = (int) ($totalDays ?? 0);
+$attTone = $totalDays === 0 ? 'muted' : ($attendancePercentage >= 85 ? 'ok' : ($attendancePercentage >= 75 ? 'warn' : 'bad'));
+$attLabel = $totalDays === 0 ? 'No records yet' : ($attendancePercentage >= 85 ? 'Good standing' : ($attendancePercentage >= 75 ? 'Needs attention' : 'Low attendance'));
+$ringDeg = (int) round(max(0, min(100, $attendancePercentage)) * 3.6);
+$currentMonth = $currentMonth ?? date('Y-m');
+$attendanceRecords = $attendanceRecords ?? [];
+
+// One combined, newest-first payment list
+$payRows = [];
+foreach ($busSeasonPayments as $p) {
+    $payRows[] = [
+        'ts' => !empty($p['payment_date']) ? (int) strtotime((string) $p['payment_date']) : 0,
+        'desc' => 'Bus season ticket',
+        'amount' => (float) ($p['paid_amount'] ?? 0),
+        'status' => trim((string) ($p['status'] ?? '')),
+    ];
+}
+foreach ($recentPayments as $p) {
+    $payRows[] = [
+        'ts' => !empty($p['pays_date']) ? (int) strtotime((string) $p['pays_date']) : 0,
+        'desc' => trim((string) ($p['payment_reason'] ?? '')) ?: 'Payment',
+        'amount' => (float) ($p['pays_amount'] ?? 0),
+        'status' => '',
+    ];
+}
+usort($payRows, static fn ($a, $b) => $b['ts'] <=> $a['ts']);
+$payRows = array_slice($payRows, 0, 5);
+
+$studentNotices = is_array($studentNotices ?? null) ? $studentNotices : [];
+$firstNotice = $studentNotices[0] ?? null;
+
+$shortcuts = [
+    ['student/profile', 'fa-user', 'My Profile', false],
+    ['student/attendance', 'fa-calendar-check', 'Attendance', false],
+    ['student/my-attendance', 'fa-fingerprint', 'Biometric', false],
+    ['student/my-timetable', 'fa-calendar-week', 'Timetable', false],
+    ['student/training-programmes', 'fa-people-carry-box', 'Training', false],
+    ['student/payments', 'fa-money-bill-wave', 'Payments', false],
+    ['student/notices', 'fa-bullhorn', 'Notices', false],
+    ['student/documents-pdf', 'fa-file-pdf', 'Documents', true],
+    ['student/forms', 'fa-file-alt', 'Forms', false],
+];
 ?>
 <style>
-.sd-page { width: 100%; max-width: 100%; overflow-x: hidden; }
-.sd-id {
-    background: linear-gradient(135deg, #001f3f 0%, #003366 100%);
-    color: #fff;
-    border-radius: 14px;
-    padding: 1rem 1.15rem;
+.sd-page {
+    --sd-navy: #001f3f; --sd-blue: #00478a; --sd-line: #e6eaf0; --sd-muted: #6c757d;
+    --sd-ok: #198754; --sd-warn: #d97706; --sd-bad: #dc3545;
+    width: 100%; max-width: 100%; overflow-x: hidden;
 }
-.sd-id-row { display: flex; align-items: center; gap: .85rem; min-width: 0; }
+.sd-page .min-w-0 { min-width: 0; }
+
+/* Hero */
+.sd-hero {
+    position: relative; overflow: hidden; color: #fff; border-radius: 16px;
+    background: linear-gradient(120deg, var(--sd-navy) 0%, var(--sd-blue) 100%);
+    padding: 1.4rem 1.5rem; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.5rem; align-items: center;
+    box-shadow: 0 6px 18px rgba(0,31,63,.18);
+}
+.sd-hero::after {
+    content: ""; position: absolute; right: -60px; top: -80px; width: 260px; height: 260px;
+    border-radius: 50%; background: rgba(255,255,255,.06); pointer-events: none;
+}
+.sd-hero-main { display: flex; align-items: center; gap: 1.1rem; min-width: 0; position: relative; z-index: 1; }
 .sd-photo {
-    width: 64px; height: 64px; object-fit: cover; border-radius: 50%;
-    border: 2px solid rgba(255,255,255,.85); background: rgba(255,255,255,.15); flex-shrink: 0;
+    width: 88px; height: 88px; object-fit: cover; border-radius: 50%; flex-shrink: 0;
+    border: 3px solid rgba(255,255,255,.9); background: rgba(255,255,255,.15);
+    box-shadow: 0 4px 12px rgba(0,0,0,.25);
 }
-.sd-photo-fallback { display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
-.sd-id h1 { font-size: 1.05rem; font-weight: 700; margin: 0 0 .15rem; overflow-wrap: anywhere; line-height: 1.25; }
-.sd-id .sd-idno { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .8rem; opacity: .9; overflow-wrap: anywhere; }
-.sd-chips { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .65rem; }
+.sd-photo-fallback { display: flex; align-items: center; justify-content: center; font-size: 1.9rem; }
+.sd-greet { font-size: .8rem; opacity: .8; margin: 0 0 .1rem; }
+.sd-name { font-size: 1.45rem; font-weight: 700; line-height: 1.2; margin: 0; overflow-wrap: anywhere; }
+.sd-meta { margin: .35rem 0 0; font-size: .82rem; opacity: .92; overflow-wrap: anywhere; }
+.sd-meta .sep { opacity: .5; margin: 0 .4rem; }
+.sd-meta .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.sd-chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .75rem; }
 .sd-chip {
-    display: inline-flex; align-items: center; gap: .3rem;
-    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.2);
-    border-radius: 999px; padding: .2rem .6rem; font-size: .7rem; max-width: 100%;
+    display: inline-flex; align-items: center; gap: .35rem; border-radius: 999px; max-width: 100%;
+    padding: .2rem .65rem; font-size: .72rem; font-weight: 500;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22);
 }
-.sd-notice {
-    display: flex; gap: .75rem; align-items: flex-start;
-    background: #fff; border: 1px solid #e6eaf0; border-radius: 12px; padding: .85rem 1rem;
-}
-.sd-notice .ic { color: #001f3f; font-size: 1.1rem; margin-top: .1rem; flex-shrink: 0; }
-.sd-notice p { margin: 0; font-size: .8rem; color: #5c6570; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.sd-card {
-    background: #fff; border: 1px solid #e6eaf0; border-radius: 12px;
-    box-shadow: 0 1px 4px rgba(0,31,63,.06); height: 100%;
-}
-.sd-card h2 {
-    font-size: .9rem; font-weight: 700; color: #001f3f; margin: 0 0 .75rem;
-    padding-bottom: .5rem; border-bottom: 1px solid #eef1f4;
-}
-.sd-dl { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem 1.25rem; align-items: start; }
-.sd-dl dt { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: #6c757d; margin: 0 0 .1rem; font-weight: 600; }
-.sd-dl dd { margin: 0; font-size: .88rem; font-weight: 600; color: #212529; overflow-wrap: anywhere; word-break: break-word; }
-.sd-stat { text-align: center; padding: .85rem .5rem; display: flex; flex-direction: column; justify-content: center; }
-.sd-stat .n { font-size: 1.45rem; font-weight: 700; color: #001f3f; line-height: 1.1; }
-.sd-stat .l { font-size: .65rem; text-transform: uppercase; letter-spacing: .03em; color: #6c757d; margin-top: .3rem; }
-.sd-dock {
-    display: flex; flex-wrap: wrap; gap: .5rem;
-}
-.sd-dock a {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: .35rem; padding: .7rem .3rem; min-height: 76px;
-    flex: 1 1 calc(25% - .5rem);
-    border: 1px solid #e6eaf0; border-radius: 12px; text-decoration: none;
-    color: #212529; background: #fff;
-}
-.sd-dock a:hover, .sd-dock a:focus-visible { border-color: #001f3f; color: #001f3f; }
-.sd-dock .ic {
-    width: 36px; height: 36px; border-radius: 10px;
+.sd-chip.ok i { color: #6ee7a8; }
+.sd-chip.warn i { color: #fcd34d; }
+.sd-hero-ring { position: relative; z-index: 1; display: flex; align-items: center; gap: .9rem; }
+.sd-ring {
+    --deg: 0deg; --clr: #6ee7a8;
+    width: 96px; height: 96px; border-radius: 50%; flex-shrink: 0;
+    background: conic-gradient(var(--clr) var(--deg), rgba(255,255,255,.18) 0);
     display: flex; align-items: center; justify-content: center;
-    background: #001f3f; color: #fff; font-size: .95rem; flex-shrink: 0;
 }
-.sd-dock a > span:not(.ic) { font-size: .7rem; font-weight: 600; text-align: center; line-height: 1.2; }
-.sd-dl .grid-span { grid-column: 1 / -1; }
-.sd-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; width: 100%; }
-.sd-cal-hd { text-align: center; font-size: .7rem; font-weight: 700; color: #6c757d; padding-bottom: .25rem; }
+.sd-ring.warn { --clr: #fcd34d; } .sd-ring.bad { --clr: #fca5a5; } .sd-ring.muted { --clr: rgba(255,255,255,.35); }
+.sd-ring > span {
+    width: 74px; height: 74px; border-radius: 50%; background: var(--sd-navy);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1;
+}
+.sd-ring b { font-size: 1.25rem; } .sd-ring small { font-size: .6rem; opacity: .75; }
+.sd-ring-txt { font-size: .75rem; line-height: 1.35; }
+.sd-ring-txt strong { display: block; font-size: .85rem; }
+
+/* Notice strip */
+.sd-notice {
+    display: flex; gap: .85rem; align-items: center; text-decoration: none; color: inherit;
+    background: #fff; border: 1px solid var(--sd-line); border-left: 4px solid var(--sd-blue);
+    border-radius: 12px; padding: .8rem 1rem;
+}
+.sd-notice:hover { box-shadow: 0 3px 10px rgba(0,31,63,.08); color: inherit; }
+.sd-notice .ic { color: var(--sd-blue); font-size: 1.15rem; flex-shrink: 0; }
+.sd-notice .t { font-weight: 600; font-size: .85rem; color: #1b2733; }
+.sd-notice p { margin: .1rem 0 0; font-size: .78rem; color: #5c6570; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sd-notice .go { margin-left: auto; color: var(--sd-muted); flex-shrink: 0; }
+
+/* KPI tiles */
+.sd-kpi {
+    background: #fff; border: 1px solid var(--sd-line); border-radius: 12px; height: 100%;
+    padding: .9rem 1rem; display: flex; align-items: center; gap: .85rem; box-shadow: 0 1px 3px rgba(0,31,63,.05);
+}
+.sd-kpi .ic { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0; }
+.sd-kpi .ic.blue { background: #e6eefb; color: var(--sd-blue); }
+.sd-kpi .ic.ok { background: #e3f4ea; color: var(--sd-ok); }
+.sd-kpi .ic.bad { background: #fde8ea; color: var(--sd-bad); }
+.sd-kpi .ic.warn { background: #fdf1dc; color: var(--sd-warn); }
+.sd-kpi .n { font-size: 1.45rem; font-weight: 700; line-height: 1.1; color: #1b2733; }
+.sd-kpi .l { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--sd-muted); font-weight: 600; }
+
+/* Shortcuts */
+.sd-dock { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .6rem; }
+.sd-dock a {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .45rem;
+    padding: .8rem .4rem; min-height: 86px; text-decoration: none; color: #1b2733; text-align: center;
+    background: #fff; border: 1px solid var(--sd-line); border-radius: 12px; transition: all .15s ease;
+}
+.sd-dock a:hover, .sd-dock a:focus-visible { border-color: var(--sd-navy); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,31,63,.1); color: var(--sd-navy); }
+.sd-dock .ic { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--sd-navy); color: #fff; font-size: .95rem; }
+.sd-dock span.t { font-size: .74rem; font-weight: 600; line-height: 1.2; }
+
+/* Cards */
+.sd-card { background: #fff; border: 1px solid var(--sd-line); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,31,63,.05); }
+.sd-card-h { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .8rem 1.1rem; border-bottom: 1px solid #eef1f4; }
+.sd-card-h h2 { margin: 0; font-size: .92rem; font-weight: 700; color: var(--sd-navy); display: flex; align-items: center; gap: .5rem; }
+.sd-card-h h2 i { color: var(--sd-blue); }
+.sd-card-h a { font-size: .76rem; text-decoration: none; font-weight: 600; }
+.sd-card-b { padding: 1rem 1.1rem; }
+
+/* Label / value lists */
+.sd-kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem 1.5rem; margin: 0; }
+.sd-kv.one { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.sd-kv dt { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--sd-muted); font-weight: 600; margin: 0 0 .1rem; }
+.sd-kv dd { margin: 0; font-size: .88rem; font-weight: 600; color: #1b2733; overflow-wrap: anywhere; }
+.sd-kv .span { grid-column: 1 / -1; }
+.sd-kv.one > div { display: flex; justify-content: space-between; gap: 1rem; padding: .55rem 0; border-bottom: 1px solid #f1f3f6; }
+.sd-kv.one > div:last-child { border-bottom: 0; }
+.sd-kv.one dt { margin: 0; align-self: center; }
+.sd-kv.one dd { text-align: right; font-size: .84rem; }
+
+.sd-empty { text-align: center; color: var(--sd-muted); padding: 1.25rem .5rem; font-size: .85rem; }
+.sd-empty i { display: block; font-size: 1.5rem; margin-bottom: .4rem; opacity: .5; }
+
+/* Payments */
+.sd-pay { width: 100%; font-size: .82rem; }
+.sd-pay td { padding: .5rem 0; border-bottom: 1px solid #f1f3f6; vertical-align: middle; }
+.sd-pay tr:last-child td { border-bottom: 0; }
+.sd-pay .d { color: var(--sd-muted); font-size: .72rem; display: block; }
+.sd-pay .a { text-align: right; font-weight: 700; white-space: nowrap; }
+
+/* Calendar */
+.sd-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; width: 100%; }
+.sd-cal-hd { text-align: center; font-size: .7rem; font-weight: 700; color: var(--sd-muted); padding-bottom: .25rem; text-transform: uppercase; }
 .attendance-calendar-day {
-    width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
-    border-radius: 8px; font-weight: 600; font-size: clamp(.65rem, 2.6vw, .85rem); min-height: 0;
+    width: 100%; aspect-ratio: 1.15; display: flex; align-items: center; justify-content: center; gap: .15rem;
+    border-radius: 8px; font-weight: 600; font-size: clamp(.65rem, 2.4vw, .82rem); min-height: 0;
 }
-.sd-pay td { vertical-align: middle; white-space: nowrap; }
-.sd-pay td:nth-child(2) { white-space: normal; word-break: break-word; }
 .attendance-present { background: #d4edda; color: #155724; }
 .attendance-absent { background: #f8d7da; color: #721c24; }
 .attendance-holiday { background: #fff3cd; color: #856404; }
-.attendance-empty { background: #e9ecef; color: #6c757d; }
-.attendance-weekend { background: #f8f9fa; color: #adb5bd; }
-@media (min-width: 768px) {
-    .sd-id {
-        display: flex; align-items: center; justify-content: space-between; gap: 1.25rem;
-        padding: 1.25rem 1.5rem;
-    }
-    .sd-id-row { flex: 1 1 auto; }
-    .sd-chips { margin-top: 0; justify-content: flex-end; max-width: 52%; }
-    .sd-photo { width: 84px; height: 84px; }
-    .sd-id h1 { font-size: 1.35rem; }
-    .sd-dock a { flex: 1 1 calc(14.28% - .5rem); min-height: 92px; }
-}
+.attendance-empty { background: #eef0f3; color: #6c757d; }
+.attendance-weekend { background: #f8f9fa; color: #b6bdc4; }
+.attendance-today { outline: 2px solid var(--sd-blue); outline-offset: 1px; }
+.sd-legend { display: flex; flex-wrap: wrap; gap: .5rem 1rem; justify-content: center; font-size: .74rem; color: var(--sd-muted); margin-top: .9rem; }
+.sd-legend .sw { width: 16px; height: 16px; border-radius: 5px; display: inline-block; vertical-align: -3px; margin-right: .3rem; }
+
 @media (max-width: 767.98px) {
-    .sd-dl { grid-template-columns: 1fr; gap: 0; }
-    .sd-dl .grid-span { grid-column: auto; }
-    .sd-dl > div {
-        display: grid; grid-template-columns: 38% minmax(0, 1fr); gap: .5rem; align-items: center;
-        padding: .5rem 0; border-bottom: 1px solid #f1f3f6;
-    }
-    .sd-dl > div:last-child { border-bottom: 0; }
-    .sd-dl dt { margin: 0; }
-    .sd-dl dd { font-size: .82rem; }
-    .sd-card:not(.sd-stat) { padding: .9rem !important; }
+    .sd-hero { grid-template-columns: 1fr; padding: 1.1rem; gap: 1rem; }
+    .sd-hero-main { align-items: flex-start; }
+    .sd-photo { width: 64px; height: 64px; }
+    .sd-name { font-size: 1.15rem; }
+    .sd-hero-ring { justify-content: flex-start; padding-top: .9rem; border-top: 1px solid rgba(255,255,255,.18); }
+    .sd-ring { width: 76px; height: 76px; } .sd-ring > span { width: 58px; height: 58px; } .sd-ring b { font-size: 1rem; }
+    .sd-kv { grid-template-columns: 1fr; gap: 0; }
+    .sd-kv > div { display: flex; justify-content: space-between; gap: 1rem; padding: .55rem 0; border-bottom: 1px solid #f1f3f6; }
+    .sd-kv > div:last-child { border-bottom: 0; }
+    .sd-kv dt { margin: 0; align-self: center; } .sd-kv dd { text-align: right; font-size: .84rem; }
+    .sd-dock { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sd-dock a { flex-direction: row; justify-content: flex-start; min-height: 58px; padding: .6rem .8rem; gap: .7rem; text-align: left; }
+    .sd-kpi { padding: .75rem; gap: .65rem; } .sd-kpi .ic { width: 36px; height: 36px; } .sd-kpi .n { font-size: 1.2rem; }
     .sd-cal .attendance-calendar-day i { display: none; }
-    .sd-stat .n { font-size: 1.25rem; }
-    .sd-dock a { min-width: calc(25% - .5rem); }
-}
-@media (max-width: 575.98px) {
-    .sd-id { padding: .9rem 1rem; border-radius: 12px; }
-    .sd-photo { width: 56px; height: 56px; }
-    .sd-chip { font-size: .65rem; }
 }
 </style>
 
 <div class="sd-page">
-    <div class="sd-id mb-3">
-        <div class="sd-id-row">
+
+    <!-- Hero -->
+    <section class="sd-hero mb-3" aria-label="Student summary">
+        <div class="sd-hero-main">
             <?php if ($profileImageUrl): ?>
                 <img src="<?php echo $e($profileImageUrl); ?>" alt="Student photo" class="sd-photo">
             <?php else: ?>
                 <div class="sd-photo sd-photo-fallback"><i class="fas fa-user-graduate"></i></div>
             <?php endif; ?>
             <div class="min-w-0">
-                <h1><?php echo $dash($student['student_fullname'] ?? ''); ?></h1>
-                <div class="sd-idno"><?php echo $dash($student['student_id'] ?? ''); ?></div>
+                <p class="sd-greet"><?php echo $e($greeting); ?>,</p>
+                <h1 class="sd-name"><?php echo $dash($fullName); ?></h1>
+                <p class="sd-meta">Student ID <span class="mono fw-semibold"><?php echo $dash($student['student_id'] ?? ''); ?></span></p>
+                <div class="sd-chips">
+                    <span class="sd-chip <?php echo $statusClass === 'success' ? 'ok' : 'warn'; ?>"><i class="fas fa-circle" style="font-size:.5rem;"></i><?php echo $dash($status); ?></span>
+                    <?php if ($courseName !== ''): ?>
+                        <span class="sd-chip"><i class="fas fa-book-open"></i><?php echo $e($courseName); ?></span>
+                    <?php endif; ?>
+                    <?php if (!empty($currentEnrollment['academic_year'])): ?>
+                        <span class="sd-chip"><i class="fas fa-calendar-alt"></i><?php echo $e($currentEnrollment['academic_year']); ?></span>
+                    <?php endif; ?>
+                    <?php if ($modeLabel !== ''): ?>
+                        <span class="sd-chip"><i class="fas fa-clock"></i><?php echo $e($modeLabel); ?></span>
+                    <?php endif; ?>
+                    <?php if (!empty($currentGroup['name'])): ?>
+                        <span class="sd-chip"><i class="fas fa-users"></i><?php echo $e($currentGroup['name']); ?></span>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
-        <div class="sd-chips">
-            <span class="sd-chip"><?php echo $dash($status); ?></span>
-            <span class="sd-chip">NIC <?php echo $dash($student['student_nic'] ?? ''); ?></span>
-            <?php if ($currentEnrollment): ?>
-                <span class="sd-chip d-none d-sm-inline-flex"><?php echo $dash($currentEnrollment['course_name'] ?? $currentEnrollment['course_id'] ?? ''); ?></span>
-                <span class="sd-chip"><?php echo $dash($currentEnrollment['academic_year'] ?? ''); ?></span>
-                <span class="sd-chip"><?php echo $e($modeLabel); ?></span>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-3 align-items-stretch">
-        <div class="col-lg-6">
-            <div class="sd-card p-3 p-md-4">
-                <h2><i class="fas fa-id-badge me-2"></i>Student information</h2>
-                <dl class="sd-dl mb-0">
-                    <div>
-                        <dt>Full name</dt>
-                        <dd><?php echo $dash($student['student_fullname'] ?? ''); ?></dd>
-                    </div>
-                    <div>
-                        <dt>Student ID</dt>
-                        <dd><?php echo $dash($student['student_id'] ?? ''); ?></dd>
-                    </div>
-                    <div>
-                        <dt>NIC</dt>
-                        <dd><?php echo $dash($student['student_nic'] ?? ''); ?></dd>
-                    </div>
-                    <div>
-                        <dt>Status</dt>
-                        <dd><span class="badge bg-<?php echo $statusClass; ?>"><?php echo $dash($status); ?></span></dd>
-                    </div>
-                    <div>
-                        <dt>Gender</dt>
-                        <dd><?php echo $dash($student['student_gender'] ?? ''); ?></dd>
-                    </div>
-                    <div>
-                        <dt>Date of birth</dt>
-                        <dd><?php echo $dash($student['student_dob'] ?? ''); ?></dd>
-                    </div>
-                    <div>
-                        <dt>Email</dt>
-                        <dd><?php echo $dash($student['student_email'] ?? ''); ?></dd>
-                    </div>
-                    <div>
-                        <dt>Phone</dt>
-                        <dd><?php echo $dash($phone); ?></dd>
-                    </div>
-                    <div>
-                        <dt>WhatsApp</dt>
-                        <dd><?php echo $dash($student['student_whatsapp'] ?? ''); ?></dd>
-                    </div>
-                    <div class="grid-span">
-                        <dt>Address</dt>
-                        <dd><?php echo $dash($address); ?></dd>
-                    </div>
-                </dl>
+        <div class="sd-hero-ring">
+            <div class="sd-ring <?php echo $attTone === 'ok' ? '' : $e($attTone); ?>" style="--deg: <?php echo $ringDeg; ?>deg;" role="img"
+                 aria-label="Attendance this month <?php echo (int) round($attendancePercentage); ?> percent">
+                <span><b><?php echo $totalDays === 0 ? '—' : (int) round($attendancePercentage) . '%'; ?></b><small>this month</small></span>
+            </div>
+            <div class="sd-ring-txt">
+                <strong>Attendance</strong>
+                <?php echo $e($attLabel); ?><br>
+                <?php echo $presentDays; ?> of <?php echo $totalDays; ?> days present
             </div>
         </div>
-        <div class="col-lg-6">
-            <div class="sd-card p-3 p-md-4">
-                <h2><i class="fas fa-university me-2"></i>Academic enrollment</h2>
-                <?php if ($currentEnrollment): ?>
-                <dl class="sd-dl mb-0">
-                    <div>
-                        <dt>Course / programme</dt>
-                        <dd><?php echo $dash($currentEnrollment['course_name'] ?? $currentEnrollment['course_id'] ?? ''); ?></dd>
-                    </div>
-                    <div>
-                        <dt>Department</dt>
-                        <dd><?php echo $dash($currentEnrollment['department_name'] ?? ''); ?></dd>
-                    </div>
-                    <div>
-                        <dt>Academic year</dt>
-                        <dd><?php echo $dash($currentEnrollment['academic_year'] ?? ''); ?></dd>
-                    </div>
-                    <div>
-                        <dt>Shift / mode</dt>
-                        <dd><?php echo $e($modeLabel); ?></dd>
-                    </div>
-                    <div>
-                        <dt>Group / batch</dt>
-                        <dd><?php echo $dash($currentGroup['name'] ?? ''); ?></dd>
-                    </div>
-                    <div>
-                        <dt>Enrollment status</dt>
-                        <dd><?php echo $dash($enrollStatus); ?></dd>
-                    </div>
-                    <div>
-                        <dt>Enrolled on</dt>
-                        <dd><?php echo $dash($currentEnrollment['student_enroll_date'] ?? ''); ?></dd>
-                    </div>
-                    <div>
-                        <dt>NVQ level</dt>
-                        <dd><?php echo $dash($currentEnrollment['course_nvq_level'] ?? ''); ?></dd>
-                    </div>
-                </dl>
-                <?php else: ?>
-                    <p class="text-muted mb-0">No current enrollment is linked to this account.</p>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
+    </section>
 
-    <nav class="sd-dock mb-3" aria-label="Student shortcuts">
-        <a href="<?php echo APP_URL; ?>/student/profile"><span class="ic"><i class="fas fa-user"></i></span><span>Profile</span></a>
-        <a href="<?php echo APP_URL; ?>/student/attendance"><span class="ic"><i class="fas fa-calendar-check"></i></span><span>Attendance</span></a>
-        <a href="<?php echo APP_URL; ?>/student/my-attendance"><span class="ic"><i class="fas fa-fingerprint"></i></span><span>Biometric</span></a>
-        <a href="<?php echo APP_URL; ?>/student/my-timetable"><span class="ic"><i class="fas fa-calendar-week"></i></span><span>Timetable</span></a>
-        <a href="<?php echo APP_URL; ?>/student/training-programmes"><span class="ic"><i class="fas fa-people-carry-box"></i></span><span>Training</span></a>
-        <a href="<?php echo APP_URL; ?>/student/payments"><span class="ic"><i class="fas fa-money-bill-wave"></i></span><span>Payments</span></a>
-        <a href="<?php echo APP_URL; ?>/student/notices"><span class="ic"><i class="fas fa-bullhorn"></i></span><span>Notices</span></a>
-        <a href="<?php echo APP_URL; ?>/student/documents-pdf" target="_blank" rel="noopener"><span class="ic"><i class="fas fa-file-pdf"></i></span><span>Documents</span></a>
-        <a href="<?php echo APP_URL; ?>/student/forms"><span class="ic"><i class="fas fa-file-alt"></i></span><span>Forms</span></a>
-        <a href="#" data-bs-toggle="modal" data-bs-target="#changePasswordModal"><span class="ic"><i class="fas fa-key"></i></span><span>Password</span></a>
-    </nav>
-
-    <?php $studentNotices = is_array($studentNotices ?? null) ? $studentNotices : []; $firstNotice = $studentNotices[0] ?? null; ?>
     <?php if ($firstNotice): ?>
-    <a href="<?php echo APP_URL; ?>/student/notices" class="sd-notice mb-3 text-decoration-none">
+    <a href="<?php echo APP_URL; ?>/student/notices" class="sd-notice mb-3">
         <span class="ic"><i class="fas fa-bullhorn"></i></span>
         <div class="min-w-0">
-            <div class="fw-semibold text-dark small mb-1"><?php echo $e($firstNotice['title'] ?? 'SLGTI notice'); ?></div>
+            <div class="t"><?php echo $e($firstNotice['title'] ?? 'SLGTI notice'); ?></div>
             <p><?php echo $e($firstNotice['body'] ?? ''); ?></p>
-            <div class="small mt-1" style="color:#001f3f;">View notices, code of conduct &amp; rules</div>
         </div>
+        <span class="go"><i class="fas fa-chevron-right"></i></span>
     </a>
     <?php endif; ?>
 
-    <div class="row g-2 g-md-3 mb-3 mb-md-4">
-        <div class="col-6 col-md-3"><div class="sd-card sd-stat"><div class="n"><?php echo (int) ($attendancePercentage ?? 0); ?>%</div><div class="l">Attendance this month</div></div></div>
-        <div class="col-6 col-md-3"><div class="sd-card sd-stat"><div class="n text-success"><?php echo (int) ($presentDays ?? 0); ?></div><div class="l">Present / <?php echo (int) ($totalDays ?? 0); ?> days</div></div></div>
-        <div class="col-6 col-md-3"><div class="sd-card sd-stat"><div class="n text-danger"><?php echo (int) ($absentDays ?? 0); ?></div><div class="l">Absent days</div></div></div>
-        <div class="col-6 col-md-3"><div class="sd-card sd-stat"><div class="n text-warning"><?php echo (int) ($holidayDays ?? 0); ?></div><div class="l">Holidays</div></div></div>
+    <!-- KPIs -->
+    <div class="row g-2 g-md-3 mb-3">
+        <div class="col-6 col-lg-3"><div class="sd-kpi"><span class="ic blue"><i class="fas fa-percent"></i></span><div><div class="n"><?php echo $totalDays === 0 ? '—' : (int) round($attendancePercentage) . '%'; ?></div><div class="l">Attendance</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="sd-kpi"><span class="ic ok"><i class="fas fa-check"></i></span><div><div class="n"><?php echo $presentDays; ?></div><div class="l">Days present</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="sd-kpi"><span class="ic bad"><i class="fas fa-times"></i></span><div><div class="n"><?php echo $absentDays; ?></div><div class="l">Days absent</div></div></div></div>
+        <div class="col-6 col-lg-3"><div class="sd-kpi"><span class="ic warn"><i class="fas fa-star"></i></span><div><div class="n"><?php echo $holidayDays; ?></div><div class="l">Holidays</div></div></div></div>
     </div>
 
-    <div class="row g-3 mb-3 mb-md-4 align-items-stretch">
-        <div class="col-lg-6">
-            <div class="sd-card p-3 p-md-4">
-                <h2><i class="fas fa-bed me-2"></i>Hostel</h2>
-                <?php if ($hostelAllocation): ?>
-                    <dl class="sd-dl mb-3">
-                        <div><dt>Hostel</dt><dd><?php echo $dash($hostelAllocation['hostel_name'] ?? ''); ?></dd></div>
-                        <div><dt>Room</dt><dd><?php echo $dash($hostelAllocation['room_no'] ?? ''); ?></dd></div>
+    <!-- Quick actions -->
+    <nav class="sd-dock mb-3" aria-label="Student shortcuts">
+        <?php foreach ($shortcuts as [$path, $icon, $label, $newTab]): ?>
+            <a href="<?php echo APP_URL . '/' . $path; ?>"<?php echo $newTab ? ' target="_blank" rel="noopener"' : ''; ?>>
+                <span class="ic"><i class="fas <?php echo $icon; ?>"></i></span><span class="t"><?php echo $e($label); ?></span>
+            </a>
+        <?php endforeach; ?>
+        <a href="#" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+            <span class="ic"><i class="fas fa-key"></i></span><span class="t">Password</span>
+        </a>
+    </nav>
+
+    <div class="row g-3 mb-3">
+        <!-- Left column -->
+        <div class="col-lg-8">
+            <section class="sd-card mb-3">
+                <div class="sd-card-h"><h2><i class="fas fa-university"></i>Academic enrollment</h2></div>
+                <div class="sd-card-b">
+                    <?php if ($currentEnrollment): ?>
+                    <dl class="sd-kv">
+                        <div class="span"><dt>Course / programme</dt><dd><?php echo $dash($courseName); ?></dd></div>
+                        <div><dt>Department</dt><dd><?php echo $dash($currentEnrollment['department_name'] ?? ''); ?></dd></div>
+                        <div><dt>Academic year</dt><dd><?php echo $dash($currentEnrollment['academic_year'] ?? ''); ?></dd></div>
+                        <div><dt>Shift / mode</dt><dd><?php echo $dash($modeLabel); ?></dd></div>
+                        <div><dt>Group / batch</dt><dd><?php echo $dash($currentGroup['name'] ?? ''); ?></dd></div>
+                        <div><dt>Enrollment status</dt><dd><?php echo $dash($enrollStatus); ?></dd></div>
+                        <div><dt>Enrolled on</dt><dd><?php echo $dash($fmtDate($currentEnrollment['student_enroll_date'] ?? '')); ?></dd></div>
+                        <div><dt>NVQ level</dt><dd><?php echo $dash($currentEnrollment['course_nvq_level'] ?? ''); ?></dd></div>
                     </dl>
-                    <div class="small text-muted mb-1">Roommates</div>
-                    <?php if (!empty($roommates)): ?>
-                        <ul class="list-unstyled mb-0 small">
-                            <?php foreach ($roommates as $rm): ?>
-                                <li class="mb-1"><?php echo $dash($rm['student_fullname'] ?? ''); ?> <span class="text-muted"><?php echo $dash($rm['student_id'] ?? ''); ?></span></li>
-                            <?php endforeach; ?>
-                        </ul>
                     <?php else: ?>
-                        <p class="text-muted small mb-0">No other active roommates.</p>
+                        <div class="sd-empty"><i class="fas fa-graduation-cap"></i>No current enrollment is linked to this account.</div>
                     <?php endif; ?>
-                <?php else: ?>
-                    <p class="text-muted mb-0">No hostel allocation.</p>
-                <?php endif; ?>
-            </div>
-        </div>
-        <div class="col-lg-6">
-            <div class="sd-card p-3 p-md-4">
-                <h2><i class="fas fa-money-bill-wave me-2"></i>Recent payments</h2>
-                <h3 class="h6 text-muted">Bus season</h3>
-                <?php if (!empty($busSeasonPayments)): ?>
-                    <div class="table-responsive mb-3">
-                        <table class="table table-sm mb-0 sd-pay">
-                            <tbody>
-                            <?php foreach (array_slice($busSeasonPayments, 0, 4) as $p): ?>
-                                <tr>
-                                    <td><?php echo $e(!empty($p['payment_date']) ? date('d M Y', strtotime($p['payment_date'])) : '—'); ?></td>
-                                    <td>Rs. <?php echo number_format($p['paid_amount'] ?? 0, 2); ?></td>
-                                    <td><?php echo $dash($p['status'] ?? ''); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php else: ?>
-                    <p class="text-muted small">No bus season payments.</p>
-                <?php endif; ?>
-                <h3 class="h6 text-muted">Other / hostel</h3>
-                <?php if (!empty($recentPayments)): ?>
-                    <div class="table-responsive">
-                        <table class="table table-sm mb-0 sd-pay">
-                            <tbody>
-                            <?php foreach ($recentPayments as $p): ?>
-                                <tr>
-                                    <td><?php echo $e(!empty($p['pays_date']) ? date('d M Y', strtotime($p['pays_date'])) : '—'); ?></td>
-                                    <td><?php echo $dash($p['payment_reason'] ?? ''); ?></td>
-                                    <td>Rs. <?php echo number_format($p['pays_amount'] ?? 0, 2); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php else: ?>
-                    <p class="text-muted small mb-0">No other payments recorded.</p>
-                <?php endif; ?>
-                <a href="<?php echo APP_URL; ?>/student/payments" class="small">View all payments</a>
-            </div>
-        </div>
-    </div>
+                </div>
+            </section>
 
-    <div class="sd-card p-3 p-md-4 mb-4">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2">
-            <h2 class="mb-0 border-0 pb-0"><i class="fas fa-calendar-check me-2"></i>Attendance — <?php echo date('F Y', strtotime(($currentMonth ?? date('Y-m')) . '-01')); ?></h2>
-            <a href="<?php echo APP_URL; ?>/student/attendance" class="btn btn-sm btn-outline-primary">Full calendar</a>
+            <section class="sd-card">
+                <div class="sd-card-h">
+                    <h2><i class="fas fa-calendar-check"></i>Attendance &middot; <?php echo $e(date('F Y', strtotime($currentMonth . '-01'))); ?></h2>
+                    <a href="<?php echo APP_URL; ?>/student/attendance">Full calendar</a>
+                </div>
+                <div class="sd-card-b">
+                    <?php
+                    $firstDay = strtotime($currentMonth . '-01');
+                    $daysInMonth = (int) date('t', $firstDay);
+                    $firstDayOfWeek = (int) date('w', $firstDay);
+                    $weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+                    $weekDaysFull = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                    $todayYmd = date('Y-m-d');
+                    ?>
+                    <div class="sd-cal">
+                        <?php foreach ($weekDaysFull as $i => $day): ?>
+                            <div class="sd-cal-hd"><span class="d-none d-sm-inline"><?php echo $day; ?></span><span class="d-sm-none"><?php echo $weekDays[$i]; ?></span></div>
+                        <?php endforeach; ?>
+                        <?php
+                        for ($i = 0; $i < $firstDayOfWeek; $i++) {
+                            echo '<div></div>';
+                        }
+                        for ($day = 1; $day <= $daysInMonth; $day++) {
+                            $date = $currentMonth . '-' . str_pad((string) $day, 2, '0', STR_PAD_LEFT);
+                            $dayOfWeek = (int) date('w', strtotime($date));
+                            $st = $attendanceRecords[$date] ?? null;
+                            $class = 'attendance-empty';
+                            $icon = '';
+                            if ($dayOfWeek === 0 || $dayOfWeek === 6) {
+                                $class = 'attendance-weekend';
+                            } elseif ($st === 1) {
+                                $class = 'attendance-present';
+                                $icon = '<i class="fas fa-check"></i>';
+                            } elseif ($st === 0) {
+                                $class = 'attendance-absent';
+                                $icon = '<i class="fas fa-times"></i>';
+                            } elseif ($st === -1) {
+                                $class = 'attendance-holiday';
+                                $icon = '<i class="fas fa-star"></i>';
+                            }
+                            if ($date === $todayYmd) {
+                                $class .= ' attendance-today';
+                            }
+                            echo '<div class="attendance-calendar-day ' . $class . '" title="' . $e(date('l, F j, Y', strtotime($date))) . '">' . $icon . $day . '</div>';
+                        }
+                        ?>
+                    </div>
+                    <div class="sd-legend">
+                        <span><span class="sw attendance-present"></span>Present</span>
+                        <span><span class="sw attendance-absent"></span>Absent</span>
+                        <span><span class="sw attendance-holiday"></span>Holiday</span>
+                        <span><span class="sw attendance-empty"></span>No record</span>
+                        <span><span class="sw attendance-weekend" style="border:1px solid #e3e6ea;"></span>Weekend</span>
+                    </div>
+                </div>
+            </section>
         </div>
-        <div class="calendar-container">
-            <?php
-            $currentMonth = $currentMonth ?? date('Y-m');
-            $attendanceRecords = $attendanceRecords ?? [];
-            $firstDay = strtotime($currentMonth . '-01');
-            $daysInMonth = (int) date('t', $firstDay);
-            $firstDayOfWeek = (int) date('w', $firstDay);
-            $weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-            $weekDaysFull = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-            ?>
-            <div class="sd-cal">
-                <?php foreach ($weekDaysFull as $i => $day): ?>
-                    <div class="sd-cal-hd"><span class="d-none d-sm-inline"><?php echo $day; ?></span><span class="d-sm-none"><?php echo $weekDays[$i]; ?></span></div>
-                <?php endforeach; ?>
-                <?php
-                for ($i = 0; $i < $firstDayOfWeek; $i++) {
-                    echo '<div></div>';
-                }
-                for ($day = 1; $day <= $daysInMonth; $day++) {
-                    $date = $currentMonth . '-' . str_pad((string) $day, 2, '0', STR_PAD_LEFT);
-                    $dayOfWeek = (int) date('w', strtotime($date));
-                    $isWeekend = ($dayOfWeek === 0 || $dayOfWeek === 6);
-                    $st = $attendanceRecords[$date] ?? null;
-                    $class = 'attendance-empty';
-                    $icon = '';
-                    if ($isWeekend) {
-                        $class = 'attendance-weekend';
-                    } elseif ($st === 1) {
-                        $class = 'attendance-present';
-                        $icon = '<i class="fas fa-check"></i> ';
-                    } elseif ($st === 0) {
-                        $class = 'attendance-absent';
-                        $icon = '<i class="fas fa-times"></i> ';
-                    } elseif ($st === -1) {
-                        $class = 'attendance-holiday';
-                        $icon = '<i class="fas fa-star"></i> ';
-                    }
-                    echo '<div class="attendance-calendar-day ' . $class . '" title="' . $e(date('l, F j, Y', strtotime($date))) . '">' . $icon . $day . '</div>';
-                }
-                ?>
-            </div>
-        </div>
-        <div class="mt-3 d-flex flex-wrap gap-2 gap-md-3 justify-content-center small text-muted">
-            <span class="d-flex align-items-center gap-1"><span class="attendance-calendar-day attendance-present" style="width:22px;height:22px;aspect-ratio:auto;"><i class="fas fa-check"></i></span> Present</span>
-            <span class="d-flex align-items-center gap-1"><span class="attendance-calendar-day attendance-absent" style="width:22px;height:22px;aspect-ratio:auto;"><i class="fas fa-times"></i></span> Absent</span>
-            <span class="d-flex align-items-center gap-1"><span class="attendance-calendar-day attendance-holiday" style="width:22px;height:22px;aspect-ratio:auto;"><i class="fas fa-star"></i></span> Holiday</span>
-            <span class="d-flex align-items-center gap-1"><span class="attendance-calendar-day attendance-weekend" style="width:22px;height:22px;aspect-ratio:auto;"></span> Weekend</span>
+
+        <!-- Right column -->
+        <div class="col-lg-4">
+            <section class="sd-card mb-3">
+                <div class="sd-card-h">
+                    <h2><i class="fas fa-id-badge"></i>Personal details</h2>
+                    <a href="<?php echo APP_URL; ?>/student/profile">View</a>
+                </div>
+                <div class="sd-card-b">
+                    <dl class="sd-kv one">
+                        <div><dt>Student ID</dt><dd><?php echo $dash($student['student_id'] ?? ''); ?></dd></div>
+                        <div><dt>NIC</dt><dd><?php echo $dash($student['student_nic'] ?? ''); ?></dd></div>
+                        <div><dt>Gender</dt><dd><?php echo $dash($student['student_gender'] ?? ''); ?></dd></div>
+                        <div><dt>Date of birth</dt><dd><?php echo $dash($fmtDate($student['student_dob'] ?? '')); ?></dd></div>
+                        <div><dt>Email</dt><dd><?php echo $dash($student['student_email'] ?? ''); ?></dd></div>
+                        <div><dt>Phone</dt><dd><?php echo $dash($phone); ?></dd></div>
+                        <div><dt>WhatsApp</dt><dd><?php echo $dash($student['student_whatsapp'] ?? ''); ?></dd></div>
+                        <div><dt>Address</dt><dd><?php echo $dash($address); ?></dd></div>
+                    </dl>
+                </div>
+            </section>
+
+            <section class="sd-card mb-3">
+                <div class="sd-card-h"><h2><i class="fas fa-bed"></i>Hostel</h2></div>
+                <div class="sd-card-b">
+                    <?php if ($hostelAllocation): ?>
+                        <dl class="sd-kv one mb-2">
+                            <div><dt>Hostel</dt><dd><?php echo $dash($hostelAllocation['hostel_name'] ?? ''); ?></dd></div>
+                            <div><dt>Room</dt><dd><?php echo $dash($hostelAllocation['room_no'] ?? ''); ?></dd></div>
+                        </dl>
+                        <div class="small fw-semibold text-muted mt-2 mb-1">Roommates</div>
+                        <?php if (!empty($roommates)): ?>
+                            <ul class="list-unstyled mb-0 small">
+                                <?php foreach ($roommates as $rm): ?>
+                                    <li class="py-1"><?php echo $dash($rm['student_fullname'] ?? ''); ?> <span class="text-muted">&middot; <?php echo $dash($rm['student_id'] ?? ''); ?></span></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php else: ?>
+                            <p class="text-muted small mb-0">No other active roommates.</p>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <div class="sd-empty"><i class="fas fa-bed"></i>No hostel allocation.</div>
+                    <?php endif; ?>
+                </div>
+            </section>
+
+            <section class="sd-card">
+                <div class="sd-card-h">
+                    <h2><i class="fas fa-money-bill-wave"></i>Recent payments</h2>
+                    <a href="<?php echo APP_URL; ?>/student/payments">View all</a>
+                </div>
+                <div class="sd-card-b">
+                    <?php if (!empty($payRows)): ?>
+                        <table class="sd-pay">
+                            <tbody>
+                            <?php foreach ($payRows as $p): ?>
+                                <tr>
+                                    <td>
+                                        <?php echo $e($p['desc']); ?>
+                                        <span class="d"><?php echo $e($p['ts'] ? date('d M Y', $p['ts']) : '—'); ?><?php echo $p['status'] !== '' ? ' &middot; ' . $e($p['status']) : ''; ?></span>
+                                    </td>
+                                    <td class="a">Rs. <?php echo number_format($p['amount'], 2); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php else: ?>
+                        <div class="sd-empty"><i class="fas fa-receipt"></i>No payments recorded.</div>
+                    <?php endif; ?>
+                </div>
+            </section>
         </div>
     </div>
 </div>

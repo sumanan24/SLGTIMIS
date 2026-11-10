@@ -62,6 +62,45 @@ class StudentSampleFormsPdfHelper {
     }
 
     /**
+     * Family income confirmation (student declaration + Grama Niladhari certification).
+     *
+     * @param array<string, mixed> $student
+     * @param array<string, mixed>|null $enrollment
+     * @param array<string, mixed>|null $application
+     */
+    public static function streamFamilyIncomeForm(
+        bool $attachment,
+        array $student,
+        ?array $enrollment,
+        ?array $application
+    ): void {
+        $html = self::renderFamilyIncomeFormHtml($student, $enrollment, $application);
+        $sid = preg_replace('/[^A-Za-z0-9_\-]/', '_', (string) ($student['student_id'] ?? 'student'));
+        self::streamA4Pdf($html, 'SLGTI_Family_Income_Confirmation_' . $sid . '.pdf', $attachment);
+    }
+
+    /**
+     * @param array<string, mixed> $student
+     * @param array<string, mixed>|null $enrollment
+     * @param array<string, mixed>|null $application
+     */
+    public static function renderFamilyIncomeFormHtml(
+        array $student = [],
+        ?array $enrollment = null,
+        ?array $application = null
+    ): string {
+        return self::renderFormView(
+            '/views/student/pdf/family_income_form.php',
+            $student,
+            $enrollment,
+            $application,
+            static function (array $sample): array {
+                return $sample;
+            }
+        );
+    }
+
+    /**
      * @param array<string, mixed> $student
      * @param array<string, mixed>|null $enrollment
      * @param array<string, mixed>|null $application

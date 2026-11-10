@@ -40,12 +40,21 @@ class StudentModel extends Model {
         
         $offset = ($page - 1) * $perPage;
         
-        $sql = "SELECT DISTINCT s.* FROM `{$this->table}` s";
+        // Optional: newest academic year first (filters['order_academic_year_desc']). The sort
+        // value is selected so it is valid with DISTINCT, and it is one value per student,
+        // so it never creates duplicate rows. Other callers keep the student ID order.
+        $orderByYear = !empty($filters['order_academic_year_desc']);
+        $sql = "SELECT DISTINCT s.*"
+            . ($orderByYear
+                ? ", (SELECT MAX(se_sort.`academic_year`) FROM `student_enroll` se_sort
+                      WHERE se_sort.`student_id` = s.`student_id`) AS sort_academic_year"
+                : '')
+            . " FROM `{$this->table}` s";
         $joins = [];
         $conditions = [];
         $params = [];
         $types = '';
-        
+
         // Current register is Following + Internship, the same population as the dashboard total.
         $currentEnrollment = !empty($filters['current_enrollment']);
 
@@ -167,7 +176,8 @@ class StudentModel extends Model {
             $sql .= " WHERE " . implode(' AND ', $conditions);
         }
         
-        $sql .= " ORDER BY s.student_id ASC LIMIT $perPage OFFSET $offset";
+        $sql .= ($orderByYear ? " ORDER BY sort_academic_year DESC, s.student_id ASC" : " ORDER BY s.student_id ASC")
+            . " LIMIT $perPage OFFSET $offset";
         
         if (!empty($params)) {
             $stmt = $this->db->prepare($sql);
@@ -182,6 +192,7 @@ class StudentModel extends Model {
         
         if ($result && $result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
+                unset($row['sort_academic_year']);
                 $data[] = $row;
             }
         }

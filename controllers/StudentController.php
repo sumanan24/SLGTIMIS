@@ -497,7 +497,8 @@ class StudentController extends Controller {
             ];
         }
         
-        $students = $studentModel->getStudents($page, 20, $filters);
+        // Newest academic year first (kept out of $filters so it never leaks into links)
+        $students = $studentModel->getStudents($page, 20, $filters + ['order_academic_year_desc' => true]);
         $total = $studentModel->getTotalStudents($filters);
         $totalPages = ceil($total / 20);
         $districts = $studentModel->getDistricts();
@@ -4229,7 +4230,7 @@ class StudentController extends Controller {
         }
         
         // Get all students without pagination for export
-        $students = $studentModel->getStudents(1, 10000, $filters); // Get up to 10000 records
+        $students = $studentModel->getStudents(1, 10000, $filters + ['order_academic_year_desc' => true]); // Get up to 10000 records
         
         // Define available columns with labels
         $availableColumns = [
