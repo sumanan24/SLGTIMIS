@@ -27,10 +27,28 @@ class AcademicYearController extends Controller {
         $model = $this->model('AcademicYearModel');
         $years = $model->getAll();
 
+        // HOD / IN1-3 / lecturers: show the student counts of their own department.
+        $deptId = null;
+        $deptName = null;
+        $studentCounts = null;
+        if ($this->isDepartmentScoped()) {
+            $deptId = $this->getUserDepartment();
+            if ($deptId) {
+                $dept = $this->model('DepartmentModel')->getById($deptId);
+                $deptName = $dept['department_name'] ?? $deptId;
+                $studentCounts = $model->studentCountsByDepartment($deptId);
+            } else {
+                $studentCounts = [];
+            }
+        }
+
         $data = [
             'title' => 'Academic Years',
             'page' => 'academic-years',
             'years' => $years,
+            'deptId' => $deptId,
+            'deptName' => $deptName,
+            'studentCounts' => $studentCounts,
             'isADM' => $this->canManage(),
             'message' => $_SESSION['message'] ?? null,
             'error' => $_SESSION['error'] ?? null,

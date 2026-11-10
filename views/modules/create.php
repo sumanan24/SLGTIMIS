@@ -85,7 +85,7 @@
                                 <label for="semester" class="form-label fw-semibold">Semester</label>
                                 <select class="form-select" id="semester" name="semester">
                                     <option value="">Not set</option>
-                                    <?php for ($s = 1; $s <= 8; $s++): ?>
+                                    <?php for ($s = 1; $s <= 2; $s++): ?>
                                         <option value="<?php echo $s; ?>">Semester <?php echo $s; ?></option>
                                     <?php endfor; ?>
                                 </select>

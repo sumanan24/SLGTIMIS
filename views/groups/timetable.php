@@ -19,6 +19,12 @@ $byPeriod = [];
 foreach ($timetableSlots as $slot) {
     $byPeriod[(string) ($slot['period'] ?? '')][(int) ($slot['weekday'] ?? 0)][] = $slot;
 }
+$draftCount = 0;
+foreach ($timetableSlots as $slot) {
+    if (($slot['publish_status'] ?? 'published') !== 'published') {
+        $draftCount++;
+    }
+}
 $classTitle = static function ($slot) {
     $name = trim((string) ($slot['module_name'] ?? ''));
     if ($name !== '') {
@@ -152,10 +158,20 @@ $formatDate = static function ($value) {
 </style>
 <div class="tt-panel" id="groupTimetable">
     <div class="tt-head">
-        <h2><i class="fas fa-calendar-alt text-primary me-2"></i>Class timetable</h2>
-        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()">
-            <i class="fas fa-print me-1"></i>Print
-        </button>
+        <h2><i class="fas fa-calendar-alt text-primary me-2"></i>Class timetable
+            <?php if ($draftCount > 0): ?><span class="badge bg-warning text-dark ms-2"><?php echo (int) $draftCount; ?> draft</span><?php endif; ?>
+        </h2>
+        <div class="d-flex gap-2">
+            <?php if ($draftCount > 0): ?>
+            <form method="post" action="<?php echo $e($app . '/groups/timetable-publish'); ?>" class="d-inline" onsubmit="return confirm('Publish all draft classes for this group?');">
+                <input type="hidden" name="group_id" value="<?php echo (int) ($group['id'] ?? 0); ?>">
+                <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-bullhorn me-1"></i>Publish timetable</button>
+            </form>
+            <?php endif; ?>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                <i class="fas fa-print me-1"></i>Print
+            </button>
+        </div>
     </div>
     <div class="tt-scroll">
         <table class="tt-grid">
@@ -174,8 +190,15 @@ $formatDate = static function ($value) {
                         <?php foreach ($visibleDays as $dayNo => $dayName): ?>
                             <td>
                                 <?php foreach ($byPeriod[$periodCode][$dayNo] ?? [] as $slot): ?>
-                                    <div class="tt-class">
+                                    <?php
+                                    list($slotFrom, $slotTo) = GroupTimetableModel::effectiveTimes($slot);
+                                    $isDraft = (($slot['publish_status'] ?? 'published') !== 'published');
+                                    ?>
+                                    <div class="tt-class" <?php echo $isDraft ? 'style="border-left-color:#f59e0b;background:#fffbeb;"' : ''; ?>>
                                         <strong><?php echo $e($classTitle($slot)); ?></strong>
+                                        <span><?php echo $e(substr($slotFrom, 0, 5) . ' – ' . substr($slotTo, 0, 5)); ?>
+                                            · <?php echo $e($slot['session_type'] ?? 'Theory'); ?>
+                                            <?php if ($isDraft): ?><span class="badge bg-warning text-dark ms-1" style="display:inline-block">Draft</span><?php endif; ?></span>
                                         <span><?php echo $e($slot['staff_name'] ?? $slot['staff_id'] ?? ''); ?></span>
                                         <?php if (trim((string) ($slot['classroom'] ?? '')) !== ''): ?>
                                             <span><?php echo $e($slot['classroom']); ?></span>
@@ -191,7 +214,19 @@ $formatDate = static function ($value) {
                                                 data-staff="<?php echo $e($slot['staff_id'] ?? ''); ?>"
                                                 data-room="<?php echo $e($slot['classroom'] ?? ''); ?>"
                                                 data-start="<?php echo $e($slot['start_date'] ?? ''); ?>"
-                                                data-end="<?php echo $e($slot['end_date'] ?? ''); ?>">Change</button>
+                                                data-end="<?php echo $e($slot['end_date'] ?? ''); ?>"
+                                                data-type="<?php echo $e($slot['session_type'] ?? 'Theory'); ?>"
+                                                data-venue="<?php echo $e($slot['venue_type'] ?? ''); ?>"
+                                                data-from="<?php echo $e(($slot['start_time'] ?? '') !== '' && $slot['start_time'] !== null ? substr((string) $slot['start_time'], 0, 5) : ''); ?>"
+                                                data-to="<?php echo $e(($slot['end_time'] ?? '') !== '' && $slot['end_time'] !== null ? substr((string) $slot['end_time'], 0, 5) : ''); ?>">Change</button>
+                                            <?php if (!$isDraft): ?>
+                                            <form method="post" action="<?php echo $e($app . '/groups/timetable-publish'); ?>" class="d-inline" onsubmit="return confirm('Move this class back to draft? It will no longer appear for attendance, diary or students.');">
+                                                <input type="hidden" name="group_id" value="<?php echo (int) ($group['id'] ?? 0); ?>">
+                                                <input type="hidden" name="slot_id" value="<?php echo (int) $slot['timetable_id']; ?>">
+                                                <input type="hidden" name="action" value="unpublish">
+                                                <button type="submit" class="btn btn-outline-secondary btn-sm">Unpublish</button>
+                                            </form>
+                                            <?php endif; ?>
                                             <form method="post" action="<?php echo $e($app . '/groups/timetable-delete'); ?>" class="d-inline" onsubmit="return confirm('Remove this class from the timetable?');">
                                                 <input type="hidden" name="group_id" value="<?php echo (int) ($group['id'] ?? 0); ?>">
                                                 <input type="hidden" name="slot_id" value="<?php echo (int) $slot['timetable_id']; ?>">
@@ -264,6 +299,31 @@ $formatDate = static function ($value) {
             <label for="ttEnd">To</label>
             <input class="form-control" type="date" id="ttEnd" name="end_date" required>
         </div>
+        <div class="tt-field">
+            <label for="ttType">Session type</label>
+            <select class="form-select" id="ttType" name="session_type">
+                <?php foreach (GroupTimetableModel::sessionTypes() as $t): ?>
+                    <option value="<?php echo $e($t); ?>"><?php echo $e($t); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="tt-field">
+            <label for="ttVenue">Venue type</label>
+            <select class="form-select" id="ttVenue" name="venue_type">
+                <option value="">Not specified</option>
+                <?php foreach (GroupTimetableModel::venueTypes() as $t): ?>
+                    <option value="<?php echo $e($t); ?>"><?php echo $e($t); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="tt-field">
+            <label for="ttFrom">Start time (optional)</label>
+            <input class="form-control" type="time" id="ttFrom" name="start_time">
+        </div>
+        <div class="tt-field">
+            <label for="ttTo">End time (optional)</label>
+            <input class="form-control" type="time" id="ttTo" name="end_time">
+        </div>
         <div class="tt-field tt-submit">
             <span class="tt-label">Action</span>
             <div class="tt-btns">
@@ -272,7 +332,7 @@ $formatDate = static function ($value) {
             </div>
         </div>
     </form>
-    <p class="tt-help">Assign one lecturer to each period. The same lecturer cannot teach two groups in the same period on the same day.</p>
+    <p class="tt-help">Period times default to the institute settings; set a start and end time only for a non-standard session. New classes are saved as drafts and only published classes are used for attendance, the instructor diary and the student timetable. A class cannot overlap another class of the same group, instructor or classroom.</p>
 </div>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -292,6 +352,10 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('ttRoom').value = data.room || '';
         document.getElementById('ttStart').value = data.start || '';
         document.getElementById('ttEnd').value = data.end || '';
+        document.getElementById('ttType').value = data.type || 'Theory';
+        document.getElementById('ttVenue').value = data.venue || '';
+        document.getElementById('ttFrom').value = data.from || '';
+        document.getElementById('ttTo').value = data.to || '';
         saveBtn.textContent = data.id ? 'Save class' : 'Add class';
         cancelBtn.classList.toggle('d-none', !data.id);
     }
@@ -306,7 +370,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 staff: btn.getAttribute('data-staff'),
                 room: btn.getAttribute('data-room'),
                 start: btn.getAttribute('data-start'),
-                end: btn.getAttribute('data-end')
+                end: btn.getAttribute('data-end'),
+                type: btn.getAttribute('data-type'),
+                venue: btn.getAttribute('data-venue'),
+                from: btn.getAttribute('data-from'),
+                to: btn.getAttribute('data-to')
             });
             form.scrollIntoView({ behavior: 'smooth', block: 'center' });
         });

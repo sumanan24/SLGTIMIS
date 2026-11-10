@@ -160,7 +160,7 @@ class NavMenuModel extends Model {
 
         $mgmtId = $this->createItem([
             'parent_id' => null,
-            'label' => 'Management',
+            'label' => 'Academic Management',
             'route_path' => '',
             'icon_class' => 'fas fa-graduation-cap',
             'page_key' => '',
@@ -172,11 +172,11 @@ class NavMenuModel extends Model {
         if ($mgmtId) {
             $inserted++;
             $children = [
-                ['Departments', 'departments', 'fas fa-building', 'departments', 10],
-                ['Academic Years', 'academic-years', 'fas fa-calendar-alt', 'academic-years', 15],
-                ['Courses', 'courses', 'fas fa-book', 'courses', 20],
-                ['Modules', 'modules', 'fas fa-cubes', 'modules', 30],
-                ['Staff', 'staff', 'fas fa-chalkboard-teacher', 'staff', 40],
+                ['Department Management', 'departments', 'fas fa-building', 'departments', 10],
+                ['Academic Year Management', 'academic-years', 'fas fa-calendar-alt', 'academic-years', 15],
+                ['Course Management', 'courses', 'fas fa-book', 'courses', 20],
+                ['Module Management', 'modules', 'fas fa-cubes', 'modules', 30],
+                ['Staff Management', 'staff', 'fas fa-chalkboard-teacher', 'staff', 40],
                 ['Inventory', 'inventory', 'fas fa-boxes', 'inventory', 50],
             ];
             foreach ($children as [$label, $route, $icon, $pageKey, $sort]) {
@@ -197,7 +197,7 @@ class NavMenuModel extends Model {
 
         $studentId = $this->createItem([
             'parent_id' => null,
-            'label' => 'Student Info',
+            'label' => 'Student Management',
             'route_path' => '',
             'icon_class' => 'fas fa-user-graduate',
             'page_key' => '',
@@ -208,7 +208,7 @@ class NavMenuModel extends Model {
         if ($studentId) {
             $inserted++;
             foreach ([
-                ['Students', 'students', 'fas fa-user-graduate', 'students', 10, []],
+                ['Student Records', 'students', 'fas fa-user-graduate', 'students', 10, []],
             ] as [$label, $route, $icon, $pageKey, $sort, $roles]) {
                 if ($this->createItem([
                     'parent_id' => $studentId,

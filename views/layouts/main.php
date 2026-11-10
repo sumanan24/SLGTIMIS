@@ -95,6 +95,9 @@
                             $canViewApplicationAdmissionSchedules = false;
                             $canViewComplaintLetters = false;
                             $canAccessExamsModule = false;
+                            $hasAttMgmtAccess = false;
+                            $canConfigureAttendance = false;
+                            $canManageTrainingMenu = false;
                             if (isset($_SESSION['user_id'])) {
                                 require_once BASE_PATH . '/models/UserModel.php';
                                 $userModel = new UserModel();
@@ -117,6 +120,10 @@
                                 $hasGroupAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'ADM']) || $isAdmin;
                                 // Instructor diary menu: teaching staff, HOD, ADM, Admin only (not DIR/DPA/DPI/REG/SAO)
                                 $hasInstructorDiaryAccess = !$isSAO && (in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'LE1', 'LE2', 'SLE', 'ADM'], true) || $isAdmin);
+                                // Biometric attendance, session diary and training programmes (existing roles only; LE3/TIN are accepted if created later)
+                                $hasAttMgmtAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'LE1', 'LE2', 'LE3', 'SLE', 'TIN', 'ADM', 'DIR', 'DPI', 'DPA'], true) || $isAdmin || !empty($headedDepartments);
+                                $canConfigureAttendance = ($userRole === 'ADM') || $isAdmin;
+                                $canManageTrainingMenu = $isHOD || in_array($userRole, ['IN1', 'IN2', 'IN3', 'LE3', 'TIN', 'ADM'], true) || $isAdmin;
                                 // Staff device (Hikvision) menu: ADM/Admin/HRO full module; DIR, REG, FIN, ACC, HOD see dashboard + month only
                                 $canStaffDeviceAttendanceMenu = !$isSAO && $userModel->canViewStaffDeviceDashboardMonth($_SESSION['user_id']);
                                 $canViewStudentApplications = $userModel->canViewOnlineStudentApplications($_SESSION['user_id']);
@@ -209,7 +216,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-graduation-cap"></i>
-                                    <span>Management</span>
+                                    <span>Academic Management</span>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
                                 <ul class="submenu" style="<?php 
@@ -226,7 +233,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/departments" class="<?php echo (isset($page) && $page === 'departments') ? 'active' : ''; ?>">
                                             <i class="fas fa-building"></i>
-                                            <span>Departments</span>
+                                            <span>Department Management</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
@@ -234,27 +241,27 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/courses" class="<?php echo (isset($page) && $page === 'courses') ? 'active' : ''; ?>">
                                             <i class="fas fa-book"></i>
-                                            <span>Courses</span>
+                                            <span>Course Management</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/modules" class="<?php echo (isset($page) && $page === 'modules') ? 'active' : ''; ?>">
                                             <i class="fas fa-cubes"></i>
-                                            <span>Modules</span>
+                                            <span>Module Management</span>
                                         </a>
                                     </li>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/academic-years" class="<?php echo (isset($page) && $page === 'academic-years') ? 'active' : ''; ?>">
                                             <i class="fas fa-calendar-alt"></i>
-                                            <span>Academic Years</span>
+                                            <span>Academic Year Management</span>
                                         </a>
                                     </li>
                                     <?php if (!empty($canMenuStaff)): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/staff" class="<?php echo (isset($page) && $page === 'staff') ? 'active' : ''; ?>">
                                             <i class="fas fa-chalkboard-teacher"></i>
-                                            <span>Staff</span>
+                                            <span>Staff Management</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
@@ -288,7 +295,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             <li data-nav="staff">
                                 <a href="<?php echo APP_URL; ?>/staff" class="<?php echo (isset($page) && $page === 'staff') ? 'active' : ''; ?>">
                                     <i class="fas fa-chalkboard-teacher"></i>
-                                    <span>Staff</span>
+                                    <span>Staff Management</span>
                                 </a>
                             </li>
                             <?php endif; ?>
@@ -360,7 +367,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             <li data-nav="student-info" class="menu-item-has-children <?php echo $studentInfoOpen ? 'active' : ''; ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-user-graduate"></i>
-                                    <span>Student Info</span>
+                                    <span>Student Management</span>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
                                 <ul class="submenu" style="<?php echo $studentInfoOpen ? 'display: block;' : ''; ?>">
@@ -368,7 +375,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/students" class="<?php echo (isset($page) && $page === 'students') ? 'active' : ''; ?>">
                                             <i class="fas fa-user-graduate"></i>
-                                            <span>Students</span>
+                                            <span>Student Records</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
@@ -376,7 +383,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/lifecycle/dashboard" class="<?php echo (isset($page) && $page === 'lifecycle') ? 'active' : ''; ?>">
                                             <i class="fas fa-route"></i>
-                                            <span>Lifecycle</span>
+                                            <span>Student Lifecycle Management</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
@@ -384,7 +391,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/groups" class="<?php echo (isset($page) && $page === 'groups') ? 'active' : ''; ?>">
                                             <i class="fas fa-users"></i>
-                                            <span>Groups</span>
+                                            <span>Student Group Management</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
@@ -513,16 +520,39 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             if ($canStudentFingerprintMenu) {
                                 $studentAttendancePages = array_merge($studentAttendancePages, $studentDevicePages);
                             }
+                            $bioAttPages = ['att-daily', 'att-class', 'att-biometric', 'att-corrections', 'att-reports', 'att-settings'];
+                            if ($hasAttMgmtAccess) {
+                                $studentAttendancePages = array_merge($bioAttPages, $studentAttendancePages);
+                            }
                             $hasStudentAttendanceMenu = !empty($studentAttendancePages);
                             ?>
                             <?php if ($hasStudentAttendanceMenu): ?>
                             <li data-nav="student-attendance" class="menu-item-has-children <?php echo (isset($page) && in_array($page, $studentAttendancePages, true)) ? 'active' : ''; ?>">
                                 <a href="#" class="menu-toggle">
                                     <i class="fas fa-calendar-check"></i>
-                                    <span>Student Attendance</span>
+                                    <span>Attendance Management</span>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
                                 <ul class="submenu" style="<?php echo (isset($page) && in_array($page, $studentAttendancePages, true)) ? 'display: block;' : ''; ?>">
+                                    <?php if ($hasAttMgmtAccess):
+                                        $bioItems = [
+                                            ['att-daily', '/attendance-management/daily', 'fa-calendar-day', 'Daily Attendance'],
+                                            ['att-class', '/attendance-management/class', 'fa-chalkboard-teacher', 'Class Attendance'],
+                                            ['att-biometric', '/attendance-management/biometric', 'fa-fingerprint', 'Biometric Records'],
+                                            ['att-corrections', '/attendance-management/corrections', 'fa-user-edit', 'Corrections'],
+                                            ['att-reports', '/attendance-management/reports', 'fa-file-alt', 'Reports'],
+                                        ];
+                                        if ($canConfigureAttendance) {
+                                            $bioItems[] = ['att-settings', '/attendance-management/settings', 'fa-sliders-h', 'Attendance Rules'];
+                                        }
+                                        foreach ($bioItems as $bi): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL . $bi[1]; ?>" class="<?php echo (isset($page) && $page === $bi[0]) ? 'active' : ''; ?>">
+                                            <i class="fas <?php echo $bi[2]; ?>"></i>
+                                            <span><?php echo $bi[3]; ?></span>
+                                        </a>
+                                    </li>
+                                    <?php endforeach; endif; ?>
                                     <?php if ($hasAttendanceAccess): ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/attendance" class="<?php echo (isset($page) && $page === 'attendance') ? 'active' : ''; ?>">
@@ -668,11 +698,36 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             
                             <?php if (isset($hasInstructorDiaryAccess) && $hasInstructorDiaryAccess): ?>
                             <!-- Instructor Diary (Teaching Staff + HOD) -->
-                            <li data-nav="instructor-diary">
-                                <a href="<?php echo APP_URL; ?>/instructor-diary" class="<?php echo (isset($page) && $page === 'instructor-diary') ? 'active' : ''; ?>">
+                            <?php
+                            $diaryPages = ['instructor-diary', 'diary-daily', 'diary-lessons', 'diary-practical', 'diary-progress', 'diary-review'];
+                            $diaryOpen = isset($page) && in_array($page, $diaryPages, true);
+                            $diaryItems = [
+                                ['diary-daily', '/teaching-diary/daily', 'fa-calendar-day', 'Daily Teaching Records'],
+                                ['diary-lessons', '/teaching-diary/lessons', 'fa-book', 'Lesson Records'],
+                                ['diary-practical', '/teaching-diary/practical', 'fa-tools', 'Practical Training Records'],
+                                ['diary-progress', '/teaching-diary/progress', 'fa-chart-line', 'Teaching Progress'],
+                            ];
+                            if ($isHOD || !empty($headedDepartments) || $isAdminOrADM) {
+                                $diaryItems[] = ['diary-review', '/teaching-diary/review', 'fa-clipboard-check', 'Diary Review'];
+                            }
+                            $diaryItems[] = ['instructor-diary', '/instructor-diary', 'fa-book-open', 'Diary Entries'];
+                            ?>
+                            <li data-nav="instructor-diary" class="menu-item-has-children <?php echo $diaryOpen ? 'active' : ''; ?>">
+                                <a href="#" class="menu-toggle">
                                     <i class="fas fa-book-open"></i>
                                     <span>Instructor Diary</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>
+                                <ul class="submenu" style="<?php echo $diaryOpen ? 'display: block;' : ''; ?>">
+                                    <?php foreach ($diaryItems as $di): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL . $di[1]; ?>" class="<?php echo (isset($page) && $page === $di[0]) ? 'active' : ''; ?>">
+                                            <i class="fas <?php echo $di[2]; ?>"></i>
+                                            <span><?php echo $di[3]; ?></span>
+                                        </a>
+                                    </li>
+                                    <?php endforeach; ?>
+                                </ul>
                             </li>
                             <?php endif; ?>
                             
@@ -695,6 +750,36 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             ?>
 
                             <?php if (!$isStudent): ?>
+                            <?php
+                            $tpPages = ['tp-schedule', 'tp-activities', 'tp-practical', 'tp-progress'];
+                            $tpOpen = isset($page) && in_array($page, $tpPages, true);
+                            $tpItems = [
+                                ['tp-schedule', '/training-programmes', 'fa-calendar-alt', 'Programme Schedule'],
+                                ['tp-activities', '/training-programmes/activities', 'fa-list-check', 'Training Activities'],
+                                ['tp-practical', '/training-programmes/practical', 'fa-tools', 'Practical Training'],
+                                ['tp-progress', '/training-programmes/progress', 'fa-chart-line', 'Training Progress'],
+                            ];
+                            ?>
+                            <?php if ($hasAttMgmtAccess): ?>
+                            <!-- Training Programme (group / student training schedules) -->
+                            <li data-nav="training-programme" class="menu-item-has-children <?php echo $tpOpen ? 'active' : ''; ?>">
+                                <a href="#" class="menu-toggle">
+                                    <i class="fas fa-people-carry-box"></i>
+                                    <span>Training Programme</span>
+                                    <i class="fas fa-chevron-down menu-arrow"></i>
+                                </a>
+                                <ul class="submenu" style="<?php echo $tpOpen ? 'display: block;' : ''; ?>">
+                                    <?php foreach ($tpItems as $ti): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL . $ti[1]; ?>" class="<?php echo (isset($page) && $page === $ti[0]) ? 'active' : ''; ?>">
+                                            <i class="fas <?php echo $ti[2]; ?>"></i>
+                                            <span><?php echo $ti[3]; ?></span>
+                                        </a>
+                                    </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </li>
+                            <?php endif; ?>
                             <!-- Circuit Program - Staff Only (not students) -->
                             <li data-nav="circuit-program">
                                 <a href="<?php echo APP_URL; ?>/circuit-program" class="<?php echo (isset($page) && in_array($page, ['circuit-program', 'circuit-program-create', 'circuit-program-view'])) ? 'active' : ''; ?>">
@@ -812,7 +897,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             <li data-nav="facilities" class="menu-item-has-children <?php echo (isset($page) && $page === 'facilities') ? 'active' : ''; ?>">
                                 <a href="<?php echo APP_URL; ?>/facilities/dashboard" class="menu-toggle">
                                     <i class="fas fa-tools"></i>
-                                    <span>Maintenance</span>
+                                    <span>Maintenance Management</span>
                                     <?php if ($facUnread > 0): ?><span class="badge bg-danger ms-1"><?php echo (int) $facUnread; ?></span><?php endif; ?>
                                     <i class="fas fa-chevron-down menu-arrow"></i>
                                 </a>

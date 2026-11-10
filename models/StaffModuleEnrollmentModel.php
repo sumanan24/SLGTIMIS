@@ -84,6 +84,46 @@ class StaffModuleEnrollmentModel extends Model
     }
 
     /**
+     * Modules assigned to one staff member (optionally for one academic year).
+     */
+    public function getByStaff($staffId, $academicYear = '')
+    {
+        $this->ensureTableStructure();
+        $staffId = trim((string) $staffId);
+        if ($staffId === '') {
+            return [];
+        }
+
+        $sql = "SELECT sme.course_id, sme.module_id, sme.academic_year, c.course_name, m.module_name
+                FROM `{$this->table}` sme
+                LEFT JOIN `course` c ON c.course_id = sme.course_id
+                LEFT JOIN `module` m ON m.module_id = sme.module_id AND m.course_id = sme.course_id
+                WHERE sme.staff_id = ?";
+        $params = [$staffId];
+        $types = 's';
+        if ($academicYear !== '' && $academicYear !== null) {
+            $sql .= " AND sme.academic_year = ?";
+            $params[] = $academicYear;
+            $types .= 's';
+        }
+        $sql .= " ORDER BY sme.academic_year DESC, c.course_name ASC, m.module_name ASC";
+
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $rows = [];
+        while ($result && ($row = $result->fetch_assoc())) {
+            $rows[] = $row;
+        }
+        $stmt->close();
+        return $rows;
+    }
+
+    /**
      * Get enrollments for a department (optional filters)
      */
     public function getEnrollmentsByDepartment($departmentId, $filters = [])

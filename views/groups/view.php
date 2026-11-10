@@ -155,7 +155,7 @@ $meta = [
 .group-show-wrap .group-table .col-email { width: 26%; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .group-show-wrap .group-table .col-when { width: 16%; color: #64748b; white-space: nowrap; }
 .group-show-wrap .group-table .col-status { width: 8%; }
-.group-show-wrap .group-table .col-actions { width: 6%; text-align: right; }
+.group-show-wrap .group-table .col-actions { width: 11%; text-align: right; }
 
 .group-show-wrap .group-empty {
     text-align: center;
@@ -209,6 +209,11 @@ $meta = [
                 · <?php echo $e($verLabel); ?>
                 · <?php echo $e($group['academic_year'] ?? 'N/A'); ?>
             </p>
+            <p class="group-show-lead mt-1">
+                <?php if (!empty($group['group_code'])): ?>Code <strong><?php echo $e($group['group_code']); ?></strong><?php endif; ?>
+                <?php if (!empty($group['batch'])): ?> · Batch <strong><?php echo $e($group['batch']); ?></strong><?php endif; ?>
+                <?php if (!empty($instructorName)): ?> · Instructor <strong><?php echo $e($instructorName); ?></strong><?php endif; ?>
+            </p>
         </div>
         <div class="group-show-actions d-flex flex-wrap gap-2">
             <a href="<?php echo $e($app . '/groups'); ?>" class="btn btn-outline-secondary">
@@ -234,6 +239,9 @@ $meta = [
             <?php endif; ?>
             <a href="<?php echo $e($app . '/groups/timetable?id=' . urlencode((string) ($group['id'] ?? ''))); ?>" class="btn btn-outline-primary">
                 <i class="fas fa-calendar-alt me-1"></i>Timetable
+            </a>
+            <a href="<?php echo $e($app . '/attendance-management/class?group_id=' . urlencode((string) ($group['id'] ?? ''))); ?>" class="btn btn-outline-primary">
+                <i class="fas fa-user-check me-1"></i>Attendance
             </a>
             <a href="<?php echo $e($app . '/groups/edit?id=' . urlencode((string) ($group['id'] ?? ''))); ?>" class="btn btn-outline-primary">
                 <i class="fas fa-pen me-1"></i>Edit
@@ -319,7 +327,15 @@ $meta = [
                                         <?php echo $e($enrolStatus); ?>
                                     </span>
                                 </td>
-                                <td class="col-actions">
+                                <td class="col-actions text-nowrap">
+                                    <?php if (!empty($transferTargets)): ?>
+                                    <button type="button" class="btn btn-outline-primary btn-sm transfer-student me-1"
+                                            data-student-id="<?php echo $e($student['student_id'] ?? ''); ?>"
+                                            data-student-name="<?php echo $e($student['student_fullname'] ?? ''); ?>"
+                                            title="Transfer to another group">
+                                        <i class="fas fa-right-left"></i>
+                                    </button>
+                                    <?php endif; ?>
                                     <button type="button" class="btn btn-outline-danger btn-sm remove-student"
                                             data-student-id="<?php echo $e($student['student_id'] ?? ''); ?>"
                                             data-group-id="<?php echo $e($group['id'] ?? ''); ?>"
@@ -342,6 +358,68 @@ $meta = [
             </div>
         <?php endif; ?>
     </div>
+
+    <?php
+    $historyLabels = ['joined' => 'Joined', 'left' => 'Removed', 'transfer_in' => 'Transferred in', 'transfer_out' => 'Transferred out'];
+    ?>
+    <div class="group-panel mt-3">
+        <div class="group-panel-head">
+            <h2 class="group-panel-title">Membership history <span class="badge bg-secondary rounded-pill"><?php echo count($history ?? []); ?></span></h2>
+        </div>
+        <?php if (!empty($history)): ?>
+            <div class="group-table-wrap" style="max-height:320px;overflow:auto;">
+                <table class="group-table" style="table-layout:auto;">
+                    <thead><tr><th>When</th><th>Student</th><th>Action</th><th>From / To</th><th>By</th><th>Remarks</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($history as $h): ?>
+                        <tr>
+                            <td class="text-nowrap"><?php echo $e($formatWhen($h['created_at'] ?? '')); ?></td>
+                            <td><?php echo $e($h['student_id'] ?? ''); ?> <span class="text-muted"><?php echo $e($h['student_fullname'] ?? ''); ?></span></td>
+                            <td><?php echo $e($historyLabels[$h['action'] ?? ''] ?? ($h['action'] ?? '')); ?></td>
+                            <td><?php echo $e(trim(($h['from_group_name'] ?? '') . (($h['to_group_name'] ?? '') !== '' ? ' → ' . $h['to_group_name'] : ''))); ?></td>
+                            <td><?php echo $e($h['performed_by'] ?? ''); ?></td>
+                            <td class="text-muted"><?php echo $e($h['remarks'] ?? ''); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php else: ?>
+            <div class="group-empty py-4"><p class="mb-0">No membership changes recorded yet.</p></div>
+        <?php endif; ?>
+    </div>
+
+    <?php if (!empty($transferTargets)): ?>
+    <div class="modal fade" id="transferModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" method="post" action="<?php echo $e($app . '/groups/transfer'); ?>">
+                <input type="hidden" name="csrf_token" value="<?php echo $e($groupCsrf ?? ''); ?>">
+                <input type="hidden" name="from_group_id" value="<?php echo (int) ($group['id'] ?? 0); ?>">
+                <input type="hidden" name="student_id" id="transferStudentId" value="">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-right-left me-2 text-primary"></i>Transfer student</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3"><strong id="transferStudentLabel"></strong></p>
+                    <label class="form-label fw-semibold" for="transferTo">Move to group</label>
+                    <select class="form-select mb-3" name="to_group_id" id="transferTo" required>
+                        <option value="">Select group</option>
+                        <?php foreach ($transferTargets as $t): ?>
+                            <option value="<?php echo (int) $t['id']; ?>"><?php echo $e($t['name'] . ' — ' . ($t['course_name'] ?? '') . ' (' . ($t['academic_year'] ?? '') . ')'); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label class="form-label fw-semibold" for="transferRemarks">Remarks</label>
+                    <input type="text" class="form-control" name="remarks" id="transferRemarks" maxlength="255" placeholder="Reason for transfer">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Transfer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <div class="modal fade" id="addStudentsModal" tabindex="-1" aria-labelledby="addStudentsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -472,6 +550,14 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(function() { alert('An error occurred'); });
         });
     }
+
+    document.querySelectorAll('.transfer-student').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.getElementById('transferStudentId').value = this.getAttribute('data-student-id');
+            document.getElementById('transferStudentLabel').textContent = this.getAttribute('data-student-id') + ' — ' + this.getAttribute('data-student-name');
+            new bootstrap.Modal(document.getElementById('transferModal')).show();
+        });
+    });
 
     document.querySelectorAll('.remove-student').forEach(function(btn) {
         btn.addEventListener('click', function() {

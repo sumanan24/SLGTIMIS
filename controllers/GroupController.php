@@ -177,13 +177,23 @@ class GroupController extends Controller {
                 }
             }
             
+            $extra = $this->readGroupExtraFields($groupModel, $courseId, $academicYear, 0);
+            if ($extra['error'] !== null) {
+                $_SESSION['error'] = $extra['error'];
+                $this->redirect('groups/create');
+                return;
+            }
+
             // Create group
             $groupData = [
                 'name' => $name,
                 'course_id' => $courseId,
                 'course_version' => $courseVersion,
                 'academic_year' => $academicYear,
-                'status' => $status,
+                'status' => $status === 'inactive' ? 'inactive' : 'active',
+                'group_code' => $extra['group_code'],
+                'batch' => $extra['batch'],
+                'instructor_staff_id' => $extra['instructor_staff_id'],
                 'created_by' => $_SESSION['user_name'] ?? null,
                 'created_at' => date('Y-m-d H:i:s')
             ];
@@ -204,6 +214,7 @@ class GroupController extends Controller {
                 'departments' => $departments,
                 'academicYears' => $academicYears,
                 'courses' => [],
+                'instructors' => $this->model('GroupTimetableModel')->listStaff($departmentId ?: ''),
                 'preCourseId' => trim((string) $this->get('course_id', '')),
                 'preVersion' => $this->get('course_version', '') === '' ? null : (int) $this->get('course_version'),
                 'error' => $_SESSION['error'] ?? null
@@ -260,12 +271,25 @@ class GroupController extends Controller {
             );
         }
         
+        if (empty($_SESSION['group_csrf'])) {
+            $_SESSION['group_csrf'] = bin2hex(random_bytes(16));
+        }
+        $instructorName = '';
+        if (!empty($group['instructor_staff_id'])) {
+            $staffRow = $this->model('StaffModel')->find($group['instructor_staff_id']);
+            $instructorName = $staffRow['staff_name'] ?? (string) $group['instructor_staff_id'];
+        }
+
         $data = [
             'title' => 'Group: ' . $group['name'],
             'page' => 'groups',
             'group' => $group,
             'students' => $students,
             'availableStudents' => $availableStudents,
+            'history' => $groupModel->getHistoryForGroup($id, 100),
+            'transferTargets' => $groupModel->getTransferTargets($id),
+            'instructorName' => $instructorName,
+            'groupCsrf' => $_SESSION['group_csrf'],
             'message' => $_SESSION['message'] ?? null,
             'error' => $_SESSION['error'] ?? null
         ];
@@ -390,19 +414,28 @@ class GroupController extends Controller {
             $this->redirect($back);
             return;
         }
-        if ($timetable->groupOverlaps($groupId, $day, $period, $startDate, $endDate, $slotId)) {
-            $_SESSION['error'] = 'This group already has ' . $periods[$period] . ' on ' . $days[$day] . ' for those dates.';
-            $this->redirect($back);
-            return;
+        $sessionType = trim((string) $this->post('session_type', 'Theory'));
+        $sessionType = $sessionType === 'Practical' ? 'Practical' : 'Theory';
+        $venueType = trim((string) $this->post('venue_type', ''));
+        if ($venueType !== '' && !isset(GroupTimetableModel::venueTypes()[$venueType])) {
+            $venueType = '';
         }
-        $busy = $timetable->staffOverlap($staffId, $day, $period, $startDate, $endDate, $slotId);
-        if ($busy) {
-            $_SESSION['error'] = $allowedStaff[$staffId] . ' already has ' . $periods[$period] . ' on ' . $days[$day] . ' in ' . $busy['group_name'] . '.';
-            $this->redirect($back);
-            return;
+        $customStart = trim((string) $this->post('start_time', ''));
+        $customEnd = trim((string) $this->post('end_time', ''));
+        $startTime = '';
+        $endTime = '';
+        if ($customStart !== '' || $customEnd !== '') {
+            require_once BASE_PATH . '/helpers/AttendanceRules.php';
+            $startTime = AttendanceRules::hms($customStart);
+            $endTime = AttendanceRules::hms($customEnd);
+            if ($startTime === '' || $endTime === '' || $startTime >= $endTime) {
+                $_SESSION['error'] = 'Enter both a start time and an end time, with the end after the start.';
+                $this->redirect($back);
+                return;
+            }
         }
 
-        $saved = $timetable->saveSlot([
+        $proposed = [
             'group_id' => $groupId,
             'weekday' => $day,
             'period' => $period,
@@ -412,13 +445,79 @@ class GroupController extends Controller {
             'classroom' => $room !== '' ? $room : null,
             'start_date' => $startDate,
             'end_date' => $endDate,
-        ], $slotId);
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'session_type' => $sessionType,
+            'venue_type' => $venueType,
+        ];
+        $conflicts = $timetable->findConflicts($proposed, $slotId);
+        if ($conflicts) {
+            $_SESSION['error'] = 'Timetable conflict: ' . implode(' ', $conflicts);
+            $this->redirect($back);
+            return;
+        }
+
+        $saved = $timetable->saveSlot($proposed, $slotId);
         if (!$saved) {
             $_SESSION['error'] = 'The class could not be saved.';
             $this->redirect($back);
             return;
         }
         $_SESSION['message'] = $slotId > 0 ? 'Class updated.' : 'Class added to the timetable.';
+        $this->redirect($back);
+    }
+
+    /**
+     * Publish all draft classes of a group (or move one class back to draft). Published classes drive
+     * class attendance, the instructor diary and the student timetable.
+     */
+    public function publishTimetable() {
+        if (!$this->checkGroupAccess()) {
+            return;
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->redirect('groups');
+            return;
+        }
+        $groupId = (int) $this->post('group_id', 0);
+        $groupModel = $this->model('GroupModel');
+        $back = 'groups/timetable?id=' . $groupId;
+        if ($groupId <= 0 || !$groupModel->canAccessGroup($groupId, $this->getUserDepartment())) {
+            $_SESSION['error'] = 'Access denied. You can only update groups from your department.';
+            $this->redirect('groups');
+            return;
+        }
+        $timetable = $this->timetableModel();
+        $slotId = (int) $this->post('slot_id', 0);
+        if ($this->post('action', 'publish') === 'unpublish' && $slotId > 0) {
+            if ($timetable->unpublishSlot($slotId, $groupId)) {
+                $_SESSION['message'] = 'Class moved back to draft.';
+            } else {
+                $_SESSION['error'] = 'That class is no longer on this timetable.';
+            }
+            $this->redirect($back);
+            return;
+        }
+        // Re-validate every draft class before it goes live.
+        $problems = [];
+        foreach ($timetable->listByGroup($groupId) as $slot) {
+            if (($slot['publish_status'] ?? 'published') === 'published') {
+                continue;
+            }
+            $found = $timetable->findConflicts($slot, (int) $slot['timetable_id']);
+            if ($found) {
+                $problems[] = implode(' ', $found);
+            }
+        }
+        if ($problems) {
+            $_SESSION['error'] = 'Resolve these conflicts before publishing: ' . implode(' | ', array_slice($problems, 0, 3));
+            $this->redirect($back);
+            return;
+        }
+        $count = $timetable->publishGroup($groupId, (string) ($_SESSION['user_name'] ?? ''));
+        $_SESSION['message'] = $count > 0
+            ? $count . ' class' . ($count === 1 ? '' : 'es') . ' published.'
+            : 'There are no draft classes to publish.';
         $this->redirect($back);
     }
 
@@ -576,11 +675,21 @@ class GroupController extends Controller {
                 return;
             }
             
+            $extra = $this->readGroupExtraFields($groupModel, (string) ($group['course_id'] ?? ''), (string) ($group['academic_year'] ?? ''), (int) $id);
+            if ($extra['error'] !== null) {
+                $_SESSION['error'] = $extra['error'];
+                $this->redirect('groups/edit?id=' . urlencode($id));
+                return;
+            }
+
             // Update group
             $groupData = [
                 'name' => $name,
-                'status' => $status,
-                'course_version' => $courseVersion
+                'status' => $status === 'inactive' ? 'inactive' : 'active',
+                'course_version' => $courseVersion,
+                'group_code' => $extra['group_code'],
+                'batch' => $extra['batch'],
+                'instructor_staff_id' => $extra['instructor_staff_id'],
             ];
             
             $result = $groupModel->updateGroup($id, $groupData);
@@ -624,6 +733,7 @@ class GroupController extends Controller {
                 'courses' => $courses,
                 'academicYears' => $academicYears,
                 'versions' => $versions,
+                'instructors' => $this->model('GroupTimetableModel')->listStaff($group['department_id'] ?? ''),
                 'error' => $_SESSION['error'] ?? null
             ];
             unset($_SESSION['error']);
@@ -716,7 +826,7 @@ class GroupController extends Controller {
             $this->json(['success' => false, 'error' => 'Access denied'], 403);
         }
         
-        $result = $groupModel->addStudentsToGroup($groupId, $studentIds);
+        $result = $groupModel->addStudentsToGroup($groupId, $studentIds, (string) ($_SESSION['user_name'] ?? ''));
         
         if ($result) {
             $this->json(['success' => true, 'message' => 'Students added successfully']);
@@ -752,12 +862,93 @@ class GroupController extends Controller {
             $this->json(['success' => false, 'error' => 'Access denied'], 403);
         }
         
-        $result = $groupModel->removeStudentFromGroup($groupId, $studentId);
+        $result = $groupModel->removeStudentFromGroup($groupId, $studentId, (string) ($_SESSION['user_name'] ?? ''));
         
         if ($result) {
             $this->json(['success' => true, 'message' => 'Student removed successfully']);
         }
         $this->json(['success' => false, 'error' => 'Failed to remove student'], 500);
+    }
+
+    /**
+     * Transfer one student to another group of the same department (POST, CSRF protected).
+     */
+    public function transfer() {
+        if (!$this->checkGroupAccess()) {
+            return;
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->redirect('groups');
+            return;
+        }
+        $fromId = (int) $this->post('from_group_id', 0);
+        $toId = (int) $this->post('to_group_id', 0);
+        $studentId = trim((string) $this->post('student_id', ''));
+        $remarks = trim((string) $this->post('remarks', ''));
+        $back = 'groups/show?id=' . $fromId;
+
+        if (!hash_equals((string) ($_SESSION['group_csrf'] ?? ''), (string) $this->post('csrf_token', ''))) {
+            $_SESSION['error'] = 'Your session expired. Please try again.';
+            $this->redirect($back);
+            return;
+        }
+        if ($fromId <= 0 || $toId <= 0 || $studentId === '') {
+            $_SESSION['error'] = 'Select the student and the target group.';
+            $this->redirect($back);
+            return;
+        }
+        $groupModel = $this->model('GroupModel');
+        $departmentId = $this->getUserDepartment();
+        if (!$groupModel->canAccessGroup($fromId, $departmentId) || !$groupModel->canAccessGroup($toId, $departmentId)) {
+            $_SESSION['error'] = 'Access denied. You can only transfer students between groups of your department.';
+            $this->redirect('groups');
+            return;
+        }
+        $error = $groupModel->transferStudent($studentId, $fromId, $toId, (string) ($_SESSION['user_name'] ?? ''), $remarks);
+        if ($error === null) {
+            if (function_exists('logActivity')) {
+                logActivity('group_transfer', 'Student ' . $studentId . ' moved from group #' . $fromId . ' to #' . $toId);
+            }
+            $_SESSION['message'] = 'Student ' . $studentId . ' transferred successfully.';
+        } else {
+            $_SESSION['error'] = $error;
+        }
+        $this->redirect($back);
+    }
+
+    /**
+     * Validate and normalise group code, batch and group instructor from the submitted form.
+     *
+     * @return array{error:?string, group_code:string, batch:?string, instructor_staff_id:?string}
+     */
+    private function readGroupExtraFields($groupModel, $courseId, $academicYear, $excludeId) {
+        $code = trim((string) $this->post('group_code', ''));
+        $batch = trim((string) $this->post('batch', ''));
+        $instructor = trim((string) $this->post('instructor_staff_id', ''));
+        $result = ['error' => null, 'group_code' => $code, 'batch' => $batch === '' ? null : mb_substr($batch, 0, 30), 'instructor_staff_id' => null];
+
+        if ($code === '') {
+            $result['group_code'] = $groupModel->suggestGroupCode($courseId, $academicYear);
+        } elseif (!preg_match('/^[A-Za-z0-9][A-Za-z0-9\-\/_ ]{1,29}$/', $code)) {
+            $result['error'] = 'Group code may contain letters, numbers, spaces, - / _ (2-30 characters).';
+        } elseif ($groupModel->groupCodeExists($code, $excludeId)) {
+            $result['error'] = 'Group code "' . $code . '" is already used by another group.';
+        }
+        if ($instructor !== '') {
+            $found = false;
+            foreach ($this->model('GroupTimetableModel')->listStaff($this->getUserDepartment() ?: '') as $s) {
+                if ((string) $s['staff_id'] === $instructor) {
+                    $found = true;
+                    break;
+                }
+            }
+            if (!$found) {
+                $result['error'] = $result['error'] ?? 'Select a valid instructor from the department.';
+            } else {
+                $result['instructor_staff_id'] = $instructor;
+            }
+        }
+        return $result;
     }
     
     /**

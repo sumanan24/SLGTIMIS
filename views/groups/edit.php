@@ -72,6 +72,31 @@
                         </div>
                         
                         <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="group_code" class="form-label fw-semibold">Group Code</label>
+                                <input type="text" class="form-control" id="group_code" name="group_code" maxlength="30"
+                                       value="<?php echo htmlspecialchars((string) ($group['group_code'] ?? '')); ?>">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="batch" class="form-label fw-semibold">Batch / Intake</label>
+                                <input type="text" class="form-control" id="batch" name="batch" maxlength="30"
+                                       value="<?php echo htmlspecialchars((string) ($group['batch'] ?? '')); ?>">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="instructor_staff_id" class="form-label fw-semibold">Group Instructor</label>
+                                <select class="form-select" id="instructor_staff_id" name="instructor_staff_id">
+                                    <option value="">Not assigned</option>
+                                    <?php foreach (($instructors ?? []) as $ins): ?>
+                                        <option value="<?php echo htmlspecialchars((string) $ins['staff_id']); ?>"
+                                            <?php echo ((string) ($group['instructor_staff_id'] ?? '') === (string) $ins['staff_id']) ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars((string) $ins['staff_name'] . ' (' . $ins['staff_id'] . ')'); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="status" class="form-label fw-semibold">
                                     Status <span class="text-danger">*</span>

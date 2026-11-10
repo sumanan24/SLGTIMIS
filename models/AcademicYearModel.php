@@ -44,6 +44,47 @@ class AcademicYearModel extends Model {
     }
 
     /**
+     * Distinct students per academic year for the courses of one department.
+     * total = current students (Following + Internship, same rule as the dashboard).
+     *
+     * @return array<string, array{total:int, following:int, internship:int, completed:int}>
+     */
+    public function studentCountsByDepartment($departmentId) {
+        $out = [];
+        $departmentId = trim((string) $departmentId);
+        if ($departmentId === '') {
+            return $out;
+        }
+        $stmt = $this->db->prepare(
+            "SELECT se.`academic_year` AS academic_year,
+                    COUNT(DISTINCT CASE WHEN se.`student_enroll_status` IN ('Following', 'Internship') THEN se.`student_id` END) AS total,
+                    COUNT(DISTINCT CASE WHEN se.`student_enroll_status` = 'Following' THEN se.`student_id` END) AS following,
+                    COUNT(DISTINCT CASE WHEN se.`student_enroll_status` = 'Internship' THEN se.`student_id` END) AS internship,
+                    COUNT(DISTINCT CASE WHEN se.`student_enroll_status` = 'Completed' THEN se.`student_id` END) AS completed
+             FROM `student_enroll` se
+             INNER JOIN `course` c ON c.`course_id` = se.`course_id`
+             WHERE c.`department_id` = ? AND se.`academic_year` IS NOT NULL AND se.`academic_year` <> ''
+             GROUP BY se.`academic_year`"
+        );
+        if (!$stmt) {
+            return $out;
+        }
+        $stmt->bind_param('s', $departmentId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        while ($res && ($row = $res->fetch_assoc())) {
+            $out[(string) $row['academic_year']] = [
+                'total' => (int) $row['total'],
+                'following' => (int) $row['following'],
+                'internship' => (int) $row['internship'],
+                'completed' => (int) $row['completed'],
+            ];
+        }
+        $stmt->close();
+        return $out;
+    }
+
+    /**
      * How many related records use this academic year.
      *
      * @return array{total:int, details:list<string>}

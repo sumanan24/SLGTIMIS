@@ -183,6 +183,33 @@ class CircuitProgramModel extends Model {
     }
     
     /**
+     * Upcoming circuit programme dates (today onwards) of one staff member.
+     */
+    public function upcomingForStaff($staffId, $limit = 5) {
+        $this->createTableIfNotExists();
+        $limit = max(1, (int) $limit);
+        $sql = "SELECT d.`date`, d.destination, d.purpose, cp.id AS program_id, cp.status
+                FROM `{$this->detailsTable}` d
+                INNER JOIN `{$this->table}` cp ON cp.id = d.circuit_program_id
+                WHERE cp.staff_id = ? AND d.`date` >= CURDATE() AND cp.status <> 'rejected'
+                ORDER BY d.`date` ASC
+                LIMIT {$limit}";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param('s', $staffId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $rows = [];
+        while ($result && ($row = $result->fetch_assoc())) {
+            $rows[] = $row;
+        }
+        $stmt->close();
+        return $rows;
+    }
+
+    /**
      * Get program by ID with details
      */
     public function getById($programId) {

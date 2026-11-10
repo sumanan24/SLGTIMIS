@@ -44,7 +44,7 @@
                             <label for="semester" class="form-label fw-semibold">Semester</label>
                             <select class="form-select" id="semester" name="semester">
                                 <option value="" <?php echo $curSem === '' ? 'selected' : ''; ?>>Not set</option>
-                                <?php for ($s = 1; $s <= 8; $s++): ?>
+                                <?php for ($s = 1; $s <= 2; $s++): ?>
                                     <option value="<?php echo $s; ?>" <?php echo $curSem !== '' && (int)$curSem === $s ? 'selected' : ''; ?>>Semester <?php echo $s; ?></option>
                                 <?php endfor; ?>
                             </select>

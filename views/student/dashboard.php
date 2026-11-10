@@ -259,6 +259,9 @@ $address = $addressParts !== [] ? implode(', ', $addressParts) : '';
     <nav class="sd-dock mb-3" aria-label="Student shortcuts">
         <a href="<?php echo APP_URL; ?>/student/profile"><span class="ic"><i class="fas fa-user"></i></span><span>Profile</span></a>
         <a href="<?php echo APP_URL; ?>/student/attendance"><span class="ic"><i class="fas fa-calendar-check"></i></span><span>Attendance</span></a>
+        <a href="<?php echo APP_URL; ?>/student/my-attendance"><span class="ic"><i class="fas fa-fingerprint"></i></span><span>Biometric</span></a>
+        <a href="<?php echo APP_URL; ?>/student/my-timetable"><span class="ic"><i class="fas fa-calendar-week"></i></span><span>Timetable</span></a>
+        <a href="<?php echo APP_URL; ?>/student/training-programmes"><span class="ic"><i class="fas fa-people-carry-box"></i></span><span>Training</span></a>
         <a href="<?php echo APP_URL; ?>/student/payments"><span class="ic"><i class="fas fa-money-bill-wave"></i></span><span>Payments</span></a>
         <a href="<?php echo APP_URL; ?>/student/notices"><span class="ic"><i class="fas fa-bullhorn"></i></span><span>Notices</span></a>
         <a href="<?php echo APP_URL; ?>/student/documents-pdf" target="_blank" rel="noopener"><span class="ic"><i class="fas fa-file-pdf"></i></span><span>Documents</span></a>
