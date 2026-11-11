@@ -4212,15 +4212,16 @@ class StudentController extends Controller {
     }
 
     /**
-     * Bulk Calling Letter PDF (official L4 Northern Province template).
+     * Bulk Calling Letter PDF (official L4 / L5 templates).
      * POST → /students/calling-letters
-     * Filters: selected Academic Year + NVQ Level 04 + Northern Province only.
-     * Each student gets the original 3-page letter; letters are merged into one PDF.
+     * letter_format: l4_northern | l4_other | l5_northern | l5_other
      */
     public function callingLetters(): void {
         if (!$this->requireEnvelopeDownloadAccess()) {
             return;
         }
+
+        require_once BASE_PATH . '/helpers/CallingLetterPdfHelper.php';
 
         $academicYear = trim((string) $this->post('academic_year', ''));
         if ($academicYear === '') {
@@ -4228,6 +4229,16 @@ class StudentController extends Controller {
             $this->redirect('students');
             return;
         }
+
+        // Prefer letter_format; fall back to legacy region=northern|other
+        $formatRaw = (string) $this->post('letter_format', '');
+        if ($formatRaw === '') {
+            $formatRaw = (string) $this->post('region', 'l4_northern');
+        }
+        $format = CallingLetterPdfHelper::normalizeTemplateKey($formatRaw);
+        $formatLabel = CallingLetterPdfHelper::labelForTemplate($format);
+        $nvqLevel = CallingLetterPdfHelper::nvqLevelForTemplate($format);
+        $nvqInt = (int) $nvqLevel;
 
         $userDepartmentId = $this->getUserDepartment();
         $restricted = $this->isDepartmentRestricted();
@@ -4238,14 +4249,21 @@ class StudentController extends Controller {
                 : ($userDepartmentId ?: trim((string) $this->post('department_id', ''))),
             'course_id' => trim((string) $this->post('course_id', '')),
             'academic_year' => $academicYear,
-            'nvq_levels' => ['04'],
-            'provinces' => ['Northern'],
+            'nvq_levels' => [$nvqLevel],
         ];
+        if (CallingLetterPdfHelper::isNorthernRegionTemplate($format)) {
+            $filters['provinces'] = ['Northern'];
+        }
 
         $studentModel = $this->model('StudentModel');
         $students = $studentModel->getStudents(1, 100000, $filters);
+        if (CallingLetterPdfHelper::isOtherProvincesTemplate($format)) {
+            $students = array_values(array_filter($students, static function ($s) {
+                return !CallingLetterPdfHelper::isNorthernProvince($s['student_provice'] ?? '');
+            }));
+        }
         if (empty($students)) {
-            $_SESSION['error'] = 'No NVQ Level 04 / Northern Province students found for academic year ' . $academicYear . '.';
+            $_SESSION['error'] = 'No ' . $formatLabel . ' students found for academic year ' . $academicYear . '.';
             $this->redirect('students');
             return;
         }
@@ -4265,10 +4283,10 @@ class StudentController extends Controller {
             if (!$enrollment) {
                 $enrollment = $enrollmentModel->getLatestEnrollment($s['student_id'] ?? '') ?: [];
             }
-            $nvq = (string) ($enrollment['course_nvq_level'] ?? '04');
+            $nvq = (string) ($enrollment['course_nvq_level'] ?? $nvqLevel);
             $nvqNorm = preg_replace('/\D+/', '', $nvq);
-            if ($nvqNorm !== '' && (int) $nvqNorm !== 4) {
-                continue; // safety: Level 04 only
+            if ($nvqNorm !== '' && (int) $nvqNorm !== $nvqInt) {
+                continue;
             }
 
             $name = trim($clean($s['student_title'] ?? '') . ' ' . $clean($s['student_fullname'] ?? ''));
@@ -4302,29 +4320,29 @@ class StudentController extends Controller {
                 'address_lines' => $addressLines,
                 'department' => $clean($enrollment['department_name'] ?? ''),
                 'course' => $clean($enrollment['course_name'] ?? ''),
-                'nvq_level' => '04',
+                'nvq_level' => $nvqLevel,
             ];
         }
 
         if ($rows === []) {
-            $_SESSION['error'] = 'No eligible Level 04 / Northern Province students found for the calling letter.';
+            $_SESSION['error'] = 'No eligible ' . $formatLabel . ' students found for the calling letter.';
             $this->redirect('students');
             return;
         }
 
-        require_once BASE_PATH . '/helpers/CallingLetterPdfHelper.php';
-        if (!is_file(CallingLetterPdfHelper::templatePath())) {
-            $_SESSION['error'] = 'Calling letter template PDF is missing.';
+        if (!is_file(CallingLetterPdfHelper::templatePath($format))) {
+            $_SESSION['error'] = 'Calling letter template PDF is missing for ' . $formatLabel . '.';
             $this->redirect('students');
             return;
         }
 
         $label = preg_replace('/[^A-Za-z0-9_-]+/', '_', $academicYear);
-        $filename = 'calling_letters_L04_Northern_' . $label . '_' . date('Ymd_His') . '.pdf';
+        $fileTag = strtoupper(str_replace('_', '_', $format));
+        $filename = 'calling_letters_' . $fileTag . '_' . $label . '_' . date('Ymd_His') . '.pdf';
 
         session_write_close();
         try {
-            $bytes = CallingLetterPdfHelper::buildPdfBytes($rows);
+            $bytes = CallingLetterPdfHelper::buildPdfBytes($rows, null, $format);
             while (ob_get_level() > 0) {
                 ob_end_clean();
             }

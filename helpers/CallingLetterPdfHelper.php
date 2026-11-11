@@ -1,8 +1,8 @@
 <?php
 /**
- * Bulk Calling Letter PDF (NVQ Level 04 / Northern Province).
- * Uses the official 3-page PDF as an immutable template and overlays only
- * student-specific fields + the Branch Principal digital signature.
+ * Bulk Calling Letter PDF (NVQ Level 04 / 05).
+ * Official 3-page templates; overlays only student-specific fields
+ * + the Branch Principal digital signature.
  */
 
 declare(strict_types=1);
@@ -13,6 +13,27 @@ use setasign\Fpdi\Fpdi;
 
 final class CallingLetterPdfHelper
 {
+    public const TEMPLATE_L4_NORTHERN = 'l4_northern';
+    public const TEMPLATE_L4_OTHER = 'l4_other';
+    public const TEMPLATE_L5_NORTHERN = 'l5_northern';
+    public const TEMPLATE_L5_OTHER = 'l5_other';
+
+    /** Back-compat aliases */
+    public const TEMPLATE_NORTHERN = self::TEMPLATE_L4_NORTHERN;
+    public const TEMPLATE_OTHER = self::TEMPLATE_L4_OTHER;
+
+    /** @var array<string, string> */
+    public const TEMPLATES = [
+        self::TEMPLATE_L4_NORTHERN => 'assets/document/Calling_Letter_L4_Northern_Province.pdf',
+        self::TEMPLATE_L4_OTHER => 'assets/document/Calling_Letter_L4_Other.pdf',
+        self::TEMPLATE_L5_NORTHERN => 'assets/document/Calling_Letter_L5_Northern_Province.pdf',
+        self::TEMPLATE_L5_OTHER => 'assets/document/Calling_Letter_L5_Other.pdf',
+        // legacy keys
+        'northern' => 'assets/document/Calling_Letter_L4_Northern_Province.pdf',
+        'other' => 'assets/document/Calling_Letter_L4_Other.pdf',
+    ];
+
+    /** @deprecated Use TEMPLATES[TEMPLATE_L4_NORTHERN] */
     public const TEMPLATE_RELATIVE = 'assets/document/Calling_Letter_L4_Northern_Province.pdf';
     public const TEMPLATE_PAGES = 3;
 
@@ -28,12 +49,17 @@ final class CallingLetterPdfHelper
      *   course:string,
      *   nvq_level:string
      * }> $students
+     * @param string $templateKey l4_northern|l4_other|l5_northern|l5_other
      */
-    public static function buildPdfBytes(array $students, ?string $signaturePath = null): string
-    {
-        $template = self::templatePath();
+    public static function buildPdfBytes(
+        array $students,
+        ?string $signaturePath = null,
+        string $templateKey = self::TEMPLATE_L4_NORTHERN
+    ): string {
+        $templateKey = self::normalizeTemplateKey($templateKey);
+        $template = self::templatePath($templateKey);
         if (!is_file($template)) {
-            throw new RuntimeException('Calling letter template PDF is missing.');
+            throw new RuntimeException('Calling letter template PDF is missing (' . $templateKey . ').');
         }
         if ($students === []) {
             throw new RuntimeException('No students to include in the calling letter PDF.');
@@ -46,7 +72,9 @@ final class CallingLetterPdfHelper
             @set_time_limit(300);
         }
 
-        $signaturePath = $signaturePath ?: self::principalSignatureFilePath();
+        $signaturePath = ($signaturePath !== null && $signaturePath !== '')
+            ? $signaturePath
+            : self::principalSignatureFilePath();
         $pdf = new Fpdi('P', 'pt', [self::PAGE_W, self::PAGE_H]);
         $pdf->SetAutoPageBreak(false);
         $pdf->SetMargins(0, 0, 0);
@@ -72,9 +100,65 @@ final class CallingLetterPdfHelper
         return $pdf->Output('S');
     }
 
-    public static function templatePath(): string
+    public static function normalizeTemplateKey(?string $key): string
     {
-        return BASE_PATH . '/' . self::TEMPLATE_RELATIVE;
+        $key = strtolower(trim((string) $key));
+        if ($key === 'northern') {
+            return self::TEMPLATE_L4_NORTHERN;
+        }
+        if ($key === 'other') {
+            return self::TEMPLATE_L4_OTHER;
+        }
+        return isset(self::TEMPLATES[$key]) ? $key : self::TEMPLATE_L4_NORTHERN;
+    }
+
+    public static function templatePath(?string $templateKey = null): string
+    {
+        $key = self::normalizeTemplateKey($templateKey);
+        return BASE_PATH . '/' . self::TEMPLATES[$key];
+    }
+
+    /** NVQ level digits for a template key ('04' or '05'). */
+    public static function nvqLevelForTemplate(?string $templateKey): string
+    {
+        $key = self::normalizeTemplateKey($templateKey);
+        return (strpos($key, 'l5') === 0) ? '05' : '04';
+    }
+
+    /** Human label for UI / filenames. */
+    public static function labelForTemplate(?string $templateKey): string
+    {
+        $key = self::normalizeTemplateKey($templateKey);
+        if ($key === self::TEMPLATE_L4_OTHER) {
+            return 'Level 04 / Other Provinces';
+        }
+        if ($key === self::TEMPLATE_L5_NORTHERN) {
+            return 'Level 05 / Northern Province';
+        }
+        if ($key === self::TEMPLATE_L5_OTHER) {
+            return 'Level 05 / Other Provinces';
+        }
+        return 'Level 04 / Northern Province';
+    }
+
+    public static function isOtherProvincesTemplate(?string $templateKey): bool
+    {
+        $key = self::normalizeTemplateKey($templateKey);
+        return $key === self::TEMPLATE_L4_OTHER || $key === self::TEMPLATE_L5_OTHER;
+    }
+
+    public static function isNorthernRegionTemplate(?string $templateKey): bool
+    {
+        $key = self::normalizeTemplateKey($templateKey);
+        return $key === self::TEMPLATE_L4_NORTHERN || $key === self::TEMPLATE_L5_NORTHERN;
+    }
+
+    /** True when student_provice is Northern (with or without "Province"). */
+    public static function isNorthernProvince(?string $province): bool
+    {
+        $name = strtolower(trim((string) $province));
+        $name = preg_replace('/\s+province$/i', '', $name) ?? $name;
+        return trim($name) === 'northern';
     }
 
     public static function principalSignatureFilePath(): ?string
@@ -236,11 +320,10 @@ final class CallingLetterPdfHelper
         $pdf->SetFillColor(255, 255, 255);
         $pdf->SetFont('Helvetica', '', 12);
 
-        // Name line (PDF y≈708.6). Cover dotted area after "Mr./Ms. " and write the name.
-        // "Mr./Ms. " ends near x≈110 in the template.
-        self::whiteRect($pdf, 112, self::fromBottom(708.6), 420, 14);
-        $pdf->SetXY(112, self::fromBottom(708.6) - 1);
-        $pdf->Cell(420, 14, self::fit($pdf, $name, 420), 0, 0, 'L');
+        // Name line (PDF y≈708.6). Cover template "Mr./Ms. …" fully — no Mr/Ms prefix.
+        self::whiteRect($pdf, 70, self::fromBottom(708.6), 470, 15);
+        $pdf->SetXY(72, self::fromBottom(708.6) - 1);
+        $pdf->Cell(460, 14, self::fit($pdf, $name, 460), 0, 0, 'L');
 
         // Address dotted lines (optional; keeps letter complete without changing official wording)
         $addrY = [691.78, 674.88];

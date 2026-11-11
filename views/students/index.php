@@ -72,7 +72,7 @@ $staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsa
                     <i class="fas fa-envelope me-1"></i>Download Envelopes / Name List
                 </button>
                 <button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#callingLetterModal">
-                    <i class="fas fa-file-alt me-1"></i>Calling Letters (L4 Northern)
+                    <i class="fas fa-file-alt me-1"></i>Calling Letters
                 </button>
                 <?php
                 $smsQuery = http_build_query(array_filter([
@@ -1024,22 +1024,42 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<!-- Calling Letter Modal (L4 / Northern Province official template) -->
+<!-- Calling Letter Modal (L4 / L5 official templates) -->
 <div class="modal fade" id="callingLetterModal" tabindex="-1" aria-labelledby="callingLetterModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-dark text-white">
                 <h5 class="modal-title" id="callingLetterModalLabel">
-                    <i class="fas fa-file-alt me-2"></i>Calling Letters — NVQ Level 04 / Northern Province
+                    <i class="fas fa-file-alt me-2"></i>Calling Letters
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="<?php echo APP_URL; ?>/students/calling-letters" id="callingLetterForm">
                 <div class="modal-body">
                     <p class="small text-muted mb-3">
-                        Downloads the official 3-page calling letter for each eligible student (name, department, course, NVQ level filled in; Branch Principal signature included), merged into one PDF.
-                        Fixed filters: <strong>NVQ Level 04</strong> and <strong>Northern Province</strong> only.
+                        Downloads the official 3-page calling letter for each eligible student (name, department, course, NVQ level; Branch Principal signature), merged into one PDF.
                     </p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold d-block mb-1">Letter format <span class="text-danger">*</span></label>
+                        <div class="d-flex flex-column gap-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="letter_format" id="clFmtL4North" value="l4_northern" checked>
+                                <label class="form-check-label" for="clFmtL4North">Level 04 — Northern Province</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="letter_format" id="clFmtL4Other" value="l4_other">
+                                <label class="form-check-label" for="clFmtL4Other">Level 04 — Other Provinces</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="letter_format" id="clFmtL5North" value="l5_northern">
+                                <label class="form-check-label" for="clFmtL5North">Level 05 — Northern Province</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="letter_format" id="clFmtL5Other" value="l5_other">
+                                <label class="form-check-label" for="clFmtL5Other">Level 05 — Other Provinces</label>
+                            </div>
+                        </div>
+                    </div>
                     <div class="mb-3">
                         <label for="cl_academic_year" class="form-label small fw-bold">Academic Year <span class="text-danger">*</span></label>
                         <select class="form-select form-select-sm" id="cl_academic_year" name="academic_year" required>
