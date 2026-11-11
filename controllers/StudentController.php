@@ -4320,5 +4320,274 @@ class StudentController extends Controller {
         fclose($output);
         exit;
     }
+
+    /** Same audience as Excel / envelopes / bulk SMS (ADM, SAO, HOD). */
+    private function requireIntakeChecklistAccess(): bool {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        if (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student') {
+            $this->redirect('student/dashboard');
+            return false;
+        }
+        if (!$this->requireModule('students', 'view')) {
+            return false;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        if ($userModel->getUserRole($uid) !== 'ADM' && !$userModel->isSAO($uid) && !$this->isHOD()) {
+            $_SESSION['error'] = 'Access denied. Only ADM, SAO, and HOD users can download intake checklists.';
+            $this->redirect('students');
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Student Intake Checklist: filter by academic year / department, pick students,
+     * download one A4 checklist page per selected student (bulk PDF).
+     * URL: /students/intake-checklist
+     */
+    public function intakeChecklist() {
+        if (!$this->requireIntakeChecklistAccess()) {
+            return;
+        }
+
+        if (empty($_SESSION['intake_checklist_csrf'])) {
+            $_SESSION['intake_checklist_csrf'] = bin2hex(random_bytes(32));
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $this->intakeChecklistDownload();
+            return;
+        }
+
+        $studentModel = $this->model('StudentModel');
+        $departmentModel = $this->model('DepartmentModel');
+        $courseModel = $this->model('CourseModel');
+        $userDepartmentId = $this->getUserDepartment();
+        $restricted = $this->isDepartmentRestricted();
+
+        $filters = $this->bulkSmsFilters($_GET);
+        $rows = $filters['academic_year'] !== ''
+            ? $this->intakeChecklistRows($filters)
+            : [];
+
+        if ($userDepartmentId) {
+            $departments = array_filter([$departmentModel->getById($userDepartmentId)]);
+            $courses = $courseModel->getCoursesWithDepartment(['department_id' => $userDepartmentId]);
+        } elseif ($restricted) {
+            $departments = [];
+            $courses = [];
+        } else {
+            $departments = $departmentModel->getAll();
+            $courses = $courseModel->all('course_name ASC');
+        }
+
+        $data = [
+            'title' => 'Student Intake Checklist',
+            'page' => 'students',
+            'filters' => $filters,
+            'rows' => $rows,
+            'departments' => $departments,
+            'courses' => $courses,
+            'academicYears' => $studentModel->getAcademicYears(),
+            'isHOD' => $restricted,
+            'csrfToken' => (string) $_SESSION['intake_checklist_csrf'],
+            'error' => $_SESSION['error'] ?? null,
+            'message' => $_SESSION['message'] ?? null,
+        ];
+        unset($_SESSION['error'], $_SESSION['message']);
+        return $this->view('students/intake_checklist', $data);
+    }
+
+    /**
+     * @param array{academic_year?:string,department_id?:string,course_id?:string,status?:string,current_enrollment?:bool} $filters
+     * @return list<array{student_id:string,name:string,department:string,course:string,academic_year:string,token:string}>
+     */
+    private function intakeChecklistRows(array $filters): array {
+        $year = trim((string) ($filters['academic_year'] ?? ''));
+        if ($year === '') {
+            return [];
+        }
+
+        $db = Database::getInstance();
+        $sql = "SELECT DISTINCT s.`student_id`, s.`student_title`, s.`student_fullname`, s.`student_ininame`,
+                       se.`academic_year`, c.`course_name`, d.`department_name`
+                FROM `student` s
+                INNER JOIN `student_enroll` se ON se.`student_id` = s.`student_id`
+                LEFT JOIN `course` c ON c.`course_id` = se.`course_id`
+                LEFT JOIN `department` d ON d.`department_id` = c.`department_id`
+                WHERE se.`academic_year` = ?
+                  AND se.`student_enroll_status` IN ('Following', 'Internship')";
+        $types = 's';
+        $params = [$year];
+
+        $dept = trim((string) ($filters['department_id'] ?? ''));
+        if ($dept !== '' && $dept !== '__none__') {
+            $sql .= ' AND c.`department_id` = ?';
+            $types .= 's';
+            $params[] = $dept;
+        } elseif ($dept === '__none__') {
+            $sql .= ' AND 1 = 0';
+        }
+
+        $course = trim((string) ($filters['course_id'] ?? ''));
+        if ($course !== '') {
+            $sql .= ' AND se.`course_id` = ?';
+            $types .= 's';
+            $params[] = $course;
+        }
+
+        $status = trim((string) ($filters['status'] ?? ''));
+        if ($status !== '') {
+            $sql .= ' AND s.`student_status` = ?';
+            $types .= 's';
+            $params[] = $status;
+        }
+
+        $sql .= ' ORDER BY s.`student_id` ASC';
+        $stmt = $db->prepare($sql);
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        $rows = [];
+        $seen = [];
+        while ($result && ($r = $result->fetch_assoc())) {
+            $sid = trim((string) ($r['student_id'] ?? ''));
+            if ($sid === '' || isset($seen[$sid])) {
+                continue;
+            }
+            $seen[$sid] = true;
+            $title = trim((string) ($r['student_title'] ?? ''));
+            $fullname = trim((string) ($r['student_fullname'] ?? ''));
+            $name = trim($title . ' ' . $fullname);
+            $rows[] = [
+                'student_id' => $sid,
+                'name' => $name,
+                'department' => trim((string) ($r['department_name'] ?? '')),
+                'course' => trim((string) ($r['course_name'] ?? '')),
+                'academic_year' => trim((string) ($r['academic_year'] ?? $year)),
+                // No dedicated token column in MIS — left blank on the PDF for handwriting.
+                'token' => '',
+            ];
+        }
+        $stmt->close();
+        return $rows;
+    }
+
+    private function intakeChecklistDownload(): void {
+        $filters = $this->bulkSmsFilters($_POST);
+        $back = 'students/intake-checklist?' . http_build_query(array_filter([
+            'academic_year' => $filters['academic_year'],
+            'department_id' => $_POST['department_id'] ?? '',
+            'course_id' => $filters['course_id'],
+        ], 'strlen'));
+
+        $sent = (string) $this->post('csrf_token', '');
+        if ($sent === '' || !hash_equals((string) ($_SESSION['intake_checklist_csrf'] ?? ''), $sent)) {
+            $_SESSION['error'] = 'Your session expired. Please try again.';
+            $this->redirect($back);
+            return;
+        }
+
+        if ($filters['academic_year'] === '') {
+            $_SESSION['error'] = 'Select an academic year first.';
+            $this->redirect($back);
+            return;
+        }
+
+        $ids = $this->post('student_ids', []);
+        $ids = is_array($ids)
+            ? array_values(array_unique(array_filter(array_map('trim', array_map('strval', $ids)), 'strlen')))
+            : [];
+        if ($ids === []) {
+            $_SESSION['error'] = 'Select at least one student.';
+            $this->redirect($back);
+            return;
+        }
+
+        $allow = [];
+        foreach ($this->intakeChecklistRows($filters) as $row) {
+            $allow[(string) $row['student_id']] = $row;
+        }
+        $selected = [];
+        foreach ($ids as $id) {
+            if (isset($allow[$id])) {
+                $selected[] = $allow[$id];
+            }
+        }
+        if ($selected === []) {
+            $_SESSION['error'] = 'No matching students found for the selected criteria.';
+            $this->redirect($back);
+            return;
+        }
+
+        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
+        require_once BASE_PATH . '/helpers/ComplaintLetterPdfHelper.php';
+        if (!ExamPdfHelper::dompdfAvailable()) {
+            $_SESSION['error'] = 'PDF engine not installed. Run: composer install.';
+            $this->redirect($back);
+            return;
+        }
+
+        $logoSrc = ComplaintLetterPdfHelper::logoDataUri();
+        $institute = ComplaintLetterPdfHelper::institutePostFrom();
+        $viewPath = BASE_PATH . '/views/students/pdf/intake_checklist.php';
+        if (!is_file($viewPath)) {
+            $_SESSION['error'] = 'Intake checklist template missing.';
+            $this->redirect($back);
+            return;
+        }
+
+        $label = preg_replace('/[^A-Za-z0-9_-]+/', '_', $filters['academic_year']) ?: 'intake';
+        $filename = 'student_intake_checklist_' . $label . '_' . date('Ymd_His') . '.pdf';
+
+        $renderOne = static function (array $student) use ($viewPath, $logoSrc, $institute): string {
+            extract([
+                'student' => $student,
+                'logoSrc' => $logoSrc,
+                'institute' => $institute,
+            ], EXTR_SKIP);
+            ob_start();
+            include $viewPath;
+            return (string) ob_get_clean();
+        };
+
+        ExamPdfHelper::prepareBulkPdfJob();
+        session_write_close();
+        try {
+            $pdfChunks = [];
+            foreach (array_chunk($selected, 20) as $batch) {
+                if (function_exists('set_time_limit')) {
+                    @set_time_limit(180);
+                }
+                foreach ($batch as $row) {
+                    $pdfChunks[] = ExamPdfHelper::renderPdfBytes($renderOne($row), 'A4', 'portrait');
+                }
+            }
+            if (count($pdfChunks) === 1) {
+                $safe = preg_replace('/[^a-zA-Z0-9._-]+/', '_', $filename) ?: 'intake_checklist.pdf';
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: attachment; filename="' . $safe . '"');
+                header('Content-Length: ' . strlen($pdfChunks[0]));
+                echo $pdfChunks[0];
+                exit;
+            }
+            ExamPdfHelper::streamMergedPdfBytes($pdfChunks, $filename);
+        } catch (Throwable $e) {
+            @session_start();
+            $_SESSION['error'] = 'Could not generate the intake checklist PDF. Please try again.';
+            $this->redirect($back);
+            return;
+        }
+        exit;
+    }
 }
 

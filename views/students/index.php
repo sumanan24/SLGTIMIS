@@ -81,6 +81,9 @@ $staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsa
                 <a href="<?php echo APP_URL; ?>/students/bulk-sms<?php echo $smsQuery !== '' ? '?' . $smsQuery : ''; ?>" class="btn btn-info btn-sm">
                     <i class="fas fa-sms me-1"></i>Bulk SMS
                 </a>
+                <a href="<?php echo APP_URL; ?>/students/intake-checklist<?php echo $smsQuery !== '' ? '?' . $smsQuery : ''; ?>" class="btn btn-outline-danger btn-sm">
+                    <i class="fas fa-clipboard-check me-1"></i>Intake Checklist
+                </a>
                 <?php endif; ?>
                 </div>
             </div>

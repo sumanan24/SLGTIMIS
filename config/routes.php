@@ -60,6 +60,7 @@ return [
     'students/export-excel' => 'StudentController@exportExcel',
     'students/envelopes' => 'StudentController@envelopes',
     'students/bulk-sms' => 'StudentController@bulkSms',
+    'students/intake-checklist' => 'StudentController@intakeChecklist',
     // Student ID card (ADM only)
     'students/id-card-select' => 'StudentController@idCardSelect',
     'students/id-card' => 'StudentController@idCard',
