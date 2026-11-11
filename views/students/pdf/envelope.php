@@ -122,13 +122,14 @@ $total = count($envelopes);
     .foot {
         margin-top: 8mm;
         padding-top: 2.2mm;
+        padding-bottom: 1mm;
         border-top: 0.6pt solid #888;
         text-align: center;
-        font-size: 7.5pt;
+        font-size: 7pt;
         font-weight: 700;
         line-height: 1.35;
         color: #333;
-        letter-spacing: 0.01em;
+        white-space: nowrap;
     }
 </style>
 <?php foreach ($envelopes as $i => $env):
@@ -173,7 +174,7 @@ $total = count($envelopes);
     </table>
 
     <div class="foot">
-        Tel: +94 21 492 7799 &nbsp;|&nbsp; Mobile: +94 70 306 0138 &nbsp;|&nbsp; Website: www.slgti.ac.lk &nbsp;|&nbsp; Email: info@slgti.ac.lk
+        Tel: +94 21 492 7799&nbsp;&nbsp;|&nbsp;&nbsp;Mobile: +94 70 306 0138&nbsp;&nbsp;|&nbsp;&nbsp;Website: www.slgti.ac.lk&nbsp;&nbsp;|&nbsp;&nbsp;Email: info@slgti.ac.lk
     </div>
 </div>
 <?php endforeach; ?>

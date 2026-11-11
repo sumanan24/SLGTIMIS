@@ -280,10 +280,9 @@ final class CallingLetterPdfHelper
             return;
         }
 
-        // Target print size: ~40mm wide, height from real aspect ratio, capped to the
-        // blank gap above "Branch Principal" (PDF y≈540) and below the email line (y≈590).
-        $targetWidthPt = 113.0; // ≈ 40 mm
-        $maxHeightPt = 46.0;    // fits the signature block gap
+        // Compact signature above "Branch Principal" (PDF y≈540).
+        $targetWidthPt = 72.0; // ≈ 25 mm
+        $maxHeightPt = 28.0;   // ≈ 10 mm
         $size = @getimagesize($signaturePath);
         $srcW = (float) (($size[0] ?? 0) ?: 1024);
         $srcH = (float) (($size[1] ?? 0) ?: 441);
@@ -295,7 +294,7 @@ final class CallingLetterPdfHelper
         }
 
         $x = 72.0;
-        $y = self::fromBottom(546.0) - $imgH;
+        $y = self::fromBottom(548.0) - $imgH;
         try {
             // Pass both W/H so placement is exact after trim.
             $pdf->Image($signaturePath, $x, $y, $imgW, $imgH);
