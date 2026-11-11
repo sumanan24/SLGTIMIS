@@ -570,8 +570,37 @@ class UserModel extends Model {
      * isSAO() treats them as SAO, so they have every function the SAO has.
      */
     public function isStudentAffairsAssistant($userId): bool {
+        return $this->isManagementAssistantInDepartment($userId, 'STU');
+    }
+
+    /**
+     * Management Assistant (MA, MA1, MA2 ...) posted to the Finance Office (FIN).
+     */
+    public function isFinanceDepartmentAssistant($userId): bool {
+        return $this->isManagementAssistantInDepartment($userId, 'FIN');
+    }
+
+    /**
+     * FIN officer, or MA/MA2 posted in the Finance department.
+     * Used for student attendance report: eligible students, locked months only.
+     */
+    public function isFinanceAttendanceViewer($userId): bool {
+        if ($this->getUserRole($userId) === 'FIN') {
+            return true;
+        }
+        return $this->isFinanceDepartmentAssistant($userId);
+    }
+
+    /**
+     * Management Assistant (role code starts with MA) in a given staff department.
+     */
+    private function isManagementAssistantInDepartment($userId, string $departmentId): bool {
         $role = (string) $this->getUserRole($userId);
         if ($role === '' || strpos($role, 'MA') !== 0) {
+            return false;
+        }
+        $departmentId = strtoupper(trim($departmentId));
+        if ($departmentId === '') {
             return false;
         }
         try {
@@ -581,9 +610,9 @@ class UserModel extends Model {
             $stmt->bind_param('i', $userId);
             $stmt->execute();
             $row = $stmt->get_result()->fetch_assoc();
-            return $row && strtoupper(trim((string) $row['department_id'])) === 'STU';
+            return $row && strtoupper(trim((string) $row['department_id'])) === $departmentId;
         } catch (Throwable $e) {
-            error_log('isStudentAffairsAssistant: ' . $e->getMessage());
+            error_log('isManagementAssistantInDepartment: ' . $e->getMessage());
             return false;
         }
     }

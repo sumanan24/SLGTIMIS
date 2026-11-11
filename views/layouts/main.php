@@ -107,8 +107,12 @@
                                 $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
                                 // Attendance access: HOD, IN1, IN2, IN3, and Admin
                                 $hasAttendanceAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3']) || $isAdmin;
-                                // Attendance report access: DIR, DPI, DPA, REG, FIN, ACC, SAO, HOD, IN1, IN2, IN3, ADM, and Admin
-                                $hasAttendanceReportAccess = in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'HOD', 'IN1', 'IN2', 'IN3', 'ADM']) || $isAdmin || $isSAO;
+                                // Attendance report access: DIR, DPI, DPA, REG, FIN, ACC, SAO, HOD, IN1, IN2, IN3, ADM, Admin,
+                                // and Finance-department Management Assistants (MA/MA2 in FIN)
+                                $hasAttendanceReportAccess = in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'HOD', 'IN1', 'IN2', 'IN3', 'ADM'])
+                                    || $isAdmin
+                                    || $isSAO
+                                    || $userModel->isFinanceDepartmentAssistant($_SESSION['user_id']);
                                 // Blank month attendance Excel (weekdays, 4 slots): ADM, HOD, IN1–IN3, Admin
                                 $hasMonthAttendanceSheetAccess = in_array($userRole, ['ADM', 'HOD', 'IN1', 'IN2', 'IN3'], true) || $isAdmin;
                                 // Month-range % summary: HOD, ADM, Admin
@@ -818,7 +822,8 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                 </a>
                                 <ul class="submenu" style="<?php echo (isset($page) && $page === 'facilities') ? 'display: block;' : ''; ?>">
                                     <?php
-                                    $facSec = isset($section) ? (string) $section : '';
+                                    // View variables can leak into this layout; only accept a string section key.
+                                    $facSec = (isset($section) && is_scalar($section)) ? (string) $section : '';
                                     if (in_array($facSec, ['view', 'assign', 'verify'], true)) { $facSec = 'list'; }
                                     $facCanApprove = !empty($canMenuFacilities) && AccessControl::can($uidMenu, 'facilities', 'approve');
                                     $facCanReport = $facCanApprove || !empty($isAdminOrADM) || (!empty($userRole) && in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'HOD'], true));

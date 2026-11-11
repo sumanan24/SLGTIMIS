@@ -417,18 +417,18 @@ a.aa-roster-card:hover { border-color: #b6d4fe; color: inherit; }
     </form>
 
     <?php foreach ($sectionOrder as $sectionKey):
-        $section = is_array($sections[$sectionKey] ?? null) ? $sections[$sectionKey] : [];
-        $rows = is_array($section['rows'] ?? null) ? $section['rows'] : [];
-        $total = (int) ($section['total'] ?? 0);
-        $page = max(1, (int) ($section['page'] ?? 1));
-        $pages = max(1, (int) ($section['pages'] ?? 1));
+        $rosterSection = is_array($sections[$sectionKey] ?? null) ? $sections[$sectionKey] : [];
+        $rows = is_array($rosterSection['rows'] ?? null) ? $rosterSection['rows'] : [];
+        $total = (int) ($rosterSection['total'] ?? 0);
+        $page = max(1, (int) ($rosterSection['page'] ?? 1));
+        $pages = max(1, (int) ($rosterSection['pages'] ?? 1));
         $fromRow = $total === 0 ? 0 : (($page - 1) * $perPage) + 1;
         $toRow = min($total, $page * $perPage);
         $pageParam = 'page_' . $sectionKey;
     ?>
     <section class="aa-roster-section is-<?php echo $e($sectionKey); ?>" id="aa-section-<?php echo $e($sectionKey); ?>">
         <div class="aa-roster-head">
-            <h2><?php echo $e((string) ($section['title'] ?? $sectionKey)); ?> <span class="aa-roster-count-badge"><?php echo (int) $total; ?></span></h2>
+            <h2><?php echo $e((string) ($rosterSection['title'] ?? $sectionKey)); ?> <span class="aa-roster-count-badge"><?php echo (int) $total; ?></span></h2>
             <div class="aa-roster-actions">
                 <span class="small text-muted"><?php echo $total === 0 ? 'No records' : ('Showing ' . (int) $fromRow . '–' . (int) $toRow . ' of ' . (int) $total); ?></span>
                 <a class="btn btn-sm btn-outline-success" href="<?php echo $e($exportBase . $rosterQuery(['list' => $sectionKey, 'format' => 'xls', $pageParam => ''])); ?>"><i class="fas fa-file-excel me-1"></i> Excel</a>
@@ -484,7 +484,7 @@ a.aa-roster-card:hover { border-color: #b6d4fe; color: inherit; }
         <?php if ($pages > 1): ?>
         <div class="aa-roster-page">
             <span class="small text-muted">Page <?php echo (int) $page; ?> of <?php echo (int) $pages; ?></span>
-            <nav aria-label="<?php echo $e((string) ($section['title'] ?? 'List')); ?> pages">
+            <nav aria-label="<?php echo $e((string) ($rosterSection['title'] ?? 'List')); ?> pages">
                 <ul class="pagination pagination-sm">
                     <li class="page-item<?php echo $page <= 1 ? ' disabled' : ''; ?>">
                         <?php if ($page <= 1): ?>

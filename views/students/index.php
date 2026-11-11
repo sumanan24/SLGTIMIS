@@ -774,7 +774,7 @@ function deselectAllColumns() {
 
 <!-- Envelope Modal -->
 <div class="modal fade" id="envelopeModal" tabindex="-1" aria-labelledby="envelopeModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-warning">
                 <h5 class="modal-title" id="envelopeModalLabel">
@@ -790,44 +790,85 @@ function deselectAllColumns() {
                     </p>
                     <div id="envSelectedInfo" class="alert alert-info py-2 small d-none"></div>
                     <div id="envFilterFields">
-                        <div class="mb-3">
-                            <label for="env_academic_year" class="form-label small fw-bold">Academic Year <span class="text-danger">*</span></label>
-                            <select class="form-select form-select-sm" id="env_academic_year" name="academic_year">
-                                <option value="">Select academic year</option>
-                                <?php foreach ($academicYears as $year): ?>
-                                    <option value="<?php echo htmlspecialchars($year); ?>"
-                                            <?php echo (isset($filters['academic_year']) && $filters['academic_year'] === $year) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($year); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <?php if (!isset($isHOD) || !$isHOD): ?>
-                        <div class="mb-3">
-                            <label for="env_department_id" class="form-label small fw-bold">Department</label>
-                            <select class="form-select form-select-sm" id="env_department_id" name="department_id">
-                                <option value="">All Departments</option>
-                                <?php foreach ($departments as $dept): ?>
-                                    <option value="<?php echo htmlspecialchars($dept['department_id']); ?>"
-                                            <?php echo (isset($filters['department_id']) && $filters['department_id'] === $dept['department_id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($dept['department_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <?php endif; ?>
-                        <div class="mb-1">
-                            <label for="env_course_id" class="form-label small fw-bold">Course</label>
-                            <select class="form-select form-select-sm" id="env_course_id" name="course_id">
-                                <option value="">All Courses</option>
-                                <?php foreach ($courses as $course): ?>
-                                    <option value="<?php echo htmlspecialchars($course['course_id']); ?>"
-                                            data-department="<?php echo htmlspecialchars($course['department_id'] ?? ''); ?>"
-                                            <?php echo (isset($filters['course_id']) && $filters['course_id'] === $course['course_id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($course['course_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="env_academic_year" class="form-label small fw-bold">Academic Year <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm" id="env_academic_year" name="academic_year">
+                                    <option value="">Select academic year</option>
+                                    <?php foreach ($academicYears as $year): ?>
+                                        <option value="<?php echo htmlspecialchars($year); ?>"
+                                                <?php echo (isset($filters['academic_year']) && $filters['academic_year'] === $year) ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($year); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <?php if (!isset($isHOD) || !$isHOD): ?>
+                            <div class="col-md-6">
+                                <label for="env_department_id" class="form-label small fw-bold">Department</label>
+                                <select class="form-select form-select-sm" id="env_department_id" name="department_id">
+                                    <option value="">All Departments</option>
+                                    <?php foreach ($departments as $dept): ?>
+                                        <option value="<?php echo htmlspecialchars($dept['department_id']); ?>"
+                                                <?php echo (isset($filters['department_id']) && $filters['department_id'] === $dept['department_id']) ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($dept['department_name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <?php endif; ?>
+                            <div class="col-md-6">
+                                <label for="env_course_id" class="form-label small fw-bold">Course</label>
+                                <select class="form-select form-select-sm" id="env_course_id" name="course_id">
+                                    <option value="">All Courses</option>
+                                    <?php foreach ($courses as $course): ?>
+                                        <option value="<?php echo htmlspecialchars($course['course_id']); ?>"
+                                                data-department="<?php echo htmlspecialchars($course['department_id'] ?? ''); ?>"
+                                                <?php echo (isset($filters['course_id']) && $filters['course_id'] === $course['course_id']) ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($course['course_name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold d-block">NVQ Level</label>
+                                <div class="d-flex flex-wrap gap-3 pt-1">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="nvq_levels[]" value="04" id="env_level_04">
+                                        <label class="form-check-label" for="env_level_04">Level 04</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="nvq_levels[]" value="05" id="env_level_05">
+                                        <label class="form-check-label" for="env_level_05">Level 05</label>
+                                    </div>
+                                </div>
+                                <div class="form-text">Leave both unticked to include all levels.</div>
+                            </div>
+                            <div class="col-12">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                                    <label class="form-label small fw-bold mb-0">Provinces</label>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-secondary" id="envProvAll">Select all</button>
+                                        <button type="button" class="btn btn-outline-secondary" id="envProvNone">Clear</button>
+                                    </div>
+                                </div>
+                                <input type="search" class="form-control form-control-sm mb-2" id="envProvSearch" placeholder="Search province…" autocomplete="off">
+                                <div class="border rounded p-2 bg-light" id="envProvinceBox" style="max-height:160px; overflow:auto;">
+                                    <div class="row g-1">
+                                        <?php foreach (($provinces ?? []) as $provinceName):
+                                            $provId = 'env_prov_' . preg_replace('/[^A-Za-z0-9]+/', '_', (string) $provinceName);
+                                        ?>
+                                        <div class="col-md-4 col-sm-6 env-prov-item" data-name="<?php echo htmlspecialchars(strtolower((string) $provinceName)); ?>">
+                                            <div class="form-check">
+                                                <input class="form-check-input env-province" type="checkbox" name="provinces[]" value="<?php echo htmlspecialchars((string) $provinceName); ?>" id="<?php echo htmlspecialchars($provId); ?>">
+                                                <label class="form-check-label small" for="<?php echo htmlspecialchars($provId); ?>"><?php echo htmlspecialchars((string) $provinceName); ?></label>
+                                            </div>
+                                        </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                                <div class="form-text">Leave all unticked to include every province.</div>
+                            </div>
                         </div>
                     </div>
                     <div id="envIdFields"></div>
@@ -877,6 +918,35 @@ document.addEventListener('DOMContentLoaded', function() {
             if (courseSelect.selectedOptions[0] && courseSelect.selectedOptions[0].hidden) {
                 courseSelect.value = '';
             }
+        });
+    }
+
+    var provAll = document.getElementById('envProvAll');
+    var provNone = document.getElementById('envProvNone');
+    var provSearch = document.getElementById('envProvSearch');
+    function provinceBoxes() {
+        return Array.prototype.slice.call(document.querySelectorAll('.env-province'));
+    }
+    if (provAll) {
+        provAll.addEventListener('click', function() {
+            provinceBoxes().forEach(function(cb) {
+                if (cb.closest('.env-prov-item') && cb.closest('.env-prov-item').style.display === 'none') return;
+                cb.checked = true;
+            });
+        });
+    }
+    if (provNone) {
+        provNone.addEventListener('click', function() {
+            provinceBoxes().forEach(function(cb) { cb.checked = false; });
+        });
+    }
+    if (provSearch) {
+        provSearch.addEventListener('input', function() {
+            var q = provSearch.value.trim().toLowerCase();
+            document.querySelectorAll('.env-prov-item').forEach(function(item) {
+                var name = item.getAttribute('data-name') || '';
+                item.style.display = (!q || name.indexOf(q) !== -1) ? '' : 'none';
+            });
         });
     }
 

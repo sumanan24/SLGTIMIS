@@ -124,7 +124,7 @@
                                     <label class="form-check-label" for="eligible_only">
                                         Eligible Students Only
                                     </label>
-                                    <div class="form-text small">FIN view: only allowance eligible students</div>
+                                    <div class="form-text small">Finance view: only allowance-eligible students (locked months only)</div>
                                     <?php else: ?>
                                     <input class="form-check-input" type="checkbox" id="eligible_only" name="eligible_only" value="1"
                                            <?php echo (isset($eligibleOnly) && $eligibleOnly) ? 'checked' : ''; ?>>

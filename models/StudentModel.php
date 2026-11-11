@@ -68,8 +68,11 @@ class StudentModel extends Model {
             $joins[] = "INNER JOIN `group_students` gs ON s.student_id = gs.student_id AND gs.status = 'active'";
         }
         
-        // Join with course if filtering by course or department
-        if (!empty($filters['course_id']) || !empty($filters['department_id'])) {
+        $nvqLevels = self::normalizeNvqLevelFilters($filters['nvq_levels'] ?? ($filters['nvq_level'] ?? []));
+        $provinces = self::normalizeProvinceFilters($filters['provinces'] ?? ($filters['province'] ?? []));
+
+        // Join with course if filtering by course, department, or NVQ level
+        if (!empty($filters['course_id']) || !empty($filters['department_id']) || $nvqLevels !== []) {
             if (!in_array("LEFT JOIN `student_enroll` se ON s.student_id = se.student_id", $joins)) {
                 $joins[] = "LEFT JOIN `student_enroll` se ON s.student_id = se.student_id";
             }
@@ -147,6 +150,26 @@ class StudentModel extends Model {
         // Same students the dashboard counts: Following and Internship only.
         if ($currentEnrollment) {
             $conditions[] = "se.student_enroll_status IN ('Following', 'Internship')";
+        }
+
+        // NVQ level filter (Level 04 / 05). Matches both "4"/"04" style values in course.
+        if ($nvqLevels !== []) {
+            $placeholders = implode(',', array_fill(0, count($nvqLevels), '?'));
+            $conditions[] = "TRIM(LEADING '0' FROM TRIM(CAST(c.`course_nvq_level` AS CHAR))) IN ($placeholders)";
+            foreach ($nvqLevels as $lvl) {
+                $params[] = $lvl;
+                $types .= 's';
+            }
+        }
+
+        // Province multi-select (student_provice). Treats "Northern" and "Northern Province" as the same.
+        if ($provinces !== []) {
+            $placeholders = implode(',', array_fill(0, count($provinces), '?'));
+            $conditions[] = "LOWER(TRIM(REPLACE(REPLACE(IFNULL(s.`student_provice`, ''), ' Province', ''), ' province', ''))) IN ($placeholders)";
+            foreach ($provinces as $province) {
+                $params[] = $province;
+                $types .= 's';
+            }
         }
         
         // Course mode filter
@@ -263,8 +286,11 @@ class StudentModel extends Model {
         $joins[] = "INNER JOIN `student_enroll` se ON s.student_id = se.student_id";
         $conditions[] = "se.student_enroll_status IN ('Following', 'Internship')";
         
-        // Join with course if filtering by course or department
-        $needsCourseJoin = !empty($filters['course_id']) || !empty($filters['department_id']);
+        $nvqLevels = self::normalizeNvqLevelFilters($filters['nvq_levels'] ?? ($filters['nvq_level'] ?? []));
+        $provinces = self::normalizeProvinceFilters($filters['provinces'] ?? ($filters['province'] ?? []));
+
+        // Join with course if filtering by course, department, or NVQ level
+        $needsCourseJoin = !empty($filters['course_id']) || !empty($filters['department_id']) || $nvqLevels !== [];
         $needsDeptJoin = !empty($filters['department_id']);
         
         if ($needsCourseJoin) {
@@ -335,6 +361,24 @@ class StudentModel extends Model {
             $conditions[] = "se.academic_year = ?";
             $params[] = $filters['academic_year'];
             $types .= 's';
+        }
+
+        if ($nvqLevels !== []) {
+            $placeholders = implode(',', array_fill(0, count($nvqLevels), '?'));
+            $conditions[] = "TRIM(LEADING '0' FROM TRIM(CAST(c.`course_nvq_level` AS CHAR))) IN ($placeholders)";
+            foreach ($nvqLevels as $lvl) {
+                $params[] = $lvl;
+                $types .= 's';
+            }
+        }
+
+        if ($provinces !== []) {
+            $placeholders = implode(',', array_fill(0, count($provinces), '?'));
+            $conditions[] = "LOWER(TRIM(REPLACE(REPLACE(IFNULL(s.`student_provice`, ''), ' Province', ''), ' province', ''))) IN ($placeholders)";
+            foreach ($provinces as $province) {
+                $params[] = $province;
+                $types .= 's';
+            }
         }
         
         // Course mode filter
@@ -471,6 +515,57 @@ class StudentModel extends Model {
         }
         
         return $data;
+    }
+
+    /**
+     * Normalize NVQ level filters to digit form without leading zeros: ['4','5'].
+     * Accepts '04', '4', 'Level 04', etc.
+     *
+     * @param mixed $raw
+     * @return list<string>
+     */
+    public static function normalizeNvqLevelFilters($raw): array {
+        if (!is_array($raw)) {
+            $raw = trim((string) $raw) === '' ? [] : [trim((string) $raw)];
+        }
+        $out = [];
+        foreach ($raw as $item) {
+            if (!preg_match('/([0-9]{1,2})/', (string) $item, $m)) {
+                continue;
+            }
+            $n = (string) ((int) $m[1]);
+            if ($n === '0') {
+                continue;
+            }
+            $out[$n] = $n;
+        }
+        return array_values($out);
+    }
+
+    /**
+     * Normalize province filters to lowercase names without a trailing "province".
+     *
+     * @param mixed $raw
+     * @return list<string>
+     */
+    public static function normalizeProvinceFilters($raw): array {
+        if (!is_array($raw)) {
+            $raw = trim((string) $raw) === '' ? [] : [trim((string) $raw)];
+        }
+        $out = [];
+        foreach ($raw as $item) {
+            $name = strtolower(trim((string) $item));
+            if ($name === '') {
+                continue;
+            }
+            $name = preg_replace('/\s+province$/i', '', $name) ?? $name;
+            $name = trim($name);
+            if ($name === '' || $name === 'all') {
+                continue;
+            }
+            $out[$name] = $name;
+        }
+        return array_values($out);
     }
     
     /**

@@ -322,9 +322,13 @@ class AttendanceController extends Controller {
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
         
-        // Allow DIR, DPI, DPA, REG, FIN, ACC, SAO, HOD, IN1, IN2, IN3, ADM, and Admin
+        // Allow DIR, DPI, DPA, REG, FIN, ACC, SAO, HOD, IN1, IN2, IN3, ADM, Admin,
+        // and Finance-department Management Assistants (MA/MA2 in FIN).
         $allowedRoles = ['DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'HOD', 'IN1', 'IN2', 'IN3', 'ADM'];
-        $hasAccess = in_array($userRole, $allowedRoles) || $isAdmin || $userModel->isSAO($_SESSION['user_id']);
+        $hasAccess = in_array($userRole, $allowedRoles)
+            || $isAdmin
+            || $userModel->isSAO($_SESSION['user_id'])
+            || $userModel->isFinanceDepartmentAssistant($_SESSION['user_id']);
         
         if (!$hasAccess) {
             $_SESSION['error'] = 'Access denied. Only authorized roles can view attendance reports.';
@@ -383,13 +387,13 @@ class AttendanceController extends Controller {
         $isFIN = false;
         $userRole = null;
         
-        // Check if user is admin or FIN
+        // FIN officer, or MA/MA2 posted in Finance: locked months + eligible students only
         if (isset($_SESSION['user_id'])) {
             require_once BASE_PATH . '/models/UserModel.php';
             $userModel = new UserModel();
             $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
             $userRole = $userModel->getUserRole($_SESSION['user_id']);
-            $isFIN = ($userRole === 'FIN');
+            $isFIN = $userModel->isFinanceAttendanceViewer($_SESSION['user_id']);
         }
         
         // Get filter parameters - use user's department if department-restricted user
@@ -403,7 +407,7 @@ class AttendanceController extends Controller {
         if (!in_array($source, ['manual', 'finger', 'both'], true)) {
             $source = 'manual';
         }
-        // FIN users see only eligible (allowance-eligible) students; others can toggle via filter
+        // FIN / Finance MA2: only eligible (allowance-eligible) students; others can toggle via filter
         $eligibleOnly = $isFIN ? true : ($this->get('eligible_only', '0') === '1');
         
         // Get filter options - only show user's department if department-restricted
@@ -935,13 +939,12 @@ class AttendanceController extends Controller {
         $attendanceModel = $this->model('AttendanceModel');
         $lockModel = $this->model('AttendanceMonthLockModel');
         
-        // Get user role to check if FIN
+        // FIN officer, or MA/MA2 posted in Finance: locked months + eligible students only
         $isFIN = false;
         if (isset($_SESSION['user_id'])) {
             require_once BASE_PATH . '/models/UserModel.php';
             $userModel = new UserModel();
-            $userRole = $userModel->getUserRole($_SESSION['user_id']);
-            $isFIN = ($userRole === 'FIN');
+            $isFIN = $userModel->isFinanceAttendanceViewer($_SESSION['user_id']);
         }
         
         // Get filter parameters
@@ -957,8 +960,7 @@ class AttendanceController extends Controller {
         }
         
         // Check if month is locked (HOD approved) - only allow download if month is locked
-        // FIN users can ONLY download locked months. Other users with attendance report access
-        // can also download locked months.
+        // FIN / Finance MA2 can ONLY download locked months. Other report users also need lock for Excel.
         $lockStatus = $lockModel->getLockStatus($departmentId, $month);
         $isMonthLocked = ($lockStatus && $lockStatus['status'] === 'locked');
         
@@ -982,7 +984,7 @@ class AttendanceController extends Controller {
             'course_id' => $courseId,
             'academic_year' => $academicYear
         ];
-        // FIN users export only eligible (allowance-eligible) students
+        // FIN / Finance MA2 export only eligible (allowance-eligible) students
         if ($isFIN) {
             $filters['eligible_only'] = true;
         }

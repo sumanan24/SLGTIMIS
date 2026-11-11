@@ -7,6 +7,10 @@ $tab = strtolower(trim((string) ($_GET['tab'] ?? 'notices')));
 if (!in_array($tab, ['notices', 'conduct', 'rules'], true)) {
     $tab = 'notices';
 }
+$conductPdfRel = 'assets/document/SLGTI_Code_of_Conduct_Book.pdf';
+$conductPdfPath = BASE_PATH . '/' . $conductPdfRel;
+$conductPdfUrl = rtrim((string) APP_URL, '/') . '/' . $conductPdfRel;
+$conductPdfExists = is_file($conductPdfPath);
 ?>
 <style>
 .sn-page { max-width: 960px; }
@@ -20,12 +24,21 @@ if (!in_array($tab, ['notices', 'conduct', 'rules'], true)) {
 .sn-nav { flex-wrap: wrap; }
 .sn-nav .nav-link { color: #001f3f; font-weight: 600; font-size: .875rem; }
 .sn-nav .nav-link.active { background: #001f3f; color: #fff; }
+.sn-pdf-frame {
+    width: 100%;
+    min-height: 72vh;
+    border: 1px solid #e6eaf0;
+    border-radius: 10px;
+    background: #f8fafc;
+}
+.sn-pdf-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .85rem; }
 @media (max-width: 576px) {
     .sn-hero { padding: 1rem; }
     .sn-hero h1 { font-size: 1.1rem; }
     .sn-nav { display: grid; grid-template-columns: 1fr; gap: .4rem; }
     .sn-nav .nav-item, .sn-nav .nav-link { width: 100%; text-align: center; }
     .sn-nav .nav-link { padding: .55rem .7rem; }
+    .sn-pdf-frame { min-height: 60vh; }
 }
 .sn-notice { border-bottom: 1px solid #eef1f4; padding: 1rem 0; }
 .sn-notice:last-child { border-bottom: 0; }
@@ -59,15 +72,33 @@ if (!in_array($tab, ['notices', 'conduct', 'rules'], true)) {
             <?php endif; ?>
         <?php elseif ($tab === 'conduct'): ?>
             <h2 class="h5 mb-2"><?php echo $e($code['title'] ?? 'Student Code of Conduct'); ?></h2>
-            <p><?php echo $e($code['intro'] ?? ''); ?></p>
-            <?php if (!empty($code['points']) && is_array($code['points'])): ?>
-                <ul>
-                    <?php foreach ($code['points'] as $p): ?>
-                        <li class="mb-1"><?php echo $e($p); ?></li>
-                    <?php endforeach; ?>
-                </ul>
+            <p class="text-muted small mb-3">
+                Official SLGTI Student Code of Conduct book. Open the PDF to read the full document.
+            </p>
+            <?php if ($conductPdfExists): ?>
+                <div class="sn-pdf-actions">
+                    <a class="btn btn-primary btn-sm" href="<?php echo $e($conductPdfUrl); ?>" target="_blank" rel="noopener">
+                        <i class="fas fa-file-pdf me-1"></i>Open Code of Conduct PDF
+                    </a>
+                    <a class="btn btn-outline-secondary btn-sm" href="<?php echo $e($conductPdfUrl); ?>" download>
+                        <i class="fas fa-download me-1"></i>Download PDF
+                    </a>
+                </div>
+                <iframe
+                    class="sn-pdf-frame"
+                    src="<?php echo $e($conductPdfUrl); ?>#toolbar=1&amp;navpanes=0"
+                    title="SLGTI Code of Conduct Book"
+                ></iframe>
+            <?php else: ?>
+                <div class="alert alert-warning mb-0">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    The Code of Conduct PDF was not found on the server
+                    (<code><?php echo $e($conductPdfRel); ?></code>).
+                </div>
             <?php endif; ?>
-            <div class="alert alert-secondary small mb-0"><?php echo $e($code['declaration'] ?? ''); ?></div>
+            <?php if (!empty($code['declaration'])): ?>
+                <div class="alert alert-secondary small mt-3 mb-0"><?php echo $e($code['declaration']); ?></div>
+            <?php endif; ?>
         <?php else: ?>
             <h2 class="h5 mb-2"><?php echo $e($rules['title'] ?? 'Common rules of SLGTI'); ?></h2>
             <p><?php echo $e($rules['intro'] ?? ''); ?></p>

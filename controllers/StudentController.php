@@ -522,6 +522,10 @@ class StudentController extends Controller {
             $courses = $courseModel->all('course_name ASC');
         }
         $academicYears = $studentModel->getAcademicYears();
+        $provinceMap = is_file(BASE_PATH . '/config/sl_provinces_districts.php')
+            ? require BASE_PATH . '/config/sl_provinces_districts.php'
+            : [];
+        $provinces = is_array($provinceMap) ? array_keys($provinceMap) : [];
         
         // Check if user is ADM or SAO for export and edit features
         require_once BASE_PATH . '/models/UserModel.php';
@@ -549,6 +553,7 @@ class StudentController extends Controller {
             'departments' => $departments,
             'courses' => $courses,
             'academicYears' => $academicYears,
+            'provinces' => $provinces,
             'statuses' => ['Active', 'Inactive', 'Graduated'],
             'genders' => ['Male', 'Female'],
             'isHOD' => $isDepartmentRestricted,
@@ -4024,6 +4029,14 @@ class StudentController extends Controller {
 
         $userDepartmentId = $this->getUserDepartment();
         $restricted = $this->isDepartmentRestricted();
+        $nvqRaw = $this->post('nvq_levels', []);
+        if (!is_array($nvqRaw)) {
+            $nvqRaw = [];
+        }
+        $provinceRaw = $this->post('provinces', []);
+        if (!is_array($provinceRaw)) {
+            $provinceRaw = [];
+        }
         $filters = [
             'status' => $restricted ? 'Active' : '',
             'department_id' => $restricted
@@ -4032,6 +4045,8 @@ class StudentController extends Controller {
             'course_id' => trim((string) $this->post('course_id', '')),
             'academic_year' => trim((string) $this->post('academic_year', '')),
             'group_id' => trim((string) $this->post('group_id', '')),
+            'nvq_levels' => $nvqRaw,
+            'provinces' => $provinceRaw,
             'current_enrollment' => true,
         ];
 
@@ -4051,6 +4066,8 @@ class StudentController extends Controller {
             $filters['course_id'] = '';
             $filters['academic_year'] = '';
             $filters['group_id'] = '';
+            $filters['nvq_levels'] = [];
+            $filters['provinces'] = [];
             if (!$restricted && !$userDepartmentId) {
                 $filters['department_id'] = '';
             }
