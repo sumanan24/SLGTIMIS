@@ -4289,10 +4289,10 @@ class StudentController extends Controller {
                 continue;
             }
 
-            $name = trim($clean($s['student_title'] ?? '') . ' ' . $clean($s['student_fullname'] ?? ''));
-            if ($name === '') {
-                $name = $clean($s['student_fullname'] ?? '');
-            }
+            // Calling letter shows full name only — no Mr./Ms. title.
+            $name = $clean($s['student_fullname'] ?? '');
+            $name = preg_replace('/^(Mr|Ms|Mrs|Miss|Dr)\.?\s+/iu', '', $name) ?? $name;
+            $name = $clean($name);
 
             $addressLines = [];
             foreach (preg_split('/\r\n|\r|\n/', (string) ($s['student_address'] ?? '')) as $part) {

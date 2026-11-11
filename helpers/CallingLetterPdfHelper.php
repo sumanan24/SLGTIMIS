@@ -279,6 +279,9 @@ final class CallingLetterPdfHelper
     private static function addStudentLetter(Fpdi $pdf, array $tplIds, array $student, ?string $signaturePath): void
     {
         $name = self::clean($student['name'] ?? '');
+        // Never print Mr./Ms. (strip if present in data or leftover from template wording).
+        $name = preg_replace('/^(Mr|Ms|Mrs|Miss|Dr)\.?\s+/i', '', $name) ?? $name;
+        $name = self::clean($name);
         $department = self::clean($student['department'] ?? '');
         $course = self::clean($student['course'] ?? '');
         $nvq = self::formatNvqLevel($student['nvq_level'] ?? '04');
