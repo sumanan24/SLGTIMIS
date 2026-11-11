@@ -1,8 +1,8 @@
 <?php
 /**
  * Bulk Calling Letter PDF (NVQ Level 04 / 05).
- * Official 3-page templates; overlays only student-specific fields
- * + the Branch Principal digital signature.
+ * Official 3-page templates at 1:1 size with aligned student-field overlays
+ * and Branch Principal signature.
  */
 
 declare(strict_types=1);
@@ -35,7 +35,9 @@ final class CallingLetterPdfHelper
 
     /** @deprecated Use TEMPLATES[TEMPLATE_L4_NORTHERN] */
     public const TEMPLATE_RELATIVE = 'assets/document/Calling_Letter_L4_Northern_Province.pdf';
+    /** Source / output pages per student (official letter). */
     public const TEMPLATE_PAGES = 3;
+    public const OUTPUT_PAGES = 3;
 
     /** Official template page size in PDF points (US Letter). */
     private const PAGE_W = 612.0;
@@ -293,26 +295,28 @@ final class CallingLetterPdfHelper
             }
         }
 
-        // Page 1 — letter body with student fields
+        // 1:1 official pages — same size and margins throughout.
+        $fit = ['ox' => 0.0, 'oy' => 0.0, 'sx' => 1.0, 'sy' => 1.0];
+
         $pdf->AddPage();
         $pdf->useTemplate($tplIds[1], 0, 0, self::PAGE_W, self::PAGE_H);
-        self::overlayPage1Fields($pdf, $name, $addressLines, $department, $course, $nvq);
+        self::overlayPage1Fields($pdf, $fit, $name, $addressLines, $department, $course, $nvq);
 
-        // Page 2 — dress code / payment (unchanged official content)
         $pdf->AddPage();
         $pdf->useTemplate($tplIds[2], 0, 0, self::PAGE_W, self::PAGE_H);
 
-        // Page 3 — closing + principal signature
         $pdf->AddPage();
         $pdf->useTemplate($tplIds[3], 0, 0, self::PAGE_W, self::PAGE_H);
-        self::overlayPrincipalSignature($pdf, $signaturePath);
+        self::overlayPrincipalSignature($pdf, $fit, $signaturePath);
     }
 
     /**
+     * @param array{ox:float,oy:float,sx:float,sy:float} $t
      * @param list<string> $addressLines
      */
     private static function overlayPage1Fields(
         Fpdi $pdf,
+        array $t,
         string $name,
         array $addressLines,
         string $department,
@@ -321,31 +325,30 @@ final class CallingLetterPdfHelper
     ): void {
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFillColor(255, 255, 255);
-        $pdf->SetFont('Helvetica', '', 12);
+        // Match formal letter body (Times) and keep a consistent size.
+        $pdf->SetFont('Times', '', 12);
+        $lineH = 14.0;
+        $left = 72.0; // align with body text margin
 
-        // Template prints "Mr./Ms." on its own line above the name blank (~725 / ~708.6).
-        // White out both lines; print full name only (no Mr/Ms).
-        $namePdfY = 725.5;
-        self::whiteRect($pdf, 55, self::fromBottom($namePdfY), 500, 32);
-        $pdf->SetXY(72, self::fromBottom($namePdfY) - 1);
-        $pdf->Cell(460, 14, self::fit($pdf, $name, 460), 0, 0, 'L');
+        // Cover "Mr./Ms." (line above or same line) and print name only, left-aligned with body.
+        self::whiteRectT($pdf, $t, 55.0, self::fromBottom(742.0), 500.0, 36.0);
+        $nameY = self::fromBottom(725.5);
+        self::textAtT($pdf, $t, $left, $nameY - 1.0, 460.0, $lineH, $name);
 
-        // Address dotted lines (optional; keeps letter complete without changing official wording)
-        $addrY = [691.78, 674.88];
-        for ($i = 0; $i < 2; $i++) {
+        // Address dotted lines — same left margin as name / body.
+        foreach ([691.78, 674.88] as $i => $pdfY) {
             $line = $addressLines[$i] ?? '';
             if ($line === '') {
                 continue;
             }
-            self::whiteRect($pdf, 72, self::fromBottom($addrY[$i]), 460, 14);
-            $pdf->SetXY(72, self::fromBottom($addrY[$i]) - 1);
-            $pdf->Cell(460, 14, self::fit($pdf, $line, 460), 0, 0, 'L');
+            $y = self::fromBottom((float) $pdfY);
+            self::whiteRectT($pdf, $t, 55.0, $y, 500.0, 15.0);
+            self::textAtT($pdf, $t, $left, $y - 1.0, 460.0, $lineH, $line);
         }
 
-        // Values after the ":" for Department / Course / NVQ (colon at x≈216)
-        // Use list pairs — float array keys are illegal in PHP 8.1+ (lose precision).
-        $valueX = 230.0;
-        $valueW = 300.0;
+        // Department / Course / NVQ — shared value column after the colon.
+        $valueX = 228.0;
+        $valueW = 310.0;
         $rows = [
             [556.97, $department],
             [540.08, $course],
@@ -356,21 +359,22 @@ final class CallingLetterPdfHelper
                 continue;
             }
             $y = self::fromBottom((float) $pdfY);
-            self::whiteRect($pdf, $valueX, $y, $valueW, 14.0);
-            $pdf->SetXY($valueX, $y - 1.0);
-            $pdf->Cell($valueW, 14.0, self::fit($pdf, $value, $valueW), 0, 0, 'L');
+            self::whiteRectT($pdf, $t, $valueX, $y, $valueW, 14.0);
+            self::textAtT($pdf, $t, $valueX, $y - 0.5, $valueW, $lineH, $value);
         }
     }
 
-    private static function overlayPrincipalSignature(Fpdi $pdf, ?string $signaturePath): void
+    /**
+     * @param array{ox:float,oy:float,sx:float,sy:float} $t
+     */
+    private static function overlayPrincipalSignature(Fpdi $pdf, array $t, ?string $signaturePath): void
     {
         if ($signaturePath === null || !is_file($signaturePath)) {
             return;
         }
 
-        // Compact signature above "Branch Principal" (PDF y≈540).
-        $targetWidthPt = 72.0; // ≈ 25 mm
-        $maxHeightPt = 28.0;   // ≈ 10 mm
+        $targetWidthPt = 72.0 * $t['sx'];
+        $maxHeightPt = 28.0 * $t['sy'];
         $size = @getimagesize($signaturePath);
         $srcW = (float) (($size[0] ?? 0) ?: 1024);
         $srcH = (float) (($size[1] ?? 0) ?: 441);
@@ -381,10 +385,9 @@ final class CallingLetterPdfHelper
             $imgW = $imgH * ($srcW / $srcH);
         }
 
-        $x = 72.0;
-        $y = self::fromBottom(548.0) - $imgH;
+        $x = self::mapX($t, 72.0);
+        $y = self::mapY($t, self::fromBottom(548.0)) - $imgH;
         try {
-            // Pass both W/H so placement is exact after trim.
             $pdf->Image($signaturePath, $x, $y, $imgW, $imgH);
         } catch (Throwable $e) {
             error_log('CallingLetterPdfHelper signature: ' . $e->getMessage());
@@ -394,6 +397,46 @@ final class CallingLetterPdfHelper
     private static function fromBottom(float $pdfY): float
     {
         return self::PAGE_H - $pdfY;
+    }
+
+    /** @param array{ox:float,oy:float,sx:float,sy:float} $t */
+    private static function mapX(array $t, float $x): float
+    {
+        return $t['ox'] + ($x * $t['sx']);
+    }
+
+    /** @param array{ox:float,oy:float,sx:float,sy:float} $t */
+    private static function mapY(array $t, float $y): float
+    {
+        return $t['oy'] + ($y * $t['sy']);
+    }
+
+    /** @param array{ox:float,oy:float,sx:float,sy:float} $t */
+    private static function whiteRectT(Fpdi $pdf, array $t, float $x, float $y, float $w, float $h): void
+    {
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->Rect(
+            self::mapX($t, $x),
+            self::mapY($t, $y) - (2.0 * $t['sy']),
+            $w * $t['sx'],
+            $h * $t['sy'],
+            'F'
+        );
+    }
+
+    /** @param array{ox:float,oy:float,sx:float,sy:float} $t */
+    private static function textAtT(
+        Fpdi $pdf,
+        array $t,
+        float $x,
+        float $y,
+        float $w,
+        float $h,
+        string $text
+    ): void {
+        $mw = $w * $t['sx'];
+        $pdf->SetXY(self::mapX($t, $x), self::mapY($t, $y));
+        $pdf->Cell($mw, $h * $t['sy'], self::fit($pdf, $text, $mw), 0, 0, 'L');
     }
 
     private static function whiteRect(Fpdi $pdf, float $x, float $y, float $w, float $h): void
