@@ -323,9 +323,11 @@ final class CallingLetterPdfHelper
         $pdf->SetFillColor(255, 255, 255);
         $pdf->SetFont('Helvetica', '', 12);
 
-        // Name line (PDF y≈708.6). Cover template "Mr./Ms. …" fully — no Mr/Ms prefix.
-        self::whiteRect($pdf, 70, self::fromBottom(708.6), 470, 15);
-        $pdf->SetXY(72, self::fromBottom(708.6) - 1);
+        // Template prints "Mr./Ms." on its own line above the name blank (~725 / ~708.6).
+        // White out both lines; print full name only (no Mr/Ms).
+        $namePdfY = 725.5;
+        self::whiteRect($pdf, 55, self::fromBottom($namePdfY), 500, 32);
+        $pdf->SetXY(72, self::fromBottom($namePdfY) - 1);
         $pdf->Cell(460, 14, self::fit($pdf, $name, 460), 0, 0, 'L');
 
         // Address dotted lines (optional; keeps letter complete without changing official wording)
