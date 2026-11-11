@@ -1037,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <form method="POST" action="<?php echo APP_URL; ?>/students/calling-letters" id="callingLetterForm">
                 <div class="modal-body">
                     <p class="small text-muted mb-3">
-                        Downloads the official 3-page calling letter for each eligible student (aligned fields; name, department, course, NVQ level; Branch Principal signature), merged into one PDF.
+                        Downloads the official calling letter for each eligible student (4 pages: letter + instructions + signature + blank A4; aligned fields; Branch Principal signature), merged into one PDF.
                     </p>
                     <div class="mb-3">
                         <label class="form-label small fw-bold d-block mb-1">Letter format <span class="text-danger">*</span></label>

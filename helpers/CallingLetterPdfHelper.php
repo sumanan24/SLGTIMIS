@@ -1,8 +1,8 @@
 <?php
 /**
  * Bulk Calling Letter PDF (NVQ Level 04 / 05).
- * Official 3-page templates at 1:1 size with aligned student-field overlays
- * and Branch Principal signature.
+ * Official 3-page templates at 1:1 size + 1 blank A4 page after the signature
+ * (4 pages total per student). Overlays student fields + Branch Principal signature.
  */
 
 declare(strict_types=1);
@@ -35,9 +35,9 @@ final class CallingLetterPdfHelper
 
     /** @deprecated Use TEMPLATES[TEMPLATE_L4_NORTHERN] */
     public const TEMPLATE_RELATIVE = 'assets/document/Calling_Letter_L4_Northern_Province.pdf';
-    /** Source / output pages per student (official letter). */
+    /** Source template pages; output is template + 1 blank A4. */
     public const TEMPLATE_PAGES = 3;
-    public const OUTPUT_PAGES = 3;
+    public const OUTPUT_PAGES = 4;
 
     /** Official template page size in PDF points (US Letter). */
     private const PAGE_W = 612.0;
@@ -308,6 +308,9 @@ final class CallingLetterPdfHelper
         $pdf->AddPage();
         $pdf->useTemplate($tplIds[3], 0, 0, self::PAGE_W, self::PAGE_H);
         self::overlayPrincipalSignature($pdf, $fit, $signaturePath);
+
+        // Blank A4 page after digital signature (4 pages total per student).
+        $pdf->AddPage();
     }
 
     /**
