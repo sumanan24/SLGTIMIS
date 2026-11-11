@@ -3988,45 +3988,38 @@ class StudentController extends Controller {
     }
 
     /**
-     * Download printable envelopes (PDF, one DL envelope per student) with the
-     * student's name and postal address.
-     *
-     * POST: student_ids[] (ticked rows; takes priority) or academic_year /
-     * department_id / course_id / group_id (all current students in that selection).
-     * Same audience as the Excel export (ADM, SAO, HOD) and always limited to the
-     * current register (Following + Internship), as on the Students page.
+     * ADM / SAO / HOD gate for envelope + student name-list PDF downloads.
      */
-    public function envelopes(): void {
+    private function requireEnvelopeDownloadAccess(): bool {
         if (!isset($_SESSION['user_id'])) {
             $this->redirect('login');
-            return;
+            return false;
         }
         if (!$this->requireModule('students', 'view')) {
-            return;
+            return false;
         }
-
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         $uid = (int) $_SESSION['user_id'];
-        $isADM = ($userModel->getUserRole($uid) === 'ADM');
-        if (!$isADM && !$userModel->isSAO($uid) && !$this->isHOD()) {
-            $_SESSION['error'] = 'Access denied. Only ADM, SAO, and HOD users can download envelopes.';
+        if ($userModel->getUserRole($uid) !== 'ADM' && !$userModel->isSAO($uid) && !$this->isHOD()) {
+            $_SESSION['error'] = 'Access denied. Only ADM, SAO, and HOD users can download this PDF.';
             $this->redirect('students');
-            return;
+            return false;
         }
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->redirect('students');
-            return;
+            return false;
         }
+        return true;
+    }
 
-        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
-        if (!ExamPdfHelper::dompdfAvailable()) {
-            $_SESSION['error'] = 'PDF engine not installed. Run: composer install.';
-            $this->redirect('students');
-            return;
-        }
-        ExamPdfHelper::prepareBulkPdfJob();
-
+    /**
+     * Resolve students for envelope / name-list downloads from POST filters
+     * (or optional student_ids[]). Returns null after redirect on failure.
+     *
+     * @return array{students:list<array>,filters:array}|null
+     */
+    private function resolveEnvelopeDownloadStudents(): ?array {
         $userDepartmentId = $this->getUserDepartment();
         $restricted = $this->isDepartmentRestricted();
         $nvqRaw = $this->post('nvq_levels', []);
@@ -4057,12 +4050,12 @@ class StudentController extends Controller {
 
         if (empty($ids)) {
             if ($filters['academic_year'] === '') {
-                $_SESSION['error'] = 'Select an academic year, or tick the students you want envelopes for.';
+                $_SESSION['error'] = 'Select an academic year, or select students on the list first.';
                 $this->redirect('students');
-                return;
+                return null;
             }
         } else {
-            // Ticked students win over the form filters; only the department limit stays.
+            // Selected IDs win over form filters; department limit stays.
             $filters['course_id'] = '';
             $filters['academic_year'] = '';
             $filters['group_id'] = '';
@@ -4074,7 +4067,6 @@ class StudentController extends Controller {
         }
 
         $studentModel = $this->model('StudentModel');
-        // The filtered query is the allow-list, so ticked IDs can never escape the user's department.
         $students = $studentModel->getStudents(1, 100000, $filters);
         if (!empty($ids)) {
             $wanted = array_flip($ids);
@@ -4085,12 +4077,50 @@ class StudentController extends Controller {
         if (empty($students)) {
             $_SESSION['error'] = 'No students found for the selected criteria.';
             $this->redirect('students');
-            return;
+            return null;
         }
 
         usort($students, static function ($a, $b) {
+            $cmp = strcasecmp((string) ($a['department_name'] ?? ''), (string) ($b['department_name'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            $cmp = strcasecmp((string) ($a['course_name'] ?? ''), (string) ($b['course_name'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
             return strcasecmp((string) ($a['student_id'] ?? ''), (string) ($b['student_id'] ?? ''));
         });
+
+        return ['students' => $students, 'filters' => $filters];
+    }
+
+    /**
+     * Download printable envelopes (PDF, one DL envelope per student) with the
+     * student's name and postal address.
+     *
+     * POST: student_ids[] (selected rows; takes priority) or academic_year /
+     * department_id / course_id / group_id (all current students in that selection).
+     */
+    public function envelopes(): void {
+        if (!$this->requireEnvelopeDownloadAccess()) {
+            return;
+        }
+
+        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
+        if (!ExamPdfHelper::dompdfAvailable()) {
+            $_SESSION['error'] = 'PDF engine not installed. Run: composer install.';
+            $this->redirect('students');
+            return;
+        }
+        ExamPdfHelper::prepareBulkPdfJob();
+
+        $resolved = $this->resolveEnvelopeDownloadStudents();
+        if ($resolved === null) {
+            return;
+        }
+        $students = $resolved['students'];
+        $filters = $resolved['filters'];
 
         $clean = static function ($v): string {
             return trim(preg_replace('/\s+/u', ' ', (string) ($v ?? '')));
@@ -4134,8 +4164,6 @@ class StudentController extends Controller {
         $label = preg_replace('/[^A-Za-z0-9_-]+/', '_', $filters['academic_year'] !== '' ? $filters['academic_year'] : 'selected');
         $filename = 'student_envelopes_' . $label . '_' . date('Ymd_His') . '.pdf';
 
-        // Chunk method: render a small batch of envelopes per Dompdf job, then merge the
-        // chunks into one PDF. Rendering a whole academic year in one go is too slow.
         $chunkSize = 25;
         $chunks = array_chunk($envelopes, $chunkSize);
         $renderChunk = function (array $batch) use ($viewPath, $headerImage, $e, $paper): string {
@@ -4148,8 +4176,6 @@ class StudentController extends Controller {
         };
 
         ExamPdfHelper::prepareBulkPdfJob();
-        // Release the session lock: a long PDF job must not block the user's other requests
-        // (a blocked request is what ends in "Maximum execution time" on session_start()).
         session_write_close();
         try {
             if (count($chunks) === 1) {
@@ -4167,7 +4193,7 @@ class StudentController extends Controller {
             $pdfChunks = [];
             foreach ($chunks as $batch) {
                 if (function_exists('set_time_limit')) {
-                    @set_time_limit(120); // restart the clock for every chunk
+                    @set_time_limit(120);
                 }
                 $pdfChunks[] = $renderChunk($batch);
             }
@@ -4180,6 +4206,255 @@ class StudentController extends Controller {
                 @session_start();
             }
             $_SESSION['error'] = 'Could not build the envelope PDF: ' . $ex->getMessage();
+            $this->redirect('students');
+        }
+    }
+
+    /**
+     * Bulk Calling Letter PDF (official L4 Northern Province template).
+     * POST → /students/calling-letters
+     * Filters: selected Academic Year + NVQ Level 04 + Northern Province only.
+     * Each student gets the original 3-page letter; letters are merged into one PDF.
+     */
+    public function callingLetters(): void {
+        if (!$this->requireEnvelopeDownloadAccess()) {
+            return;
+        }
+
+        $academicYear = trim((string) $this->post('academic_year', ''));
+        if ($academicYear === '') {
+            $_SESSION['error'] = 'Select an academic year for the calling letters.';
+            $this->redirect('students');
+            return;
+        }
+
+        $userDepartmentId = $this->getUserDepartment();
+        $restricted = $this->isDepartmentRestricted();
+        $filters = [
+            'status' => $restricted ? 'Active' : '',
+            'department_id' => $restricted
+                ? ($userDepartmentId ?: '__none__')
+                : ($userDepartmentId ?: trim((string) $this->post('department_id', ''))),
+            'course_id' => trim((string) $this->post('course_id', '')),
+            'academic_year' => $academicYear,
+            'nvq_levels' => ['04'],
+            'provinces' => ['Northern'],
+        ];
+
+        $studentModel = $this->model('StudentModel');
+        $students = $studentModel->getStudents(1, 100000, $filters);
+        if (empty($students)) {
+            $_SESSION['error'] = 'No NVQ Level 04 / Northern Province students found for academic year ' . $academicYear . '.';
+            $this->redirect('students');
+            return;
+        }
+
+        usort($students, static function ($a, $b) {
+            return strcasecmp((string) ($a['student_id'] ?? ''), (string) ($b['student_id'] ?? ''));
+        });
+
+        $enrollmentModel = $this->model('StudentEnrollmentModel');
+        $clean = static function ($v): string {
+            return trim(preg_replace('/\s+/u', ' ', (string) ($v ?? '')));
+        };
+
+        $rows = [];
+        foreach ($students as $s) {
+            $enrollment = $enrollmentModel->getEnrollmentForAcademicYear((string) ($s['student_id'] ?? ''), $academicYear);
+            if (!$enrollment) {
+                $enrollment = $enrollmentModel->getLatestEnrollment($s['student_id'] ?? '') ?: [];
+            }
+            $nvq = (string) ($enrollment['course_nvq_level'] ?? '04');
+            $nvqNorm = preg_replace('/\D+/', '', $nvq);
+            if ($nvqNorm !== '' && (int) $nvqNorm !== 4) {
+                continue; // safety: Level 04 only
+            }
+
+            $name = trim($clean($s['student_title'] ?? '') . ' ' . $clean($s['student_fullname'] ?? ''));
+            if ($name === '') {
+                $name = $clean($s['student_fullname'] ?? '');
+            }
+
+            $addressLines = [];
+            foreach (preg_split('/\r\n|\r|\n/', (string) ($s['student_address'] ?? '')) as $part) {
+                $part = $clean($part);
+                if ($part !== '') {
+                    $addressLines[] = $part;
+                }
+            }
+            $district = $clean($s['student_district'] ?? '');
+            $zip = $clean($s['student_zip'] ?? '');
+            $tail = trim($district . ($zip !== '' ? ' ' . $zip : ''));
+            if ($tail !== '') {
+                $addressLines[] = $tail;
+            }
+            // Keep two address lines for the template blanks
+            if (count($addressLines) > 2) {
+                $addressLines = [
+                    $addressLines[0],
+                    implode(', ', array_slice($addressLines, 1)),
+                ];
+            }
+
+            $rows[] = [
+                'name' => $name,
+                'address_lines' => $addressLines,
+                'department' => $clean($enrollment['department_name'] ?? ''),
+                'course' => $clean($enrollment['course_name'] ?? ''),
+                'nvq_level' => '04',
+            ];
+        }
+
+        if ($rows === []) {
+            $_SESSION['error'] = 'No eligible Level 04 / Northern Province students found for the calling letter.';
+            $this->redirect('students');
+            return;
+        }
+
+        require_once BASE_PATH . '/helpers/CallingLetterPdfHelper.php';
+        if (!is_file(CallingLetterPdfHelper::templatePath())) {
+            $_SESSION['error'] = 'Calling letter template PDF is missing.';
+            $this->redirect('students');
+            return;
+        }
+
+        $label = preg_replace('/[^A-Za-z0-9_-]+/', '_', $academicYear);
+        $filename = 'calling_letters_L04_Northern_' . $label . '_' . date('Ymd_His') . '.pdf';
+
+        session_write_close();
+        try {
+            $bytes = CallingLetterPdfHelper::buildPdfBytes($rows);
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Content-Length: ' . strlen($bytes));
+            echo $bytes;
+            exit;
+        } catch (Throwable $ex) {
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                @session_start();
+            }
+            $_SESSION['error'] = 'Could not build calling letters PDF: ' . $ex->getMessage();
+            $this->redirect('students');
+        }
+    }
+
+    /**
+     * Download an A4 PDF student name list (same filters as envelopes).
+     * POST → /students/name-list
+     */
+    public function studentNameList(): void {
+        if (!$this->requireEnvelopeDownloadAccess()) {
+            return;
+        }
+
+        require_once BASE_PATH . '/helpers/ExamPdfHelper.php';
+        if (!ExamPdfHelper::dompdfAvailable()) {
+            $_SESSION['error'] = 'PDF engine not installed. Run: composer install.';
+            $this->redirect('students');
+            return;
+        }
+        ExamPdfHelper::prepareBulkPdfJob();
+
+        $resolved = $this->resolveEnvelopeDownloadStudents();
+        if ($resolved === null) {
+            return;
+        }
+        $students = $resolved['students'];
+        $filters = $resolved['filters'];
+
+        $clean = static function ($v): string {
+            return trim(preg_replace('/\s+/u', ' ', (string) ($v ?? '')));
+        };
+        $enrollmentModel = $this->model('StudentEnrollmentModel');
+        $rows = [];
+        foreach ($students as $s) {
+            $enrollment = $enrollmentModel->getCurrentEnrollment($s['student_id'] ?? '');
+            $rows[] = [
+                'student_id' => $clean($s['student_id'] ?? ''),
+                'name' => trim($clean($s['student_title'] ?? '') . ' ' . $clean($s['student_fullname'] ?? '')),
+                'department' => $clean($enrollment['department_name'] ?? ($s['department_name'] ?? '')),
+                'course' => $clean($enrollment['course_name'] ?? ($s['course_name'] ?? '')),
+                'academic_year' => $clean($enrollment['academic_year'] ?? ($s['academic_year'] ?? '')),
+            ];
+        }
+
+        usort($rows, static function ($a, $b) {
+            $cmp = strcasecmp((string) ($a['department'] ?? ''), (string) ($b['department'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            $cmp = strcasecmp((string) ($a['course'] ?? ''), (string) ($b['course'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return strcasecmp((string) ($a['student_id'] ?? ''), (string) ($b['student_id'] ?? ''));
+        });
+
+        $viewPath = BASE_PATH . '/views/students/pdf/name_list.php';
+        if (!is_file($viewPath)) {
+            $_SESSION['error'] = 'Student name list template missing.';
+            $this->redirect('students');
+            return;
+        }
+
+        $meta = [
+            'academic_year' => (string) ($filters['academic_year'] ?? ''),
+            'department' => '',
+            'course' => '',
+            'generated_at' => date('Y-m-d H:i'),
+            'total' => count($rows),
+        ];
+        if ($meta['academic_year'] === '' && !empty($rows[0]['academic_year'])) {
+            $meta['academic_year'] = (string) $rows[0]['academic_year'];
+        }
+        if (!empty($filters['department_id'])) {
+            foreach ($rows as $r) {
+                if ($r['department'] !== '') {
+                    $meta['department'] = $r['department'];
+                    break;
+                }
+            }
+        }
+        if (!empty($filters['course_id'])) {
+            foreach ($rows as $r) {
+                if ($r['course'] !== '') {
+                    $meta['course'] = $r['course'];
+                    break;
+                }
+            }
+        }
+
+        $e = static function ($v): string {
+            return htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
+        };
+        extract(['rows' => $rows, 'meta' => $meta, 'e' => $e], EXTR_SKIP);
+        ob_start();
+        include $viewPath;
+        $inner = (string) ob_get_clean();
+        $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Student Name List</title></head><body>' . $inner . '</body></html>';
+
+        $label = preg_replace('/[^A-Za-z0-9_-]+/', '_', $meta['academic_year'] !== '' ? $meta['academic_year'] : 'selected');
+        $filename = 'student_name_list_' . $label . '_' . date('Ymd_His') . '.pdf';
+
+        session_write_close();
+        try {
+            $bytes = ExamPdfHelper::renderPdfBytes($html, 'A4', 'portrait');
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Content-Length: ' . strlen($bytes));
+            echo $bytes;
+            exit;
+        } catch (Throwable $ex) {
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                @session_start();
+            }
+            $_SESSION['error'] = 'Could not build the student name list PDF: ' . $ex->getMessage();
             $this->redirect('students');
         }
     }

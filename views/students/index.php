@@ -69,7 +69,10 @@ $staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsa
                     <i class="fas fa-file-excel me-1"></i>Export to Excel
                 </button>
                 <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#envelopeModal">
-                    <i class="fas fa-envelope me-1"></i>Download Envelopes
+                    <i class="fas fa-envelope me-1"></i>Download Envelopes / Name List
+                </button>
+                <button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#callingLetterModal">
+                    <i class="fas fa-file-alt me-1"></i>Calling Letters (L4 Northern)
                 </button>
                 <?php
                 $smsQuery = http_build_query(array_filter([
@@ -236,7 +239,7 @@ $staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsa
                         <thead class="table-light">
                             <tr>
                                 <?php if (!empty($canExport)): ?>
-                                <th style="width: 40px;"><input type="checkbox" class="form-check-input" id="envSelectAll" title="Select all on this page for envelopes"></th>
+                                <th style="width: 40px;"><input type="checkbox" class="form-check-input" id="envSelectAll" title="Select all on this page"></th>
                                 <?php endif; ?>
                                 <th class="fw-bold" style="width: 60px;">No</th>
                                 <th class="fw-bold" style="width: 80px;">Photo</th>
@@ -258,7 +261,7 @@ $staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsa
                             ?>
                                 <tr>
                                     <?php if (!empty($canExport)): ?>
-                                    <td><input type="checkbox" class="form-check-input env-select" value="<?php echo htmlspecialchars($student['student_id']); ?>" title="Select for envelope"></td>
+                                    <td><input type="checkbox" class="form-check-input env-select" value="<?php echo htmlspecialchars($student['student_id']); ?>" title="Select student"></td>
                                     <?php endif; ?>
                                     <td class="text-muted"><?php echo $rowNumber++; ?></td>
                                     <td>
@@ -772,22 +775,35 @@ function deselectAllColumns() {
 }
 </script>
 
-<!-- Envelope Modal -->
+<!-- Envelope / Name List Modal -->
 <div class="modal fade" id="envelopeModal" tabindex="-1" aria-labelledby="envelopeModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-warning">
                 <h5 class="modal-title" id="envelopeModalLabel">
-                    <i class="fas fa-envelope me-2"></i>Download Student Envelopes
+                    <i class="fas fa-envelope me-2"></i>Download Student Envelopes / Name List
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="<?php echo APP_URL; ?>/students/envelopes" id="envelopeForm">
                 <div class="modal-body">
                     <p class="small text-muted mb-3">
-                        Creates a PDF with one envelope per student (name and address), ready to print on DL envelopes (220 &times; 110 mm).
+                        Choose filters below, then download either printable DL envelopes or an A4 student name list PDF.
                         Only current students (Following and Internship) are included.
                     </p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold d-block mb-1">Download type</label>
+                        <div class="d-flex flex-wrap gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="download_type" id="envTypeEnvelope" value="envelopes" checked>
+                                <label class="form-check-label" for="envTypeEnvelope">Student Envelopes (name + address)</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="download_type" id="envTypeNameList" value="name_list">
+                                <label class="form-check-label" for="envTypeNameList">Student Name List (PDF)</label>
+                            </div>
+                        </div>
+                    </div>
                     <div id="envSelectedInfo" class="alert alert-info py-2 small d-none"></div>
                     <div id="envFilterFields">
                         <div class="row g-3">
@@ -877,7 +893,7 @@ function deselectAllColumns() {
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                         <i class="fas fa-times me-1"></i>Cancel
                     </button>
-                    <button type="submit" class="btn btn-warning">
+                    <button type="submit" class="btn btn-warning" id="envDownloadBtn">
                         <i class="fas fa-download me-1"></i>Download PDF
                     </button>
                 </div>
@@ -897,10 +913,30 @@ document.addEventListener('DOMContentLoaded', function() {
     var yearSelect = document.getElementById('env_academic_year');
     var deptSelect = document.getElementById('env_department_id');
     var courseSelect = document.getElementById('env_course_id');
+    var downloadBtn = document.getElementById('envDownloadBtn');
+    var typeEnvelope = document.getElementById('envTypeEnvelope');
+    var typeNameList = document.getElementById('envTypeNameList');
+    var envelopesUrl = <?php echo json_encode(APP_URL . '/students/envelopes'); ?>;
+    var nameListUrl = <?php echo json_encode(APP_URL . '/students/name-list'); ?>;
 
     function ticked() {
         return Array.prototype.slice.call(document.querySelectorAll('.env-select:checked'));
     }
+
+    function syncDownloadTarget() {
+        if (!form) return;
+        var nameList = typeNameList && typeNameList.checked;
+        form.action = nameList ? nameListUrl : envelopesUrl;
+        if (downloadBtn) {
+            downloadBtn.innerHTML = nameList
+                ? '<i class="fas fa-list me-1"></i>Download Name List PDF'
+                : '<i class="fas fa-envelope me-1"></i>Download Envelopes PDF';
+        }
+    }
+
+    if (typeEnvelope) typeEnvelope.addEventListener('change', syncDownloadTarget);
+    if (typeNameList) typeNameList.addEventListener('change', syncDownloadTarget);
+    syncDownloadTarget();
 
     if (selectAll) {
         selectAll.addEventListener('change', function() {
@@ -952,11 +988,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (modalEl) {
         modalEl.addEventListener('show.bs.modal', function() {
+            syncDownloadTarget();
             var n = ticked().length;
             if (n > 0) {
                 info.classList.remove('d-none');
                 info.innerHTML = '<i class="fas fa-check-circle me-1"></i><strong>' + n + '</strong> student' + (n === 1 ? '' : 's') +
-                    ' ticked on this page. Envelopes will be created for these students only.';
+                    ' selected on this page. Download will include these students only.';
                 filterFields.classList.add('d-none');
             } else {
                 info.classList.add('d-none');
@@ -967,6 +1004,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (form) {
         form.addEventListener('submit', function(ev) {
+            syncDownloadTarget();
             idFields.innerHTML = '';
             var rows = ticked();
             if (rows.length > 0) {
@@ -979,7 +1017,101 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             } else if (yearSelect && !yearSelect.value) {
                 ev.preventDefault();
-                alert('Please select an academic year, or tick the students you want envelopes for.');
+                alert('Please select an academic year, or select students on the list first.');
+            }
+        });
+    }
+});
+</script>
+
+<!-- Calling Letter Modal (L4 / Northern Province official template) -->
+<div class="modal fade" id="callingLetterModal" tabindex="-1" aria-labelledby="callingLetterModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="callingLetterModalLabel">
+                    <i class="fas fa-file-alt me-2"></i>Calling Letters — NVQ Level 04 / Northern Province
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="<?php echo APP_URL; ?>/students/calling-letters" id="callingLetterForm">
+                <div class="modal-body">
+                    <p class="small text-muted mb-3">
+                        Downloads the official 3-page calling letter for each eligible student (name, department, course, NVQ level filled in; Branch Principal signature included), merged into one PDF.
+                        Fixed filters: <strong>NVQ Level 04</strong> and <strong>Northern Province</strong> only.
+                    </p>
+                    <div class="mb-3">
+                        <label for="cl_academic_year" class="form-label small fw-bold">Academic Year <span class="text-danger">*</span></label>
+                        <select class="form-select form-select-sm" id="cl_academic_year" name="academic_year" required>
+                            <option value="">Select academic year</option>
+                            <?php foreach ($academicYears as $year): ?>
+                                <option value="<?php echo htmlspecialchars($year); ?>"
+                                        <?php echo (isset($filters['academic_year']) && $filters['academic_year'] === $year) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($year); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php if (!isset($isHOD) || !$isHOD): ?>
+                    <div class="mb-3">
+                        <label for="cl_department_id" class="form-label small fw-bold">Department (optional)</label>
+                        <select class="form-select form-select-sm" id="cl_department_id" name="department_id">
+                            <option value="">All Departments</option>
+                            <?php foreach ($departments as $dept): ?>
+                                <option value="<?php echo htmlspecialchars($dept['department_id']); ?>">
+                                    <?php echo htmlspecialchars($dept['department_name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
+                    <div class="mb-0">
+                        <label for="cl_course_id" class="form-label small fw-bold">Course (optional)</label>
+                        <select class="form-select form-select-sm" id="cl_course_id" name="course_id">
+                            <option value="">All Courses</option>
+                            <?php foreach ($courses as $course): ?>
+                                <option value="<?php echo htmlspecialchars($course['course_id']); ?>"
+                                        data-department="<?php echo htmlspecialchars($course['department_id'] ?? ''); ?>">
+                                    <?php echo htmlspecialchars($course['course_name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Cancel
+                    </button>
+                    <button type="submit" class="btn btn-dark">
+                        <i class="fas fa-download me-1"></i>Download Calling Letters PDF
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var clDept = document.getElementById('cl_department_id');
+    var clCourse = document.getElementById('cl_course_id');
+    var clForm = document.getElementById('callingLetterForm');
+    var clYear = document.getElementById('cl_academic_year');
+    if (clDept && clCourse) {
+        clDept.addEventListener('change', function() {
+            Array.prototype.forEach.call(clCourse.options, function(opt) {
+                var d = opt.getAttribute('data-department');
+                opt.hidden = !!(opt.value && clDept.value && d !== clDept.value);
+            });
+            if (clCourse.selectedOptions[0] && clCourse.selectedOptions[0].hidden) {
+                clCourse.value = '';
+            }
+        });
+    }
+    if (clForm) {
+        clForm.addEventListener('submit', function(ev) {
+            if (clYear && !clYear.value) {
+                ev.preventDefault();
+                alert('Please select an academic year.');
             }
         });
     }

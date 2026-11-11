@@ -124,6 +124,29 @@ class StudentEnrollmentModel extends Model {
         
         return $result->fetch_assoc();
     }
+
+    /**
+     * Enrollment for a specific academic year (course + department + NVQ).
+     */
+    public function getEnrollmentForAcademicYear($studentId, string $academicYear): ?array {
+        $academicYear = trim($academicYear);
+        if ($academicYear === '') {
+            return null;
+        }
+        $sql = "SELECT se.*, c.course_name, c.course_nvq_level, c.department_id, d.department_name
+                FROM `{$this->table}` se
+                LEFT JOIN `course` c ON se.course_id = c.course_id
+                LEFT JOIN `department` d ON c.department_id = d.department_id
+                WHERE se.student_id = ? AND se.academic_year = ?
+                ORDER BY FIELD(se.student_enroll_status, 'Following', 'Internship') DESC,
+                         se.student_enroll_date DESC
+                LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param('ss', $studentId, $academicYear);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
+    }
     
     public function findEnrollment(string $studentId, string $courseId, string $academicYear): ?array {
         $sql = "SELECT * FROM `{$this->table}` WHERE `student_id` = ? AND `course_id` = ? AND `academic_year` = ? LIMIT 1";
