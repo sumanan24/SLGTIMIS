@@ -110,15 +110,15 @@ class ApplicationAdmissionPdfHelper {
      */
     private static function envelopeStylesheet(): string {
         return ''
-            . '@page{size:220mm 110mm;margin:8mm 14mm 12mm 14mm;}'
+            . '@page{size:220mm 110mm;margin:0 50px;}'
             . 'html,body{margin:0;padding:0;}'
             . 'body{font-family:DejaVu Sans,Helvetica,Arial,sans-serif;font-size:9pt;color:#222;}'
             . 'table{border-collapse:collapse;}'
             . 'img{border:0;}'
-            . '.env-page{width:100%;page-break-inside:avoid;}'
+            . '.env-page{width:100%;page-break-inside:avoid;box-sizing:border-box;}'
             . '.env-page+.env-page{page-break-before:always;}'
             . '.env-top-space{height:30px;line-height:30px;font-size:1px;}'
-            . 'td.env-left-space{width:10px;padding:0;font-size:1px;line-height:1px;}'
+            . 'td.env-left-space{width:0;padding:0;font-size:1px;line-height:1px;}'
             . 'table.env-head{width:100%;margin:0 0 5mm 0;padding:0 0 3.5mm 0;border-bottom:0.6pt solid #bbb;}'
             . 'td.env-logo{width:16%;vertical-align:middle;padding:0 3mm 0 0;}'
             . '.env-logo-img{height:13mm;width:auto;display:block;}'

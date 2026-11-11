@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Env Preview</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>body{margin:0;background:#3a3a3a}canvas{display:block;margin:28px auto;background:#fff;box-shadow:0 6px 28px rgba(0,0,0,.45)}</style>
+</head><body>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+(async()=>{
+  const pdf=await pdfjsLib.getDocument('./tmp_envelope_sample.pdf').promise;
+  const page=await pdf.getPage(1);
+  const vp=page.getViewport({scale:2.4});
+  const c=document.createElement('canvas'); c.width=vp.width; c.height=vp.height;
+  document.body.appendChild(c);
+  await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+  const t=await page.getTextContent();
+  const pre=document.createElement('pre');
+  pre.style.cssText='color:#ddd;max-width:900px;margin:12px auto;font:12px monospace;white-space:pre-wrap';
+  pre.textContent='SIZE: 220mm × 110mm (DL landscape)\n'+t.items.map(i=>i.str).filter(Boolean).join(' | ');
+  document.body.appendChild(pre);
+  document.title='READY';
+})();
+</script>
+</body></html>

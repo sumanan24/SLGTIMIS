@@ -4157,22 +4157,23 @@ class StudentController extends Controller {
         };
         $headerImage = is_file($headerFile) ? str_replace('\\', '/', $headerFile) : '';
 
-        // DL envelope, landscape: 220 x 110 mm (1 mm = 72/25.4 pt)
-        $mmToPt = 72 / 25.4;
-        $paper = [0, 0, 220 * $mmToPt, 110 * $mmToPt];
+        // Site-wide DL long envelope: 220 × 110 mm (same as application-admission envelopes)
+        require_once BASE_PATH . '/helpers/ApplicationAdmissionPdfHelper.php';
+        $paper = ApplicationAdmissionPdfHelper::envelopePaperSize();
+        $orientation = ApplicationAdmissionPdfHelper::ENVELOPE_ORIENTATION;
 
         $label = preg_replace('/[^A-Za-z0-9_-]+/', '_', $filters['academic_year'] !== '' ? $filters['academic_year'] : 'selected');
         $filename = 'student_envelopes_' . $label . '_' . date('Ymd_His') . '.pdf';
 
         $chunkSize = 25;
         $chunks = array_chunk($envelopes, $chunkSize);
-        $renderChunk = function (array $batch) use ($viewPath, $headerImage, $e, $paper): string {
+        $renderChunk = function (array $batch) use ($viewPath, $headerImage, $e, $paper, $orientation): string {
             extract(['envelopes' => $batch, 'headerImage' => $headerImage, 'e' => $e], EXTR_SKIP);
             ob_start();
             include $viewPath;
             $inner = (string) ob_get_clean();
             $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Envelopes</title></head><body>' . $inner . '</body></html>';
-            return ExamPdfHelper::renderPdfBytes($html, $paper, 'portrait');
+            return ExamPdfHelper::renderPdfBytes($html, $paper, $orientation);
         };
 
         ExamPdfHelper::prepareBulkPdfJob();

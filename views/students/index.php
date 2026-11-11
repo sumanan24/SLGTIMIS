@@ -788,7 +788,7 @@ function deselectAllColumns() {
             <form method="POST" action="<?php echo APP_URL; ?>/students/envelopes" id="envelopeForm">
                 <div class="modal-body">
                     <p class="small text-muted mb-3">
-                        Choose filters below, then download either printable DL envelopes or an A4 student name list PDF.
+                        Choose filters below, then download either printable DL envelopes (220&nbsp;&times;&nbsp;110&nbsp;mm) or an A4 student name list PDF.
                         Only current students (Following and Internship) are included.
                     </p>
                     <div class="mb-3">

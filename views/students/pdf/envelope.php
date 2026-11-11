@@ -1,6 +1,14 @@
 <?php
 /**
- * Student envelope PDF (one DL envelope, 220 x 110 mm, per page).
+ * Official SLGTI DL long envelope — print-ready.
+ *
+ * Page: 220 mm × 110 mm (ISO 269 DL, landscape proportions).
+ * Header: envelope_header.png (logo left + Sinhala / Tamil / English centre).
+ * Body: equal FROM | TO columns (no vertical divider).
+ * Footer: thin rule + contact line.
+ *
+ * Dompdf note: setPaper([0,0,220mm,110mm], 'portrait') — custom size already
+ * encodes landscape; do not pass orientation=landscape or Dompdf will swap axes.
  *
  * @var list<array{name:string,lines:list<string>}> $envelopes
  * @var string $headerImage Absolute path of the header artwork
@@ -14,39 +22,158 @@ $e = $e ?? static function ($v): string {
 $total = count($envelopes);
 ?>
 <style>
-    @page { margin: 0; }
-    body { margin: 0; padding: 0; font-family: Helvetica, Arial, sans-serif; color: #000; }
-    .env { position: relative; width: 220mm; height: 109mm; overflow: hidden; }
-    .env.brk { page-break-after: always; }
-    .env .hdr { position: absolute; left: 0; top: 0; width: 220mm; height: 25mm; }
-    .env .from { position: absolute; left: 6mm; top: 50mm; width: 100mm; font-size: 9.5pt; font-weight: bold; line-height: 1.4; }
-    .env .to { position: absolute; left: 118mm; top: 48mm; width: 95mm; font-size: 11pt; line-height: 1.4; }
-    .env .to .lbl { font-size: 10pt; font-weight: bold; margin-bottom: 1mm; }
-    .env .to .nm { font-size: 13pt; font-weight: bold; }
-    .env .foot { position: absolute; left: 0; top: 92mm; width: 220mm; text-align: center; font-size: 9pt; font-weight: bold; }
+    /* Exact DL page box */
+    @page {
+        size: 220mm 110mm;
+        margin: 5mm 12mm 5mm 12mm;
+    }
+
+    html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        font-family: DejaVu Sans, Helvetica, Arial, sans-serif;
+        color: #111;
+        font-size: 10pt;
+    }
+
+    .env {
+        width: 100%;
+        page-break-inside: avoid;
+        overflow: hidden;
+    }
+    .env + .env {
+        page-break-before: always;
+    }
+
+    /* ---- Header: logo left + trilingual name (in artwork) ---- */
+    .hdr {
+        width: 100%;
+        margin: 0 0 5mm 0;
+        padding: 0;
+        text-align: left;
+        overflow: hidden;
+    }
+    .hdr img {
+        display: block;
+        width: 100%;
+        height: auto;
+        max-height: 20mm;
+        object-fit: contain;
+        object-position: left center;
+    }
+
+    /* ---- Address: two equal columns, horizontally aligned ---- */
+    table.addr {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        margin: 0;
+    }
+    td.from,
+    td.to {
+        width: 50%;
+        vertical-align: top;
+        padding: 0;
+    }
+    td.from {
+        padding-right: 6mm;
+    }
+    td.to {
+        padding-left: 6mm;
+    }
+
+    .lbl {
+        font-size: 9pt;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #333;
+        margin: 0 0 2.2mm 0;
+        line-height: 1.15;
+    }
+
+    .from-line {
+        font-size: 9.5pt;
+        font-weight: 700;
+        line-height: 1.45;
+        margin: 0 0 0.35mm 0;
+        color: #111;
+    }
+
+    .to-name {
+        font-size: 12pt;
+        font-weight: 700;
+        line-height: 1.35;
+        margin: 0 0 1.6mm 0;
+        color: #000;
+        word-wrap: break-word;
+    }
+    .to-line {
+        font-size: 10pt;
+        font-weight: 400;
+        line-height: 1.4;
+        margin: 0 0 0.45mm 0;
+        color: #111;
+        word-wrap: break-word;
+    }
+
+    /* ---- Footer ---- */
+    .foot {
+        margin-top: 8mm;
+        padding-top: 2.2mm;
+        border-top: 0.6pt solid #888;
+        text-align: center;
+        font-size: 7.5pt;
+        font-weight: 700;
+        line-height: 1.35;
+        color: #333;
+        letter-spacing: 0.01em;
+    }
 </style>
-<?php foreach ($envelopes as $i => $env): ?>
-<div class="env<?php echo $i < $total - 1 ? ' brk' : ''; ?>">
+<?php foreach ($envelopes as $i => $env):
+    $name = trim((string) ($env['name'] ?? ''));
+    $lines = [];
+    foreach (($env['lines'] ?? []) as $line) {
+        $line = trim((string) $line);
+        if ($line !== '') {
+            $lines[] = $line;
+        }
+    }
+    if (count($lines) > 5) {
+        $lines = array_slice($lines, 0, 5);
+    }
+?>
+<div class="env">
     <?php if ($headerImage !== ''): ?>
-        <img class="hdr" src="<?php echo $e($headerImage); ?>" alt="">
+        <div class="hdr">
+            <img src="<?php echo $e($headerImage); ?>" alt="SLGTI — Sri Lanka German Training Institute">
+        </div>
     <?php endif; ?>
 
-    <div class="to">
-        <div class="lbl">To:</div>
-        <div class="nm"><?php echo $e($env['name']); ?></div>
-        <?php foreach ($env['lines'] as $line): ?>
-            <div><?php echo $e($line); ?></div>
-        <?php endforeach; ?>
-    </div>
+    <table class="addr" role="presentation">
+        <tr>
+            <td class="from">
+                <div class="lbl">From</div>
+                <div class="from-line">Sri Lanka German Training Institute</div>
+                <div class="from-line">Ariviyal Nagar,</div>
+                <div class="from-line">Kilinochchi 44000,</div>
+                <div class="from-line">Sri Lanka.</div>
+            </td>
+            <td class="to">
+                <div class="lbl">To</div>
+                <?php if ($name !== ''): ?>
+                    <div class="to-name"><?php echo $e($name); ?></div>
+                <?php endif; ?>
+                <?php foreach ($lines as $line): ?>
+                    <div class="to-line"><?php echo $e($line); ?></div>
+                <?php endforeach; ?>
+            </td>
+        </tr>
+    </table>
 
-    <div class="from">
-        From:<br>
-        Sri Lanka German Training Institute<br>
-        Ariviyal Nagar,<br>
-        Kilinochchi 44000,<br>
-        Sri Lanka.
+    <div class="foot">
+        Tel: +94 21 492 7799 &nbsp;|&nbsp; Mobile: +94 70 306 0138 &nbsp;|&nbsp; Website: www.slgti.ac.lk &nbsp;|&nbsp; Email: info@slgti.ac.lk
     </div>
-
-    <div class="foot">Tel: +94 21 492 7799 | Mobile: +94 70 306 0138 | Website: www.slgti.ac.lk | Email: info@slgti.ac.lk</div>
 </div>
 <?php endforeach; ?>
