@@ -279,9 +279,7 @@ $e = static function ($v): string {
 <div class="sf-page">
     <header class="sf-hero">
         <div class="sf-hero-copy">
-            <p class="sf-hero-kicker">Sri Lanka–German Training Institute</p>
             <h1><i class="fas fa-file-alt me-2" aria-hidden="true"></i>Student Forms</h1>
-            <p>Download official SLGTI forms pre-filled with your student profile. Print, sign, and submit to the office listed on each form.</p>
         </div>
         <div class="sf-hero-actions">
             <a href="<?php echo APP_URL; ?>/student/dashboard" class="btn btn-sm">
@@ -289,12 +287,6 @@ $e = static function ($v): string {
             </a>
         </div>
     </header>
-
-    <div class="sf-steps" aria-label="How to use these forms">
-        <div class="sf-step"><b>1</b><span>Download the PDF for the form you need</span></div>
-        <div class="sf-step"><b>2</b><span>Print the form and sign where required</span></div>
-        <div class="sf-step"><b>3</b><span>Submit it to the office shown on the card</span></div>
-    </div>
 
     <div class="sf-grid">
         <?php if ($forms === []): ?>
@@ -308,15 +300,6 @@ $e = static function ($v): string {
                         </div>
                         <div class="sf-body">
                             <h2 class="sf-title"><?php echo $e($form['title'] ?? ''); ?></h2>
-                            <p class="sf-desc"><?php echo $e($form['description'] ?? ''); ?></p>
-                            <div class="sf-meta">
-                                <?php if (!empty($form['pages'])): ?>
-                                    <span class="sf-chip"><i class="fas fa-file-pdf" aria-hidden="true"></i>A4 · <?php echo $e($form['pages']); ?></span>
-                                <?php endif; ?>
-                                <?php if (!empty($form['submit_to'])): ?>
-                                    <span class="sf-chip"><i class="fas fa-paper-plane" aria-hidden="true"></i>Submit to: <?php echo $e($form['submit_to']); ?></span>
-                                <?php endif; ?>
-                            </div>
                         </div>
                     </div>
                     <div class="sf-action">

@@ -345,8 +345,59 @@ final class CallingLetterPdfHelper
         $pdf->useTemplate($tplIds[3], 0, 0, self::PAGE_W, self::PAGE_H);
         self::overlayPrincipalSignature($pdf, $fit, $signaturePath);
 
-        // Blank A4 page after digital signature (4 pages total per student).
+        // Page 4: bank details for fee payment (all 4 confirmation letter types).
         $pdf->AddPage();
+        self::overlayBankDetailsPage($pdf);
+    }
+
+    /**
+     * Bank account details for SLGTI fee payments (page 4 of confirmation letter).
+     */
+    private static function overlayBankDetailsPage(Fpdi $pdf): void
+    {
+        $left = 72.0;
+        $width = 468.0;
+        $lineH = 16.0;
+
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->SetDrawColor(0, 0, 0);
+        $pdf->SetLineWidth(0.6);
+
+        $pdf->SetFont('Times', 'B', 14);
+        $pdf->SetXY($left, 72.0);
+        $pdf->Cell($width, 18.0, 'Bank Details', 0, 1, 'L');
+
+        $pdf->SetLineWidth(1.0);
+        $pdf->Line($left, 92.0, $left + $width, 92.0);
+        $pdf->SetLineWidth(0.6);
+
+        $rows = [
+            ['Bank', "People's Bank"],
+            ['Branch', 'Kilinochchi'],
+            ['Account Number', '048-1-001-8-0086726'],
+            ['Account Name', 'Sri Lanka German Training Institute'],
+        ];
+
+        $y = 110.0;
+        $labelW = 130.0;
+        $valueX = $left + $labelW + 10.0;
+        $valueW = $width - $labelW - 10.0;
+
+        foreach ($rows as [$label, $value]) {
+            $pdf->SetFont('Times', 'B', 12);
+            $pdf->SetXY($left, $y);
+            $pdf->Cell($labelW, $lineH, $label, 0, 0, 'L');
+
+            $pdf->SetFont('Times', '', 12);
+            $pdf->SetXY($left + $labelW, $y);
+            $pdf->Cell(10.0, $lineH, ':', 0, 0, 'C');
+
+            $pdf->SetFont('Times', 'B', 12);
+            $pdf->SetXY($valueX, $y);
+            $pdf->Cell($valueW, $lineH, $value, 0, 0, 'L');
+
+            $y += 22.0;
+        }
     }
 
     /**

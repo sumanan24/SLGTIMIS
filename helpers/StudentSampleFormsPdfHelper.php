@@ -94,7 +94,12 @@ class StudentSampleFormsPdfHelper {
             $student,
             $enrollment,
             $application,
-            static function (array $sample): array {
+            static function (array $sample) use ($enrollment): array {
+                $t = static function ($v): string {
+                    return trim((string) ($v ?? ''));
+                };
+                $sample['academic_year'] = $t($enrollment['academic_year'] ?? ($sample['academic_year'] ?? ''));
+                $sample['course_name'] = $t($sample['course'] ?? '');
                 return $sample;
             }
         );

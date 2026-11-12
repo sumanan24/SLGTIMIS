@@ -106,16 +106,7 @@ $val = static function ($v) use ($e): string {
     </tr>
 </table>
 
-<div class="sec">3. Parent / guardian</div>
-<table class="f"><tr class="sp"><td class="l"></td><td class="v0"></td><td class="gap"></td><td class="l"></td><td class="v0"></td></tr>
-    <tr>
-        <td class="l">Name</td><td class="v"><?php echo $val($u($s['guardian_name'] ?? '')); ?></td>
-        <td class="gap"></td>
-        <td class="l">Contact number</td><td class="v"><?php echo $val($s['guardian_phone'] ?? ''); ?></td>
-    </tr>
-</table>
-
-<div class="sec">4. Declaration</div>
+<div class="sec">3. Declaration</div>
 <p class="decl">
     I request a bus season ticket for travel between my residence and the <?php echo $e($instName); ?>
     for the month and route stated above. I declare that the particulars given in this form are true and correct.
@@ -129,10 +120,7 @@ $val = static function ($v) use ($e): string {
             <div class="sig-lab">Signature of student</div>
         </td>
         <td class="gap"></td>
-        <td class="box">
-            <div class="sig-line"></div>
-            <div class="sig-lab">Signature of parent / guardian</div>
-        </td>
+        <td class="box"></td>
     </tr>
 </table>
 

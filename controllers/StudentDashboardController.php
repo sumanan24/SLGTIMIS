@@ -280,49 +280,52 @@ class StudentDashboardController extends Controller {
             return;
         }
 
+        $studentModel = $this->model('StudentModel');
+        $student = $studentModel->find($studentId);
+        if (!$student) {
+            $_SESSION['error'] = 'Student record not found.';
+            $this->redirect('student/dashboard');
+            return;
+        }
+
+        require_once BASE_PATH . '/helpers/CallingLetterPdfHelper.php';
+        $isNorthern = CallingLetterPdfHelper::isNorthernProvince((string) ($student['student_provice'] ?? ''));
         $dl = rtrim(APP_URL, '/') . '/student/forms/download?form=';
+
+        // Confirmation + Family Income for all; Northern → Bus Season; other provinces → Hostel
         $forms = [
             [
                 'key' => 'student-confirmation',
                 'title' => 'Student Confirmation Letter',
-                'description' => 'Official confirmation letter for your NVQ level and province (Level 04/05 × Northern / Other Provinces), filled from your student profile.',
                 'icon' => 'fa-envelope-open-text',
-                'pages' => '4 pages',
-                'submit_to' => 'Keep for your records / admissions',
                 'action_label' => 'Download PDF',
                 'url' => $dl . 'student-confirmation',
             ],
             [
-                'key' => 'hostel-request',
-                'title' => 'Hostel Request Form',
-                'description' => 'Request hostel admission, renewal or a change of room.',
-                'icon' => 'fa-bed',
-                'pages' => '1 page',
-                'submit_to' => 'Hostel Office',
-                'action_label' => 'Download PDF',
-                'url' => $dl . 'hostel-request',
-            ],
-            [
-                'key' => 'bus-season-request',
-                'title' => 'Bus Season Request Form',
-                'description' => 'Apply for a monthly bus season ticket for your route.',
-                'icon' => 'fa-bus',
-                'pages' => '1 page',
-                'submit_to' => 'Student Affairs Office',
-                'action_label' => 'Download PDF',
-                'url' => $dl . 'bus-season-request',
-            ],
-            [
                 'key' => 'family-income',
                 'title' => 'Family Income Confirmation',
-                'description' => 'Declare family annual income below Rs. 500,000 for the Rs. 7,500 monthly student allowance. Needs Grama Niladhari certification.',
                 'icon' => 'fa-file-signature',
-                'pages' => '1 page',
-                'submit_to' => 'Branch Principal',
                 'action_label' => 'Download PDF',
                 'url' => $dl . 'family-income',
             ],
         ];
+        if ($isNorthern) {
+            $forms[] = [
+                'key' => 'bus-season-request',
+                'title' => 'Bus Season Request Form',
+                'icon' => 'fa-bus',
+                'action_label' => 'Download PDF',
+                'url' => $dl . 'bus-season-request',
+            ];
+        } else {
+            $forms[] = [
+                'key' => 'hostel-request',
+                'title' => 'Hostel Request Form',
+                'icon' => 'fa-bed',
+                'action_label' => 'Download PDF',
+                'url' => $dl . 'hostel-request',
+            ];
+        }
 
         return $this->view('student/forms', [
             'title' => 'Forms',
@@ -348,27 +351,28 @@ class StudentDashboardController extends Controller {
         }
 
         $form = strtolower(trim((string) $this->get('form', '')));
-        $allowed = [
+        $studentModel = $this->model('StudentModel');
+        $student = $studentModel->find($studentId);
+        if (!$student) {
+            $_SESSION['error'] = 'Student record not found.';
+            $this->redirect('student/forms');
+            return;
+        }
+
+        require_once BASE_PATH . '/helpers/CallingLetterPdfHelper.php';
+        $isNorthern = CallingLetterPdfHelper::isNorthernProvince((string) ($student['student_provice'] ?? ''));
+        $sharedForms = [
             'student-confirmation',
             'confirmation',
             'confirmation-letter',
             'calling-letter',
             'student-application',
             'application',
-            'hostel-request',
-            'bus-season-request',
             'family-income',
         ];
+        $provinceForm = $isNorthern ? 'bus-season-request' : 'hostel-request';
+        $allowed = array_merge($sharedForms, [$provinceForm]);
         if (!in_array($form, $allowed, true)) {
-            $_SESSION['error'] = 'Requested form was not found.';
-            $this->redirect('student/forms');
-            return;
-        }
-
-        $studentModel = $this->model('StudentModel');
-        $student = $studentModel->find($studentId);
-        if (!$student) {
-            $_SESSION['error'] = 'Student record not found.';
             $this->redirect('student/forms');
             return;
         }
@@ -385,7 +389,14 @@ class StudentDashboardController extends Controller {
             $enrollment = null;
         }
 
-        $confirmationForms = ['student-confirmation', 'confirmation', 'confirmation-letter', 'calling-letter', 'student-application', 'application'];
+        $confirmationForms = [
+            'student-confirmation',
+            'confirmation',
+            'confirmation-letter',
+            'calling-letter',
+            'student-application',
+            'application',
+        ];
         if (in_array($form, $confirmationForms, true)) {
             $this->streamStudentConfirmationLetter($student, is_array($enrollment) ? $enrollment : null);
             return;
@@ -427,7 +438,6 @@ class StudentDashboardController extends Controller {
             return;
         }
 
-        $_SESSION['error'] = 'Requested form was not found.';
         $this->redirect('student/forms');
     }
 
