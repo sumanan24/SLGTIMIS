@@ -61,6 +61,12 @@ $check('configurable window changes the result', $r['status'] === 'full');
 $r = AttendanceRules::calculateDay(['09:10:00', '16:00:00'], $cfg);
 $check('same punches with default window = half', $r['status'] === 'half');
 
+echo "\nintake start (2026/2027)\n";
+$check('2026/2027 before 18 Nov does not count', AttendanceRules::attendanceCountsOn('2026-11-17', '2026/2027') === false);
+$check('2026/2027 on 18 Nov counts', AttendanceRules::attendanceCountsOn('2026-11-18', '2026/2027') === true);
+$check('2026/2027 after 18 Nov counts', AttendanceRules::attendanceCountsOn('2026-11-19', '2026/2027') === true);
+$check('other intake is unchanged', AttendanceRules::attendanceCountsOn('2026-11-02', '2025/2026') === true);
+
 echo "\neditState (month lock)\n";
 $now = new DateTimeImmutable('2026-11-20 10:00:00', $tz);
 $check('10 Nov record editable on 20 Nov', AttendanceRules::editState('2026-11-10', $now)['editable'] === true);

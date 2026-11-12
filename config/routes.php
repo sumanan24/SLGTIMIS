@@ -63,6 +63,7 @@ return [
     'students/calling-letters' => 'StudentController@callingLetters',
     'students/bulk-sms' => 'StudentController@bulkSms',
     'students/intake-checklist' => 'StudentController@intakeChecklist',
+    'students/language-report' => 'StudentController@languageReport',
     // Student ID card (ADM only)
     'students/id-card-select' => 'StudentController@idCardSelect',
     'students/id-card' => 'StudentController@idCard',

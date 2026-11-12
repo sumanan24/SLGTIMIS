@@ -867,6 +867,102 @@
     </div>
     <?php endif; ?>
 
+    <?php if (!empty($department_id)):
+        $lockMonth = (string) ($selectedLockMonth ?? date('Y-m'));
+        $lockRow = is_array($selectedLockStatus ?? null) ? $selectedLockStatus : null;
+        $monthIsLocked = $lockRow && (($lockRow['status'] ?? '') === 'locked');
+        $lockLabel = $lockMonth !== '' ? date('F Y', strtotime($lockMonth . '-01')) : '';
+        $lockedAt = '';
+        if ($monthIsLocked && !empty($lockRow['locked_at'])) {
+            $lockedAt = date('d M Y, h:i A', strtotime((string) $lockRow['locked_at']));
+        }
+        $lockedBy = $monthIsLocked ? trim((string) ($lockRow['locked_by_name'] ?? '')) : '';
+        $reportUrl = APP_URL . '/attendance/report?' . http_build_query([
+            'department_id' => $department_id,
+            'academic_year' => $selectedAcademicYear ?? '',
+            'month' => $lockMonth,
+            'view' => 'summary',
+            'source' => 'manual',
+        ]);
+    ?>
+    <div class="assign-card">
+        <div class="assign-head"><i class="fas fa-lock me-2"></i>Attendance report lock</div>
+        <div class="assign-body">
+            <form method="get" action="<?php echo APP_URL; ?>/hod/dashboard" class="row g-2 align-items-end mb-3">
+                <?php if (!empty($selectedAcademicYear)): ?>
+                    <input type="hidden" name="academic_year" value="<?php echo $e($selectedAcademicYear); ?>">
+                <?php endif; ?>
+                <div class="col-sm-6 col-md-4">
+                    <label for="lock_month" class="form-label small fw-semibold mb-1">Month</label>
+                    <input type="month" class="form-control" id="lock_month" name="lock_month" value="<?php echo $e($lockMonth); ?>" required>
+                </div>
+                <div class="col-sm-auto">
+                    <button type="submit" class="btn btn-primary">Show lock</button>
+                </div>
+            </form>
+
+            <div class="assign-item <?php echo $monthIsLocked ? 'is-active' : ''; ?>">
+                <div>
+                    <strong><?php echo $e($lockLabel); ?></strong>
+                    <?php if ($monthIsLocked): ?>
+                        <span class="assign-type" style="background:#b91c1c;">Locked</span>
+                        <div class="assign-meta">
+                            <?php echo $lockedBy !== '' ? 'Locked by ' . $e($lockedBy) : 'Locked'; ?>
+                            <?php if ($lockedAt !== ''): ?> &middot; <?php echo $e($lockedAt); ?><?php endif; ?>
+                            &middot; Attendance for this month cannot be edited. Finance can use the report.
+                        </div>
+                    <?php else: ?>
+                        <span class="assign-type" style="background:#15803d;">Open</span>
+                        <div class="assign-meta">This month is not locked. Attendance can still be edited. Lock it from the attendance report when the month is complete.</div>
+                    <?php endif; ?>
+                </div>
+                <a class="btn btn-sm btn-outline-primary" href="<?php echo $e($reportUrl); ?>">Open report</a>
+            </div>
+
+            <?php if (!empty($attendanceLocks)): ?>
+                <div class="table-responsive mt-3">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Locked by</th>
+                                <th>Locked at</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($attendanceLocks as $lock):
+                                $m = (string) ($lock['month'] ?? '');
+                                $mLabel = $m !== '' ? date('M Y', strtotime($m . '-01')) : '—';
+                                $by = trim((string) ($lock['locked_by_name'] ?? ''));
+                                if ($by === '') {
+                                    $by = trim((string) ($lock['user_name'] ?? ''));
+                                }
+                                $at = !empty($lock['locked_at']) ? date('d M Y, h:i A', strtotime((string) $lock['locked_at'])) : '—';
+                                $open = APP_URL . '/attendance/report?' . http_build_query([
+                                    'department_id' => $department_id,
+                                    'month' => $m,
+                                    'view' => 'summary',
+                                    'source' => 'manual',
+                                ]);
+                            ?>
+                                <tr>
+                                    <td><?php echo $e($mLabel); ?></td>
+                                    <td><?php echo $e($by !== '' ? $by : '—'); ?></td>
+                                    <td><?php echo $e($at); ?></td>
+                                    <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="<?php echo $e($open); ?>">Open</a></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <p class="assign-meta mb-0 mt-2">No locked months for this department yet.</p>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Main Stats Cards - Department Only (if user has department) -->
     <?php if (!empty($department)): ?>
     <div class="row g-4 mb-4">

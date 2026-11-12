@@ -233,7 +233,29 @@ class HODDashboardController extends Controller {
                 }
             }
 
+            $attendanceLocks = [];
+            $selectedLockMonth = date('Y-m');
+            $selectedLockStatus = null;
+            if ($userDepartmentId) {
+                try {
+                    $lockModel = $this->model('AttendanceMonthLockModel');
+                    $attendanceLocks = $lockModel->getLockedMonths($userDepartmentId);
+                    $requestedMonth = trim((string) $this->get('lock_month', ''));
+                    if (!preg_match('/^\d{4}-\d{2}$/', $requestedMonth)) {
+                        $requestedMonth = date('Y-m');
+                    }
+                    $selectedLockMonth = $requestedMonth;
+                    $row = $lockModel->getLockStatus($userDepartmentId, $selectedLockMonth);
+                    $selectedLockStatus = is_array($row) ? $row : null;
+                } catch (Throwable $ex) {
+                    error_log('HODDashboard attendance locks: ' . $ex->getMessage());
+                }
+            }
+
             $data = [
+                'attendanceLocks' => $attendanceLocks,
+                'selectedLockMonth' => $selectedLockMonth,
+                'selectedLockStatus' => $selectedLockStatus,
                 'studentStatusCounts' => $studentStatusCounts,
                 'my' => $my,
                 'error' => $flashError,

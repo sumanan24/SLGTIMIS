@@ -22,6 +22,21 @@ class AttendanceRules {
     const STATUS_HALF = 'half';
     const STATUS_ABSENT = 'absent';
 
+    /** 2026/2027 intake: attendance is counted from this date (inclusive). Earlier days are ignored. */
+    const INTAKE_2026_ATTENDANCE_FROM = '2026-11-18';
+
+    /**
+     * Whether a calendar day counts toward attendance for this academic year.
+     * 2026/2027 students are counted only from 18 November 2026.
+     */
+    public static function attendanceCountsOn(string $date, ?string $academicYear): bool
+    {
+        if (trim((string) $academicYear) !== '2026/2027') {
+            return true;
+        }
+        return $date >= self::INTAKE_2026_ATTENDANCE_FROM;
+    }
+
     /** @var array<string,string>|null */
     private static $configCache = null;
 

@@ -426,9 +426,20 @@ class AttendanceModel extends Model {
             $fingerByDay = [];
             $fingerPresentDays = 0;
             $fingerLateDays = 0;
+            $skippedBeforeStart = 0;
+            $academicYear = trim((string) ($row['academic_year'] ?? ''));
+            require_once BASE_PATH . '/helpers/AttendanceRules.php';
 
             foreach ($workingDaysList as $day) {
                 $date = $day['date'];
+                if (!AttendanceRules::attendanceCountsOn($date, $academicYear)) {
+                    $dayByDayAttendance[$date] = '';
+                    if ($includeFinger) {
+                        $fingerByDay[$date] = '';
+                    }
+                    $skippedBeforeStart++;
+                    continue;
+                }
                 $status = $attendanceRecords[$date] ?? null;
 
                 // Finger (device) status for this day: P present, L late/incomplete, '' no punch
@@ -481,6 +492,9 @@ class AttendanceModel extends Model {
                 }
             }
             
+            // Working days before the 2026/2027 start date do not count
+            $workingDays -= $skippedBeforeStart;
+
             // Calculate effective working days (excluding holidays)
             $effectiveWorkingDays = $workingDays - $holidayDays;
             

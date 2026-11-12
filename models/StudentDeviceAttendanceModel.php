@@ -2725,8 +2725,15 @@ class StudentDeviceAttendanceModel extends Model {
             $absentDays = 0;
             $holidayDays = 0;
 
+            $studentYear = trim((string) ($st['academic_year'] ?? $academicYear));
+            require_once BASE_PATH . '/helpers/AttendanceRules.php';
+
             foreach ($columns as $col) {
                 $ymd = $col['date'];
+                if (!AttendanceRules::attendanceCountsOn($ymd, $studentYear)) {
+                    $dayByDay[$ymd] = '';
+                    continue;
+                }
                 if (!empty($col['is_public_holiday']) || isset($leaveMap[$ymd])) {
                     $dayByDay[$ymd] = 'H';
                     $holidayDays++;
@@ -2859,6 +2866,7 @@ class StudentDeviceAttendanceModel extends Model {
                     c.`department_id`,
                     se.`course_id`,
                     se.`course_mode`,
+                    se.`academic_year`,
                     d.`department_name`,
                     c.`course_name`
                 FROM `student` s
@@ -2902,7 +2910,7 @@ class StudentDeviceAttendanceModel extends Model {
                 $params[] = $reportMonth;
             }
         }
-        $sql .= ' GROUP BY s.`student_id`, c.`department_id`, se.`course_id`, se.`course_mode`, d.`department_name`, c.`course_name`,
+        $sql .= ' GROUP BY s.`student_id`, c.`department_id`, se.`course_id`, se.`course_mode`, se.`academic_year`, d.`department_name`, c.`course_name`,
                     s.`student_ininame`, s.`student_fullname`, s.`student_nic`, s.`bank_name`, s.`bank_account_no`,
                     s.`bank_branch`, s.`allowance_eligible`, s.`allowance_eligible_date`
                   ORDER BY d.`department_name` ASC, `student_name` ASC, s.`student_id` ASC';
@@ -2939,6 +2947,7 @@ class StudentDeviceAttendanceModel extends Model {
                     'course_mode_label' => $modeLabel,
                     'department_name' => (string) ($r['department_name'] ?? ''),
                     'course_name' => (string) ($r['course_name'] ?? ''),
+                    'academic_year' => (string) ($r['academic_year'] ?? ''),
                 ];
             }
         }

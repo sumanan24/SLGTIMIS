@@ -102,7 +102,12 @@ class StudentDashboardController extends Controller {
         $holidayDays = 0;
         $attendancePercentage = 0;
         
+        require_once BASE_PATH . '/helpers/AttendanceRules.php';
+        $enrollYear = trim((string) ($currentEnrollment['academic_year'] ?? ''));
         foreach ($attendanceRecords as $date => $status) {
+            if (!AttendanceRules::attendanceCountsOn((string) $date, $enrollYear)) {
+                continue;
+            }
             $dayOfWeek = date('w', strtotime($date));
             // Skip weekends
             if ($dayOfWeek == 0 || $dayOfWeek == 6) {

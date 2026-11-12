@@ -499,6 +499,92 @@ class StudentModel extends Model {
         
         return $data;
     }
+
+    /**
+     * Sinhala / Tamil student counts for one academic year.
+     * Following and Internship enrolments only. One row per course.
+     *
+     * @return array{rows:list<array<string,mixed>>, totals:array{sinhala:int,tamil:int,other:int,total:int}}
+     */
+    public function getLanguageCounts(string $academicYear, string $departmentId = ''): array {
+        $empty = ['rows' => [], 'totals' => ['sinhala' => 0, 'tamil' => 0, 'other' => 0, 'total' => 0]];
+        $academicYear = trim($academicYear);
+        if ($academicYear === '') {
+            return $empty;
+        }
+
+        $where = "se.`academic_year` = ?
+            AND se.`student_enroll_status` IN ('Following', 'Internship')
+            AND s.`student_status` = 'Active'";
+        $types = 's';
+        $params = [$academicYear];
+        if ($departmentId !== '' && $departmentId !== '__none__') {
+            $where .= ' AND c.`department_id` = ?';
+            $types .= 's';
+            $params[] = $departmentId;
+        } elseif ($departmentId === '__none__') {
+            return $empty;
+        }
+
+        $lang = "LOWER(TRIM(IFNULL(s.`student_nationality`, '')))";
+        $sql = "SELECT
+                    COALESCE(d.`department_name`, '') AS department_name,
+                    COALESCE(c.`course_name`, '') AS course_name,
+                    COUNT(DISTINCT CASE WHEN {$lang} = 'sinhala' THEN s.`student_id` END) AS sinhala_count,
+                    COUNT(DISTINCT CASE WHEN {$lang} = 'tamil' THEN s.`student_id` END) AS tamil_count,
+                    COUNT(DISTINCT CASE WHEN {$lang} NOT IN ('sinhala', 'tamil') THEN s.`student_id` END) AS other_count,
+                    COUNT(DISTINCT s.`student_id`) AS total_count
+                FROM `student` s
+                INNER JOIN `student_enroll` se ON se.`student_id` = s.`student_id`
+                INNER JOIN `course` c ON c.`course_id` = se.`course_id`
+                LEFT JOIN `department` d ON d.`department_id` = c.`department_id`
+                WHERE {$where}
+                GROUP BY d.`department_name`, c.`course_name`
+                ORDER BY d.`department_name` ASC, c.`course_name` ASC";
+
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return $empty;
+        }
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $rows = [];
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $rows[] = $row;
+            }
+        }
+        $stmt->close();
+
+        $totalSql = "SELECT
+                    COUNT(DISTINCT CASE WHEN {$lang} = 'sinhala' THEN s.`student_id` END) AS sinhala_count,
+                    COUNT(DISTINCT CASE WHEN {$lang} = 'tamil' THEN s.`student_id` END) AS tamil_count,
+                    COUNT(DISTINCT CASE WHEN {$lang} NOT IN ('sinhala', 'tamil') THEN s.`student_id` END) AS other_count,
+                    COUNT(DISTINCT s.`student_id`) AS total_count
+                FROM `student` s
+                INNER JOIN `student_enroll` se ON se.`student_id` = s.`student_id`
+                INNER JOIN `course` c ON c.`course_id` = se.`course_id`
+                WHERE {$where}";
+        $totalStmt = $this->db->prepare($totalSql);
+        $totals = ['sinhala' => 0, 'tamil' => 0, 'other' => 0, 'total' => 0];
+        if ($totalStmt) {
+            $totalStmt->bind_param($types, ...$params);
+            $totalStmt->execute();
+            $totalRow = $totalStmt->get_result()->fetch_assoc();
+            $totalStmt->close();
+            if (is_array($totalRow)) {
+                $totals = [
+                    'sinhala' => (int) ($totalRow['sinhala_count'] ?? 0),
+                    'tamil' => (int) ($totalRow['tamil_count'] ?? 0),
+                    'other' => (int) ($totalRow['other_count'] ?? 0),
+                    'total' => (int) ($totalRow['total_count'] ?? 0),
+                ];
+            }
+        }
+
+        return ['rows' => $rows, 'totals' => $totals];
+    }
     
     /**
      * Get unique districts for filter dropdown
