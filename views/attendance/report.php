@@ -2,6 +2,7 @@
 $isFIN = !empty($isFIN);
 $isHOD = !empty($isHOD);
 $isAdmin = !empty($isAdmin);
+$canLockMonth = !empty($canLockMonth) || $isHOD;
 $isMonthLocked = !empty($isMonthLocked);
 $reportData = $reportData ?? [];
 $allDays = $allDays ?? [];
@@ -172,7 +173,7 @@ $canExport = $isMonthLocked && !empty($selectedDepartment) && !empty($selectedMo
                             <i class="fas fa-file-excel me-1"></i>Download Excel
                         </a>
                     <?php endif; ?>
-                    <?php if (!empty($reportData) && $isHOD && !$isMonthLocked && !empty($selectedDepartment) && !empty($selectedMonth)): ?>
+                    <?php if (!empty($reportData) && !empty($canLockMonth) && !$isMonthLocked && !empty($selectedDepartment) && !empty($selectedMonth)): ?>
                         <button type="button" class="btn btn-warning btn-sm" id="lockMonthBtn"
                                 data-department-id="<?php echo htmlspecialchars($selectedDepartment); ?>"
                                 data-month="<?php echo htmlspecialchars($selectedMonth); ?>">

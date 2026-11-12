@@ -80,8 +80,8 @@ $instAddr = (string) ($institute['address'] ?? '');
                 <strong><?php echo $leaveDays; ?> consecutive working day(s)</strong> of unauthorised absence
                 (threshold: <?php echo $threshold; ?> days).
             </p>
-            <p>Present attendance requires In on or before <strong><?php echo $e($inCutoff); ?></strong>
-                and Out on or after <strong><?php echo $e($outCutoff); ?></strong>. Weekends, public holidays,
+            <p>Present attendance requires a daily In and Out with more than <strong>7 hours</strong>
+                between first and last punch. Weekends, public holidays,
                 and approved special leave are excluded from this calculation.</p>
             <?php if ($dates !== []): ?>
                 <p><strong>Dates of consecutive unauthorised absence:</strong></p>

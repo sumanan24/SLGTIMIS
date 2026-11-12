@@ -1119,7 +1119,7 @@ class StudentController extends Controller {
             }
             
             if (!isset($_SESSION['user_table']) || $_SESSION['user_table'] !== 'student') {
-                $this->json(['success' => false, 'error' => 'Access denied. Only students can accept the Student Agreement.'], 403);
+                $this->json(['success' => false, 'error' => 'Access denied. Only students can accept the code of conduct.'], 403);
             }
             
             if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -1138,7 +1138,7 @@ class StudentController extends Controller {
             if (!empty($student['student_conduct_accepted_at'])) {
                 $this->json([
                     'success' => true,
-                    'message' => 'Student Agreement already accepted.',
+                    'message' => 'Code of conduct already accepted.',
                     'accepted_at' => $student['student_conduct_accepted_at']
                 ]);
             }
@@ -1162,7 +1162,7 @@ class StudentController extends Controller {
                 $activityLogger = new ActivityLogger();
                 $activityLogger->log(
                     'student_conduct_accepted',
-                    "Student {$studentId} accepted Student Agreement",
+                    "Student {$studentId} accepted Code of Conduct",
                     'success',
                     $_SESSION['user_id'],
                     $studentId
@@ -1173,7 +1173,7 @@ class StudentController extends Controller {
             
             $this->json([
                 'success' => true,
-                'message' => 'Student Agreement accepted successfully.',
+                'message' => 'Code of conduct accepted successfully.',
                 'accepted_at' => $currentDateTime
             ]);
         } catch (Throwable $e) {
@@ -4661,60 +4661,6 @@ class StudentController extends Controller {
      * download one A4 checklist page per selected student (bulk PDF).
      * URL: /students/intake-checklist
      */
-    /**
-     * Common report: Sinhala and Tamil student counts for a selected academic year.
-     */
-    public function languageReport() {
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return;
-        }
-        if (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student') {
-            $_SESSION['error'] = 'Access denied. Students cannot access this page.';
-            $this->redirect('student/dashboard');
-            return;
-        }
-        if (!$this->requireModule('students', 'view')) {
-            return;
-        }
-
-        $studentModel = $this->model('StudentModel');
-        $academicYears = $studentModel->getAcademicYears();
-        $selectedYear = trim((string) $this->get('academic_year', ''));
-        if ($selectedYear === '' && !empty($academicYears)) {
-            $selectedYear = (string) $academicYears[0];
-        }
-
-        $userDepartmentId = $this->getUserDepartment();
-        $restricted = $this->isDepartmentRestricted();
-        $departmentId = '';
-        if ($userDepartmentId) {
-            $departmentId = (string) $userDepartmentId;
-        } elseif ($restricted) {
-            $departmentId = '__none__';
-        }
-
-        $report = ($selectedYear !== '')
-            ? $studentModel->getLanguageCounts($selectedYear, $departmentId)
-            : ['rows' => [], 'totals' => ['sinhala' => 0, 'tamil' => 0, 'other' => 0, 'total' => 0]];
-
-        $departmentName = '';
-        if ($userDepartmentId) {
-            $department = $this->model('DepartmentModel')->getById($userDepartmentId);
-            $departmentName = (string) ($department['department_name'] ?? '');
-        }
-
-        return $this->view('students/language_report', [
-            'title' => 'Sinhala and Tamil Student Count',
-            'page' => 'students',
-            'academicYears' => $academicYears,
-            'selectedYear' => $selectedYear,
-            'rows' => $report['rows'],
-            'totals' => $report['totals'],
-            'departmentName' => $departmentName,
-        ]);
-    }
-
     public function intakeChecklist() {
         if (!$this->requireIntakeChecklistAccess()) {
             return;

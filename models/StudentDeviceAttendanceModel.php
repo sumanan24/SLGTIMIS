@@ -1941,14 +1941,20 @@ class StudentDeviceAttendanceModel extends Model {
         ];
     }
 
-    /** Present when In is on/before 08:40 and Out is on/after 16:00. */
+    /**
+     * Present when day's first punch (In) to last punch (Out) is more than 7 hours.
+     * Legacy cutoff constants kept for older report labels only.
+     */
+    public const PRESENT_MIN_HOURS = 7;
+    public const PRESENT_MIN_SECONDS = 7 * 3600;
     public const PRESENT_IN_CUTOFF = '08:40:00';
     public const PRESENT_OUT_CUTOFF = '16:00:00';
 
     /**
      * Classify a day's punches.
+     * Present = In and Out both exist and (Out − In) > 7 hours.
      *
-     * @return array{status:string,label:string,time_in:string,time_out:string,time_others:string}
+     * @return array{status:string,label:string,time_in:string,time_out:string,time_others:string,duration_seconds?:int}
      */
     public static function classifyDayStatus(?string $timeIn, ?string $timeOut, string $timeOthers = ''): array {
         $in = self::normalizeTime($timeIn);
@@ -1962,18 +1968,21 @@ class StudentDeviceAttendanceModel extends Model {
                 'time_in' => '',
                 'time_out' => '',
                 'time_others' => $others,
+                'duration_seconds' => 0,
             ];
         }
 
-        $inOk = $in !== '' && $in <= self::PRESENT_IN_CUTOFF;
-        $outOk = $out !== '' && $out >= self::PRESENT_OUT_CUTOFF;
+        $durationSeconds = 0;
+        if ($in !== '' && $out !== '') {
+            $durationSeconds = self::secondsBetweenTimes($in, $out);
+        }
 
-        if ($inOk && $outOk) {
+        if ($in !== '' && $out !== '' && $durationSeconds > self::PRESENT_MIN_SECONDS) {
             $status = 'present';
             $label = 'Present';
         } elseif ($in !== '' && $out !== '') {
             $status = 'late';
-            $label = 'Late / Incomplete hours';
+            $label = 'Under 7 hours';
         } else {
             $status = 'incomplete';
             $label = 'Incomplete punch';
@@ -1985,7 +1994,21 @@ class StudentDeviceAttendanceModel extends Model {
             'time_in' => $in !== '' ? substr($in, 0, 5) : '',
             'time_out' => $out !== '' ? substr($out, 0, 5) : '',
             'time_others' => $others,
+            'duration_seconds' => $durationSeconds,
         ];
+    }
+
+    /** Seconds from HH:MM:SS to HH:MM:SS (same calendar day). Negative/invalid → 0. */
+    private static function secondsBetweenTimes(string $from, string $to): int {
+        $fromParts = array_map('intval', explode(':', $from));
+        $toParts = array_map('intval', explode(':', $to));
+        if (count($fromParts) < 2 || count($toParts) < 2) {
+            return 0;
+        }
+        $fromSec = ($fromParts[0] * 3600) + ($fromParts[1] * 60) + ($fromParts[2] ?? 0);
+        $toSec = ($toParts[0] * 3600) + ($toParts[1] * 60) + ($toParts[2] ?? 0);
+        $diff = $toSec - $fromSec;
+        return $diff > 0 ? $diff : 0;
     }
 
     private static function normalizeTime(?string $time): string {

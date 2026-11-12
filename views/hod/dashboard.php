@@ -854,6 +854,9 @@
                 <a class="btn btn-outline-primary btn-sm" href="<?php echo APP_URL; ?>/modules?department_id=<?php echo urlencode($department['department_id']); ?>">
                     <i class="fas fa-cubes me-1"></i>Course Modules
                 </a>
+                <a class="btn btn-outline-primary btn-sm" href="<?php echo APP_URL; ?>/groups">
+                    <i class="fas fa-users me-1"></i>Student Groups
+                </a>
                 <?php if (!empty($canManageCourses)): ?>
                 <a class="btn btn-outline-secondary btn-sm" href="<?php echo APP_URL; ?>/modules/create">
                     <i class="fas fa-plus me-1"></i>Add Module
@@ -867,98 +870,73 @@
     </div>
     <?php endif; ?>
 
-    <?php if (!empty($department_id)):
-        $lockMonth = (string) ($selectedLockMonth ?? date('Y-m'));
-        $lockRow = is_array($selectedLockStatus ?? null) ? $selectedLockStatus : null;
-        $monthIsLocked = $lockRow && (($lockRow['status'] ?? '') === 'locked');
-        $lockLabel = $lockMonth !== '' ? date('F Y', strtotime($lockMonth . '-01')) : '';
-        $lockedAt = '';
-        if ($monthIsLocked && !empty($lockRow['locked_at'])) {
-            $lockedAt = date('d M Y, h:i A', strtotime((string) $lockRow['locked_at']));
-        }
-        $lockedBy = $monthIsLocked ? trim((string) ($lockRow['locked_by_name'] ?? '')) : '';
-        $reportUrl = APP_URL . '/attendance/report?' . http_build_query([
-            'department_id' => $department_id,
-            'academic_year' => $selectedAcademicYear ?? '',
-            'month' => $lockMonth,
-            'view' => 'summary',
-            'source' => 'manual',
-        ]);
+    <?php if (!empty($department) && (!empty($canMarkAttendance) || !empty($canViewAttendanceReport))): ?>
+    <?php
+        $attMonth = (string) ($attendanceMonth ?? date('Y-m'));
+        $attMonthLabel = date('F Y', strtotime($attMonth . '-01'));
+        $attLocked = !empty($attendanceMonthLocked);
+        $attDeptQs = 'department_id=' . urlencode((string) ($department['department_id'] ?? ''));
+        $attYearQs = !empty($selectedAcademicYear) ? '&academic_year=' . urlencode((string) $selectedAcademicYear) : '';
+        $attMonthQs = '&month=' . urlencode($attMonth);
+        $markUrl = APP_URL . '/attendance?' . $attDeptQs . $attYearQs . $attMonthQs;
+        $reportUrl = APP_URL . '/attendance/report?' . $attDeptQs . $attYearQs . $attMonthQs . '&view=summary';
     ?>
-    <div class="assign-card">
-        <div class="assign-head"><i class="fas fa-lock me-2"></i>Attendance report lock</div>
-        <div class="assign-body">
-            <form method="get" action="<?php echo APP_URL; ?>/hod/dashboard" class="row g-2 align-items-end mb-3">
-                <?php if (!empty($selectedAcademicYear)): ?>
-                    <input type="hidden" name="academic_year" value="<?php echo $e($selectedAcademicYear); ?>">
-                <?php endif; ?>
-                <div class="col-sm-6 col-md-4">
-                    <label for="lock_month" class="form-label small fw-semibold mb-1">Month</label>
-                    <input type="month" class="form-control" id="lock_month" name="lock_month" value="<?php echo $e($lockMonth); ?>" required>
-                </div>
-                <div class="col-sm-auto">
-                    <button type="submit" class="btn btn-primary">Show lock</button>
-                </div>
-            </form>
-
-            <div class="assign-item <?php echo $monthIsLocked ? 'is-active' : ''; ?>">
-                <div>
-                    <strong><?php echo $e($lockLabel); ?></strong>
-                    <?php if ($monthIsLocked): ?>
-                        <span class="assign-type" style="background:#b91c1c;">Locked</span>
-                        <div class="assign-meta">
-                            <?php echo $lockedBy !== '' ? 'Locked by ' . $e($lockedBy) : 'Locked'; ?>
-                            <?php if ($lockedAt !== ''): ?> &middot; <?php echo $e($lockedAt); ?><?php endif; ?>
-                            &middot; Attendance for this month cannot be edited. Finance can use the report.
-                        </div>
-                    <?php else: ?>
-                        <span class="assign-type" style="background:#15803d;">Open</span>
-                        <div class="assign-meta">This month is not locked. Attendance can still be edited. Lock it from the attendance report when the month is complete.</div>
+    <style>
+        .hod-att-card { border-radius: 14px; border: 1px solid #e2e8f0; background: #fff; box-shadow: 0 2px 10px rgba(15,23,42,.06); margin-bottom: 1.5rem; overflow: hidden; }
+        .hod-att-head { background: linear-gradient(135deg, #0f766e 0%, #115e59 100%); color: #fff; padding: 1rem 1.25rem; font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+        .hod-att-body { padding: 1.15rem 1.25rem; }
+        .hod-att-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+        .hod-att-action { display: flex; flex-direction: column; gap: .55rem; min-width: 0; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; background: #f8fafc; height: 100%; }
+        .hod-att-action h3 { margin: 0; font-size: .95rem; font-weight: 700; color: #0f172a; }
+        .hod-att-action p { margin: 0; font-size: .84rem; color: #64748b; line-height: 1.4; flex: 1; }
+        .hod-att-meta { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-bottom: .85rem; }
+        .hod-att-meta .badge { font-weight: 600; }
+        @media (max-width: 767.98px) {
+            .hod-att-grid { grid-template-columns: 1fr; }
+            .hod-att-body { padding: .85rem .75rem; }
+            .hod-att-action .btn { width: 100%; }
+        }
+    </style>
+    <div class="hod-att-card">
+        <div class="hod-att-head">
+            <span><i class="fas fa-user-check me-2"></i>Student Attendance</span>
+            <span class="small opacity-90"><?php echo $e($attMonthLabel); ?></span>
+        </div>
+        <div class="hod-att-body">
+            <div class="hod-att-meta">
+                <?php if ($attLocked): ?>
+                    <span class="badge bg-danger"><i class="fas fa-lock me-1"></i>Month locked</span>
+                    <?php if (!empty($attendanceLockStatus['locked_by_name'])): ?>
+                        <span class="small text-muted">by <?php echo $e($attendanceLockStatus['locked_by_name']); ?></span>
                     <?php endif; ?>
-                </div>
-                <a class="btn btn-sm btn-outline-primary" href="<?php echo $e($reportUrl); ?>">Open report</a>
+                <?php else: ?>
+                    <span class="badge bg-success"><i class="fas fa-unlock me-1"></i>Open for marking</span>
+                <?php endif; ?>
+                <span class="small text-muted"><?php echo $e($department['department_name'] ?? ''); ?></span>
             </div>
-
-            <?php if (!empty($attendanceLocks)): ?>
-                <div class="table-responsive mt-3">
-                    <table class="table table-sm mb-0">
-                        <thead>
-                            <tr>
-                                <th>Month</th>
-                                <th>Locked by</th>
-                                <th>Locked at</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($attendanceLocks as $lock):
-                                $m = (string) ($lock['month'] ?? '');
-                                $mLabel = $m !== '' ? date('M Y', strtotime($m . '-01')) : '—';
-                                $by = trim((string) ($lock['locked_by_name'] ?? ''));
-                                if ($by === '') {
-                                    $by = trim((string) ($lock['user_name'] ?? ''));
-                                }
-                                $at = !empty($lock['locked_at']) ? date('d M Y, h:i A', strtotime((string) $lock['locked_at'])) : '—';
-                                $open = APP_URL . '/attendance/report?' . http_build_query([
-                                    'department_id' => $department_id,
-                                    'month' => $m,
-                                    'view' => 'summary',
-                                    'source' => 'manual',
-                                ]);
-                            ?>
-                                <tr>
-                                    <td><?php echo $e($mLabel); ?></td>
-                                    <td><?php echo $e($by !== '' ? $by : '—'); ?></td>
-                                    <td><?php echo $e($at); ?></td>
-                                    <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="<?php echo $e($open); ?>">Open</a></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+            <div class="hod-att-grid">
+                <?php if (!empty($canMarkAttendance)): ?>
+                <div class="hod-att-action">
+                    <h3><i class="fas fa-clipboard-check me-1 text-teal" style="color:#0f766e;"></i>Mark attendance</h3>
+                    <p>Mark daily student attendance for your department courses and groups<?php echo $attLocked ? '. This month is locked — open only if admin unlocks.' : '.'; ?></p>
+                    <a class="btn btn-success btn-sm <?php echo $attLocked ? 'disabled' : ''; ?>"
+                       href="<?php echo $attLocked ? '#' : $e($markUrl); ?>"
+                       <?php echo $attLocked ? 'aria-disabled="true" tabindex="-1"' : ''; ?>>
+                        <i class="fas fa-pen me-1"></i><?php echo $attLocked ? 'Marking locked' : 'Open mark sheet'; ?>
+                    </a>
                 </div>
-            <?php else: ?>
-                <p class="assign-meta mb-0 mt-2">No locked months for this department yet.</p>
-            <?php endif; ?>
+                <?php endif; ?>
+                <?php if (!empty($canViewAttendanceReport)): ?>
+                <div class="hod-att-action">
+                    <h3><i class="fas fa-chart-bar me-1" style="color:#003366;"></i>Report &amp; lock</h3>
+                    <p>View the department attendance report, export when locked, and lock the month after review.</p>
+                    <a class="btn btn-primary btn-sm" href="<?php echo $e($reportUrl); ?>">
+                        <i class="fas fa-<?php echo $attLocked ? 'lock' : 'file-alt'; ?> me-1"></i>
+                        <?php echo $attLocked ? 'View locked report' : 'Open report / lock month'; ?>
+                    </a>
+                </div>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
     <?php endif; ?>

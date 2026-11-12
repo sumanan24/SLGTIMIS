@@ -147,8 +147,10 @@ $blockRoom = trim((string) ($s['block_name'] ?? '')
     <div class="oh">For office use only</div>
     <table class="room">
         <tr>
-            <td class="rl">Hostel</td><td class="rv"><?php echo $val($u($s['hostel_name'] ?? '')); ?></td>
-            <td class="rl">Room no.</td><td class="rv"><?php echo $val($u($s['room_no'] ?? '')); ?></td>
+            <td class="rl">Hostel</td><td class="rv"></td>
+            <td class="rl">Block</td><td class="rv"></td>
+            <td class="rl">Room no.</td><td class="rv"></td>
+            <td class="rl">Bed no.</td><td class="rv"></td>
         </tr>
     </table>
     <table>
@@ -160,10 +162,9 @@ $blockRoom = trim((string) ($s['block_name'] ?? '')
                 <div class="ol"></div><div class="os">Signature &amp; date</div>
             </td>
             <td>
-                <div class="ot">Finance Officer</div>
-                <div class="oo">Name</div>
-                <div class="ol"></div>
-                <div class="os">Signature &amp; date</div>
+                <div class="ot">Head of department</div>
+                <div class="oo"><?php echo $chk(false); ?>Approved</div>
+                <div class="oo"><?php echo $chk(false); ?>Rejected</div>
             </td>
             <td>
                 <div class="ot">SAO / Registrar</div>

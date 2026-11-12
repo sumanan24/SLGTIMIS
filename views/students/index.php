@@ -64,9 +64,6 @@ $staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsa
                     <i class="fas fa-images me-1"></i>Import Profile Images
                 </a>
                 <?php endif; ?>
-                <a href="<?php echo APP_URL; ?>/students/language-report" class="btn btn-outline-light btn-sm">
-                    <i class="fas fa-language me-1"></i>Sinhala / Tamil Count
-                </a>
                 <?php if (isset($canExport) && $canExport): ?>
                 <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#exportModal">
                     <i class="fas fa-file-excel me-1"></i>Export to Excel

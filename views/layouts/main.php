@@ -105,20 +105,31 @@
                                 $isAdminOrADM = $userModel->isAdminOrADM($_SESSION['user_id']);
                                 $canManageRoomAllocations = $userModel->canManageRoomAllocations($_SESSION['user_id']);
                                 $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-                                // Attendance access: HOD, IN1, IN2, IN3, and Admin
-                                $hasAttendanceAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3']) || $isAdmin;
-                                // Attendance report access: DIR, DPI, DPA, REG, FIN, ACC, SAO, HOD, IN1, IN2, IN3, ADM, Admin,
-                                // and Finance-department Management Assistants (MA/MA2 in FIN)
-                                $hasAttendanceReportAccess = in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'HOD', 'IN1', 'IN2', 'IN3', 'ADM'])
+                                // Assigned Permanent / Acting / Cover-up department heads (HOD assign)
+                                $isAssignedDeptHead = !empty($headedDepartments);
+                                // Attendance access: HOD, IN1–IN3, assigned heads, Admin
+                                $hasAttendanceAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3'], true)
+                                    || $isAssignedDeptHead
+                                    || $isAdmin;
+                                // Attendance report access: DIR, DPI, DPA, REG, FIN, ACC, SAO, HOD, IN1–IN3, ADM, Admin,
+                                // assigned heads, and Finance-department Management Assistants (MA/MA2 in FIN)
+                                $hasAttendanceReportAccess = in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'HOD', 'IN1', 'IN2', 'IN3', 'ADM'], true)
                                     || $isAdmin
                                     || $isSAO
+                                    || $isAssignedDeptHead
                                     || $userModel->isFinanceDepartmentAssistant($_SESSION['user_id']);
-                                // Blank month attendance Excel (weekdays, 4 slots): ADM, HOD, IN1–IN3, Admin
-                                $hasMonthAttendanceSheetAccess = in_array($userRole, ['ADM', 'HOD', 'IN1', 'IN2', 'IN3'], true) || $isAdmin;
-                                // Month-range % summary: HOD, ADM, Admin
-                                $hasAttendanceRangeSummaryAccess = in_array($userRole, ['HOD', 'ADM'], true) || $isAdmin;
-                                // Groups access: HOD, IN1, IN2, IN3, ADM, and Admin
-                                $hasGroupAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'ADM']) || $isAdmin;
+                                // Blank month attendance Excel (weekdays, 4 slots): ADM, HOD, IN1–IN3, assigned heads, Admin
+                                $hasMonthAttendanceSheetAccess = in_array($userRole, ['ADM', 'HOD', 'IN1', 'IN2', 'IN3'], true)
+                                    || $isAssignedDeptHead
+                                    || $isAdmin;
+                                // Month-range % summary: HOD, ADM, assigned heads, Admin
+                                $hasAttendanceRangeSummaryAccess = in_array($userRole, ['HOD', 'ADM'], true)
+                                    || $isAssignedDeptHead
+                                    || $isAdmin;
+                                // Groups access: HOD, IN1–IN3, ADM, assigned heads, Admin
+                                $hasGroupAccess = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'ADM'], true)
+                                    || !empty($headedDepartments)
+                                    || $isAdmin;
                                 // Instructor diary menu: teaching staff, HOD, ADM, Admin only (not DIR/DPA/DPI/REG/SAO)
                                 $hasInstructorDiaryAccess = !$isSAO && (in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3', 'LE1', 'LE2', 'SLE', 'ADM'], true) || $isAdmin);
                                 // Staff device (Hikvision) menu: ADM/Admin/HRO full module; DIR, REG, FIN, ACC, HOD see dashboard + month only
@@ -192,7 +203,7 @@
                             
                             <ul class="sidebar-menu sidebar-menu-ordered<?php echo $isADMRole ? ' sidebar-menu-adm' : ''; ?>">
                             <li data-nav="dashboard">
-                                <a href="<?php echo APP_URL; ?>/<?php echo ($isHOD) ? 'hod/dashboard' : 'dashboard'; ?>" class="<?php echo (isset($page) && $page === 'dashboard') ? 'active' : ''; ?>">
+                                <a href="<?php echo APP_URL; ?>/<?php echo ($isHOD || !empty($headedDepartments)) ? 'hod/dashboard' : 'dashboard'; ?>" class="<?php echo (isset($page) && $page === 'dashboard') ? 'active' : ''; ?>">
                                     <i class="fas fa-tachometer-alt"></i>
                                     <span>Dashboard</span>
                                 </a>

@@ -19,12 +19,14 @@ class AttendanceController extends Controller {
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
         
-        // Allow HOD, IN1, IN2, IN3, and Admin
+        // Allow HOD, IN1–IN3, assigned department heads, and Admin
         $allowedRoles = ['HOD', 'IN1', 'IN2', 'IN3'];
-        $hasAccess = in_array($userRole, $allowedRoles) || $isAdmin;
+        $hasAccess = in_array($userRole, $allowedRoles, true)
+            || $isAdmin
+            || $userModel->isAssignedDepartmentHead((int) $_SESSION['user_id']);
         
         if (!$hasAccess) {
-            $_SESSION['error'] = 'Access denied. Only HOD, IN1, IN2, and IN3 can access attendance.';
+            $_SESSION['error'] = 'Access denied. Only HOD, instructors, or assigned department heads can access attendance.';
             $this->redirect('dashboard');
             return false;
         }
@@ -43,9 +45,10 @@ class AttendanceController extends Controller {
         $studentModel = $this->model('StudentModel');
         $attendanceModel = $this->model('AttendanceModel');
         
-        // HOD / IN1–IN3: own department only; ADM / admin: any department
+        // HOD / IN1–IN3 / assigned heads: own department only; ADM / admin: any department
         $userDepartmentId = $this->getUserDepartment();
-        if ($this->isDepartmentRestricted()) {
+        $forceOwnDepartment = $this->isDepartmentRestricted() || $this->isDepartmentScoped();
+        if ($forceOwnDepartment) {
             if ($userDepartmentId === null || $userDepartmentId === '') {
                 $_SESSION['error'] = 'Your account has no department assigned. Please contact the administrator.';
                 $this->redirect('dashboard');
@@ -123,9 +126,47 @@ class AttendanceController extends Controller {
         if (!empty($attendanceData)) {
             foreach ($attendanceData as $studentAttendance) {
                 foreach ($studentAttendance as $date => $status) {
-                    if ($status == -1 && !in_array($date, $holidayDates)) {
+                    if ((int) $status === -1 && !in_array($date, $holidayDates, true)) {
                         $holidayDates[] = $date;
                     }
+                }
+            }
+        }
+
+        // Fingerprint auto-suggest for unmarked weekdays (up to today):
+        // finger OK (In–Out duration > 7 hours) → Present; otherwise Absent.
+        // Saved marks and holidays are never overwritten.
+        $fingerMap = [];
+        $fingerSuggested = [];
+        if (!empty($students) && !empty($calendarDays)) {
+            $startDate = $month . '-01';
+            $endDate = date('Y-m-t', strtotime($startDate));
+            $fingerMap = $attendanceModel->getFingerDayMap(
+                array_column($students, 'student_id'),
+                $startDate,
+                $endDate
+            );
+            $today = date('Y-m-d');
+            $holidayLookup = array_fill_keys($holidayDates, true);
+            foreach ($students as $student) {
+                $sid = (string) ($student['student_id'] ?? '');
+                if ($sid === '') {
+                    continue;
+                }
+                if (!isset($attendanceData[$sid]) || !is_array($attendanceData[$sid])) {
+                    $attendanceData[$sid] = [];
+                }
+                foreach ($calendarDays as $day) {
+                    $date = (string) ($day['date'] ?? '');
+                    if ($date === '' || $date > $today || isset($holidayLookup[$date])) {
+                        continue;
+                    }
+                    if (array_key_exists($date, $attendanceData[$sid]) && $attendanceData[$sid][$date] !== null && $attendanceData[$sid][$date] !== '') {
+                        continue;
+                    }
+                    $fingerOk = (($fingerMap[$sid][$date] ?? '') === 'P');
+                    $attendanceData[$sid][$date] = $fingerOk ? 1 : 0;
+                    $fingerSuggested[$sid][$date] = $fingerOk ? 'P' : 'A';
                 }
             }
         }
@@ -157,6 +198,8 @@ class AttendanceController extends Controller {
             'groups' => $groups,
             'students' => $students,
             'attendanceData' => $attendanceData,
+            'fingerMap' => $fingerMap,
+            'fingerSuggested' => $fingerSuggested,
             'calendarDays' => $calendarDays,
             'holidayDates' => $holidayDates,
             'selectedDepartment' => $departmentId,
@@ -169,8 +212,8 @@ class AttendanceController extends Controller {
             'lockStatus' => $lockStatus,
             'error' => $_SESSION['error'] ?? null,
             'message' => $_SESSION['message'] ?? null,
-            'lockDepartmentSelection' => $this->isDepartmentRestricted(),
-            'forcedDepartmentId' => $this->isDepartmentRestricted() ? (string) $userDepartmentId : '',
+            'lockDepartmentSelection' => $this->isDepartmentRestricted() || $this->isDepartmentScoped(),
+            'forcedDepartmentId' => ($this->isDepartmentRestricted() || $this->isDepartmentScoped()) ? (string) $userDepartmentId : '',
         ];
         
         unset($_SESSION['error'], $_SESSION['message']);
@@ -192,11 +235,13 @@ class AttendanceController extends Controller {
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
         $allowedRoles = ['HOD', 'IN1', 'IN2', 'IN3'];
-        $hasAccess = in_array($userRole, $allowedRoles) || $isAdmin;
+        $hasAccess = in_array($userRole, $allowedRoles, true)
+            || $isAdmin
+            || $userModel->isAssignedDepartmentHead((int) $_SESSION['user_id']);
         
         if (!$hasAccess) {
             $this->json(
-                ['success' => false, 'error' => 'Access denied. Only HOD, IN1, IN2, and IN3 can update attendance.'],
+                ['success' => false, 'error' => 'Access denied. Only HOD, instructors, or assigned department heads can update attendance.'],
                 403
             );
         }
@@ -322,12 +367,13 @@ class AttendanceController extends Controller {
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
         
-        // Allow DIR, DPI, DPA, REG, FIN, ACC, SAO, HOD, IN1, IN2, IN3, ADM, Admin,
-        // and Finance-department Management Assistants (MA/MA2 in FIN).
+        // Allow DIR, DPI, DPA, REG, FIN, ACC, SAO, HOD, IN1–IN3, ADM, Admin,
+        // assigned department heads, and Finance-department Management Assistants (MA/MA2 in FIN).
         $allowedRoles = ['DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'HOD', 'IN1', 'IN2', 'IN3', 'ADM'];
-        $hasAccess = in_array($userRole, $allowedRoles)
+        $hasAccess = in_array($userRole, $allowedRoles, true)
             || $isAdmin
             || $userModel->isSAO($_SESSION['user_id'])
+            || $userModel->isAssignedDepartmentHead((int) $_SESSION['user_id'])
             || $userModel->isFinanceDepartmentAssistant($_SESSION['user_id']);
         
         if (!$hasAccess) {
@@ -353,10 +399,12 @@ class AttendanceController extends Controller {
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
         $allowedRoles = ['ADM', 'HOD', 'IN1', 'IN2', 'IN3'];
-        $hasAccess = in_array($userRole, $allowedRoles, true) || $isAdmin;
+        $hasAccess = in_array($userRole, $allowedRoles, true)
+            || $isAdmin
+            || $userModel->isAssignedDepartmentHead((int) $_SESSION['user_id']);
         
         if (!$hasAccess) {
-            $_SESSION['error'] = 'Access denied. Only ADM, HOD, IN1, IN2, IN3, or administrator can download the month attendance sheet.';
+            $_SESSION['error'] = 'Access denied. Only ADM, HOD, instructors, assigned department heads, or administrator can download the month attendance sheet.';
             $this->redirect('dashboard');
             return false;
         }
@@ -379,13 +427,14 @@ class AttendanceController extends Controller {
         $attendanceModel = $this->model('AttendanceModel');
         $lockModel = $this->model('AttendanceMonthLockModel');
         
-        // Get user's department if user is HOD, IN1, IN2, or IN3
+        // Get user's department if HOD, IN1–IN3, or assigned department head
         $userDepartmentId = $this->getUserDepartment();
-        $isDepartmentRestricted = $this->isDepartmentRestricted();
+        $isDepartmentRestricted = $this->isDepartmentRestricted() || $this->isDepartmentScoped();
         $isHOD = $this->isHOD();
         $isAdmin = false;
         $isFIN = false;
         $userRole = null;
+        $isAssignedHead = false;
         
         // FIN officer, or MA/MA2 posted in Finance: locked months + eligible students only
         // (summary view + Excel download for payment processing)
@@ -395,10 +444,13 @@ class AttendanceController extends Controller {
             $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
             $userRole = $userModel->getUserRole($_SESSION['user_id']);
             $isFIN = $userModel->isFinanceAttendanceViewer($_SESSION['user_id']);
+            $isAssignedHead = $userModel->isAssignedDepartmentHead((int) $_SESSION['user_id']);
         }
         
-        // Get filter parameters - use user's department if department-restricted user
-        $departmentId = $userDepartmentId ? $userDepartmentId : $this->get('department_id', '');
+        // Get filter parameters - use user's department if department-restricted / assigned head
+        $departmentId = ($userDepartmentId && $isDepartmentRestricted)
+            ? $userDepartmentId
+            : ($userDepartmentId ?: $this->get('department_id', ''));
         $courseId = $this->get('course_id', '');
         $academicYear = $this->get('academic_year', '');
         $month = $this->get('month', date('Y-m'));
@@ -513,6 +565,9 @@ class AttendanceController extends Controller {
             'source' => $source,
             'eligibleOnly' => $eligibleOnly,
             'isHOD' => $isHOD,
+            'canLockMonth' => $isHOD
+                || $isAssignedHead
+                || in_array((string) $userRole, ['IN1', 'IN2', 'IN3'], true),
             'isAdmin' => $isAdmin,
             'isFIN' => $isFIN,
             'isMonthLocked' => $isMonthLocked,
@@ -539,10 +594,12 @@ class AttendanceController extends Controller {
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
         $allowedRoles = ['HOD', 'ADM'];
-        $hasAccess = in_array($userRole, $allowedRoles, true) || $isAdmin;
+        $hasAccess = in_array($userRole, $allowedRoles, true)
+            || $isAdmin
+            || $userModel->isAssignedDepartmentHead((int) $_SESSION['user_id']);
         
         if (!$hasAccess) {
-            $_SESSION['error'] = 'Access denied. Only HOD and ADM can view the month-range attendance summary.';
+            $_SESSION['error'] = 'Access denied. Only HOD, ADM, or assigned department heads can view the month-range attendance summary.';
             $this->redirect('dashboard');
             return false;
         }
@@ -794,16 +851,17 @@ class AttendanceController extends Controller {
             return;
         }
         
-        // Only HOD, IN1, IN2, IN3 can lock months
+        // HOD, IN1–IN3, assigned department heads, or Admin can lock months
         require_once BASE_PATH . '/models/UserModel.php';
         $userModel = new UserModel();
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
         $allowedRoles = ['HOD', 'IN1', 'IN2', 'IN3'];
-        $hasAccess = in_array($userRole, $allowedRoles) || $isAdmin;
+        $isAssignedHead = $userModel->isAssignedDepartmentHead((int) $_SESSION['user_id']);
+        $hasAccess = in_array($userRole, $allowedRoles, true) || $isAdmin || $isAssignedHead;
         
         if (!$hasAccess) {
-            $this->json(['success' => false, 'message' => 'Access denied. Only HOD, IN1, IN2, and IN3 can lock months.'], 403);
+            $this->json(['success' => false, 'message' => 'Access denied. Only HOD, instructors, or assigned department heads can lock months.'], 403);
             return;
         }
         
@@ -820,11 +878,22 @@ class AttendanceController extends Controller {
             return;
         }
         
-        // Verify HOD's department matches
-        $hodDepartmentId = $this->getHODDepartment();
-        if ($hodDepartmentId !== $departmentId) {
-            $this->json(['success' => false, 'message' => 'Access denied. You can only lock your own department\'s attendance.'], 403);
-            return;
+        // Own / headed department only (unless admin)
+        if (!$isAdmin) {
+            $allowedDeptIds = $userModel->getHeadedDepartmentIds((int) $_SESSION['user_id']);
+            $activeDept = $this->getUserDepartment();
+            if ($activeDept) {
+                $allowedDeptIds[] = (string) $activeDept;
+            }
+            $hodDept = $this->getHODDepartment();
+            if ($hodDept) {
+                $allowedDeptIds[] = (string) $hodDept;
+            }
+            $allowedDeptIds = array_values(array_unique(array_filter(array_map('strval', $allowedDeptIds))));
+            if (!in_array((string) $departmentId, $allowedDeptIds, true)) {
+                $this->json(['success' => false, 'message' => 'Access denied. You can only lock your own department\'s attendance.'], 403);
+                return;
+            }
         }
         
         // Get user name

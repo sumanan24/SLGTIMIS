@@ -82,11 +82,8 @@ table.sig td.box { width: 45%; }
 .office td:first-child { border-left: 0; }
 .office table.room { width: 100%; border-collapse: collapse; table-layout: fixed; border-bottom: 0.5pt solid #bbb; }
 .office table.room td { padding: 0; border: 0; vertical-align: bottom; height: 8.5mm; }
-.office table.room td.rl { width: 16%; font-size: 8pt; font-weight: bold; padding: 0 1.5mm 0 3mm; white-space: nowrap; }
-.office table.room td.rv {
-    width: 34%; border-bottom: 0.5pt solid #555; padding: 0 1.5mm 0.6mm;
-    font-size: 8.5pt; font-weight: bold; text-transform: uppercase;
-}
+.office table.room td.rl { width: 12%; font-size: 8pt; font-weight: bold; padding: 0 1.5mm 0 3mm; white-space: nowrap; }
+.office table.room td.rv { width: 13%; border-bottom: 0.5pt solid #555; padding: 0; }
 .office .ot { font-size: 8pt; font-weight: bold; margin-bottom: 0.8mm; }
 .office .oo { font-size: 8.2pt; margin-bottom: 0.6mm; }
 .office .ol { border-bottom: 0.5pt solid #555; height: 6mm; }

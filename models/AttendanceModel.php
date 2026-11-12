@@ -426,20 +426,9 @@ class AttendanceModel extends Model {
             $fingerByDay = [];
             $fingerPresentDays = 0;
             $fingerLateDays = 0;
-            $skippedBeforeStart = 0;
-            $academicYear = trim((string) ($row['academic_year'] ?? ''));
-            require_once BASE_PATH . '/helpers/AttendanceRules.php';
 
             foreach ($workingDaysList as $day) {
                 $date = $day['date'];
-                if (!AttendanceRules::attendanceCountsOn($date, $academicYear)) {
-                    $dayByDayAttendance[$date] = '';
-                    if ($includeFinger) {
-                        $fingerByDay[$date] = '';
-                    }
-                    $skippedBeforeStart++;
-                    continue;
-                }
                 $status = $attendanceRecords[$date] ?? null;
 
                 // Finger (device) status for this day: P present, L late/incomplete, '' no punch
@@ -492,9 +481,6 @@ class AttendanceModel extends Model {
                 }
             }
             
-            // Working days before the 2026/2027 start date do not count
-            $workingDays -= $skippedBeforeStart;
-
             // Calculate effective working days (excluding holidays)
             $effectiveWorkingDays = $workingDays - $holidayDays;
             
@@ -556,8 +542,8 @@ class AttendanceModel extends Model {
 
     /**
      * Finger (biometric device) attendance per student per day.
-     * Uses the existing In/Out rule: In on/before 08:40 and Out on/after 16:00 = present ('P');
-     * any other punches = late / incomplete ('L'); no punches = no entry.
+     * Present ('P') when first–last punch duration is more than 7 hours;
+     * other punches = late / incomplete ('L'); no punches = no entry.
      *
      * @param array $studentIds
      * @return array<string, array<string, string>> [student_id => [Y-m-d => 'P'|'L']]

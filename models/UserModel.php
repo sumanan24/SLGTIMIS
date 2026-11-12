@@ -376,6 +376,13 @@ class UserModel extends Model {
     }
 
     /**
+     * True when staff is assigned as Permanent / Acting / Cover-up head of at least one department.
+     */
+    public function isAssignedDepartmentHead($userId): bool {
+        return $this->getHeadedDepartmentIds((int) $userId) !== [];
+    }
+
+    /**
      * Check if user is HRO (HR Officer)
      */
     public function isHRO($userId) {
@@ -681,7 +688,11 @@ class UserModel extends Model {
             return true;
         }
         $role = $this->getUserRole($userId);
-        return in_array($role, ['MA2', 'DIR', 'REG', 'FIN', 'ACC', 'HOD'], true);
+        if (in_array($role, ['MA2', 'DIR', 'REG', 'FIN', 'ACC', 'HOD'], true)) {
+            return true;
+        }
+        // Assigned Permanent / Acting / Cover-up department heads (HOD assign)
+        return $this->isAssignedDepartmentHead($userId);
     }
     
     /**

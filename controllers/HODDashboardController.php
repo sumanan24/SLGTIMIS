@@ -233,29 +233,28 @@ class HODDashboardController extends Controller {
                 }
             }
 
-            $attendanceLocks = [];
-            $selectedLockMonth = date('Y-m');
-            $selectedLockStatus = null;
-            if ($userDepartmentId) {
+            // Student attendance shortcuts (mark + locked report) for HOD / IN / assigned heads
+            $isAssignedHead = $userModel->isAssignedDepartmentHead((int) $_SESSION['user_id']);
+            $canMarkAttendance = in_array($userRole, ['HOD', 'IN1', 'IN2', 'IN3'], true)
+                || $isAssignedHead
+                || $userModel->isAdmin((int) $_SESSION['user_id']);
+            $canViewAttendanceReport = $canMarkAttendance
+                || in_array($userRole, ['DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'ADM'], true)
+                || $userModel->isFinanceDepartmentAssistant((int) $_SESSION['user_id']);
+            $attendanceMonth = date('Y-m');
+            $attendanceLockStatus = null;
+            if ($userDepartmentId && $canViewAttendanceReport) {
                 try {
-                    $lockModel = $this->model('AttendanceMonthLockModel');
-                    $attendanceLocks = $lockModel->getLockedMonths($userDepartmentId);
-                    $requestedMonth = trim((string) $this->get('lock_month', ''));
-                    if (!preg_match('/^\d{4}-\d{2}$/', $requestedMonth)) {
-                        $requestedMonth = date('Y-m');
-                    }
-                    $selectedLockMonth = $requestedMonth;
-                    $row = $lockModel->getLockStatus($userDepartmentId, $selectedLockMonth);
-                    $selectedLockStatus = is_array($row) ? $row : null;
+                    $attendanceLockStatus = $this->model('AttendanceMonthLockModel')
+                        ->getLockStatus($userDepartmentId, $attendanceMonth);
                 } catch (Throwable $ex) {
-                    error_log('HODDashboard attendance locks: ' . $ex->getMessage());
+                    $attendanceLockStatus = null;
                 }
             }
+            $attendanceMonthLocked = is_array($attendanceLockStatus)
+                && (($attendanceLockStatus['status'] ?? '') === 'locked');
 
             $data = [
-                'attendanceLocks' => $attendanceLocks,
-                'selectedLockMonth' => $selectedLockMonth,
-                'selectedLockStatus' => $selectedLockStatus,
                 'studentStatusCounts' => $studentStatusCounts,
                 'my' => $my,
                 'error' => $flashError,
@@ -264,6 +263,11 @@ class HODDashboardController extends Controller {
                 'activeAssignment' => $activeAssignment,
                 'courseModuleRows' => $courseModuleRows,
                 'canManageCourses' => $this->isDepartmentManager(),
+                'canMarkAttendance' => $canMarkAttendance,
+                'canViewAttendanceReport' => $canViewAttendanceReport,
+                'attendanceMonth' => $attendanceMonth,
+                'attendanceMonthLocked' => $attendanceMonthLocked,
+                'attendanceLockStatus' => $attendanceLockStatus,
                 'title' => 'Department Dashboard',
                 'page' => 'dashboard',
                 'user_name' => $_SESSION['user_name'] ?? 'User',

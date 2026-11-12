@@ -111,12 +111,14 @@ class AccessControl {
                     'can_delete' => $manage ? 1 : 0,
                 ]);
             case 'student_attendance':
-                // View: classroom roles + office roles, and Finance-department MA/MA2 (attendance report).
+                // View: classroom roles + office roles, Finance MA/MA2, and assigned department heads.
+                $isAssignedHead = $userModel->isAssignedDepartmentHead($userId);
                 $view = in_array($role, ['HOD', 'IN1', 'IN2', 'IN3', 'DIR', 'DPI', 'DPA', 'REG', 'FIN', 'ACC', 'SAO', 'ADM'], true)
                     || $isAdmin
                     || $isSao
+                    || $isAssignedHead
                     || $userModel->isFinanceDepartmentAssistant($userId);
-                $manage = in_array($role, ['HOD', 'IN1', 'IN2', 'IN3', 'ADM'], true) || $isAdmin;
+                $manage = in_array($role, ['HOD', 'IN1', 'IN2', 'IN3', 'ADM'], true) || $isAdmin || $isAssignedHead;
                 return [
                     'can_view' => $view ? 1 : 0,
                     'can_add' => $manage ? 1 : 0,
@@ -150,7 +152,9 @@ class AccessControl {
                     'can_delete' => $manageCourses ? 1 : 0,
                 ];
             case 'groups':
-                $ok = in_array($role, ['HOD', 'IN1', 'IN2', 'IN3', 'ADM'], true) || $isAdmin;
+                $ok = in_array($role, ['HOD', 'IN1', 'IN2', 'IN3', 'ADM'], true)
+                    || $isAdmin
+                    || $userModel->isAssignedDepartmentHead($userId);
                 return [
                     'can_view' => $ok ? 1 : 0,
                     'can_add' => $ok ? 1 : 0,

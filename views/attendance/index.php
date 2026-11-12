@@ -139,7 +139,10 @@
                                 Students List (<?php echo count($students); ?> students)
                             </h6>
                             <?php if (!isset($isMonthLocked) || !$isMonthLocked || (isset($isAdmin) && $isAdmin)): ?>
-                            <div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="fillFromFingerprint()">
+                                    <i class="fas fa-fingerprint me-1"></i>Fill from fingerprint
+                                </button>
                                 <button type="button" class="btn btn-sm btn-success" onclick="markAllPresent()">
                                     <i class="fas fa-check me-1"></i>Mark All Present
                                 </button>
@@ -149,7 +152,6 @@
                             </div>
                             <?php endif; ?>
                         </div>
-                        
                         <form id="attendanceForm" method="POST" action="<?php echo APP_URL; ?>/attendance/bulk-update">
                             <input type="hidden" name="module_name" value="General">
                             <input type="hidden" name="department_id" value="<?php echo htmlspecialchars($selectedDepartment ?? ''); ?>">
@@ -169,6 +171,9 @@
                                 }
                                 .attendance-fixed-layout .date-header, .attendance-fixed-layout .date-cell { width: 40px; min-width: 40px; padding: 0.15rem 0.1rem; font-size: 0.75rem; }
                                 .attendance-fixed-layout .date-cell .form-check-input { width: 1rem; height: 1rem; }
+                                .attendance-fixed-layout .date-cell.finger-p { background: #e8f8ef; }
+                                .attendance-fixed-layout .date-cell.finger-a { background: #fff1f0; }
+                                .attendance-fixed-layout .date-cell.finger-saved { background: transparent; }
                                 .attendance-header-wrap { overflow-x: auto; overflow-y: hidden; background: #f8f9fa; border: 1px solid #dee2e6; border-bottom: none; scrollbar-width: none; -ms-overflow-style: none; }
                                 .attendance-header-wrap::-webkit-scrollbar { display: none; }
                                 .attendance-body-wrap { max-height: 70vh; overflow: auto; border: 1px solid #dee2e6; }
@@ -220,30 +225,49 @@
                                                     <div class="small text-muted" style="font-size: 0.7rem; line-height: 1.2;"><?php echo htmlspecialchars($student['student_fullname']); ?></div>
                                                 </td>
                                                 <?php 
-                                                $studentAttendance = $attendanceData[$student['student_id']] ?? [];
+                                                $sid = (string) ($student['student_id'] ?? '');
+                                                $studentAttendance = $attendanceData[$sid] ?? [];
+                                                $studentFingerSug = $fingerSuggested[$sid] ?? [];
+                                                $studentFingerRaw = $fingerMap[$sid] ?? [];
                                                 foreach ($calendarDays as $day): 
                                                     $date = $day['date'];
                                                     $currentStatus = $studentAttendance[$date] ?? null;
+                                                    $sug = $studentFingerSug[$date] ?? '';
+                                                    $fingerRaw = $studentFingerRaw[$date] ?? '';
+                                                    $cellClass = '';
+                                                    if ($sug === 'P') {
+                                                        $cellClass = 'finger-p';
+                                                    } elseif ($sug === 'A') {
+                                                        $cellClass = 'finger-a';
+                                                    }
+                                                    $tipExtra = $fingerRaw === 'P'
+                                                        ? 'Finger OK (>7h) → Present'
+                                                        : ($fingerRaw === 'L' ? 'Finger under 7h / incomplete → Absent' : 'No finger punch → Absent');
+                                                    if ($sug !== '') {
+                                                        $tipExtra .= ' (auto)';
+                                                    }
                                                 ?>
-                                                    <td class="text-center date-cell">
+                                                    <td class="text-center date-cell <?php echo htmlspecialchars($cellClass); ?>">
                                                         <?php 
-                                                        $uniqueId = str_replace(['-', '/'], '_', $student['student_id'] . '_' . $date);
-                                                        $isPresent = ($currentStatus === 1);
-                                                        $isHoliday = ($currentStatus === -1);
+                                                        $uniqueId = str_replace(['-', '/'], '_', $sid . '_' . $date);
+                                                        $isPresent = ((int) $currentStatus === 1);
+                                                        $isHoliday = ((int) $currentStatus === -1);
                                                         ?>
                                                         <div class="form-check d-flex justify-content-center align-items-center" 
                                                              data-bs-toggle="tooltip" 
                                                              data-bs-placement="top" 
-                                                             title="Student: <?php echo htmlspecialchars($student['student_id']); ?> | Date: <?php echo date('Y-m-d', strtotime($date)); ?>">
+                                                             title="<?php echo htmlspecialchars($sid . ' | ' . $date . ' | ' . $tipExtra); ?>">
                                                             <input type="checkbox" 
                                                                    class="form-check-input attendance-checkbox <?php echo $isHoliday ? 'holiday-checkbox' : ''; ?>" 
-                                                                   data-student="<?php echo htmlspecialchars($student['student_id']); ?>" 
+                                                                   data-student="<?php echo htmlspecialchars($sid); ?>" 
                                                                    data-date="<?php echo $date; ?>"
+                                                                   data-finger="<?php echo htmlspecialchars($fingerRaw === 'P' ? 'P' : ($fingerRaw !== '' ? 'L' : 'A')); ?>"
+                                                                   data-suggested="<?php echo htmlspecialchars($sug); ?>"
                                                                    id="attendance_<?php echo $uniqueId; ?>" 
                                                                    <?php echo $isPresent ? 'checked' : ''; ?>
                                                                    <?php echo ($isHoliday || (isset($isMonthLocked) && $isMonthLocked && (!isset($isAdmin) || !$isAdmin))) ? 'disabled' : ''; ?>
                                                                    style="width: 1rem; height: 1rem; cursor: pointer;"
-                                                                   title="Student: <?php echo htmlspecialchars($student['student_id']); ?> | Date: <?php echo date('Y-m-d', strtotime($date)); ?>">
+                                                                   title="<?php echo htmlspecialchars($sid . ' | ' . $date . ' | ' . $tipExtra); ?>">
                                                             <label class="form-check-label" 
                                                                    for="attendance_<?php echo $uniqueId; ?>"
                                                                    style="cursor: pointer; user-select: none; margin: 0;">
@@ -581,6 +605,31 @@ function toggleHolidayForDate(date, isHoliday) {
             checkbox.classList.remove('holiday-checkbox');
         }
     });
+}
+
+// Re-apply fingerprint suggestions on unmarked (enabled) cells: OK → Present, else Absent
+function fillFromFingerprint() {
+    const isMonthLocked = <?php echo (isset($isMonthLocked) && $isMonthLocked && (!isset($isAdmin) || !$isAdmin)) ? 'true' : 'false'; ?>;
+    if (isMonthLocked) {
+        alert('Cannot modify attendance: Month is locked. Only administrators can modify locked attendance.');
+        return;
+    }
+    let filled = 0;
+    document.querySelectorAll('.attendance-checkbox:not(:disabled)').forEach(function(checkbox) {
+        const finger = checkbox.getAttribute('data-finger') || 'A';
+        const ok = finger === 'P';
+        checkbox.checked = ok;
+        const cell = checkbox.closest('.date-cell');
+        if (cell) {
+            cell.classList.remove('finger-p', 'finger-a');
+            cell.classList.add(ok ? 'finger-p' : 'finger-a');
+        }
+        checkbox.setAttribute('data-suggested', ok ? 'P' : 'A');
+        filled++;
+    });
+    alert(filled > 0
+        ? ('Filled ' + filled + ' day(s) from fingerprint (OK = Present, otherwise Absent). Review and Save.')
+        : 'No editable days to fill.');
 }
 
 // Mark all students present

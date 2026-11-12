@@ -6,9 +6,8 @@
 class GroupController extends Controller {
     
     /**
-     * Check if user has group access (HOD, IN1, IN2, IN3, ADM)
-     * HOD/IN1/IN2/IN3 can only access their own department
-     * ADM can access all departments
+     * Check if user has group access (HOD, IN1–IN3, ADM, assigned department heads)
+     * Department-scoped users only see their own department; ADM/Admin see all.
      */
     private function checkGroupAccess() {
         if (!isset($_SESSION['user_id'])) {
@@ -21,63 +20,23 @@ class GroupController extends Controller {
         $userRole = $userModel->getUserRole($_SESSION['user_id']);
         $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
         
-        // Allow HOD, IN1, IN2, IN3, ADM, and Admin
         $allowedRoles = ['HOD', 'IN1', 'IN2', 'IN3', 'ADM'];
-        $hasAccess = in_array($userRole, $allowedRoles) || $isAdmin;
+        $hasAccess = in_array($userRole, $allowedRoles, true)
+            || $isAdmin
+            || $userModel->isAssignedDepartmentHead((int) $_SESSION['user_id']);
         
         if (!$hasAccess) {
-            $_SESSION['error'] = 'Access denied. Only HOD, IN1, IN2, IN3, and ADM can access groups.';
+            $_SESSION['error'] = 'Access denied. Only HOD, instructors, ADM, or assigned department heads can manage groups.';
             $this->redirect('dashboard');
             return false;
         }
 
-        // HOD / IN1-3 need a department; otherwise they would see every department
+        // Department-scoped users need a department; otherwise they would see every department
         if (!$this->requireDepartmentAssigned('dashboard')) {
             return false;
         }
         
         return true;
-    }
-    
-    /**
-     * Get user's department ID
-     * For HOD: use getHODDepartment()
-     * For IN1/IN2/IN3: get from staff table
-     * For ADM/Admin: return null (can access all)
-     */
-    protected function getUserDepartment() {
-        if (!isset($_SESSION['user_id'])) {
-            return null;
-        }
-        
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        $userRole = $userModel->getUserRole($_SESSION['user_id']);
-        $isAdmin = $userModel->isAdmin($_SESSION['user_id']);
-        
-        // ADM and Admin can access all departments
-        if ($userRole === 'ADM' || $isAdmin) {
-            return null;
-        }
-        
-        // HOD: use existing method
-        if ($userRole === 'HOD') {
-            return $userModel->getHODDepartment($_SESSION['user_id']);
-        }
-        
-        // IN1, IN2, IN3: get department from staff table
-        if (in_array($userRole, ['IN1', 'IN2', 'IN3'])) {
-            $user = $userModel->find($_SESSION['user_id']);
-            if (!$user || !isset($user['user_name'])) {
-                return null;
-            }
-            
-            $staffModel = $this->model('StaffModel');
-            $staff = $staffModel->find($user['user_name']);
-            return $staff ? ($staff['department_id'] ?? null) : null;
-        }
-        
-        return null;
     }
     
     /**

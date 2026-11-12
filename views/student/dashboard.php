@@ -84,7 +84,6 @@ $payRows = array_slice($payRows, 0, 5);
 $studentNotices = is_array($studentNotices ?? null) ? $studentNotices : [];
 $firstNotice = $studentNotices[0] ?? null;
 
-$canAccessForms = !empty($canAccessForms);
 $shortcuts = [
     ['student/profile', 'fa-user', 'My Profile', false],
     ['student/attendance', 'fa-calendar-check', 'Attendance', false],
@@ -94,10 +93,8 @@ $shortcuts = [
     ['student/payments', 'fa-money-bill-wave', 'Payments', false],
     ['student/notices', 'fa-bullhorn', 'Notices', false],
     ['student/documents-pdf', 'fa-file-pdf', 'Documents', true],
+    ['student/forms', 'fa-file-alt', 'Forms', false],
 ];
-if ($canAccessForms) {
-    $shortcuts[] = ['student/forms', 'fa-file-alt', 'Forms', false];
-}
 ?>
 <style>
 .sd-page {
@@ -1008,44 +1005,21 @@ if ($canAccessForms) {
 </div>
 
 <?php if (!$hasAcceptedConduct): ?>
-<style>
-.sd-agree ol { margin: 0; padding-left: 1.25rem; }
-.sd-agree li { margin: 0 0 .65rem; line-height: 1.45; font-size: .92rem; }
-.sd-agree li:last-child { margin-bottom: 0; }
-@media (max-width: 576px) {
-    .sd-agree li { font-size: .88rem; }
-}
-</style>
 <div class="modal fade" id="conductModal" tabindex="-1" aria-labelledby="conductModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="conductModalLabel"><i class="fas fa-file-contract me-2"></i>SLGTI STUDENT AGREEMENT</h5>
+                <h5 class="modal-title" id="conductModalLabel"><i class="fas fa-file-contract me-2"></i>SLGTI STUDENT CODE OF CONDUCT</h5>
             </div>
             <div class="modal-body">
-                <div class="alert alert-info"><i class="fas fa-info-circle me-2"></i><strong>Important:</strong> Please read the following terms and conditions carefully before accepting.</div>
-                <div class="border rounded p-3 p-md-4 mb-3 sd-agree" style="background-color: #f8f9fa; max-height: min(52vh, 520px); overflow-y: auto;">
-                    <h6 class="fw-bold mb-3">Terms and Conditions</h6>
-                    <ol>
-                        <li>The maximum training period shall be 30 hours per week. However, the training schedule may be adjusted according to the requirements of the Institute.</li>
-                        <li>The trainee shall undergo training in accordance with the approved training procedures, curriculum and guidelines prescribed for the relevant course throughout the entire training period.</li>
-                        <li>If the trainee's attendance, discipline, conduct or training performance is found to be unsatisfactory, the Institute reserves the right to take appropriate disciplinary action, including removal from the training programme, in accordance with institutional rules and regulations.</li>
-                        <li>The trainee shall ensure that all prescribed theoretical knowledge, practical competencies and relevant subject areas are successfully covered within the stipulated training period.</li>
-                        <li>The Institute shall provide the required training through its qualified instructors, employees or other duly authorized personnel.</li>
-                        <li>The trainee shall make every reasonable effort to achieve the learning outcomes and competencies prescribed under the relevant training programme.</li>
-                        <li>All assignments, practical activities, projects and other duties assigned by the Institute as part of the training programme shall be completed properly and within the stipulated time.</li>
-                        <li>The trainee shall comply with all instructions, directions and orders issued by the Institute, its management, instructors and other authorized personnel in connection with the training programme.</li>
-                        <li>The trainee shall use all training tools, machinery, equipment, computers and other institutional property safely, responsibly and only for their intended purposes. Any damage caused through negligence or misuse shall be dealt with in accordance with institutional regulations.</li>
-                        <li>The trainee shall strictly follow the SLGTI Apprentice Disciplinary Code (Clauses 01–38) throughout the training period and shall not violate any rules, regulations, instructions or disciplinary requirements stipulated therein.</li>
-                        <li>The trainee shall maintain proper attendance, punctuality, personal discipline and professional conduct throughout the training period.</li>
-                        <li>The trainee shall respect the Institute's management, instructors, staff members, fellow trainees and institutional property and shall contribute positively to maintaining a safe and professional learning environment.</li>
-                        <li>The trainee shall be responsible for maintaining the good name, reputation and standards of the Sri Lanka German Training Institute during the training period.</li>
-                        <li>The trainee and parent/guardian shall acknowledge and agree to comply with the terms and conditions of this Training Agreement and the applicable rules and regulations of SLGTI.</li>
-                    </ol>
+                <div class="alert alert-info"><i class="fas fa-info-circle me-2"></i><strong>Important:</strong> Please read the following declaration carefully before accepting.</div>
+                <div class="border rounded p-3 p-md-4 mb-3" style="background-color: #f8f9fa; max-height: min(400px, 45vh); overflow-y: auto;">
+                    <h6 class="fw-bold mb-3">SLGTI Student Code of Conduct and Honor</h6>
+                    <p>I hereby confirm that I have read, understood, and agreed to comply with the SLGTI Student Code of Conduct and Honor, including all rules, regulations, policies, and procedures of the Sri Lanka–German Training Institute (SLGTI). I acknowledge my responsibility to maintain discipline, academic integrity, professional conduct, and respect for all members of the SLGTI community and its property. I understand that this Code applies to my conduct on campus, off campus, and during all SLGTI-authorized activities, including industrial training and On-the-Job Training (OJT). I further understand that any violation of this Code may result in disciplinary action in accordance with SLGTI regulations, including warnings, suspension, or expulsion. By submitting this declaration electronically, I confirm that this acceptance is legally binding and equivalent to my handwritten signature.</p>
                 </div>
                 <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" id="agreeCheckbox" required>
-                    <label class="form-check-label" for="agreeCheckbox"><strong>I agree to the Terms and Conditions of the SLGTI Student Agreement</strong></label>
+                    <label class="form-check-label" for="agreeCheckbox"><strong>I agree to the SLGTI Student Code of Conduct and Honor</strong></label>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1087,11 +1061,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 conductModal.hide();
                 const alertDiv = document.createElement('div');
                 alertDiv.className = 'alert alert-success alert-dismissible fade show';
-                alertDiv.innerHTML = '<i class="fas fa-check-circle me-2"></i>' + (data.message || 'Student Agreement accepted successfully!') + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+                alertDiv.innerHTML = '<i class="fas fa-check-circle me-2"></i>' + (data.message || 'Code of conduct accepted successfully!') + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
                 const page = document.querySelector('.sd-page');
                 if (page) page.insertBefore(alertDiv, page.firstChild);
             } else {
-                alert('Error: ' + (data.error || 'Failed to accept the Student Agreement. Please try again.'));
+                alert('Error: ' + (data.error || 'Failed to accept code of conduct. Please try again.'));
                 acceptBtn.disabled = false;
                 acceptBtn.innerHTML = originalText;
             }
