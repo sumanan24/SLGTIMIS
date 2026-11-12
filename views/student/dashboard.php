@@ -84,6 +84,7 @@ $payRows = array_slice($payRows, 0, 5);
 $studentNotices = is_array($studentNotices ?? null) ? $studentNotices : [];
 $firstNotice = $studentNotices[0] ?? null;
 
+$canAccessForms = !empty($canAccessForms);
 $shortcuts = [
     ['student/profile', 'fa-user', 'My Profile', false],
     ['student/attendance', 'fa-calendar-check', 'Attendance', false],
@@ -93,8 +94,10 @@ $shortcuts = [
     ['student/payments', 'fa-money-bill-wave', 'Payments', false],
     ['student/notices', 'fa-bullhorn', 'Notices', false],
     ['student/documents-pdf', 'fa-file-pdf', 'Documents', true],
-    ['student/forms', 'fa-file-alt', 'Forms', false],
 ];
+if ($canAccessForms) {
+    $shortcuts[] = ['student/forms', 'fa-file-alt', 'Forms', false];
+}
 ?>
 <style>
 .sd-page {

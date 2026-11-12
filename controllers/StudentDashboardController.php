@@ -149,7 +149,7 @@ class StudentDashboardController extends Controller {
         
         // Check if student has accepted code of conduct
         $hasAcceptedConduct = !empty($student['student_conduct_accepted_at']);
-        
+
         $data = [
             'title' => 'Student Dashboard',
             'page' => 'student-dashboard',
@@ -169,20 +169,30 @@ class StudentDashboardController extends Controller {
             'recentPayments' => $recentPayments,
             'busSeasonPayments' => $busSeasonPayments,
             'hasAcceptedConduct' => $hasAcceptedConduct,
+            'canAccessForms' => $this->studentIsInFormsAcademicYear($studentId),
             'studentNotices' => array_slice($this->studentHandbook()['notices'] ?? [], 0, 3),
         ];
         
         return $this->view('student/dashboard', $data);
     }
 
+    /** Academic year for which student portal forms are available. */
+    private const FORMS_ACADEMIC_YEAR = '2026/2027';
+
     /**
      * Forms available to logged-in students (PDF filled from student profile).
+     * Limited to students enrolled in FORMS_ACADEMIC_YEAR only.
      */
     public function forms() {
         if (!$this->requireStudentAccess()) {
             return;
         }
 
+        if (!$this->requireFormsAcademicYear()) {
+            return;
+        }
+
+        $northern = $this->loggedInStudentIsNorthern();
         $dl = rtrim(APP_URL, '/') . '/student/forms/download?form=';
         $forms = [
             [
@@ -195,7 +205,10 @@ class StudentDashboardController extends Controller {
                 'action_label' => 'Download PDF',
                 'url' => $dl . 'student-confirmation',
             ],
-            [
+        ];
+        // Hostel request is for students outside the Northern Province only.
+        if (!$northern) {
+            $forms[] = [
                 'key' => 'hostel-request',
                 'title' => 'Hostel Request Form',
                 'description' => 'Request hostel admission, renewal or a change of room.',
@@ -204,8 +217,11 @@ class StudentDashboardController extends Controller {
                 'submit_to' => 'Hostel Office',
                 'action_label' => 'Download PDF',
                 'url' => $dl . 'hostel-request',
-            ],
-            [
+            ];
+        }
+        // Bus season request is for Northern Province students only.
+        if ($northern) {
+            $forms[] = [
                 'key' => 'bus-season-request',
                 'title' => 'Bus Season Request Form',
                 'description' => 'Apply for a monthly bus season ticket for your route.',
@@ -214,17 +230,17 @@ class StudentDashboardController extends Controller {
                 'submit_to' => 'Student Affairs Office',
                 'action_label' => 'Download PDF',
                 'url' => $dl . 'bus-season-request',
-            ],
-            [
-                'key' => 'family-income',
-                'title' => 'Family Income Confirmation',
-                'description' => 'Declare family annual income below Rs. 500,000 for the Rs. 7,500 monthly student allowance. Needs Grama Niladhari certification.',
-                'icon' => 'fa-file-signature',
-                'pages' => '1 page',
-                'submit_to' => 'Branch Principal',
-                'action_label' => 'Download PDF',
-                'url' => $dl . 'family-income',
-            ],
+            ];
+        }
+        $forms[] = [
+            'key' => 'family-income',
+            'title' => 'Family Income Confirmation',
+            'description' => 'Declare family annual income below Rs. 500,000 for the Rs. 7,500 monthly student allowance. Needs Grama Niladhari certification.',
+            'icon' => 'fa-file-signature',
+            'pages' => '1 page',
+            'submit_to' => 'Branch Principal',
+            'action_label' => 'Download PDF',
+            'url' => $dl . 'family-income',
         ];
 
         return $this->view('student/forms', [
@@ -239,6 +255,10 @@ class StudentDashboardController extends Controller {
      */
     public function downloadForm() {
         if (!$this->requireStudentAccess()) {
+            return;
+        }
+
+        if (!$this->requireFormsAcademicYear()) {
             return;
         }
 
@@ -296,6 +316,11 @@ class StudentDashboardController extends Controller {
         }
 
         if ($form === 'hostel-request') {
+            if ($this->studentProvinceIsNorthern($student)) {
+                $_SESSION['error'] = 'Hostel request form is not available for Northern Province students.';
+                $this->redirect('student/forms');
+                return;
+            }
             $allocation = null;
             try {
                 $roomAllocationModel = $this->model('RoomAllocationModel');
@@ -309,6 +334,11 @@ class StudentDashboardController extends Controller {
         }
 
         if ($form === 'bus-season-request') {
+            if (!$this->studentProvinceIsNorthern($student)) {
+                $_SESSION['error'] = 'Bus season request form is available only for Northern Province students.';
+                $this->redirect('student/forms');
+                return;
+            }
             $latest = null;
             try {
                 $busSeasonModel = $this->model('BusSeasonRequestModel');
@@ -455,6 +485,64 @@ class StudentDashboardController extends Controller {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Whether the logged-in student is enrolled in the forms academic year.
+     */
+    private function studentIsInFormsAcademicYear(?string $studentId = null): bool {
+        $studentId = trim((string) ($studentId ?? ($_SESSION['user_name'] ?? '')));
+        if ($studentId === '') {
+            return false;
+        }
+        try {
+            $enrollmentModel = $this->model('StudentEnrollmentModel');
+            $enrollment = $enrollmentModel->getCurrentEnrollment($studentId)
+                ?: $enrollmentModel->getLatestEnrollment($studentId);
+        } catch (Throwable $e) {
+            return false;
+        }
+        if (!is_array($enrollment)) {
+            return false;
+        }
+        $year = trim((string) ($enrollment['academic_year'] ?? ''));
+        return $year === self::FORMS_ACADEMIC_YEAR;
+    }
+
+    /**
+     * True when the logged-in student's province is Northern.
+     */
+    private function loggedInStudentIsNorthern(): bool {
+        $studentId = trim((string) ($_SESSION['user_name'] ?? ''));
+        if ($studentId === '') {
+            return false;
+        }
+        try {
+            $student = $this->model('StudentModel')->find($studentId);
+        } catch (Throwable $e) {
+            return false;
+        }
+        return is_array($student) && $this->studentProvinceIsNorthern($student);
+    }
+
+    /**
+     * @param array<string,mixed> $student
+     */
+    private function studentProvinceIsNorthern(array $student): bool {
+        require_once BASE_PATH . '/helpers/CallingLetterPdfHelper.php';
+        return CallingLetterPdfHelper::isNorthernProvince((string) ($student['student_provice'] ?? ''));
+    }
+
+    /**
+     * Gate forms list/download to FORMS_ACADEMIC_YEAR students only.
+     */
+    private function requireFormsAcademicYear(): bool {
+        if ($this->studentIsInFormsAcademicYear()) {
+            return true;
+        }
+        $_SESSION['error'] = 'Student forms are available only for academic year ' . self::FORMS_ACADEMIC_YEAR . ' students.';
+        $this->redirect('student/dashboard');
+        return false;
     }
 
     /**
