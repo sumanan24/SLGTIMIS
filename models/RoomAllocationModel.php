@@ -11,11 +11,15 @@ class RoomAllocationModel extends Model {
     }
 
     /**
-     * Enrollment joins required when filtering by department.
+     * Enrollment joins required when filtering by department or academic year.
      */
     private function getDepartmentFilterJoins() {
         return " LEFT JOIN `student_enroll` se ON s.student_id = se.student_id AND se.student_enroll_status = 'Following'
                  LEFT JOIN `course` c ON se.course_id = c.course_id";
+    }
+
+    private function needsEnrollmentJoin($filters) {
+        return !empty($filters['department_id']) || !empty($filters['academic_year']);
     }
 
     /**
@@ -58,6 +62,22 @@ class RoomAllocationModel extends Model {
             $types .= 's';
         }
 
+        if (!empty($filters['academic_year'])) {
+            $sql .= " AND se.academic_year = ?";
+            $params[] = $filters['academic_year'];
+            $types .= 's';
+        }
+
+        // Province region: northern | other (non-northern)
+        if (!empty($filters['province_region'])) {
+            $normalizedProvince = "LOWER(TRIM(REPLACE(REPLACE(IFNULL(s.`student_provice`, ''), ' Province', ''), ' province', '')))";
+            if ($filters['province_region'] === 'northern') {
+                $sql .= " AND {$normalizedProvince} = 'northern'";
+            } elseif ($filters['province_region'] === 'other') {
+                $sql .= " AND {$normalizedProvince} <> 'northern'";
+            }
+        }
+
         if (!empty($filters['search'])) {
             $searchTerm = '%' . $filters['search'] . '%';
             $sql .= " AND (s.student_fullname LIKE ? OR s.student_id LIKE ? OR r.room_no LIKE ?)";
@@ -86,14 +106,8 @@ class RoomAllocationModel extends Model {
                 LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
                 LEFT JOIN `hostels` h ON b.hostel_id = h.id";
 
-        if (!empty($filters['department_id'])) {
-            $sql .= $this->getDepartmentFilterJoins();
-            $sql .= " LEFT JOIN `department` d ON c.department_id = d.department_id";
-        } else {
-            $sql .= " LEFT JOIN `student_enroll` se ON s.student_id = se.student_id AND se.student_enroll_status = 'Following'
-                      LEFT JOIN `course` c ON se.course_id = c.course_id
-                      LEFT JOIN `department` d ON c.department_id = d.department_id";
-        }
+        $sql .= $this->getDepartmentFilterJoins();
+        $sql .= " LEFT JOIN `department` d ON c.department_id = d.department_id";
 
         $sql .= " WHERE 1=1";
         
@@ -142,14 +156,8 @@ class RoomAllocationModel extends Model {
                 LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
                 LEFT JOIN `hostels` h ON b.hostel_id = h.id";
 
-        if (!empty($filters['department_id'])) {
-            $sql .= $this->getDepartmentFilterJoins();
-            $sql .= " LEFT JOIN `department` d ON c.department_id = d.department_id";
-        } else {
-            $sql .= " LEFT JOIN `student_enroll` se ON s.student_id = se.student_id AND se.student_enroll_status = 'Following'
-                      LEFT JOIN `course` c ON se.course_id = c.course_id
-                      LEFT JOIN `department` d ON c.department_id = d.department_id";
-        }
+        $sql .= $this->getDepartmentFilterJoins();
+        $sql .= " LEFT JOIN `department` d ON c.department_id = d.department_id";
 
         $sql .= " WHERE 1=1";
         
@@ -188,7 +196,7 @@ class RoomAllocationModel extends Model {
                 LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
                 LEFT JOIN `hostel_blocks` b ON r.block_id = b.id";
 
-        if (!empty($filters['department_id'])) {
+        if ($this->needsEnrollmentJoin($filters)) {
             $sql .= $this->getDepartmentFilterJoins();
         }
 
@@ -304,6 +312,21 @@ class RoomAllocationModel extends Model {
             $params[] = $filters['department_id'];
             $types .= 's';
         }
+
+        if (!empty($filters['academic_year'])) {
+            $sql .= " AND se.academic_year = ?";
+            $params[] = $filters['academic_year'];
+            $types .= 's';
+        }
+
+        if (!empty($filters['province_region'])) {
+            $normalizedProvince = "LOWER(TRIM(REPLACE(REPLACE(IFNULL(s.`student_provice`, ''), ' Province', ''), ' province', '')))";
+            if ($filters['province_region'] === 'northern') {
+                $sql .= " AND {$normalizedProvince} = 'northern'";
+            } elseif ($filters['province_region'] === 'other') {
+                $sql .= " AND {$normalizedProvince} <> 'northern'";
+            }
+        }
         
         $sql .= " ORDER BY ha.allocated_at DESC";
         
@@ -320,6 +343,52 @@ class RoomAllocationModel extends Model {
         }
         
         return $data;
+    }
+
+    /**
+     * Active students keyed by room_id for a set of rooms.
+     *
+     * @param list<int|string> $roomIds
+     * @return array<string, list<array<string,mixed>>>
+     */
+    public function getActiveStudentsByRoomIds(array $roomIds): array {
+        $roomIds = array_values(array_unique(array_filter(array_map('strval', $roomIds), static function ($id) {
+            return $id !== '';
+        })));
+        if ($roomIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($roomIds), '?'));
+        $sql = "SELECT ha.room_id, ha.allocated_at, ha.status,
+                s.student_id, s.student_fullname, s.student_phone, s.student_nic, s.student_gender,
+                d.department_name, c.course_name
+                FROM `{$this->table}` ha
+                LEFT JOIN `student` s ON ha.student_id = s.student_id
+                LEFT JOIN `student_enroll` se ON s.student_id = se.student_id AND se.student_enroll_status = 'Following'
+                LEFT JOIN `course` c ON se.course_id = c.course_id
+                LEFT JOIN `department` d ON c.department_id = d.department_id
+                WHERE ha.status = 'active' AND ha.room_id IN ($placeholders)
+                ORDER BY ha.room_id ASC, s.student_fullname ASC";
+
+        $types = str_repeat('s', count($roomIds));
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param($types, ...$roomIds);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        $byRoom = [];
+        while ($row = $result->fetch_assoc()) {
+            $rid = (string) ($row['room_id'] ?? '');
+            if ($rid === '') {
+                continue;
+            }
+            if (!isset($byRoom[$rid])) {
+                $byRoom[$rid] = [];
+            }
+            $byRoom[$rid][] = $row;
+        }
+        return $byRoom;
     }
     
     /**

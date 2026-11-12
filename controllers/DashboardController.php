@@ -19,17 +19,20 @@ class DashboardController extends Controller {
             return;
         }
         
-        // HOD, instructors and lecturers only see their own department
         require_once BASE_PATH . '/models/UserModel.php';
-        // (also anyone assigned as Permanent / Acting / Cover-up head of a department)
-        if ($this->isDepartmentScoped() || (new UserModel())->usesDepartmentDashboard((int) $_SESSION['user_id'])) {
-            $this->redirect('hod/dashboard');
-            return;
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+
+        // Finance Office (FIN / ACC / FIN MA2) — finance dashboard first
+        if ($userModel->usesFinanceDashboard($uid)) {
+            return $this->financeDashboard();
         }
 
-        // Finance staff (FIN / ACC) only see finance-related items
-        if ((new UserModel())->usesFinanceDashboard((int) $_SESSION['user_id'])) {
-            return $this->financeDashboard();
+        // HOD, instructors and lecturers only see their own department
+        // (also anyone assigned as Permanent / Acting / Cover-up head of a department)
+        if ($this->isDepartmentScoped() || $userModel->usesDepartmentDashboard($uid)) {
+            $this->redirect('hod/dashboard');
+            return;
         }
         
         try {
@@ -227,13 +230,19 @@ class DashboardController extends Controller {
 
     private function financeDashboard() {
         require_once BASE_PATH . '/core/AccessControl.php';
+        require_once BASE_PATH . '/models/UserModel.php';
         $uid = (int) $_SESSION['user_id'];
+        $userModel = new UserModel();
         $data = [
             'title' => 'Finance Dashboard',
             'page' => 'dashboard',
             'user_name' => $_SESSION['user_name'] ?? 'User',
+            'user_role' => $userModel->getUserRole($uid),
+            'isFinanceAssistant' => $userModel->isFinanceDepartmentAssistant($uid),
             'canManagePayments' => AccessControl::can($uid, 'payments', 'add'),
             'canViewPayments' => AccessControl::can($uid, 'payments', 'view'),
+            'canViewAttendanceReport' => AccessControl::can($uid, 'student_attendance', 'view'),
+            'lockedMonths' => [],
             'error' => null,
         ];
         try {
@@ -241,6 +250,14 @@ class DashboardController extends Controller {
         } catch (Throwable $e) {
             error_log('DashboardController::financeDashboard: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
             $data['error'] = 'Unable to load the finance figures right now.';
+        }
+        try {
+            // Recent HOD-locked attendance months (allowance / payment processing)
+            $locks = $this->model('AttendanceMonthLockModel')->getLockedMonths();
+            $data['lockedMonths'] = array_slice($locks, 0, 12);
+        } catch (Throwable $e) {
+            error_log('DashboardController::financeDashboard locks: ' . $e->getMessage());
+            $data['lockedMonths'] = [];
         }
         return $this->view('dashboard/finance', $data);
     }

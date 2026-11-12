@@ -1,21 +1,22 @@
 <?php
 $groupPayments = $group['payments'] ?? [];
-$reportColumns = 5;
+$colsBeforeAmount = 3; // Date, Receipt, Method always shown before qty/amount; student/type/subtype/dept optional
 if ($basis !== 'student') {
-    $reportColumns++;
+    $colsBeforeAmount++;
 }
 if ($basis !== 'type') {
-    $reportColumns++;
+    $colsBeforeAmount++;
 }
 if ($basis !== 'subtype') {
-    $reportColumns++;
+    $colsBeforeAmount++;
 }
 if ($basis !== 'department') {
-    $reportColumns++;
+    $colsBeforeAmount++;
 }
+$colsBeforeAmount++; // Qty
 ?>
 <div class="table-responsive">
-    <table class="table table-sm table-hover align-middle mb-0">
+    <table class="table table-sm table-hover align-middle mb-0 pay-table">
         <thead>
             <tr>
                 <th>Date</th>
@@ -44,30 +45,32 @@ if ($basis !== 'department') {
                 $rowTotal = $lineTotal($payment);
                 ?>
                 <tr>
-                    <td><?php echo !empty($payment['pays_date']) ? date('d M Y', strtotime($payment['pays_date'])) : '-'; ?></td>
+                    <td><?php echo !empty($payment['pays_date']) ? date('d M Y', strtotime($payment['pays_date'])) : '—'; ?></td>
                     <td>#<?php echo (int) $payment['pays_id']; ?></td>
                     <?php if ($basis !== 'student'): ?>
                         <td>
-                            <div><?php echo htmlspecialchars($payment['student_reg_no'] ?? $payment['student_id'] ?? '-'); ?></div>
-                            <small class="text-muted"><?php echo htmlspecialchars($payment['student_fullname'] ?? ''); ?></small>
+                            <div><?php echo htmlspecialchars($payment['student_reg_no'] ?? $payment['student_id'] ?? '—'); ?></div>
+                            <?php if (!empty($payment['student_fullname'])): ?>
+                                <small class="text-muted"><?php echo htmlspecialchars($payment['student_fullname']); ?></small>
+                            <?php endif; ?>
                         </td>
                     <?php endif; ?>
                     <?php if ($basis !== 'type'): ?>
-                        <td><?php echo htmlspecialchars($payment['payment_type'] ?? '-'); ?></td>
+                        <td><?php echo htmlspecialchars($payment['payment_type'] ?? '—'); ?></td>
                     <?php endif; ?>
                     <?php if ($basis !== 'subtype'): ?>
-                        <td><?php echo htmlspecialchars($payment['payment_reason'] ?? '-'); ?></td>
+                        <td><?php echo htmlspecialchars($payment['payment_reason'] ?? '—'); ?></td>
                     <?php endif; ?>
                     <?php if ($basis !== 'department'): ?>
-                        <td><?php echo htmlspecialchars($payment['pays_department_name'] ?? $payment['department_name'] ?? '-'); ?></td>
+                        <td><?php echo htmlspecialchars($payment['pays_department_name'] ?? $payment['department_name'] ?? '—'); ?></td>
                     <?php endif; ?>
-                    <td><?php echo htmlspecialchars($payment['payment_method'] ?? '-'); ?></td>
+                    <td><?php echo htmlspecialchars($payment['payment_method'] ?? '—'); ?></td>
                     <td class="text-end"><?php echo $qty; ?></td>
                     <td class="text-end">Rs. <?php echo number_format($rowTotal, 2); ?></td>
                 </tr>
             <?php endforeach; ?>
             <tr class="table-light">
-                <td colspan="<?php echo $reportColumns - 1; ?>" class="text-end fw-bold">Section total</td>
+                <td colspan="<?php echo $colsBeforeAmount; ?>" class="text-end fw-bold">Section total</td>
                 <td class="text-end fw-bold">Rs. <?php echo number_format((float) ($group['total'] ?? 0), 2); ?></td>
             </tr>
         </tbody>

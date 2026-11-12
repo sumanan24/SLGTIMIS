@@ -28,6 +28,11 @@ class RoomAllocationController extends Controller {
         $status = $this->get('status', '');
         $departmentId = $this->get('department_id', '');
         $gender = $this->get('gender', '');
+        $academicYear = $this->get('academic_year', '');
+        $provinceRegion = strtolower(trim((string) $this->get('province_region', '')));
+        if (!in_array($provinceRegion, ['northern', 'other'], true)) {
+            $provinceRegion = '';
+        }
         
         $filters = [];
         if (!empty($search)) {
@@ -48,10 +53,18 @@ class RoomAllocationController extends Controller {
         if (!empty($gender)) {
             $filters['gender'] = $gender;
         }
+        if (!empty($academicYear)) {
+            $filters['academic_year'] = $academicYear;
+        }
+        if (!empty($provinceRegion)) {
+            $filters['province_region'] = $provinceRegion;
+        }
         
         $hostels = $hostelModel->getAll();
         $departmentModel = $this->model('DepartmentModel');
         $departments = $departmentModel->getAll();
+        $studentModel = $this->model('StudentModel');
+        $academicYears = $studentModel->getAcademicYears();
         $genders = ['Male', 'Female'];
         $roomModel = $this->model('RoomModel');
         $leftCountFilters = $filters;
@@ -63,8 +76,8 @@ class RoomAllocationController extends Controller {
         $userModel = new UserModel();
         $canManage = $userModel->canManageRoomAllocations($_SESSION['user_id']);
         
-        // If hostel is selected and no room/search/department/gender filter, show room-wise card view
-        $roomWiseView = !empty($hostelId) && empty($roomId) && empty($search) && empty($departmentId) && empty($gender);
+        // If hostel is selected and no room/search/department/gender/year/province filter, show room-wise card view
+        $roomWiseView = !empty($hostelId) && empty($roomId) && empty($search) && empty($departmentId) && empty($gender) && empty($academicYear) && empty($provinceRegion);
         
         if ($roomWiseView) {
             // Get all rooms for the hostel
@@ -98,8 +111,11 @@ class RoomAllocationController extends Controller {
                 'status' => $status,
                 'department_id' => $departmentId,
                 'gender' => $gender,
+                'academic_year' => $academicYear,
+                'province_region' => $provinceRegion,
                 'hostels' => $hostels,
                 'departments' => $departments,
+                'academicYears' => $academicYears,
                 'genders' => $genders,
                 'rooms' => $rooms,
                 'canManage' => $canManage,
@@ -133,8 +149,11 @@ class RoomAllocationController extends Controller {
                 'status' => $status,
                 'department_id' => $departmentId,
                 'gender' => $gender,
+                'academic_year' => $academicYear,
+                'province_region' => $provinceRegion,
                 'hostels' => $hostels,
                 'departments' => $departments,
+                'academicYears' => $academicYears,
                 'genders' => $genders,
                 'rooms' => $rooms,
                 'canManage' => $canManage,
@@ -579,6 +598,11 @@ class RoomAllocationController extends Controller {
         $status = $this->get('status', '');
         $departmentId = $this->get('department_id', '');
         $gender = $this->get('gender', '');
+        $academicYear = $this->get('academic_year', '');
+        $provinceRegion = strtolower(trim((string) $this->get('province_region', '')));
+        if (!in_array($provinceRegion, ['northern', 'other'], true)) {
+            $provinceRegion = '';
+        }
         
         if (!empty($search)) {
             $filters['search'] = $search;
@@ -597,6 +621,12 @@ class RoomAllocationController extends Controller {
         }
         if (!empty($gender)) {
             $filters['gender'] = $gender;
+        }
+        if (!empty($academicYear)) {
+            $filters['academic_year'] = $academicYear;
+        }
+        if (!empty($provinceRegion)) {
+            $filters['province_region'] = $provinceRegion;
         }
         
         $allocations = $allocationModel->getAllocationsForExport($filters);

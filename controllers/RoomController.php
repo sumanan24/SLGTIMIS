@@ -45,19 +45,58 @@ class RoomController extends Controller {
         $totalPages = 1;
         $page = 1;
 
+        // Active students per room (for room-wise student info)
+        $allocationModel = $this->model('RoomAllocationModel');
+        $roomIds = array_column($rooms, 'id');
+        $studentsByRoom = $allocationModel->getActiveStudentsByRoomIds($roomIds);
+
         $hostelGroups = [];
         foreach ($rooms as $room) {
+            $rid = (string) ($room['id'] ?? '');
+            $room['students'] = $studentsByRoom[$rid] ?? [];
             $key = (string) ($room['hostel_id'] ?? 0);
+            $flatName = trim((string) ($room['block_name'] ?? ''));
+            if ($flatName === '') {
+                $flatName = 'Unassigned flat';
+            }
             if (!isset($hostelGroups[$key])) {
-                $hostelGroups[$key] = ['id' => $key, 'name' => $room['hostel_name'] ?? 'Unknown hostel', 'rooms' => [], 'flats' => [], 'capacity' => 0, 'occupied' => 0];
+                $hostelGroups[$key] = [
+                    'id' => $key,
+                    'name' => $room['hostel_name'] ?? 'Unknown hostel',
+                    'rooms' => [],
+                    'flats' => [],
+                    'capacity' => 0,
+                    'occupied' => 0,
+                    'students' => 0,
+                ];
             }
             $g = &$hostelGroups[$key];
+            if (!isset($g['flats'][$flatName])) {
+                $g['flats'][$flatName] = [
+                    'name' => $flatName,
+                    'rooms' => [],
+                    'capacity' => 0,
+                    'occupied' => 0,
+                    'students' => 0,
+                ];
+            }
+            $cap = (int) ($room['capacity'] ?? 0);
+            $occ = (int) ($room['occupied_beds'] ?? 0);
+            $stu = count($room['students']);
             $g['rooms'][] = $room;
-            $g['flats'][$room['block_name'] ?? ''] = true;
-            $g['capacity'] += (int) ($room['capacity'] ?? 0);
-            $g['occupied'] += (int) ($room['occupied_beds'] ?? 0);
+            $g['flats'][$flatName]['rooms'][] = $room;
+            $g['flats'][$flatName]['capacity'] += $cap;
+            $g['flats'][$flatName]['occupied'] += $occ;
+            $g['flats'][$flatName]['students'] += $stu;
+            $g['capacity'] += $cap;
+            $g['occupied'] += $occ;
+            $g['students'] += $stu;
             unset($g);
         }
+        foreach ($hostelGroups as &$g) {
+            $g['flats'] = array_values($g['flats']);
+        }
+        unset($g);
         $hostels = $hostelModel->getAll();
         
         // Get blocks for selected hostel
@@ -109,10 +148,7 @@ class RoomController extends Controller {
             $data = [
                 'block_id' => trim($this->post('block_id', '')),
                 'room_no' => trim($this->post('room_no', '')),
-                'room_type' => trim($this->post('room_type', '')),
                 'capacity' => (int)$this->post('capacity', 0),
-                'description' => trim($this->post('description', '')),
-                'status' => $this->post('status', 'active')
             ];
             
             // Validation
@@ -121,9 +157,6 @@ class RoomController extends Controller {
                 $this->redirect('rooms/create');
                 return;
             }
-            
-            // Remove room_type if not needed (column doesn't exist in DB)
-            unset($data['room_type']);
             
             if ($data['capacity'] < 1) {
                 $_SESSION['error'] = 'Capacity must be at least 1.';
@@ -207,10 +240,7 @@ class RoomController extends Controller {
             $data = [
                 'block_id' => trim($this->post('block_id', '')),
                 'room_no' => trim($this->post('room_no', '')),
-                'room_type' => trim($this->post('room_type', '')),
                 'capacity' => (int)$this->post('capacity', 0),
-                'description' => trim($this->post('description', '')),
-                'status' => $this->post('status', 'active')
             ];
             
             // Validation
@@ -219,9 +249,6 @@ class RoomController extends Controller {
                 $this->redirect('rooms/edit?id=' . urlencode($id));
                 return;
             }
-            
-            // Remove room_type if not needed (column doesn't exist in DB)
-            unset($data['room_type']);
             
             if ($data['capacity'] < 1) {
                 $_SESSION['error'] = 'Capacity must be at least 1.';

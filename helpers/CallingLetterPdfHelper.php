@@ -163,6 +163,42 @@ final class CallingLetterPdfHelper
         return trim($name) === 'northern';
     }
 
+    /**
+     * Pick the official template from NVQ level + province.
+     * Level 4/5 × Northern / Other Provinces.
+     *
+     * @return string|null template key, or null when level is not 4 or 5
+     */
+    public static function resolveTemplateKeyForStudent(?string $nvqLevel, ?string $province): ?string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $nvqLevel);
+        $level = (int) $digits;
+        if ($level !== 4 && $level !== 5) {
+            return null;
+        }
+        $northern = self::isNorthernProvince($province);
+        if ($level === 5) {
+            return $northern ? self::TEMPLATE_L5_NORTHERN : self::TEMPLATE_L5_OTHER;
+        }
+        return $northern ? self::TEMPLATE_L4_NORTHERN : self::TEMPLATE_L4_OTHER;
+    }
+
+    /**
+     * Build one confirmation / calling letter for a logged-in student row.
+     *
+     * @param array{
+     *   name:string,
+     *   address_lines?:list<string>,
+     *   department:string,
+     *   course:string,
+     *   nvq_level:string
+     * } $student
+     */
+    public static function buildSingleStudentPdfBytes(array $student, string $templateKey): string
+    {
+        return self::buildPdfBytes([$student], null, $templateKey);
+    }
+
     public static function principalSignatureFilePath(): ?string
     {
         // Official principal signature for calling letters.

@@ -243,6 +243,66 @@ class PaymentModel extends Model {
     public function createPayment($data) {
         return $this->create($data);
     }
+
+    /**
+     * One shared auto reference for the same payment category on the same day.
+     * Format: DAY-YYYYMMDD-NNN (manual bank/cheque refs are never reused).
+     */
+    public function getDailyCategoryReference($paysDate, $paymentType, $paymentReason) {
+        $paysDate = trim((string) $paysDate);
+        $paymentType = trim((string) $paymentType);
+        $paymentReason = trim((string) $paymentReason);
+        if ($paysDate === '' || $paymentType === '') {
+            return '';
+        }
+
+        $ts = strtotime($paysDate);
+        if ($ts === false) {
+            return '';
+        }
+        $prefix = 'DAY-' . date('Ymd', $ts) . '-';
+        $like = $prefix . '%';
+
+        $sql = "SELECT `reference_no` FROM `{$this->table}`
+                WHERE `pays_date` = ?
+                  AND `payment_type` = ?
+                  AND `payment_reason` = ?
+                  AND `reference_no` LIKE ?
+                ORDER BY `pays_id` ASC
+                LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param('ssss', $paysDate, $paymentType, $paymentReason, $like);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            $existing = trim((string) ($row['reference_no'] ?? ''));
+            if ($existing !== '') {
+                return $existing;
+            }
+        }
+
+        $maxSql = "SELECT `reference_no` FROM `{$this->table}`
+                   WHERE `reference_no` LIKE ?
+                   ORDER BY `pays_id` DESC
+                   LIMIT 50";
+        $maxStmt = $this->db->prepare($maxSql);
+        $next = 1;
+        if ($maxStmt) {
+            $maxStmt->bind_param('s', $like);
+            $maxStmt->execute();
+            $result = $maxStmt->get_result();
+            $highest = 0;
+            while ($row = $result->fetch_assoc()) {
+                $ref = (string) ($row['reference_no'] ?? '');
+                if (preg_match('/^DAY-\d{8}-(\d+)$/', $ref, $m)) {
+                    $highest = max($highest, (int) $m[1]);
+                }
+            }
+            $next = $highest + 1;
+        }
+
+        return $prefix . str_pad((string) $next, 3, '0', STR_PAD_LEFT);
+    }
     
     /**
      * Update payment
@@ -409,7 +469,26 @@ class PaymentModel extends Model {
             $recent[] = $row;
         }
 
-        return ['summary' => $summary, 'months' => $months, 'by_type' => $byType, 'recent' => $recent];
+        // Pending approval queue for Finance Office action list
+        $pending = [];
+        $result = $this->db->query("SELECT p.pays_id, p.student_id, s.student_fullname, p.payment_type, p.payment_reason,
+                p.pays_amount, p.pays_qty, p.pays_date, p.payment_method
+            FROM `{$this->table}` p
+            LEFT JOIN `student` s ON p.student_id = s.student_id
+            WHERE p.approved = 0
+            ORDER BY p.pays_date DESC, p.pays_id DESC
+            LIMIT 15");
+        while ($result && ($row = $result->fetch_assoc())) {
+            $pending[] = $row;
+        }
+
+        return [
+            'summary' => $summary,
+            'months' => $months,
+            'by_type' => $byType,
+            'recent' => $recent,
+            'pending' => $pending,
+        ];
     }
 
     /**

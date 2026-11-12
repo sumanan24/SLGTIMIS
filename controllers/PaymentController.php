@@ -178,6 +178,7 @@ class PaymentController extends Controller {
             $studentEnrollmentModel = $this->model('StudentEnrollmentModel');
             $enrollment = $studentEnrollmentModel->getCurrentEnrollment($studentId);
             $paysDepartment = $enrollment['department_id'] ?? '';
+            $collectedBy = $this->resolveCollectingOfficerName();
 
             $db = Database::getInstance();
             if (!$db->begin_transaction()) {
@@ -187,7 +188,21 @@ class PaymentController extends Controller {
             }
             $savedIds = [];
             $saveFailed = false;
+            $dailyRefCache = [];
             foreach ($parsedItems['items'] as $item) {
+                if ($referenceNo !== '') {
+                    $itemReference = $referenceNo;
+                } else {
+                    $catKey = $item['payment_type'] . "\0" . $item['payment_reason'];
+                    if (!isset($dailyRefCache[$catKey])) {
+                        $dailyRefCache[$catKey] = $paymentModel->getDailyCategoryReference(
+                            $paysDate,
+                            $item['payment_type'],
+                            $item['payment_reason']
+                        );
+                    }
+                    $itemReference = $dailyRefCache[$catKey];
+                }
                 $result = $paymentModel->createPayment([
                     'student_id' => $studentId,
                     'pays_date' => $paysDate,
@@ -197,9 +212,10 @@ class PaymentController extends Controller {
                     'payment_method' => $paymentMethod,
                     'pays_note' => $paysNote,
                     'pays_qty' => $item['pays_qty'],
-                    'reference_no' => $referenceNo,
+                    'reference_no' => $itemReference,
                     'pays_department' => $paysDepartment,
-                    'approved' => $approved
+                    'approved' => $approved,
+                    'collected_by' => $collectedBy,
                 ]);
                 if (!$result) {
                     $saveFailed = true;
@@ -230,7 +246,7 @@ class PaymentController extends Controller {
                 'page' => 'payments-create',
                 'paymentReasons' => $paymentReasons,
                 'paymentMethods' => $this->posPaymentMethods($paymentModel),
-                'cashierName' => $_SESSION['user_name'] ?? 'Staff',
+                'cashierName' => $this->resolveCollectingOfficerName(),
                 'formToken' => $_SESSION['payment_form_token'],
                 'error' => $_SESSION['error'] ?? null
             ];
@@ -322,12 +338,26 @@ class PaymentController extends Controller {
             $lineTotal += (float) ($row['pays_amount'] ?? 0) * $qty;
         }
 
+        $cashierName = trim((string) ($payment['collected_by'] ?? ''));
+        if ($cashierName === '') {
+            foreach ($payments as $row) {
+                $stored = trim((string) ($row['collected_by'] ?? ''));
+                if ($stored !== '') {
+                    $cashierName = $stored;
+                    break;
+                }
+            }
+        }
+        if ($cashierName === '') {
+            $cashierName = $this->resolveCollectingOfficerName();
+        }
+
         $data = [
             'title' => 'Payment Receipt (POS)',
             'use_print_layout' => true,
             'payment' => $payment,
             'payments' => $payments,
-            'cashierName' => $_SESSION['user_name'] ?? 'Staff',
+            'cashierName' => $cashierName,
             'lineTotal' => $lineTotal,
             'autoPrint' => $autoPrint,
             'posReceipt' => true,
@@ -1147,6 +1177,30 @@ class PaymentController extends Controller {
 
         fclose($output);
         exit();
+    }
+
+    /**
+     * Display name of the logged-in staff who is collecting the payment.
+     * Prefer staff.staff_name; fall back to session user_name / Staff.
+     */
+    private function resolveCollectingOfficerName() {
+        $loginId = trim((string) ($_SESSION['user_name'] ?? ''));
+        if ($loginId === '') {
+            return 'Staff';
+        }
+
+        try {
+            $staffModel = $this->model('StaffModel');
+            $staff = $staffModel->getById($loginId);
+            $name = trim((string) ($staff['staff_name'] ?? ''));
+            if ($name !== '') {
+                return $name;
+            }
+        } catch (Throwable $e) {
+            // keep fallback
+        }
+
+        return $loginId;
     }
 }
 

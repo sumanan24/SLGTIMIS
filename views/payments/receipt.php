@@ -5,17 +5,29 @@ $qty = max(1, (int)($p['pays_qty'] ?? 1));
 $unitAmount = (float)($p['pays_amount'] ?? 0);
 $lineTotal = $lineTotal ?? ($unitAmount * $qty);
 $payDate = !empty($p['pays_date']) ? date('d/m/Y', strtotime($p['pays_date'])) : '—';
-$payTime = date('h:i A');
 $studentId = $p['student_id'] ?? $p['student_reg_no'] ?? '—';
 $studentName = $p['student_fullname'] ?? '—';
 $department = $p['department_name'] ?? '';
 $paymentType = $p['payment_type'] ?? '—';
 $paymentReason = $p['payment_reason'] ?? '—';
 $paymentMethod = trim($p['payment_method'] ?? '');
-$referenceNo = trim($p['reference_no'] ?? '');
 $notes = trim($p['pays_note'] ?? '');
-$cashierName = $cashierName ?? ($_SESSION['user_name'] ?? 'Staff');
+$cashierName = trim((string) ($cashierName ?? ''));
+if ($cashierName === '') {
+    $cashierName = trim((string) ($payment['collected_by'] ?? ''));
+}
+if ($cashierName === '') {
+    $cashierName = 'Staff';
+}
 $receiptPayments = (isset($payments) && is_array($payments) && count($payments) > 0) ? $payments : [$p];
+$referenceNos = [];
+foreach ($receiptPayments as $row) {
+    $ref = trim((string) ($row['reference_no'] ?? ''));
+    if ($ref !== '' && !in_array($ref, $referenceNos, true)) {
+        $referenceNos[] = $ref;
+    }
+}
+$referenceNo = implode(', ', $referenceNos);
 $receiptNos = array_map(function ($row) {
     return str_pad((string) (int) ($row['pays_id'] ?? 0), 6, '0', STR_PAD_LEFT);
 }, $receiptPayments);
@@ -311,10 +323,6 @@ $grandTotal = isset($lineTotal) ? (float) $lineTotal : ($unitAmount * $qty);
         <div class="pos-row">
             <span class="pos-label">Date</span>
             <span class="pos-val"><?php echo htmlspecialchars($payDate); ?></span>
-        </div>
-        <div class="pos-row">
-            <span class="pos-label">Time</span>
-            <span class="pos-val"><?php echo htmlspecialchars($payTime); ?></span>
         </div>
 
         <hr class="pos-rule">

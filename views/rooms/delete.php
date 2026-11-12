@@ -35,10 +35,6 @@
                             <td><?php echo htmlspecialchars($room['block_name'] ?? 'N/A'); ?></td>
                         </tr>
                         <tr>
-                            <th>Type:</th>
-                            <td><?php echo htmlspecialchars($room['room_type'] ?? 'N/A'); ?></td>
-                        </tr>
-                        <tr>
                             <th>Capacity:</th>
                             <td><?php echo number_format($room['capacity'] ?? 0); ?></td>
                         </tr>

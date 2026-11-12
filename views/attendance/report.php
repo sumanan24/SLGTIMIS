@@ -1,571 +1,454 @@
+<?php
+$isFIN = !empty($isFIN);
+$isHOD = !empty($isHOD);
+$isAdmin = !empty($isAdmin);
+$isMonthLocked = !empty($isMonthLocked);
+$reportData = $reportData ?? [];
+$allDays = $allDays ?? [];
+$summary = $summary ?? [];
+$monthLabel = !empty($selectedMonth) ? date('F Y', strtotime($selectedMonth . '-01')) : '';
+$exportQuery = http_build_query(array_filter([
+    'department_id' => $selectedDepartment ?? '',
+    'course_id' => $selectedCourse ?? '',
+    'academic_year' => $selectedAcademicYear ?? '',
+    'month' => $selectedMonth ?? ''
+], static function ($v) {
+    return $v !== '' && $v !== null;
+}));
+$canExport = $isMonthLocked && !empty($selectedDepartment) && !empty($selectedMonth);
+?>
 <style>
+.att-page { width: 100%; }
+.att-page .att-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: .75rem 1rem;
+    align-items: end;
+}
+.att-page .att-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: center;
+}
+.att-page .att-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .75rem;
+}
+.att-page .att-stat {
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
+    padding: .75rem;
+    text-align: center;
+    background: #fff;
+}
+.att-page .att-stat .lbl { color: #6c757d; font-size: .75rem; margin-bottom: .2rem; }
+.att-page .att-stat .val { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+.att-page .att-table-wrap {
+    overflow: auto;
+    max-height: 72vh;
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
+}
+.att-page .att-table {
+    width: max-content;
+    min-width: 100%;
+    margin: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: .8rem;
+}
+.att-page .att-table th,
+.att-page .att-table td {
+    vertical-align: middle;
+    padding: .3rem .35rem;
+    white-space: nowrap;
+    border: 1px solid #dee2e6;
+}
+.att-page .att-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #212529;
+    color: #fff;
+    text-align: center;
+    font-weight: 600;
+}
+.att-page .att-table .c-no { min-width: 36px; text-align: center; }
+.att-page .att-table .c-id { min-width: 118px; }
+.att-page .att-table .c-name { min-width: 170px; }
+.att-page .att-table .c-nic { min-width: 105px; }
+.att-page .att-table .c-day {
+    min-width: 34px;
+    width: 34px;
+    text-align: center;
+    font-weight: 700;
+    padding: .2rem .1rem;
+}
+.att-page .att-table .c-day .d-n { display: block; font-size: .68rem; line-height: 1.1; }
+.att-page .att-table .c-day .d-w { display: block; font-size: .6rem; opacity: .85; font-weight: 500; }
+.att-page .att-table .c-tot,
+.att-page .att-table .c-p,
+.att-page .att-table .c-pct { min-width: 58px; text-align: center; font-weight: 700; }
+.att-page .att-table .c-allow { min-width: 86px; text-align: right; font-weight: 700; }
+.att-page .att-table .sticky {
+    position: sticky;
+    z-index: 4;
+    background: #fff;
+}
+.att-page .att-table thead .sticky { z-index: 6; background: #212529; }
+.att-page .att-table .sticky.c-no { left: 0; }
+.att-page .att-table .sticky.c-id { left: 36px; }
+.att-page .att-table .sticky.c-name { left: 154px; }
+.att-page .att-table .sticky.c-nic { left: 324px; box-shadow: 2px 0 0 rgba(0,0,0,.06); }
+.att-page .att-table .m-p { background: #198754; color: #fff; }
+.att-page .att-table .m-a { background: #dc3545; color: #fff; }
+.att-page .att-table .m-h { background: #ffc107; color: #212529; }
+.att-page .att-table .m-l { background: #ffe5b4; color: #212529; }
+.att-page .att-table tbody tr:nth-child(even) .sticky { background: #f8f9fa; }
+.att-page .att-table tfoot td {
+    background: #e9ecef;
+    font-weight: 700;
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+}
+.att-page .att-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1rem;
+    margin-top: .75rem;
+    font-size: .8rem;
+    color: #6c757d;
+}
+.att-page .att-legend .sw {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.4rem;
+    height: 1.25rem;
+    padding: 0 .3rem;
+    border-radius: .25rem;
+    font-weight: 700;
+    font-size: .72rem;
+    margin-right: .3rem;
+}
+@media (max-width: 991.98px) {
+    .att-page .att-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media print {
-    .no-print,
-    form,
-    .btn,
-    .alert {
-        display: none !important;
-    }
-    .card,
-    .card-header,
-    .card-body {
-        border: none !important;
-        box-shadow: none !important;
-    }
-    .table {
-        font-size: 11px;
-    }
+    .no-print, form, .btn, .alert { display: none !important; }
+    .card, .card-header, .card-body { border: none !important; box-shadow: none !important; }
+    .att-page .att-table-wrap { max-height: none; overflow: visible; }
+    .att-page .att-table { font-size: 9px; }
 }
 </style>
-<div class="container-fluid py-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white border-bottom">
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <h5 class="mb-0 fw-bold">
-                            <i class="fas fa-chart-line me-2"></i>Attendance Report
-                        </h5>
-                        <div class="d-flex gap-2">
-                            <?php if (!empty($reportData) && isset($isMonthLocked) && $isMonthLocked): ?>
-                                <span class="badge bg-danger d-flex align-items-center" style="height: 38px;">
-                                    <i class="fas fa-lock me-1"></i>Month Locked
-                                </span>
-                            <?php endif; ?>
-                            <?php if (!empty($reportData) && isset($isMonthLocked) && $isMonthLocked && !empty($selectedDepartment) && !empty($selectedMonth)): ?>
-                                <a href="<?php echo APP_URL; ?>/attendance/export-report?<?php echo http_build_query([
-                                    'department_id' => $selectedDepartment,
-                                    'course_id' => $selectedCourse,
-                                    'academic_year' => $selectedAcademicYear,
-                                    'month' => $selectedMonth
-                                ]); ?>" class="btn btn-success btn-sm">
-                                    <i class="fas fa-file-excel me-1"></i>Export to Excel
-                                </a>
-                            <?php endif; ?>
-                            <?php if (!empty($reportData) && isset($isHOD) && $isHOD && !empty($selectedDepartment) && !empty($selectedMonth) && (!isset($isMonthLocked) || !$isMonthLocked)): ?>
-                                <button type="button" class="btn btn-warning btn-sm" id="lockMonthBtn" data-department-id="<?php echo htmlspecialchars($selectedDepartment); ?>" data-month="<?php echo htmlspecialchars($selectedMonth); ?>">
-                                    <i class="fas fa-lock me-1"></i>Lock This Month
-                                </button>
-                            <?php endif; ?>
-                            <?php if (!empty($reportData) && isset($isAdmin) && $isAdmin && isset($isMonthLocked) && $isMonthLocked && !empty($selectedDepartment) && !empty($selectedMonth)): ?>
-                                <button type="button" class="btn btn-success btn-sm" id="unlockMonthBtn" data-department-id="<?php echo htmlspecialchars($selectedDepartment); ?>" data-month="<?php echo htmlspecialchars($selectedMonth); ?>">
-                                    <i class="fas fa-unlock me-1"></i>Unlock Month
-                                </button>
-                            <?php endif; ?>
-                        </div>
-                    </div>
+
+<div class="container-fluid px-3 px-lg-4 py-3 att-page">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white border-bottom">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-calendar-check me-2"></i>
+                        <?php echo $isFIN ? 'Attendance Summary' : 'Attendance Report'; ?>
+                    </h5>
+                    <?php if ($monthLabel !== ''): ?>
+                        <div class="text-muted small mt-1"><?php echo htmlspecialchars($monthLabel); ?><?php echo $isMonthLocked ? ' · Locked' : ''; ?></div>
+                    <?php endif; ?>
                 </div>
-                
-                <div class="card-body">
-                    <!-- Filters -->
-                    <form method="GET" action="<?php echo APP_URL; ?>/attendance/report" class="mb-4">
-                        <div class="row g-3">
-                            <?php if (!isset($isHOD) || !$isHOD): ?>
-                            <div class="col-md-3">
-                                <label for="department_id" class="form-label fw-semibold">Department</label>
-                                <select class="form-select" id="department_id" name="department_id">
-                                    <option value="">All Departments</option>
-                                    <?php if (isset($departments) && !empty($departments)): ?>
-                                        <?php foreach ($departments as $dept): ?>
-                                            <option value="<?php echo htmlspecialchars($dept['department_id']); ?>" 
-                                                    <?php echo ($selectedDepartment ?? '') == $dept['department_id'] ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($dept['department_name']); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </select>
-                            </div>
-                            <?php else: ?>
-                                <input type="hidden" name="department_id" value="<?php echo htmlspecialchars($selectedDepartment ?? ''); ?>">
-                            <?php endif; ?>
-                            
-                            <div class="col-md-3">
-                                <label for="course_id" class="form-label fw-semibold">Course</label>
-                                <select class="form-select" id="course_id" name="course_id">
-                                    <option value="">All Courses</option>
-                                    <?php if (isset($courses) && !empty($courses)): ?>
-                                        <?php foreach ($courses as $course): ?>
-                                            <option value="<?php echo htmlspecialchars($course['course_id']); ?>" 
-                                                    <?php echo ($selectedCourse ?? '') == $course['course_id'] ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($course['course_name']); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </select>
-                            </div>
-                            
-                            <div class="col-md-2">
-                                <label for="academic_year" class="form-label fw-semibold">Academic Year</label>
-                                <select class="form-select" id="academic_year" name="academic_year">
-                                    <option value="">All Years</option>
-                                    <?php if (isset($academicYears) && !empty($academicYears)): ?>
-                                        <?php foreach ($academicYears as $year): ?>
-                                            <option value="<?php echo htmlspecialchars($year); ?>" 
-                                                    <?php echo ($selectedAcademicYear ?? '') == $year ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($year); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </select>
-                            </div>
-                            
-                            <div class="col-md-2">
-                                <label for="month" class="form-label fw-semibold">Month</label>
-                                <input type="month" class="form-control" id="month" name="month" 
-                                       value="<?php echo htmlspecialchars($selectedMonth ?? date('Y-m')); ?>" required>
-                            </div>
-                            <input type="hidden" name="view" value="<?php echo htmlspecialchars(($reportView ?? 'summary') === 'daily' ? 'daily' : 'summary'); ?>">
-                            
-                            <div class="col-md-2">
-                                <label class="form-label fw-semibold">&nbsp;</label>
-                                <div class="form-check mt-2">
-                                    <?php if (isset($isFIN) && $isFIN): ?>
-                                    <input class="form-check-input" type="checkbox" id="eligible_only" name="eligible_only" value="1" checked disabled>
-                                    <label class="form-check-label" for="eligible_only">
-                                        Eligible Students Only
-                                    </label>
-                                    <div class="form-text small">Finance view: only allowance-eligible students (locked months only)</div>
-                                    <?php else: ?>
-                                    <input class="form-check-input" type="checkbox" id="eligible_only" name="eligible_only" value="1"
-                                           <?php echo (isset($eligibleOnly) && $eligibleOnly) ? 'checked' : ''; ?>>
-                                    <label class="form-check-label" for="eligible_only">
-                                        Eligible Students Only
-                                    </label>
-                                    <div class="form-text small">Show only allowance eligible students</div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="row mt-3">
-                            <div class="col-md-4 col-lg-3 mb-3">
-                                <label for="source" class="form-label fw-semibold">Attendance source</label>
-                                <select class="form-select" id="source" name="source">
-                                    <option value="manual" <?php echo ($source ?? 'manual') === 'manual' ? 'selected' : ''; ?>>Manual (marked by staff)</option>
-                                    <option value="finger" <?php echo ($source ?? '') === 'finger' ? 'selected' : ''; ?>>Finger machine</option>
-                                    <option value="both" <?php echo ($source ?? '') === 'both' ? 'selected' : ''; ?>>Manual + Finger (either)</option>
-                                </select>
-                                <div class="form-text small">Finger present = In by 08:40 and Out from 16:00</div>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-12">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-search me-1"></i>Generate Report
-                                </button>
-                                <button type="submit" name="view" value="summary" class="btn <?php echo (($reportView ?? 'summary') !== 'daily') ? 'btn-dark' : 'btn-outline-dark'; ?>">
-                                    <i class="fas fa-users me-1"></i>Month summary
-                                </button>
-                                <button type="submit" name="view" value="daily" class="btn <?php echo (($reportView ?? 'summary') === 'daily') ? 'btn-dark' : 'btn-outline-dark'; ?>">
-                                    <i class="fas fa-calendar-day me-1"></i>Daily register
-                                </button>
-                                <a href="<?php echo APP_URL; ?>/attendance/report" class="btn btn-outline-secondary">
-                                    <i class="fas fa-redo me-1"></i>Reset
-                                </a>
-                            </div>
-                        </div>
-                    </form>
-                    
-                        <?php if (isset($error) && !empty($error)): ?>
-                            <div class="alert alert-danger d-flex align-items-center">
-                                <i class="fas fa-exclamation-circle me-2"></i>
-                                <div><?php echo htmlspecialchars($error); ?></div>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <?php if (isset($message) && !empty($message)): ?>
-                            <div class="alert alert-success d-flex align-items-center">
-                                <i class="fas fa-check-circle me-2"></i>
-                                <div><?php echo htmlspecialchars($message); ?></div>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <?php if (isset($isFIN) && $isFIN && (!isset($isMonthLocked) || !$isMonthLocked) && !empty($selectedDepartment) && !empty($selectedMonth)): ?>
-                            <div class="alert alert-info d-flex align-items-center">
-                                <i class="fas fa-info-circle me-2"></i>
-                                <div>
-                                    <strong>Access Restricted:</strong> Attendance reports can only be viewed after HOD approval and monthly lock. Please wait until the month is locked.
-                                </div>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <?php if (isset($isMonthLocked) && $isMonthLocked && (!isset($isAdmin) || !$isAdmin)): ?>
-                            <div class="alert alert-warning d-flex align-items-center">
-                                <i class="fas fa-lock me-2"></i>
-                                <div>
-                                    <strong>Month Locked:</strong> Attendance for this month has been locked.
-                                </div>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <?php if (!empty($reportData)): ?>
-                        <?php
-                        $isSummaryView = (($reportView ?? 'summary') !== 'daily');
-                        $monthLabel = !empty($selectedMonth) ? date('F Y', strtotime($selectedMonth . '-01')) : '';
-                        ?>
-
-                        <?php if ($isSummaryView): ?>
-                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                            <h6 class="mb-0 fw-bold">Student summary — <?php echo htmlspecialchars($monthLabel); ?></h6>
-                            <button type="button" class="btn btn-outline-secondary btn-sm no-print" onclick="window.print();">
-                                <i class="fas fa-print me-1"></i>Print summary
-                            </button>
-                        </div>
-
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-2 col-6">
-                                <div class="border rounded p-3 text-center bg-light h-100">
-                                    <div class="text-muted small">Students</div>
-                                    <div class="fs-4 fw-bold"><?php echo (int)($summary['total_students'] ?? 0); ?></div>
-                                </div>
-                            </div>
-                            <div class="col-md-2 col-6">
-                                <div class="border rounded p-3 text-center h-100">
-                                    <div class="text-muted small">Weekdays</div>
-                                    <div class="fs-4 fw-bold"><?php echo (int)($summary['total_working_days'] ?? 0); ?></div>
-                                </div>
-                            </div>
-                            <div class="col-md-2 col-6">
-                                <div class="border rounded p-3 text-center h-100">
-                                    <div class="text-muted small">≥ 90%</div>
-                                    <div class="fs-4 fw-bold text-success"><?php echo (int)($summary['above_90'] ?? 0); ?></div>
-                                </div>
-                            </div>
-                            <div class="col-md-2 col-6">
-                                <div class="border rounded p-3 text-center h-100">
-                                    <div class="text-muted small">80% – 89%</div>
-                                    <div class="fs-4 fw-bold text-warning"><?php echo (int)($summary['above_80'] ?? 0); ?></div>
-                                </div>
-                            </div>
-                            <div class="col-md-2 col-6">
-                                <div class="border rounded p-3 text-center h-100">
-                                    <div class="text-muted small">&lt; 80%</div>
-                                    <div class="fs-4 fw-bold text-danger"><?php echo (int)($summary['below_80'] ?? 0); ?></div>
-                                </div>
-                            </div>
-                            <div class="col-md-2 col-6">
-                                <div class="border rounded p-3 text-center h-100">
-                                    <div class="text-muted small">Total allowance</div>
-                                    <div class="fs-5 fw-bold">Rs. <?php echo number_format($summary['total_allowance'] ?? 0, 0); ?></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-striped table-hover" style="font-size: 0.9rem;">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th class="text-center" style="width: 48px;">#</th>
-                                        <th>Student ID</th>
-                                        <th>Full name</th>
-                                        <th>NIC</th>
-                                        <th>Department</th>
-                                        <th>Course</th>
-                                        <th class="text-center">Working days</th>
-                                        <th class="text-center">Present</th>
-                                        <th class="text-center">Absent</th>
-                                        <th class="text-center">Holidays</th>
-                                        <th class="text-center">%</th>
-                                        <th class="text-center" title="Days present on the finger machine (In by 08:40 and Out from 16:00)"><i class="fas fa-fingerprint me-1"></i>Finger present</th>
-                                        <th class="text-center"><i class="fas fa-fingerprint me-1"></i>Finger %</th>
-                                        <th class="text-end">Allowance</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    $summaryAbsentTotal = 0;
-                                    $summaryWorkingTotal = 0;
-                                    $summaryHolidayTotal = 0;
-                                    $rowNo = 0;
-                                    foreach ($reportData as $student):
-                                        $rowNo++;
-                                        $workingDays = (int)($student['effective_working_days'] ?? 0);
-                                        $presentDays = (int)($student['present_days'] ?? 0);
-                                        $holidayDays = (int)($student['holiday_days'] ?? 0);
-                                        $absentDays = max(0, $workingDays - $presentDays);
-                                        $summaryAbsentTotal += $absentDays;
-                                        $summaryWorkingTotal += $workingDays;
-                                        $summaryHolidayTotal += $holidayDays;
-                                        $pct = (float)($student['attendance_percentage'] ?? 0);
-                                        $badge = $pct >= 90 ? 'bg-success' : ($pct >= 80 ? 'bg-warning text-dark' : 'bg-danger');
-                                    ?>
-                                        <tr>
-                                            <td class="text-center"><?php echo $rowNo; ?></td>
-                                            <td><?php echo htmlspecialchars($student['student_id']); ?></td>
-                                            <td><?php echo htmlspecialchars($student['student_fullname']); ?></td>
-                                            <td><?php echo htmlspecialchars($student['student_nic']); ?></td>
-                                            <td><?php echo htmlspecialchars($student['department_name'] ?? ''); ?></td>
-                                            <td><?php echo htmlspecialchars($student['course_name'] ?? ''); ?></td>
-                                            <td class="text-center"><?php echo $workingDays; ?></td>
-                                            <td class="text-center"><?php echo $presentDays; ?></td>
-                                            <td class="text-center"><?php echo $absentDays; ?></td>
-                                            <td class="text-center"><?php echo $holidayDays; ?></td>
-                                            <td class="text-center">
-                                                <span class="badge <?php echo $badge; ?>"><?php echo number_format($pct, 1); ?>%</span>
-                                            </td>
-                                            <td class="text-center"><?php echo (int)($student['finger_present_days'] ?? 0); ?><?php if (!empty($student['finger_late_days'])): ?> <small class="text-warning" title="Late / incomplete punches"><?php echo '(+' . (int)$student['finger_late_days'] . ' late)'; ?></small><?php endif; ?></td>
-                                            <td class="text-center"><?php echo number_format((float)($student['finger_percentage'] ?? 0), 1); ?>%</td>
-                                            <td class="text-end">Rs. <?php echo number_format($student['allowance'] ?? 0, 0); ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                                <tfoot>
-                                    <tr class="table-secondary fw-bold">
-                                        <td colspan="6" class="text-end">Total</td>
-                                        <td class="text-center">—</td>
-                                        <td class="text-center"><?php echo (int)($summary['total_present'] ?? 0); ?></td>
-                                        <td class="text-center"><?php echo (int)$summaryAbsentTotal; ?></td>
-                                        <td class="text-center"><?php echo (int)$summaryHolidayTotal; ?></td>
-                                        <td class="text-center">—</td>
-                                        <td class="text-center"><?php echo (int)($summary['total_finger_present'] ?? 0); ?></td>
-                                        <td class="text-center">—</td>
-                                        <td class="text-end">Rs. <?php echo number_format($summary['total_allowance'] ?? 0, 0); ?></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                        <p class="text-muted small mb-0">
-                            One row per student for the full month. Working days exclude weekends and holidays. Present, % and allowance follow the selected attendance source; the Finger columns always show the finger machine result.
-                        </p>
-                        <?php else: ?>
-
-                        <!-- Report Table with Day-by-Day Attendance -->
-                        <div class="table-responsive" style="max-height: 80vh; overflow-x: auto; overflow-y: auto;">
-                            <table class="table table-bordered table-striped" style="font-size: 0.85rem;">
-                                <thead class="table-dark" style="position: sticky; top: 0; z-index: 10;">
-                                    <tr>
-                                        <th rowspan="2" style="position: sticky; left: 0; z-index: 11; background: #212529; min-width: 120px;">Student ID</th>
-                                        <th rowspan="2" style="position: sticky; left: 120px; z-index: 11; background: #212529; min-width: 150px;">Full Name</th>
-                                        <th rowspan="2" style="position: sticky; left: 270px; z-index: 11; background: #212529; min-width: 100px;">NIC</th>
-                                        <th rowspan="2" style="position: sticky; left: 370px; z-index: 11; background: #212529; min-width: 100px;">Bank Name</th>
-                                        <th rowspan="2" style="position: sticky; left: 470px; z-index: 11; background: #212529; min-width: 120px;">Account No</th>
-                                        <th rowspan="2" style="position: sticky; left: 590px; z-index: 11; background: #212529; min-width: 100px;">Branch</th>
-                                        <?php if (!empty($allDays)): ?>
-                                            <?php foreach ($allDays as $day): ?>
-                                                <th class="text-center" style="min-width: 50px; writing-mode: vertical-rl; text-orientation: mixed;">
-                                                    <?php echo htmlspecialchars($day['day']); ?>
-                                                </th>
-                                            <?php endforeach; ?>
-                                        <?php endif; ?>
-                                        <th rowspan="2" class="text-center" style="min-width: 70px;">Total Days</th>
-                                        <th rowspan="2" class="text-center" style="min-width: 60px;">P</th>
-                                        <th rowspan="2" class="text-center" style="min-width: 60px;">%</th>
-                                        <th rowspan="2" class="text-center" style="min-width: 70px;" title="Days present on the finger machine"><i class="fas fa-fingerprint"></i> Finger P</th>
-                                        <th rowspan="2" class="text-center" style="min-width: 80px;">Allowance</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($reportData as $student): ?>
-                                        <tr>
-                                            <td style="position: sticky; left: 0; z-index: 9; background: #ffffff;"><?php echo htmlspecialchars($student['student_id']); ?></td>
-                                            <td style="position: sticky; left: 120px; z-index: 9; background: #ffffff;"><?php echo htmlspecialchars($student['student_fullname']); ?></td>
-                                            <td style="position: sticky; left: 270px; z-index: 9; background: #ffffff;"><?php echo htmlspecialchars($student['student_nic']); ?></td>
-                                            <td style="position: sticky; left: 370px; z-index: 9; background: #ffffff;"><?php echo htmlspecialchars($student['bank_name'] ?? '-'); ?></td>
-                                            <td style="position: sticky; left: 470px; z-index: 9; background: #ffffff;"><?php echo htmlspecialchars($student['bank_account_no'] ?? '-'); ?></td>
-                                            <td style="position: sticky; left: 590px; z-index: 9; background: #ffffff;"><?php echo htmlspecialchars($student['bank_branch'] ?? '-'); ?></td>
-                                            <?php if (!empty($allDays)): ?>
-                                                <?php foreach ($allDays as $day): ?>
-                                                    <?php 
-                                                    $status = $student['day_by_day'][$day['date']] ?? '';
-                                                    $class = '';
-                                                    $statusValue = '';
-                                                    
-                                                    if ($status == 'P') {
-                                                        $class = 'bg-success text-white';
-                                                        $statusValue = '1'; // Present = 1
-                                                    } elseif ($status == 'A') {
-                                                        $class = 'bg-danger text-white';
-                                                        $statusValue = '0'; // Absent = 0
-                                                    } elseif ($status == 'H') {
-                                                        $class = 'bg-warning text-dark';
-                                                        $statusValue = '-1'; // Holiday = -1 (as per requirement)
-                                                    } elseif ($status == 'L') {
-                                                        $class = 'text-dark';
-                                                        $statusValue = 'L'; // Finger: late / incomplete punch
-                                                    } else {
-                                                        $statusValue = ''; // Not marked = empty
-                                                    }
-                                                    ?>
-                                                    <?php $fingerMark = $student['finger_by_day'][$day['date']] ?? ''; ?>
-                                                    <td class="text-center <?php echo $class; ?>" style="min-width: 60px; padding: 0.5rem;<?php echo $status == 'L' ? ' background:#ffe5b4;' : ''; ?>">
-                                                        <div style="font-size: 1.2rem; font-weight: bold;">
-                                                            <?php echo $statusValue; ?>
-                                                        </div>
-                                                        <?php if ($fingerMark !== '' && ($source ?? 'manual') === 'manual'): ?>
-                                                            <div style="font-size: .65rem; line-height: 1;" title="<?php echo $fingerMark === 'P' ? 'Finger: present' : 'Finger: late / incomplete'; ?>">
-                                                                <i class="fas fa-fingerprint"></i> <?php echo $fingerMark; ?>
-                                                            </div>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                <?php endforeach; ?>
-                                            <?php endif; ?>
-                                            <td class="text-center fw-bold"><?php echo $student['effective_working_days']; ?></td>
-                                            <td class="text-center fw-bold"><?php echo $student['present_days']; ?></td>
-                                            <td class="text-center">
-                                                <span class="badge <?php 
-                                                    echo $student['attendance_percentage'] >= 90 ? 'bg-success' : 
-                                                        ($student['attendance_percentage'] >= 75 ? 'bg-warning' : 'bg-danger'); 
-                                                ?>">
-                                                    <?php echo number_format($student['attendance_percentage'], 1); ?>%
-                                                </span>
-                                            </td>
-                                            <td class="text-center"><?php echo (int)($student['finger_present_days'] ?? 0); ?></td>
-                                            <td class="text-center fw-bold">
-                                                Rs. <?php echo number_format($student['allowance'], 0); ?>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                    <?php if (!empty($reportData)): ?>
-                                        <tr class="table-secondary fw-bold">
-                                            <td colspan="<?php echo 6 + count($allDays); ?>" class="text-end">Total:</td>
-                                            <td class="text-center"><?php echo number_format($summary['total_effective_working_days'] ?? 0, 0); ?></td>
-                                            <td class="text-center"><?php echo number_format($summary['total_present'] ?? 0, 0); ?></td>
-                                            <td class="text-center">-</td>
-                                            <td class="text-center"><?php echo number_format($summary['total_finger_present'] ?? 0, 0); ?></td>
-                                            <td class="text-center">Rs. <?php echo number_format($summary['total_allowance'] ?? 0, 0); ?></td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <div class="mt-3">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <small class="text-muted">
-                                        <strong>Legend:</strong> 
-                                        <span class="badge bg-success text-white">1</span> = Present, 
-                                        <span class="badge bg-danger text-white">0</span> = Absent, 
-                                        <span class="badge bg-warning text-dark">-1</span> = Holiday,
-                                        <span class="badge text-dark" style="background:#ffe5b4;">L</span> = Finger: late / incomplete punch,
-                                        <i class="fas fa-fingerprint"></i> P/L = finger result shown under manual mark,
-                                        <span class="badge bg-light text-dark">Empty</span> = Not Marked
-                                    </small>
-                                </div>
-                                <div class="col-md-6 text-end">
-                                    <small class="text-muted">
-                                        <strong>Note:</strong> Weekends (Saturday & Sunday) are excluded from working days
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                        <?php endif; ?>
-                    <?php else: ?>
-                        <div class="alert alert-info text-center">
-                            <i class="fas fa-info-circle me-2"></i>
-                            Please select filters and click "Generate Report" to view attendance data.
-                        </div>
+                <div class="att-actions no-print">
+                    <?php if ($isMonthLocked): ?>
+                        <span class="badge bg-danger align-self-center px-3 py-2"><i class="fas fa-lock me-1"></i>Locked</span>
+                    <?php endif; ?>
+                    <?php if (!empty($reportData)): ?>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print();">
+                            <i class="fas fa-print me-1"></i>Print
+                        </button>
+                    <?php endif; ?>
+                    <?php if ($canExport): ?>
+                        <a class="btn btn-success btn-sm" href="<?php echo APP_URL; ?>/attendance/export-report?<?php echo htmlspecialchars($exportQuery); ?>">
+                            <i class="fas fa-file-excel me-1"></i>Download Excel
+                        </a>
+                    <?php endif; ?>
+                    <?php if (!empty($reportData) && $isHOD && !$isMonthLocked && !empty($selectedDepartment) && !empty($selectedMonth)): ?>
+                        <button type="button" class="btn btn-warning btn-sm" id="lockMonthBtn"
+                                data-department-id="<?php echo htmlspecialchars($selectedDepartment); ?>"
+                                data-month="<?php echo htmlspecialchars($selectedMonth); ?>">
+                            <i class="fas fa-lock me-1"></i>Lock Month
+                        </button>
+                    <?php endif; ?>
+                    <?php if (!empty($reportData) && $isAdmin && $isMonthLocked && !empty($selectedDepartment) && !empty($selectedMonth)): ?>
+                        <button type="button" class="btn btn-outline-success btn-sm" id="unlockMonthBtn"
+                                data-department-id="<?php echo htmlspecialchars($selectedDepartment); ?>"
+                                data-month="<?php echo htmlspecialchars($selectedMonth); ?>">
+                            <i class="fas fa-unlock me-1"></i>Unlock
+                        </button>
                     <?php endif; ?>
                 </div>
             </div>
+        </div>
+
+        <div class="card-body">
+            <form method="GET" action="<?php echo APP_URL; ?>/attendance/report" class="mb-3 no-print">
+                <input type="hidden" name="view" value="summary">
+                <div class="att-filters">
+                    <?php if (!$isHOD): ?>
+                    <div>
+                        <label class="form-label small fw-semibold mb-1" for="department_id">Department</label>
+                        <select class="form-select form-select-sm" id="department_id" name="department_id">
+                            <option value="">All</option>
+                            <?php foreach (($departments ?? []) as $dept): ?>
+                                <option value="<?php echo htmlspecialchars($dept['department_id']); ?>"
+                                    <?php echo ($selectedDepartment ?? '') == $dept['department_id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($dept['department_name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php else: ?>
+                        <input type="hidden" name="department_id" value="<?php echo htmlspecialchars($selectedDepartment ?? ''); ?>">
+                    <?php endif; ?>
+
+                    <div>
+                        <label class="form-label small fw-semibold mb-1" for="course_id">Course</label>
+                        <select class="form-select form-select-sm" id="course_id" name="course_id">
+                            <option value="">All</option>
+                            <?php foreach (($courses ?? []) as $course): ?>
+                                <option value="<?php echo htmlspecialchars($course['course_id']); ?>"
+                                    <?php echo ($selectedCourse ?? '') == $course['course_id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($course['course_name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="form-label small fw-semibold mb-1" for="academic_year">Academic Year</label>
+                        <select class="form-select form-select-sm" id="academic_year" name="academic_year">
+                            <option value="">All</option>
+                            <?php foreach (($academicYears ?? []) as $year): ?>
+                                <option value="<?php echo htmlspecialchars($year); ?>"
+                                    <?php echo ($selectedAcademicYear ?? '') === $year ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($year); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="form-label small fw-semibold mb-1" for="month">Month</label>
+                        <input type="month" class="form-control form-control-sm" id="month" name="month"
+                               value="<?php echo htmlspecialchars($selectedMonth ?? date('Y-m')); ?>" required>
+                    </div>
+
+                    <?php if (!$isFIN): ?>
+                    <div>
+                        <label class="form-label small fw-semibold mb-1" for="source">Source</label>
+                        <select class="form-select form-select-sm" id="source" name="source">
+                            <option value="manual" <?php echo ($source ?? 'manual') === 'manual' ? 'selected' : ''; ?>>Manual</option>
+                            <option value="finger" <?php echo ($source ?? '') === 'finger' ? 'selected' : ''; ?>>Finger</option>
+                            <option value="both" <?php echo ($source ?? '') === 'both' ? 'selected' : ''; ?>>Both</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label small fw-semibold mb-1 d-block">Eligible</label>
+                        <div class="form-check mt-1">
+                            <input class="form-check-input" type="checkbox" id="eligible_only" name="eligible_only" value="1"
+                                   <?php echo !empty($eligibleOnly) ? 'checked' : ''; ?>>
+                            <label class="form-check-label small" for="eligible_only">Eligible only</label>
+                        </div>
+                    </div>
+                    <?php else: ?>
+                        <input type="hidden" name="source" value="manual">
+                    <?php endif; ?>
+                </div>
+
+                <div class="att-actions mt-3">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-search me-1"></i>View Report
+                    </button>
+                    <a href="<?php echo APP_URL; ?>/attendance/report" class="btn btn-outline-secondary btn-sm">Clear</a>
+                </div>
+            </form>
+
+            <?php if (!empty($error)): ?>
+                <div class="alert alert-danger py-2"><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
+            <?php if (!empty($message)): ?>
+                <div class="alert alert-success py-2"><?php echo htmlspecialchars($message); ?></div>
+            <?php endif; ?>
+
+            <?php if ($isFIN && !$isMonthLocked && !empty($selectedDepartment) && !empty($selectedMonth)): ?>
+                <div class="alert alert-info py-2">
+                    This month is not locked yet. Finance can view the report after HOD lock.
+                </div>
+            <?php endif; ?>
+
+            <?php if (!empty($reportData)): ?>
+                <div class="att-stats mb-3">
+                    <div class="att-stat">
+                        <div class="lbl">Students</div>
+                        <div class="val"><?php echo (int)($summary['total_students'] ?? 0); ?></div>
+                    </div>
+                    <div class="att-stat">
+                        <div class="lbl">≥ 90%</div>
+                        <div class="val text-success"><?php echo (int)($summary['above_90'] ?? 0); ?></div>
+                    </div>
+                    <div class="att-stat">
+                        <div class="lbl">80% – 89%</div>
+                        <div class="val text-warning"><?php echo (int)($summary['above_80'] ?? 0); ?></div>
+                    </div>
+                    <div class="att-stat">
+                        <div class="lbl">Total allowance</div>
+                        <div class="val" style="font-size:1.05rem;">Rs. <?php echo number_format($summary['total_allowance'] ?? 0, 0); ?></div>
+                    </div>
+                </div>
+
+                <div class="att-table-wrap" id="attendance-summary-document">
+                    <table class="att-table">
+                        <thead>
+                            <tr>
+                                <th class="sticky c-no">#</th>
+                                <th class="sticky c-id">Student ID</th>
+                                <th class="sticky c-name">Full name</th>
+                                <th class="sticky c-nic">NIC</th>
+                                <?php foreach ($allDays as $day): ?>
+                                    <th class="c-day" title="<?php echo htmlspecialchars(($day['date'] ?? '') . ' ' . ($day['day_name'] ?? '')); ?>">
+                                        <span class="d-n"><?php echo htmlspecialchars($day['day'] ?? ''); ?></span>
+                                        <?php if (!empty($day['day_name'])): ?>
+                                            <span class="d-w"><?php echo htmlspecialchars(substr($day['day_name'], 0, 3)); ?></span>
+                                        <?php endif; ?>
+                                    </th>
+                                <?php endforeach; ?>
+                                <th class="c-tot">Days</th>
+                                <th class="c-p">P</th>
+                                <th class="c-pct">%</th>
+                                <th class="c-allow">Allowance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php $rowNo = 0; foreach ($reportData as $student): $rowNo++;
+                                $workingDays = (int)($student['effective_working_days'] ?? 0);
+                                $presentDays = (int)($student['present_days'] ?? 0);
+                                $pct = (float)($student['attendance_percentage'] ?? 0);
+                                $badge = $pct >= 90 ? 'bg-success' : ($pct >= 80 ? 'bg-warning text-dark' : 'bg-danger');
+                            ?>
+                            <tr>
+                                <td class="sticky c-no"><?php echo $rowNo; ?></td>
+                                <td class="sticky c-id"><?php echo htmlspecialchars($student['student_id']); ?></td>
+                                <td class="sticky c-name"><?php echo htmlspecialchars($student['student_fullname']); ?></td>
+                                <td class="sticky c-nic"><?php echo htmlspecialchars($student['student_nic']); ?></td>
+                                <?php foreach ($allDays as $day):
+                                    $status = $student['day_by_day'][$day['date']] ?? '';
+                                    $cls = '';
+                                    $val = '';
+                                    if ($status === 'P') { $cls = 'm-p'; $val = '1'; }
+                                    elseif ($status === 'A') { $cls = 'm-a'; $val = '0'; }
+                                    elseif ($status === 'H') { $cls = 'm-h'; $val = '-1'; }
+                                    elseif ($status === 'L') { $cls = 'm-l'; $val = 'L'; }
+                                ?>
+                                    <td class="c-day <?php echo $cls; ?>"><?php echo $val; ?></td>
+                                <?php endforeach; ?>
+                                <td class="c-tot"><?php echo $workingDays; ?></td>
+                                <td class="c-p"><?php echo $presentDays; ?></td>
+                                <td class="c-pct"><span class="badge <?php echo $badge; ?>"><?php echo number_format($pct, 1); ?>%</span></td>
+                                <td class="c-allow">Rs. <?php echo number_format($student['allowance'] ?? 0, 0); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td class="sticky c-no"></td>
+                                <td class="sticky c-id"></td>
+                                <td class="sticky c-name text-end">Total</td>
+                                <td class="sticky c-nic"></td>
+                                <?php foreach ($allDays as $day): ?>
+                                    <td class="c-day"></td>
+                                <?php endforeach; ?>
+                                <td class="c-tot"><?php echo (int)($summary['total_effective_working_days'] ?? 0); ?></td>
+                                <td class="c-p"><?php echo (int)($summary['total_present'] ?? 0); ?></td>
+                                <td class="c-pct">—</td>
+                                <td class="c-allow">Rs. <?php echo number_format($summary['total_allowance'] ?? 0, 0); ?></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="att-legend">
+                    <span><span class="sw m-p">1</span>Present</span>
+                    <span><span class="sw m-a">0</span>Absent</span>
+                    <span><span class="sw m-h">-1</span>Holiday</span>
+                    <span><span class="sw m-l">L</span>Late</span>
+                    <span>% = Present ÷ Working days</span>
+                </div>
+            <?php else: ?>
+                <div class="alert alert-light border text-center mb-0">
+                    <?php if ($isFIN && $isMonthLocked && !empty($selectedDepartment) && !empty($selectedMonth)): ?>
+                        No eligible students for this selection.
+                    <?php else: ?>
+                        Select filters and click <strong>View Report</strong>.
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
 
 <script>
-// Load courses when department is selected
-document.addEventListener('DOMContentLoaded', function() {
-    const departmentSelect = document.getElementById('department_id');
-    const courseSelect = document.getElementById('course_id');
-    
+document.addEventListener('DOMContentLoaded', function () {
+    var departmentSelect = document.getElementById('department_id');
+    var courseSelect = document.getElementById('course_id');
     if (departmentSelect && courseSelect) {
-        departmentSelect.addEventListener('change', function() {
-            const departmentId = this.value;
-            
-            if (departmentId) {
-                // Fetch courses for selected department
-                fetch('<?php echo APP_URL; ?>/courses/get-by-department?department_id=' + encodeURIComponent(departmentId))
-                    .then(response => response.json())
-                    .then(data => {
-                        courseSelect.innerHTML = '<option value="">All Courses</option>';
-                        if (data.success && data.courses) {
-                            data.courses.forEach(function(course) {
-                                const option = document.createElement('option');
-                                option.value = course.course_id;
-                                option.textContent = course.course_name;
-                                courseSelect.appendChild(option);
-                            });
-                        }
-                        courseSelect.disabled = false;
-                    })
-                    .catch(error => {
-                        console.error('Error loading courses:', error);
-                        courseSelect.innerHTML = '<option value="">Error loading courses</option>';
-                    });
-            } else {
-                courseSelect.innerHTML = '<option value="">All Courses</option>';
-                courseSelect.disabled = false;
-            }
-        });
-    }
-    
-    // Lock Month Button (HOD only)
-    const lockMonthBtn = document.getElementById('lockMonthBtn');
-    if (lockMonthBtn) {
-        lockMonthBtn.addEventListener('click', function() {
-            const departmentId = this.dataset.departmentId;
-            const month = this.dataset.month;
-            
-            if (!confirm('Are you sure you want to lock attendance for this month?')) {
+        departmentSelect.addEventListener('change', function () {
+            var departmentId = this.value;
+            if (!departmentId) {
+                courseSelect.innerHTML = '<option value="">All</option>';
                 return;
             }
-            
-            fetch('<?php echo APP_URL; ?>/attendance/lock-month', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'department_id=' + encodeURIComponent(departmentId) + '&month=' + encodeURIComponent(month)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    location.reload();
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while locking the month.');
-            });
+            fetch('<?php echo APP_URL; ?>/courses/get-by-department?department_id=' + encodeURIComponent(departmentId))
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    courseSelect.innerHTML = '<option value="">All</option>';
+                    if (data.success && data.courses) {
+                        data.courses.forEach(function (course) {
+                            var option = document.createElement('option');
+                            option.value = course.course_id;
+                            option.textContent = course.course_name;
+                            courseSelect.appendChild(option);
+                        });
+                    }
+                })
+                .catch(function () {
+                    courseSelect.innerHTML = '<option value="">Error loading courses</option>';
+                });
         });
     }
-    
-    // Unlock Month Button (Admin only)
-    const unlockMonthBtn = document.getElementById('unlockMonthBtn');
-    if (unlockMonthBtn) {
-        unlockMonthBtn.addEventListener('click', function() {
-            const departmentId = this.dataset.departmentId;
-            const month = this.dataset.month;
-            
-            if (!confirm('Are you sure you want to unlock attendance for this month?\n\nAfter unlocking, attendance can be modified again.')) {
-                return;
-            }
-            
-            fetch('<?php echo APP_URL; ?>/attendance/unlock-month', {
+
+    function postLock(url, btn, confirmMsg) {
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+            if (!confirm(confirmMsg)) return;
+            var body = 'department_id=' + encodeURIComponent(btn.dataset.departmentId)
+                + '&month=' + encodeURIComponent(btn.dataset.month);
+            fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'department_id=' + encodeURIComponent(departmentId) + '&month=' + encodeURIComponent(month)
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    location.reload();
-                } else {
-                    alert('Error: ' + data.message);
-                }
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                alert(data.message || (data.success ? 'Done' : 'Failed'));
+                if (data.success) location.reload();
             })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while unlocking the month.');
-            });
+            .catch(function () { alert('Request failed.'); });
         });
     }
+
+    postLock('<?php echo APP_URL; ?>/attendance/lock-month', document.getElementById('lockMonthBtn'),
+        'Lock attendance for this month?');
+    postLock('<?php echo APP_URL; ?>/attendance/unlock-month', document.getElementById('unlockMonthBtn'),
+        'Unlock this month so attendance can be edited again?');
 });
 </script>
-

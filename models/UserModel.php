@@ -550,19 +550,26 @@ class UserModel extends Model {
     }
 
     /**
-     * Finance staff (position FIN or ACC) get a finance-only dashboard.
+     * Finance staff (FIN / ACC) and Finance Office MA/MA2 get a finance-only dashboard.
      * System admin and ADM keep the full dashboard.
      */
     public function usesFinanceDashboard($userId): bool {
         if ($this->isAdminOrADM($userId)) {
             return false;
         }
-        return in_array($this->getUserRole($userId), ['FIN', 'ACC'], true);
+        if (in_array($this->getUserRole($userId), ['FIN', 'ACC'], true)) {
+            return true;
+        }
+        return $this->isFinanceDepartmentAssistant($userId);
     }
 
     public function hasFinanceAccess($userId) {
         $role = $this->getUserRole($userId);
-        return in_array($role, ['FIN', 'ACC', 'ADM']);
+        if (in_array($role, ['FIN', 'ACC', 'ADM'], true)) {
+            return true;
+        }
+        // Management Assistants posted to Finance Office (e.g. MA2 in FIN)
+        return $this->isFinanceDepartmentAssistant($userId);
     }
     
     /**
@@ -758,7 +765,7 @@ class UserModel extends Model {
     }
     
     /**
-     * View payments list / receipts: FIN, ACC, ADM, or DIR (DIR is read-only).
+     * View payments list / receipts: FIN, ACC, ADM, Finance MA/MA2, or DIR (DIR is read-only).
      */
     public function canViewPaymentsList($userId): bool {
         if ($this->hasFinanceAccess($userId)) {

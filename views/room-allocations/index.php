@@ -4,6 +4,8 @@ $allocationFilters = [
     'room_id' => $room_id ?? '',
     'department_id' => $department_id ?? '',
     'gender' => $gender ?? '',
+    'academic_year' => $academic_year ?? '',
+    'province_region' => $province_region ?? '',
     'status' => $status ?? '',
     'search' => $search ?? ''
 ];
@@ -125,7 +127,7 @@ if (!function_exists('allocationDateLabel')) {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-6 col-lg-3">
+                        <div class="col-md-6 col-lg-2">
                             <label for="filter_department_id" class="form-label fw-bold small mb-1">Department</label>
                             <select name="department_id" id="filter_department_id" class="form-select form-select-sm">
                                 <option value="">All Departments</option>
@@ -135,6 +137,26 @@ if (!function_exists('allocationDateLabel')) {
                                         <?php echo htmlspecialchars($dept['department_name']); ?>
                                     </option>
                                 <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6 col-lg-2">
+                            <label for="filter_academic_year" class="form-label fw-bold small mb-1">Academic Year</label>
+                            <select name="academic_year" id="filter_academic_year" class="form-select form-select-sm">
+                                <option value="">All Years</option>
+                                <?php foreach ($academicYears ?? [] as $year): ?>
+                                    <option value="<?php echo htmlspecialchars($year); ?>"
+                                            <?php echo ($academic_year ?? '') === $year ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($year); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6 col-lg-2">
+                            <label for="filter_province_region" class="form-label fw-bold small mb-1">Province</label>
+                            <select name="province_region" id="filter_province_region" class="form-select form-select-sm">
+                                <option value="">All Provinces</option>
+                                <option value="northern" <?php echo ($province_region ?? '') === 'northern' ? 'selected' : ''; ?>>Northern</option>
+                                <option value="other" <?php echo ($province_region ?? '') === 'other' ? 'selected' : ''; ?>>Other Provinces</option>
                             </select>
                         </div>
                         <div class="col-md-6 col-lg-2">
@@ -149,7 +171,7 @@ if (!function_exists('allocationDateLabel')) {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-6 col-lg-3">
+                        <div class="col-md-6 col-lg-2">
                             <label for="filter_status" class="form-label fw-bold small mb-1">Status</label>
                             <select name="status" id="filter_status" class="form-select form-select-sm">
                                 <option value="">All Status</option>
@@ -169,7 +191,7 @@ if (!function_exists('allocationDateLabel')) {
                                 <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
                                     <i class="fas fa-filter me-1"></i>Filter
                                 </button>
-                                <?php if (!empty($search) || !empty($hostel_id) || !empty($room_id) || !empty($status) || !empty($department_id) || !empty($gender)): ?>
+                                <?php if (!empty($search) || !empty($hostel_id) || !empty($room_id) || !empty($status) || !empty($department_id) || !empty($gender) || !empty($academic_year) || !empty($province_region)): ?>
                                     <a href="<?php echo APP_URL; ?>/room-allocations" class="btn btn-outline-secondary btn-sm flex-grow-1">
                                         <i class="fas fa-times me-1"></i>Clear
                                     </a>
@@ -527,7 +549,9 @@ if (!function_exists('allocationDateLabel')) {
                         'room_id' => $room_id ?? '',
                         'status' => $status ?? '',
                         'department_id' => $department_id ?? '',
-                        'gender' => $gender ?? ''
+                        'gender' => $gender ?? '',
+                        'academic_year' => $academic_year ?? '',
+                        'province_region' => $province_region ?? ''
                     ]));
                     $paginationPrefix = $paginationQuery ? '?' . $paginationQuery . '&' : '?';
                 ?>

@@ -305,10 +305,18 @@ class AttendanceModel extends Model {
                 INNER JOIN `student_enroll` se ON s.student_id = se.student_id
                 INNER JOIN `course` c ON se.course_id = c.course_id
                 INNER JOIN `department` d ON c.department_id = d.department_id
-                WHERE se.student_enroll_status = 'Following' AND s.student_status = 'Active'";
+                WHERE s.student_status = 'Active'";
         
         $params = [];
         $types = '';
+
+        // Default: Following only. Finance payment / locked-month reports also include Internship
+        // (cohorts often move to Internship after the attendance month).
+        if (!empty($filters['include_internship'])) {
+            $sql .= " AND se.student_enroll_status IN ('Following', 'Internship')";
+        } else {
+            $sql .= " AND se.student_enroll_status = 'Following'";
+        }
         
         // Apply filters
         if (!empty($filters['department_id'])) {

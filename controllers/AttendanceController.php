@@ -388,6 +388,7 @@ class AttendanceController extends Controller {
         $userRole = null;
         
         // FIN officer, or MA/MA2 posted in Finance: locked months + eligible students only
+        // (summary view + Excel download for payment processing)
         if (isset($_SESSION['user_id'])) {
             require_once BASE_PATH . '/models/UserModel.php';
             $userModel = new UserModel();
@@ -401,7 +402,8 @@ class AttendanceController extends Controller {
         $courseId = $this->get('course_id', '');
         $academicYear = $this->get('academic_year', '');
         $month = $this->get('month', date('Y-m'));
-        $reportView = $this->get('view', 'summary') === 'daily' ? 'daily' : 'summary';
+        // Finance payment users: always month summary (not daily register)
+        $reportView = $isFIN ? 'summary' : ($this->get('view', 'summary') === 'daily' ? 'daily' : 'summary');
         // Attendance source: manual (marked by staff), finger (biometric device) or both
         $source = $this->get('source', 'manual');
         if (!in_array($source, ['manual', 'finger', 'both'], true)) {
@@ -450,8 +452,7 @@ class AttendanceController extends Controller {
             'below_80' => 0
         ];
         
-        // FIN users can only view locked (HOD approved) months
-        // Only get report data if not FIN or if month is locked (for FIN users)
+        // FIN / Finance MA2: only locked (HOD-approved) months — summary + Excel for payment
         if (!empty($month) && (!$isFIN || $isMonthLocked)) {
             $filters = [
                 'department_id' => $departmentId,
@@ -459,7 +460,9 @@ class AttendanceController extends Controller {
                 'academic_year' => $academicYear,
                 'eligible_only' => $eligibleOnly,
                 'source' => $source,
-                'include_finger' => true
+                'include_finger' => true,
+                // Finance: include Internship so locked-month cohorts still appear for payment
+                'include_internship' => $isFIN ? true : false
             ];
             
             $reportData = $attendanceModel->getAttendanceReport($month, $filters);
@@ -982,11 +985,13 @@ class AttendanceController extends Controller {
         $filters = [
             'department_id' => $departmentId,
             'course_id' => $courseId,
-            'academic_year' => $academicYear
+            'academic_year' => $academicYear,
+            'include_finger' => true
         ];
-        // FIN / Finance MA2 export only eligible (allowance-eligible) students
+        // FIN / Finance MA2 export: eligible students + Internship cohorts for payment
         if ($isFIN) {
             $filters['eligible_only'] = true;
+            $filters['include_internship'] = true;
         }
         
         // Get report data (same method as report view)

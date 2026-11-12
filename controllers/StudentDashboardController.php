@@ -186,14 +186,14 @@ class StudentDashboardController extends Controller {
         $dl = rtrim(APP_URL, '/') . '/student/forms/download?form=';
         $forms = [
             [
-                'key' => 'student-application',
-                'title' => 'Student Application Form',
-                'description' => 'Your full application details, pre-filled from your student profile.',
-                'icon' => 'fa-file-alt',
-                'pages' => '2 pages',
-                'submit_to' => 'Student Affairs Office',
+                'key' => 'student-confirmation',
+                'title' => 'Student Confirmation Letter',
+                'description' => 'Official confirmation letter for your NVQ level and province (Level 04/05 × Northern / Other Provinces), filled from your student profile.',
+                'icon' => 'fa-envelope-open-text',
+                'pages' => '4 pages',
+                'submit_to' => 'Keep for your records / admissions',
                 'action_label' => 'Download PDF',
-                'url' => $dl . 'student-application',
+                'url' => $dl . 'student-confirmation',
             ],
             [
                 'key' => 'hostel-request',
@@ -243,7 +243,17 @@ class StudentDashboardController extends Controller {
         }
 
         $form = strtolower(trim((string) $this->get('form', '')));
-        $allowed = ['student-application', 'application', 'hostel-request', 'bus-season-request', 'family-income'];
+        $allowed = [
+            'student-confirmation',
+            'confirmation',
+            'confirmation-letter',
+            'calling-letter',
+            'student-application',
+            'application',
+            'hostel-request',
+            'bus-season-request',
+            'family-income',
+        ];
         if (!in_array($form, $allowed, true)) {
             $_SESSION['error'] = 'Requested form was not found.';
             $this->redirect('student/forms');
@@ -271,13 +281,14 @@ class StudentDashboardController extends Controller {
             $enrollment = null;
         }
 
-        require_once BASE_PATH . '/helpers/StudentSampleFormsPdfHelper.php';
-        $application = StudentSampleFormsPdfHelper::findApplicationForStudent($student);
-
-        if ($form === 'student-application' || $form === 'application') {
-            StudentSampleFormsPdfHelper::streamStudentApplicationBlank(true, $student, $enrollment, $application);
+        $confirmationForms = ['student-confirmation', 'confirmation', 'confirmation-letter', 'calling-letter', 'student-application', 'application'];
+        if (in_array($form, $confirmationForms, true)) {
+            $this->streamStudentConfirmationLetter($student, is_array($enrollment) ? $enrollment : null);
             return;
         }
+
+        require_once BASE_PATH . '/helpers/StudentSampleFormsPdfHelper.php';
+        $application = StudentSampleFormsPdfHelper::findApplicationForStudent($student);
 
         if ($form === 'family-income') {
             StudentSampleFormsPdfHelper::streamFamilyIncomeForm(true, $student, $enrollment, $application);
@@ -337,6 +348,91 @@ class StudentDashboardController extends Controller {
         }
         $data = require $file;
         return is_array($data) ? $data : ['notices' => [], 'code_of_conduct' => [], 'common_rules' => []];
+    }
+
+    /**
+     * Stream the official confirmation letter for the logged-in student.
+     * Template is chosen from NVQ level (04/05) and province (Northern / Other).
+     *
+     * @param array<string,mixed> $student
+     * @param array<string,mixed>|null $enrollment
+     */
+    private function streamStudentConfirmationLetter(array $student, ?array $enrollment): void {
+        require_once BASE_PATH . '/helpers/CallingLetterPdfHelper.php';
+
+        $clean = static function ($v): string {
+            return trim(preg_replace('/\s+/u', ' ', (string) ($v ?? '')) ?? '');
+        };
+
+        $nvqRaw = (string) ($enrollment['course_nvq_level'] ?? '');
+        $province = (string) ($student['student_provice'] ?? '');
+        $templateKey = CallingLetterPdfHelper::resolveTemplateKeyForStudent($nvqRaw, $province);
+        if ($templateKey === null) {
+            $_SESSION['error'] = 'Confirmation letter is available for NVQ Level 04 and 05 students only. Your course level could not be matched.';
+            $this->redirect('student/forms');
+            return;
+        }
+
+        if (!is_file(CallingLetterPdfHelper::templatePath($templateKey))) {
+            $_SESSION['error'] = 'Confirmation letter template is missing for ' . CallingLetterPdfHelper::labelForTemplate($templateKey) . '.';
+            $this->redirect('student/forms');
+            return;
+        }
+
+        $name = $clean($student['student_fullname'] ?? '');
+        $name = preg_replace('/^(Mr|Ms|Mrs|Miss|Dr)\.?\s+/iu', '', $name) ?? $name;
+        $name = $clean($name);
+
+        $addressLines = [];
+        foreach (preg_split('/\r\n|\r|\n/', (string) ($student['student_address'] ?? '')) as $part) {
+            $part = $clean($part);
+            if ($part !== '') {
+                $addressLines[] = $part;
+            }
+        }
+        $district = $clean($student['student_district'] ?? '');
+        $zip = $clean($student['student_zip'] ?? '');
+        $tail = trim($district . ($zip !== '' ? ' ' . $zip : ''));
+        if ($tail !== '') {
+            $addressLines[] = $tail;
+        }
+        if (count($addressLines) > 2) {
+            $addressLines = [
+                $addressLines[0],
+                implode(', ', array_slice($addressLines, 1)),
+            ];
+        }
+
+        $nvqLevel = CallingLetterPdfHelper::nvqLevelForTemplate($templateKey);
+        $row = [
+            'name' => $name,
+            'address_lines' => $addressLines,
+            'department' => $clean($enrollment['department_name'] ?? ''),
+            'course' => $clean($enrollment['course_name'] ?? ''),
+            'nvq_level' => $nvqLevel,
+        ];
+
+        $studentIdSafe = preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) ($student['student_id'] ?? 'student'));
+        $filename = 'confirmation_letter_' . strtoupper($templateKey) . '_' . $studentIdSafe . '.pdf';
+
+        session_write_close();
+        try {
+            $bytes = CallingLetterPdfHelper::buildSingleStudentPdfBytes($row, $templateKey);
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Content-Length: ' . strlen($bytes));
+            echo $bytes;
+            exit;
+        } catch (Throwable $ex) {
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                @session_start();
+            }
+            $_SESSION['error'] = 'Could not build confirmation letter: ' . $ex->getMessage();
+            $this->redirect('student/forms');
+        }
     }
 
     /**

@@ -400,7 +400,7 @@ class Controller {
         $userModel = new UserModel();
 
         if (!$userModel->canViewPaymentsList($_SESSION['user_id'])) {
-            $_SESSION['error'] = 'Access denied. Payments are available to Finance staff, Administrator, or Director (view only).';
+            $_SESSION['error'] = 'Access denied. Payments are available to Finance staff (including Finance MA/MA2), Administrator, or Director (view only).';
             $this->redirect('dashboard');
             return false;
         }

@@ -1,7 +1,10 @@
 <?php
 $paymentReasons = $paymentReasons ?? [];
 $paymentMethods = $paymentMethods ?? [];
-$cashierName = $cashierName ?? ($_SESSION['user_name'] ?? 'Staff');
+$cashierName = trim((string) ($cashierName ?? ''));
+if ($cashierName === '') {
+    $cashierName = 'Staff';
+}
 $typeGroups = [];
 foreach ($paymentReasons as $row) {
     $typeName = (string) ($row['payment_type'] ?? '');
@@ -354,6 +357,7 @@ foreach ($paymentReasons as $row) {
                     <div id="referenceWrap" class="mt-3 d-none">
                         <label for="reference_no" class="form-label fw-semibold">Reference number <span class="text-muted fw-normal">(optional)</span></label>
                         <input type="text" class="form-control" id="reference_no" name="reference_no" placeholder="Bank slip, cheque, or transfer reference">
+                        <div class="form-text">Leave blank to use the day’s common number for each payment category.</div>
                     </div>
                     <div class="mt-3">
                         <button class="btn btn-link px-0" type="button" data-bs-toggle="collapse" data-bs-target="#notesCollapse">

@@ -1,14 +1,15 @@
 <?php
 $filters = $filters ?? [];
-if (!in_array($basis, ['type', 'subtype', 'student', 'department'], true)) {
-    $basis = 'type';
-}
+$basis = in_array($basis ?? '', ['type', 'subtype', 'student', 'department'], true) ? $basis : 'type';
 $printMode = !empty($printMode);
-$summary = $summary ?? ['count' => 0, 'students' => 0, 'amount' => 0, 'types' => [], 'subtypes' => []];
+$summary = $summary ?? ['count' => 0, 'students' => 0, 'amount' => 0, 'types' => [], 'subtypes' => [], 'departments' => []];
 $groups = $groups ?? [];
+$paymentTypes = $paymentTypes ?? [];
 $paymentSubtypes = $paymentSubtypes ?? [];
 $academicYears = $academicYears ?? [];
 $departments = $departments ?? [];
+$students = $students ?? [];
+
 $departmentLabel = '';
 foreach ($departments as $departmentOption) {
     if (($filters['department'] ?? '') !== '' && ($filters['department'] ?? '') === ($departmentOption['department_id'] ?? '')) {
@@ -16,137 +17,175 @@ foreach ($departments as $departmentOption) {
         break;
     }
 }
-$headingTitle = 'Payments Report';
-if ($basis === 'department') {
-    $headingTitle = 'Department-wise Payments Report';
-} elseif ($basis === 'student') {
-    $headingTitle = 'Student-wise Payments Report';
-} elseif ($basis === 'subtype') {
-    $headingTitle = 'Sub Type-wise Payments Report';
-}
-$headingLines = [];
+
+$basisTitles = [
+    'type' => 'By payment type',
+    'subtype' => 'By sub type',
+    'student' => 'By student',
+    'department' => 'By department',
+];
+$headingTitle = $basisTitles[$basis] ?? 'Payments Report';
+
+$metaBits = [];
 if (($filters['payment_subtype'] ?? '') !== '') {
-    $subjectLine = $filters['payment_subtype'];
-    if (($filters['payment_type'] ?? '') !== '') {
-        $subjectLine .= ' — ' . $filters['payment_type'];
-    }
-    $headingLines[] = $subjectLine;
+    $metaBits[] = $filters['payment_subtype'];
 } elseif (($filters['payment_type'] ?? '') !== '') {
-    $headingLines[] = $filters['payment_type'];
+    $metaBits[] = $filters['payment_type'];
 }
 if (($filters['academic_year'] ?? '') !== '') {
-    $headingLines[] = 'Academic Year ' . $filters['academic_year'];
+    $metaBits[] = $filters['academic_year'];
 }
 if ($departmentLabel !== '') {
-    $headingLines[] = $departmentLabel;
+    $metaBits[] = $departmentLabel;
 }
 if (($filters['student_id'] ?? '') !== '') {
-    $headingLines[] = 'Student ' . $filters['student_id'];
+    $metaBits[] = $filters['student_id'];
 }
 if (($filters['date_from'] ?? '') !== '' || ($filters['date_to'] ?? '') !== '') {
-    $fromLabel = ($filters['date_from'] ?? '') !== '' ? date('d F Y', strtotime($filters['date_from'])) : 'Start';
-    $toLabel = ($filters['date_to'] ?? '') !== '' ? date('d F Y', strtotime($filters['date_to'])) : 'Today';
-    $headingLines[] = $fromLabel . ' to ' . $toLabel;
+    $fromLabel = ($filters['date_from'] ?? '') !== '' ? date('d M Y', strtotime($filters['date_from'])) : '…';
+    $toLabel = ($filters['date_to'] ?? '') !== '' ? date('d M Y', strtotime($filters['date_to'])) : '…';
+    $metaBits[] = $fromLabel . ' – ' . $toLabel;
 }
-$queryBase = $filters;
-$printQuery = $queryBase;
-$printQuery['format'] = 'print';
-$csvQuery = $queryBase;
-$csvQuery['format'] = 'csv';
 
-$lineTotal = function ($payment) {
+$queryBase = $filters;
+$printQuery = $queryBase + ['format' => 'print'];
+$csvQuery = $queryBase + ['format' => 'csv'];
+
+$lineTotal = static function ($payment) {
     $qty = max(1, (int) ($payment['pays_qty'] ?? 1));
     return (float) ($payment['pays_amount'] ?? 0) * $qty;
 };
 ?>
 <style>
-.pay-report-sheet {
+.pay-page { width: 100%; }
+.pay-page .pay-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: .75rem 1rem;
+    align-items: end;
+}
+.pay-page .pay-basis {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1rem;
+    align-items: center;
+}
+.pay-page .pay-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: center;
+}
+.pay-page .pay-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .75rem;
+}
+.pay-page .pay-stat {
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
+    padding: .75rem;
+    text-align: center;
     background: #fff;
 }
-.pay-report-block {
+.pay-page .pay-stat .lbl { color: #6c757d; font-size: .75rem; margin-bottom: .2rem; }
+.pay-page .pay-stat .val { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+.pay-page .pay-table-wrap {
+    overflow: auto;
     border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
-    margin-bottom: 1.25rem;
+    border-radius: .5rem;
+}
+.pay-page .pay-table {
+    width: 100%;
+    margin: 0;
+    font-size: .875rem;
+}
+.pay-page .pay-table th,
+.pay-page .pay-table td {
+    vertical-align: middle;
+    padding: .45rem .55rem;
+    white-space: nowrap;
+}
+.pay-page .pay-table thead th {
+    background: #f8f9fa;
+    font-weight: 600;
+    border-bottom-width: 1px;
+}
+.pay-page .pay-block {
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
     overflow: hidden;
+    margin-bottom: 1rem;
 }
-.pay-report-block h6 {
-    margin: 0;
+.pay-page .pay-block-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+    padding: .65rem .85rem;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
 }
-.pay-report-heading {
-    text-align: center;
-    color: #111;
-    margin-bottom: 1.5rem;
-}
-.pay-report-inst {
-    font-size: 1.2rem;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-}
-.pay-report-addr {
-    font-size: 0.92rem;
-}
-.pay-report-rule {
-    border: 0;
-    border-top: 2px solid #0d2148;
-    margin: 0.65rem auto 0.75rem;
-    max-width: 520px;
-}
-.pay-report-title {
-    font-size: 1.45rem;
-    font-weight: 700;
-    margin: 0;
-    line-height: 1.3;
-}
-.pay-report-line {
-    margin-top: 0.15rem;
+.pay-page .pay-print-head { display: none; text-align: center; margin-bottom: 1rem; }
+@media (max-width: 767.98px) {
+    .pay-page .pay-stats { grid-template-columns: 1fr; }
 }
 @media print {
     .no-print { display: none !important; }
-    .pay-report-sheet { box-shadow: none !important; border: 0 !important; }
-    .pay-report-block {
-        break-inside: avoid;
-        page-break-inside: avoid;
-        border-color: #000;
-    }
-    .pay-report-block + .pay-report-block {
-        break-before: page;
-        page-break-before: always;
-    }
+    .pay-page .pay-print-head { display: block; }
+    .pay-page .card, .pay-page .card-body { border: 0 !important; box-shadow: none !important; }
+    .pay-page .pay-block { break-inside: avoid; page-break-inside: avoid; border-color: #000; }
+    .pay-page .pay-block + .pay-block { break-before: page; page-break-before: always; }
     a { text-decoration: none; color: inherit; }
 }
 </style>
 
-<div class="container-fluid px-4 py-3 pay-report-page">
-    <div class="card shadow-sm border-0 pay-report-sheet">
-        <div class="card-header bg-primary text-white no-print">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                <h5 class="mb-0 fw-bold"><i class="fas fa-file-alt me-2"></i>Payments Report</h5>
-                <a href="<?php echo APP_URL; ?>/payments" class="btn btn-outline-light btn-sm">
-                    <i class="fas fa-arrow-left me-1"></i>Back to Payments
-                </a>
+<div class="container-fluid px-3 px-lg-4 py-3 pay-page">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white border-bottom no-print">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-file-invoice-dollar me-2"></i>Payments Report</h5>
+                    <div class="text-muted small mt-1"><?php echo htmlspecialchars($headingTitle); ?></div>
+                </div>
+                <div class="pay-actions">
+                    <a class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener"
+                       href="<?php echo APP_URL; ?>/payments/report?<?php echo htmlspecialchars(http_build_query($printQuery)); ?>">
+                        <i class="fas fa-print me-1"></i>Print
+                    </a>
+                    <a class="btn btn-outline-success btn-sm"
+                       href="<?php echo APP_URL; ?>/payments/report?<?php echo htmlspecialchars(http_build_query($csvQuery)); ?>">
+                        <i class="fas fa-file-csv me-1"></i>CSV
+                    </a>
+                    <a class="btn btn-outline-secondary btn-sm" href="<?php echo APP_URL; ?>/payments">
+                        <i class="fas fa-arrow-left me-1"></i>Payments
+                    </a>
+                </div>
             </div>
         </div>
+
         <div class="card-body">
             <?php if (!empty($error)): ?>
-                <div class="alert alert-danger no-print"><?php echo htmlspecialchars($error); ?></div>
+                <div class="alert alert-danger py-2 no-print"><?php echo htmlspecialchars($error); ?></div>
             <?php endif; ?>
 
-            <form method="GET" action="<?php echo APP_URL; ?>/payments/report" class="mb-4 no-print">
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-2">
-                        <label for="date_from" class="form-label fw-semibold">Date From</label>
-                        <input type="date" class="form-control" id="date_from" name="date_from"
+            <form method="GET" action="<?php echo APP_URL; ?>/payments/report" class="mb-3 no-print">
+                <div class="pay-filters">
+                    <div>
+                        <label class="form-label small fw-semibold mb-1" for="date_from">From</label>
+                        <input type="date" class="form-control form-control-sm" id="date_from" name="date_from"
                                value="<?php echo htmlspecialchars($filters['date_from'] ?? ''); ?>">
                     </div>
-                    <div class="col-md-2">
-                        <label for="date_to" class="form-label fw-semibold">Date To</label>
-                        <input type="date" class="form-control" id="date_to" name="date_to"
+                    <div>
+                        <label class="form-label small fw-semibold mb-1" for="date_to">To</label>
+                        <input type="date" class="form-control form-control-sm" id="date_to" name="date_to"
                                value="<?php echo htmlspecialchars($filters['date_to'] ?? ''); ?>">
                     </div>
-                    <div class="col-md-2">
-                        <label for="payment_type" class="form-label fw-semibold">Payment Type</label>
-                        <select class="form-select" id="payment_type" name="payment_type">
-                            <option value="">All Types</option>
+                    <div>
+                        <label class="form-label small fw-semibold mb-1" for="payment_type">Type</label>
+                        <select class="form-select form-select-sm" id="payment_type" name="payment_type">
+                            <option value="">All</option>
                             <?php foreach ($paymentTypes as $type): ?>
                                 <option value="<?php echo htmlspecialchars($type); ?>"
                                     <?php echo ($filters['payment_type'] ?? '') === $type ? 'selected' : ''; ?>>
@@ -155,23 +194,23 @@ $lineTotal = function ($payment) {
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-2">
-                        <label for="payment_subtype" class="form-label fw-semibold">Sub type</label>
-                        <select class="form-select" id="payment_subtype" name="payment_subtype">
-                            <option value="">All Sub types</option>
+                    <div>
+                        <label class="form-label small fw-semibold mb-1" for="payment_subtype">Sub type</label>
+                        <select class="form-select form-select-sm" id="payment_subtype" name="payment_subtype">
+                            <option value="">All</option>
                             <?php foreach ($paymentSubtypes as $subtype): ?>
                                 <option value="<?php echo htmlspecialchars($subtype['payment_reason']); ?>"
                                     data-type="<?php echo htmlspecialchars($subtype['payment_type']); ?>"
                                     <?php echo ($filters['payment_subtype'] ?? '') === $subtype['payment_reason'] ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($subtype['payment_reason'] . ' (' . $subtype['payment_type'] . ')'); ?>
+                                    <?php echo htmlspecialchars($subtype['payment_reason']); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-2">
-                        <label for="academic_year" class="form-label fw-semibold">Academic Year</label>
-                        <select class="form-select" id="academic_year" name="academic_year">
-                            <option value="">All Years</option>
+                    <div>
+                        <label class="form-label small fw-semibold mb-1" for="academic_year">Year</label>
+                        <select class="form-select form-select-sm" id="academic_year" name="academic_year">
+                            <option value="">All</option>
                             <?php foreach ($academicYears as $year): ?>
                                 <option value="<?php echo htmlspecialchars($year); ?>"
                                     <?php echo ($filters['academic_year'] ?? '') === $year ? 'selected' : ''; ?>>
@@ -180,10 +219,10 @@ $lineTotal = function ($payment) {
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <label for="department" class="form-label fw-semibold">Department</label>
-                        <select class="form-select" id="department" name="department">
-                            <option value="">All Departments</option>
+                    <div>
+                        <label class="form-label small fw-semibold mb-1" for="department">Department</label>
+                        <select class="form-select form-select-sm" id="department" name="department">
+                            <option value="">All</option>
                             <?php foreach ($departments as $departmentOption): ?>
                                 <option value="<?php echo htmlspecialchars($departmentOption['department_id']); ?>"
                                     <?php echo ($filters['department'] ?? '') === $departmentOption['department_id'] ? 'selected' : ''; ?>>
@@ -192,99 +231,116 @@ $lineTotal = function ($payment) {
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-4">
-                        <label for="student_id" class="form-label fw-semibold">Student</label>
-                        <select class="form-select" id="student_id" name="student_id">
-                            <option value="">All Students</option>
-                            <?php if (!empty($students)): ?>
-                                <?php foreach ($students as $student): ?>
-                                    <option value="<?php echo htmlspecialchars($student['student_id']); ?>"
-                                        <?php echo ($filters['student_id'] ?? '') == $student['student_id'] ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($student['student_id'] . ' - ' . $student['student_fullname']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
+                    <div>
+                        <label class="form-label small fw-semibold mb-1" for="student_id">Student</label>
+                        <select class="form-select form-select-sm" id="student_id" name="student_id">
+                            <option value="">All</option>
+                            <?php foreach ($students as $student): ?>
+                                <option value="<?php echo htmlspecialchars($student['student_id']); ?>"
+                                    <?php echo ($filters['student_id'] ?? '') == $student['student_id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($student['student_id'] . ' — ' . ($student['student_fullname'] ?? '')); ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label fw-semibold">Report</label>
-                        <div class="d-flex flex-wrap gap-3 pt-1">
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="basis" id="basis_type" value="type"
-                                    <?php echo $basis === 'type' ? 'checked' : ''; ?>>
-                                <label class="form-check-label" for="basis_type">By type</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="basis" id="basis_subtype" value="subtype"
-                                    <?php echo $basis === 'subtype' ? 'checked' : ''; ?>>
-                                <label class="form-check-label" for="basis_subtype">By sub type</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="basis" id="basis_student" value="student"
-                                    <?php echo $basis === 'student' ? 'checked' : ''; ?>>
-                                <label class="form-check-label" for="basis_student">By student (total paid)</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="basis" id="basis_department" value="department"
-                                    <?php echo $basis === 'department' ? 'checked' : ''; ?>>
-                                <label class="form-check-label" for="basis_department">By department</label>
-                            </div>
-                        </div>
-                    </div>
                 </div>
-                <div class="d-flex flex-wrap gap-2 mt-3">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-search me-1"></i>Show Report
-                    </button>
-                    <a class="btn btn-outline-secondary" target="_blank" rel="noopener"
-                       href="<?php echo APP_URL; ?>/payments/report?<?php echo htmlspecialchars(http_build_query($printQuery)); ?>">
-                        <i class="fas fa-print me-1"></i>Print
-                    </a>
-                    <a class="btn btn-outline-success"
-                       href="<?php echo APP_URL; ?>/payments/report?<?php echo htmlspecialchars(http_build_query($csvQuery)); ?>">
-                        <i class="fas fa-file-csv me-1"></i>CSV
-                    </a>
-                    <a class="btn btn-outline-secondary" href="<?php echo APP_URL; ?>/payments/report">
-                        <i class="fas fa-redo me-1"></i>Reset
-                    </a>
+
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+                    <div class="pay-basis">
+                        <span class="small text-muted fw-semibold me-1">Group:</span>
+                        <?php foreach ($basisTitles as $value => $label): ?>
+                            <div class="form-check form-check-inline mb-0">
+                                <input class="form-check-input" type="radio" name="basis" id="basis_<?php echo $value; ?>"
+                                       value="<?php echo $value; ?>" <?php echo $basis === $value ? 'checked' : ''; ?>>
+                                <label class="form-check-label small" for="basis_<?php echo $value; ?>"><?php echo htmlspecialchars($label); ?></label>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="pay-actions">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-search me-1"></i>Show
+                        </button>
+                        <a class="btn btn-outline-secondary btn-sm" href="<?php echo APP_URL; ?>/payments/report">Clear</a>
+                    </div>
                 </div>
             </form>
 
-            <header class="pay-report-heading">
-                <div class="pay-report-inst">Sri Lanka German Training Institute</div>
-                <div class="pay-report-addr">Ariviyal Nagar, Kilinochchi</div>
-                <hr class="pay-report-rule">
-                <h2 class="pay-report-title"><?php echo htmlspecialchars($headingTitle); ?></h2>
-                <?php foreach ($headingLines as $headingLine): ?>
-                    <div class="pay-report-line"><?php echo htmlspecialchars($headingLine); ?></div>
-                <?php endforeach; ?>
-            </header>
+            <div class="pay-print-head">
+                <div class="fw-bold">Sri Lanka German Training Institute</div>
+                <div class="small">Ariviyal Nagar, Kilinochchi</div>
+                <div class="fw-bold mt-2"><?php echo htmlspecialchars($headingTitle); ?></div>
+                <?php if ($metaBits !== []): ?>
+                    <div class="small"><?php echo htmlspecialchars(implode(' · ', $metaBits)); ?></div>
+                <?php endif; ?>
+            </div>
 
-            <div class="row g-3 mb-4">
-                <div class="col-md-4">
-                    <div class="border rounded p-3 h-100">
-                        <div class="text-muted small">Payments</div>
-                        <div class="fs-4 fw-bold"><?php echo (int) $summary['count']; ?></div>
-                    </div>
+            <?php if ($metaBits !== []): ?>
+                <div class="text-muted small mb-3 no-print"><?php echo htmlspecialchars(implode(' · ', $metaBits)); ?></div>
+            <?php endif; ?>
+
+            <div class="pay-stats mb-3">
+                <div class="pay-stat">
+                    <div class="lbl">Payments</div>
+                    <div class="val"><?php echo (int) $summary['count']; ?></div>
                 </div>
-                <div class="col-md-4">
-                    <div class="border rounded p-3 h-100">
-                        <div class="text-muted small">Students</div>
-                        <div class="fs-4 fw-bold"><?php echo (int) $summary['students']; ?></div>
-                    </div>
+                <div class="pay-stat">
+                    <div class="lbl">Students</div>
+                    <div class="val"><?php echo (int) $summary['students']; ?></div>
                 </div>
-                <div class="col-md-4">
-                    <div class="border rounded p-3 h-100">
-                        <div class="text-muted small">Total amount</div>
-                        <div class="fs-4 fw-bold text-success">Rs. <?php echo number_format((float) $summary['amount'], 2); ?></div>
-                    </div>
+                <div class="pay-stat">
+                    <div class="lbl">Total amount</div>
+                    <div class="val text-success" style="font-size:1.1rem;">Rs. <?php echo number_format((float) $summary['amount'], 2); ?></div>
                 </div>
             </div>
 
-            <?php if ($basis === 'department' && !empty($summary['departments'])): ?>
-                <div class="table-responsive mb-4">
-                    <table class="table table-sm table-bordered mb-0">
-                        <thead class="table-light">
+            <?php if ($basis === 'type' && !empty($summary['types'])): ?>
+                <div class="pay-table-wrap mb-3">
+                    <table class="table table-sm table-bordered pay-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th class="text-end">Payments</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($summary['types'] as $typeName => $typeRow): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($typeName); ?></td>
+                                    <td class="text-end"><?php echo (int) $typeRow['count']; ?></td>
+                                    <td class="text-end">Rs. <?php echo number_format((float) $typeRow['amount'], 2); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php elseif ($basis === 'subtype' && !empty($summary['subtypes'])): ?>
+                <div class="pay-table-wrap mb-3">
+                    <table class="table table-sm table-bordered pay-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Sub type</th>
+                                <th class="text-end">Payments</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($summary['subtypes'] as $subtypeRow): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($subtypeRow['type']); ?></td>
+                                    <td><?php echo htmlspecialchars($subtypeRow['subtype']); ?></td>
+                                    <td class="text-end"><?php echo (int) $subtypeRow['count']; ?></td>
+                                    <td class="text-end">Rs. <?php echo number_format((float) $subtypeRow['amount'], 2); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php elseif ($basis === 'department' && !empty($summary['departments'])): ?>
+                <div class="pay-table-wrap mb-3">
+                    <table class="table table-sm table-bordered pay-table mb-0">
+                        <thead>
                             <tr>
                                 <th>Department</th>
                                 <th class="text-end">Payments</th>
@@ -306,63 +362,12 @@ $lineTotal = function ($payment) {
                 </div>
             <?php endif; ?>
 
-            <?php if ($basis === 'subtype' && !empty($summary['subtypes'])): ?>
-                <div class="table-responsive mb-4">
-                    <table class="table table-sm table-bordered mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Payment Type</th>
-                                <th>Sub type</th>
-                                <th class="text-end">Payments</th>
-                                <th class="text-end">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($summary['subtypes'] as $subtypeRow): ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($subtypeRow['type']); ?></td>
-                                    <td><?php echo htmlspecialchars($subtypeRow['subtype']); ?></td>
-                                    <td class="text-end"><?php echo (int) $subtypeRow['count']; ?></td>
-                                    <td class="text-end">Rs. <?php echo number_format((float) $subtypeRow['amount'], 2); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php endif; ?>
-
-            <?php if ($basis === 'type' && !empty($summary['types'])): ?>
-                <div class="table-responsive mb-4">
-                    <table class="table table-sm table-bordered mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Payment Type</th>
-                                <th class="text-end">Payments</th>
-                                <th class="text-end">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($summary['types'] as $typeName => $typeRow): ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($typeName); ?></td>
-                                    <td class="text-end"><?php echo (int) $typeRow['count']; ?></td>
-                                    <td class="text-end">Rs. <?php echo number_format((float) $typeRow['amount'], 2); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php endif; ?>
-
             <?php if (empty($groups)): ?>
-                <div class="text-center py-5 text-muted">
-                    <i class="fas fa-file-alt fa-3x mb-3"></i>
-                    <p class="mb-0">No payments found for this date range and filters.</p>
-                </div>
+                <div class="alert alert-light border text-center mb-0">No payments for this selection.</div>
             <?php elseif ($basis === 'student'): ?>
-                <div class="table-responsive">
-                    <table class="table table-sm table-bordered align-middle mb-0">
-                        <thead class="table-light">
+                <div class="pay-table-wrap">
+                    <table class="table table-sm table-bordered pay-table mb-0">
+                        <thead>
                             <tr>
                                 <th>Department</th>
                                 <th>Student ID</th>
@@ -380,7 +385,7 @@ $lineTotal = function ($payment) {
                             $studentDepartmentTotal = 0.0;
                             $studentGrandPayments = 0;
                             $studentGrandTotal = 0.0;
-                            $writeStudentDepartmentTotal = function () use (&$studentDepartmentLabel, &$studentDepartmentPayments, &$studentDepartmentTotal) {
+                            $writeStudentDepartmentTotal = static function () use (&$studentDepartmentLabel, &$studentDepartmentPayments, &$studentDepartmentTotal) {
                                 ?>
                                 <tr class="table-light">
                                     <td colspan="4" class="text-end fw-bold"><?php echo htmlspecialchars($studentDepartmentLabel); ?> total</td>
@@ -430,44 +435,39 @@ $lineTotal = function ($payment) {
                 </div>
             <?php else: ?>
                 <?php foreach ($groups as $group): ?>
-                    <section class="pay-report-block">
-                        <div class="bg-light px-3 py-2 d-flex justify-content-between flex-wrap gap-2">
+                    <section class="pay-block">
+                        <div class="pay-block-head">
                             <div>
-                                <h6 class="fw-bold">
+                                <div class="fw-bold">
                                     <?php if ($basis === 'department' && !empty($group['code']) && $group['code'] !== $group['title']): ?>
                                         <?php echo htmlspecialchars($group['code']); ?> —
                                     <?php endif; ?>
                                     <?php echo htmlspecialchars($group['title']); ?>
-                                </h6>
+                                </div>
                                 <?php if ($basis === 'subtype' && !empty($group['type'])): ?>
                                     <div class="small text-muted"><?php echo htmlspecialchars($group['type']); ?></div>
                                 <?php endif; ?>
                             </div>
-                            <div class="fw-bold text-success">
-                                <?php echo count($group['payments']); ?> payment<?php echo count($group['payments']) === 1 ? '' : 's'; ?>
-                                · Rs. <?php echo number_format((float) $group['total'], 2); ?>
+                            <div class="small fw-semibold text-success">
+                                <?php echo count($group['payments']); ?> · Rs. <?php echo number_format((float) $group['total'], 2); ?>
                             </div>
                         </div>
                         <?php include BASE_PATH . '/views/payments/_report_lines.php'; ?>
                     </section>
                 <?php endforeach; ?>
-            <?php endif; ?>
-
-            <?php if (!empty($groups)): ?>
-                <div class="d-flex justify-content-end">
-                    <div class="fw-bold">Grand total: <span class="text-success">Rs. <?php echo number_format((float) $summary['amount'], 2); ?></span></div>
+                <div class="text-end fw-bold">
+                    Grand total: <span class="text-success">Rs. <?php echo number_format((float) $summary['amount'], 2); ?></span>
                 </div>
             <?php endif; ?>
         </div>
     </div>
 </div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     var typeSelect = document.getElementById('payment_type');
     var subtypeSelect = document.getElementById('payment_subtype');
-    if (!typeSelect || !subtypeSelect) {
-        return;
-    }
+    if (!typeSelect || !subtypeSelect) return;
     function filterSubtypes() {
         var type = typeSelect.value;
         Array.prototype.forEach.call(subtypeSelect.options, function (option) {

@@ -55,20 +55,6 @@
                                        value="<?php echo htmlspecialchars($room['room_no'] ?? ''); ?>" 
                                        required maxlength="50">
                             </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="room_type" class="form-label fw-semibold">
-                                    Room Type <span class="text-danger">*</span>
-                                </label>
-                                <select class="form-select" id="room_type" name="room_type" required>
-                                    <option value="">Select Type</option>
-                                    <option value="Single" <?php echo ($room['room_type'] ?? '') === 'Single' ? 'selected' : ''; ?>>Single</option>
-                                    <option value="Double" <?php echo ($room['room_type'] ?? '') === 'Double' ? 'selected' : ''; ?>>Double</option>
-                                    <option value="Triple" <?php echo ($room['room_type'] ?? '') === 'Triple' ? 'selected' : ''; ?>>Triple</option>
-                                    <option value="Quad" <?php echo ($room['room_type'] ?? '') === 'Quad' ? 'selected' : ''; ?>>Quad</option>
-                                    <option value="Dormitory" <?php echo ($room['room_type'] ?? '') === 'Dormitory' ? 'selected' : ''; ?>>Dormitory</option>
-                                </select>
-                            </div>
                         </div>
                         
                         <div class="row">
@@ -81,20 +67,6 @@
                                        required min="1">
                                 <div class="form-text">Currently occupied: <?php echo number_format($room['occupied_beds'] ?? 0); ?> beds</div>
                             </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="status" class="form-label fw-semibold">Status</label>
-                                <select class="form-select" id="status" name="status">
-                                    <option value="active" <?php echo ($room['status'] ?? 'active') === 'active' ? 'selected' : ''; ?>>Active</option>
-                                    <option value="inactive" <?php echo ($room['status'] ?? '') === 'inactive' ? 'selected' : ''; ?>>Inactive</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="description" class="form-label fw-semibold">Description</label>
-                            <textarea class="form-control" id="description" name="description" 
-                                      rows="3" maxlength="500"><?php echo htmlspecialchars($room['description'] ?? ''); ?></textarea>
                         </div>
                         
                         <div class="d-flex justify-content-end gap-2 mt-4">
