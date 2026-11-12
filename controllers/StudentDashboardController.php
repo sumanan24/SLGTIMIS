@@ -164,14 +164,15 @@ class StudentDashboardController extends Controller {
             'studentNotices' => array_slice($this->studentHandbook()['notices'] ?? [], 0, 3),
             'autoQuickSync' => $autoQuickSync,
             'quickSyncUrl' => rtrim(APP_URL, '/') . '/student/attendance/quick-sync',
+            'canAccessForms' => $this->studentCanAccessForms((string) $studentId),
         ];
         
         return $this->view('student/dashboard', $data);
     }
 
     /**
-     * Student portal: pull today's punches from fingerprint machines (chunked: main + readers).
-     * Same syncTodayChunk pipeline as staff quick sync; restricted to logged-in students.
+     * Student portal: pull today's punches from the 3 readers only
+     * (172.16.0.29, .28, .27) — not MAIN. Chunk 0..2.
      */
     public function quickSyncToday() {
         if (!$this->requireStudentAccess()) {
@@ -181,18 +182,29 @@ class StudentDashboardController extends Controller {
         header('Content-Type: application/json; charset=UTF-8');
         header('Cache-Control: no-store');
 
+        $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $jsonFlags |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+
+        $respond = static function (array $payload, int $code = 200) use ($jsonFlags): void {
+            http_response_code($code);
+            $out = json_encode($payload, $jsonFlags);
+            echo $out !== false ? $out : '{"success":false,"ok":false,"done":true,"message":"JSON encode failed"}';
+        };
+
         $last = (int) ($_SESSION['student_portal_last_quick_sync'] ?? 0);
         $chunk = (int) ($this->get('chunk', $this->post('chunk', 0)));
-        $chunk = max(0, min(20, $chunk));
+        $chunk = max(0, min(2, $chunk));
         // Soft throttle: at most one full run every 45s (chunk 0 starts a run)
         if ($chunk === 0 && $last > 0 && (time() - $last) < 45) {
-            echo json_encode([
+            $respond([
                 'success' => true,
                 'ok' => true,
                 'done' => true,
                 'chunk' => 0,
                 'next_chunk' => 0,
-                'total' => 0,
+                'total' => 3,
                 'skipped' => true,
                 'message' => 'Synced recently — calendar already up to date',
                 'summary' => 'Synced recently — calendar already up to date',
@@ -204,7 +216,7 @@ class StudentDashboardController extends Controller {
         try {
             require_once BASE_PATH . '/core/StudentDeviceAttendanceSyncService.php';
             $svc = new StudentDeviceAttendanceSyncService();
-            $row = $svc->syncTodayChunk($chunk, 35);
+            $row = $svc->syncTodayReadersChunk($chunk, 30);
 
             if ($chunk === 0) {
                 $_SESSION['student_portal_quick_run'] = [
@@ -233,31 +245,38 @@ class StudentDashboardController extends Controller {
                 $_SESSION['student_portal_last_quick_sync'] = time();
                 $row['run'] = $run;
                 $row['summary'] = sprintf(
-                    'Today sync done — %d/%d reader(s) OK, retrieved %d, saved %d',
+                    'Today sync done — %d/3 reader(s) OK (.29/.28/.27), retrieved %d, saved %d',
                     (int) $run['online'],
-                    (int) ($row['total'] ?? 0),
                     (int) $run['retrieved'],
                     (int) $run['saved']
                 );
             }
 
-            echo json_encode(['success' => true] + $row);
+            $respond(['success' => true] + $row);
         } catch (Throwable $e) {
-            http_response_code(500);
-            echo json_encode([
+            error_log('[student quick-sync] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+            $respond([
                 'success' => false,
                 'ok' => false,
                 'done' => true,
                 'message' => 'Quick sync failed: ' . $e->getMessage(),
-            ]);
+            ], 500);
         }
     }
 
     /**
      * Forms available to logged-in students (PDF filled from student profile).
+     * Restricted to academic year 2026/2027 enrollments only.
      */
     public function forms() {
         if (!$this->requireStudentAccess()) {
+            return;
+        }
+
+        $studentId = $this->resolvePortalStudentId();
+        if ($studentId === '' || !$this->studentCanAccessForms($studentId)) {
+            $_SESSION['error'] = 'Forms are only available for academic year 2026/2027 students.';
+            $this->redirect('student/dashboard');
             return;
         }
 
@@ -314,9 +333,17 @@ class StudentDashboardController extends Controller {
 
     /**
      * Download application form PDF filled from the logged-in student record.
+     * Restricted to academic year 2026/2027 enrollments only.
      */
     public function downloadForm() {
         if (!$this->requireStudentAccess()) {
+            return;
+        }
+
+        $studentId = $this->resolvePortalStudentId();
+        if ($studentId === '' || !$this->studentCanAccessForms($studentId)) {
+            $_SESSION['error'] = 'Forms are only available for academic year 2026/2027 students.';
+            $this->redirect('student/dashboard');
             return;
         }
 
@@ -338,7 +365,6 @@ class StudentDashboardController extends Controller {
             return;
         }
 
-        $studentId = (string) ($_SESSION['user_name'] ?? '');
         $studentModel = $this->model('StudentModel');
         $student = $studentModel->find($studentId);
         if (!$student) {
@@ -533,6 +559,47 @@ class StudentDashboardController extends Controller {
             return false;
         }
         return true;
+    }
+
+    /** Academic year allowed to use student portal Forms. */
+    private const FORMS_ALLOWED_ACADEMIC_YEAR = '2026/2027';
+
+    private function resolvePortalStudentId(): string {
+        require_once BASE_PATH . '/helpers/AdmissionRegistrationService.php';
+        $studentId = (new AdmissionRegistrationService())->resolveStudentPortalId((string) ($_SESSION['user_name'] ?? ''));
+        if ($studentId) {
+            $_SESSION['user_name'] = $studentId;
+        }
+        return trim((string) ($studentId ?: ($_SESSION['user_name'] ?? '')));
+    }
+
+    /**
+     * Forms are limited to students enrolled in academic year 2026/2027.
+     */
+    private function studentCanAccessForms(string $studentId): bool {
+        $studentId = trim($studentId);
+        if ($studentId === '') {
+            return false;
+        }
+        try {
+            $enrollmentModel = $this->model('StudentEnrollmentModel');
+            $enrollment = $enrollmentModel->getCurrentEnrollment($studentId)
+                ?: $enrollmentModel->getLatestEnrollment($studentId);
+        } catch (Throwable $e) {
+            return false;
+        }
+        if (!is_array($enrollment)) {
+            return false;
+        }
+        return $this->normalizeAcademicYear((string) ($enrollment['academic_year'] ?? ''))
+            === $this->normalizeAcademicYear(self::FORMS_ALLOWED_ACADEMIC_YEAR);
+    }
+
+    private function normalizeAcademicYear(string $year): string {
+        $year = strtoupper(trim($year));
+        $year = str_replace(['–', '—', '-', ' '], '/', $year);
+        $year = preg_replace('#/+#', '/', $year) ?? $year;
+        return trim($year, '/');
     }
 
     /**

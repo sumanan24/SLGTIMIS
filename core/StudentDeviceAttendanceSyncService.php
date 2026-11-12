@@ -265,6 +265,7 @@ class StudentDeviceAttendanceSyncService {
 
     /**
      * Quick sync: one device per HTTP request (today only). Use chunk 0..N-1.
+     * Includes MAIN + readers from config.
      *
      * @return array{
      *   ok:bool,done:bool,chunk:int,next_chunk:int,total:int,
@@ -275,12 +276,6 @@ class StudentDeviceAttendanceSyncService {
      */
     public function syncTodayChunk(int $chunkIndex, int $deviceTimeoutSec = 35): array {
         $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
-        $tzName = !empty($cfg['timezone']) ? (string) $cfg['timezone'] : 'Asia/Colombo';
-        $tz = new DateTimeZone($tzName);
-        $today = new DateTimeImmutable('now', $tz);
-        $startImm = $today->setTime(0, 0, 0);
-        $endImm = $today->setTime(23, 59, 59);
-
         $devices = $this->configuredDevices($cfg);
         if ($devices === []) {
             $devices = [[
@@ -294,6 +289,41 @@ class StudentDeviceAttendanceSyncService {
                 'timeout' => (int) ($cfg['timeout'] ?? 60),
             ]];
         }
+        return $this->syncTodayDevicesChunk($devices, $cfg, $chunkIndex, $deviceTimeoutSec);
+    }
+
+    /**
+     * Student portal quick sync: today only from the 3 readers
+     * (172.16.0.29, 172.16.0.28, 172.16.0.27) — not MAIN.
+     *
+     * @return array<string,mixed>
+     */
+    public function syncTodayReadersChunk(int $chunkIndex, int $deviceTimeoutSec = 35): array {
+        $cfg = require BASE_PATH . '/config/student_attendance_machine.php';
+        return $this->syncTodayDevicesChunk(
+            $this->attendanceReaders($cfg),
+            $cfg,
+            $chunkIndex,
+            $deviceTimeoutSec
+        );
+    }
+
+    /**
+     * @param list<array<string,mixed>> $devices
+     * @param array<string,mixed> $cfg
+     * @return array<string,mixed>
+     */
+    private function syncTodayDevicesChunk(
+        array $devices,
+        array $cfg,
+        int $chunkIndex,
+        int $deviceTimeoutSec = 35
+    ): array {
+        $tzName = !empty($cfg['timezone']) ? (string) $cfg['timezone'] : 'Asia/Colombo';
+        $tz = new DateTimeZone($tzName);
+        $today = new DateTimeImmutable('now', $tz);
+        $startImm = $today->setTime(0, 0, 0);
+        $endImm = $today->setTime(23, 59, 59);
 
         $total = count($devices);
         if ($total === 0) {
@@ -310,7 +340,7 @@ class StudentDeviceAttendanceSyncService {
                 'saved' => 0,
                 'duplicates' => 0,
                 'finger_ids_linked' => 0,
-                'message' => 'No devices configured',
+                'message' => 'No readers configured',
                 'skipped' => true,
             ];
         }
@@ -352,7 +382,7 @@ class StudentDeviceAttendanceSyncService {
             'total' => $total,
             'host' => (string) ($part['host'] ?? ''),
             'label' => (string) ($part['label'] ?? ''),
-            'role' => (string) ($part['role'] ?? ''),
+            'role' => (string) ($part['role'] ?? 'reader'),
             'records_retrieved' => (int) ($part['records_retrieved'] ?? 0),
             'saved' => (int) ($part['saved'] ?? 0),
             'duplicates' => (int) ($part['duplicates'] ?? 0),

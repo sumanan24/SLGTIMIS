@@ -87,6 +87,7 @@ $payRows = array_slice($payRows, 0, 5);
 $studentNotices = is_array($studentNotices ?? null) ? $studentNotices : [];
 $firstNotice = $studentNotices[0] ?? null;
 
+$canAccessForms = !empty($canAccessForms);
 $shortcuts = [
     ['student/profile', 'fa-user', 'My Profile', false],
     ['student/attendance', 'fa-calendar-check', 'Attendance', false],
@@ -96,8 +97,10 @@ $shortcuts = [
     ['student/payments', 'fa-money-bill-wave', 'Payments', false],
     ['student/notices', 'fa-bullhorn', 'Notices', false],
     ['student/documents-pdf', 'fa-file-pdf', 'Documents', true],
-    ['student/forms', 'fa-file-alt', 'Forms', false],
 ];
+if ($canAccessForms) {
+    $shortcuts[] = ['student/forms', 'fa-file-alt', 'Forms', false];
+}
 ?>
 <style>
 .sd-page {
@@ -1275,7 +1278,13 @@ document.querySelectorAll('.st-pw-toggle').forEach(function (btn) {
                 var j = null;
                 try { j = JSON.parse(text); } catch (e) { j = null; }
                 if (!j || j.success === undefined) {
-                    throw new Error((j && j.message) || ('HTTP ' + r.status));
+                    var hint = '';
+                    if (text) {
+                        var m = text.match(/<p><strong>Error:<\/strong>\s*([^<]+)/i)
+                            || text.match(/Quick sync failed:\s*([^<"\n]+)/i);
+                        if (m && m[1]) hint = m[1].trim();
+                    }
+                    throw new Error(hint || ('Reader sync failed (HTTP ' + r.status + ')'));
                 }
                 return j;
             });
@@ -1286,11 +1295,11 @@ document.querySelectorAll('.st-pw-toggle').forEach(function (btn) {
         if (running || !baseUrl) return;
         setBusy(true);
         savedTotal = 0;
-        showBar('Today sync (readers)');
-        if (msgEl) msgEl.textContent = 'Syncing fingerprint machines…';
+        showBar('Today sync — 3 readers');
+        if (msgEl) msgEl.textContent = 'Syncing .29 / .28 / .27…';
 
         function step(chunk) {
-            if (msgEl) msgEl.textContent = 'Reader ' + (chunk + 1) + '…';
+            if (msgEl) msgEl.textContent = 'Reader ' + (chunk + 1) + '/3…';
             var url = baseUrl + (baseUrl.indexOf('?') >= 0 ? '&' : '?') + 'chunk=' + encodeURIComponent(String(chunk));
             return fetchJson(url).then(function (data) {
                 if (!data || data.success === false) {
@@ -1300,19 +1309,20 @@ document.querySelectorAll('.st-pw-toggle').forEach(function (btn) {
                     finish(true, data.summary || data.message || 'Already synced', false);
                     return;
                 }
-                var total = parseInt(data.total, 10) || 0;
-                var label = data.label || data.host || ('#' + (chunk + 1));
+                var total = parseInt(data.total, 10) || 3;
+                var label = data.label || data.host || ('Reader ' + (chunk + 1));
                 savedTotal += parseInt(data.saved, 10) || 0;
                 if (prog && total > 0) {
                     var pct = Math.round(((parseInt(data.chunk, 10) || chunk) + 1) / total * 100);
                     prog.style.width = pct + '%';
                 }
                 if (msgEl) {
-                    msgEl.textContent = label + ': ' + (data.message || (data.ok ? 'OK' : 'Failed'))
-                        + (total ? (' (' + (chunk + 1) + '/' + total + ')') : '');
+                    var status = data.ok ? (data.message || 'OK') : ('Unavailable — ' + (data.message || 'check network'));
+                    msgEl.textContent = label + ': ' + status + ' (' + (chunk + 1) + '/' + total + ')';
                 }
+                // Continue other readers even if one is offline
                 if (data.done) {
-                    finish(true, data.summary || ('Saved ' + savedTotal + ' new punch(es)'), forceReload !== false);
+                    finish(true, data.summary || ('Saved ' + savedTotal + ' new punch(es)'), forceReload !== false && savedTotal >= 0);
                     return;
                 }
                 return step(parseInt(data.next_chunk, 10) || (chunk + 1));
