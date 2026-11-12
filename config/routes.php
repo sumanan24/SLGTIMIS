@@ -41,6 +41,7 @@ return [
     'student/document' => 'StudentController@studentDocumentFile',
     'student/accept-conduct' => 'StudentController@acceptConduct',
     'student/attendance' => 'StudentAttendanceController@index',
+    'student/attendance/quick-sync' => 'StudentDashboardController@quickSyncToday',
     'student/my-attendance' => 'StudentAcademicController@biometricAttendance',
     'student/my-timetable' => 'StudentAcademicController@timetable',
     'student/training-programmes' => 'StudentAcademicController@programmes',

@@ -88,44 +88,35 @@ class StudentDashboardController extends Controller {
             }
         }
         
-        // Get attendance summary for current month
+        // Attendance: fingerprint (In–Out > 7h) + manual marks for current month
         $currentMonth = date('Y-m');
-        $startDate = $currentMonth . '-01';
-        $endDate = date('Y-m-t', strtotime($startDate));
-        
-        $attendanceRecords = $attendanceModel->getAttendanceByStudentAndDateRange($studentId, $startDate, $endDate);
-        
-        // Calculate attendance statistics
-        $totalDays = 0;
-        $presentDays = 0;
-        $absentDays = 0;
-        $holidayDays = 0;
-        $attendancePercentage = 0;
-        
-        foreach ($attendanceRecords as $date => $status) {
-            $dayOfWeek = date('w', strtotime($date));
-            // Skip weekends
-            if ($dayOfWeek == 0 || $dayOfWeek == 6) {
-                continue;
-            }
-            
-            $totalDays++;
-            if ($status == 1) {
-                $presentDays++;
-            } elseif ($status == 0) {
-                $absentDays++;
-            } elseif ($status == -1) {
-                $holidayDays++;
-                $totalDays--; // Don't count holidays in total
+        require_once BASE_PATH . '/helpers/StudentAttendanceCalendarHelper.php';
+        $attPack = StudentAttendanceCalendarHelper::buildMonth((string) $studentId, $currentMonth, $attendanceModel);
+        $attendanceDayMap = $attPack['day_map'];
+        $stats = $attPack['stats'];
+        $totalDays = (int) ($stats['totalDays'] ?? 0);
+        $presentDays = (int) ($stats['presentDays'] ?? 0);
+        $absentDays = (int) ($stats['absentDays'] ?? 0);
+        $holidayDays = (int) ($stats['holidayDays'] ?? 0);
+        $attendancePercentage = (float) ($stats['attendancePercentage'] ?? 0);
+
+        // Legacy int map for any older view bits (1/0/-1)
+        $attendanceRecords = [];
+        foreach ($attendanceDayMap as $date => $cell) {
+            $st = $cell['status'] ?? null;
+            if ($st === 'present') {
+                $attendanceRecords[$date] = 1;
+            } elseif ($st === 'absent') {
+                $attendanceRecords[$date] = 0;
+            } elseif ($st === 'holiday') {
+                $attendanceRecords[$date] = -1;
             }
         }
-        
-        if ($totalDays > 0) {
-            $attendancePercentage = round(($presentDays / $totalDays) * 100, 2);
-        }
-        
-        // Get recent attendance (last 10 days)
         $recentAttendance = array_slice($attendanceRecords, -10, 10, true);
+
+        $nosync = (string) ($_GET['nosync'] ?? '') === '1';
+        $lastPortalSync = (int) ($_SESSION['student_portal_last_quick_sync'] ?? 0);
+        $autoQuickSync = !$nosync && ($lastPortalSync === 0 || (time() - $lastPortalSync) >= 300);
         
         // Get payment info
         $recentPayments = [];
@@ -159,6 +150,7 @@ class StudentDashboardController extends Controller {
             'hostelAllocation' => $hostelAllocation,
             'roommates' => $roommates,
             'attendanceRecords' => $attendanceRecords,
+            'attendanceDayMap' => $attendanceDayMap,
             'totalDays' => $totalDays,
             'presentDays' => $presentDays,
             'absentDays' => $absentDays,
@@ -170,9 +162,95 @@ class StudentDashboardController extends Controller {
             'busSeasonPayments' => $busSeasonPayments,
             'hasAcceptedConduct' => $hasAcceptedConduct,
             'studentNotices' => array_slice($this->studentHandbook()['notices'] ?? [], 0, 3),
+            'autoQuickSync' => $autoQuickSync,
+            'quickSyncUrl' => rtrim(APP_URL, '/') . '/student/attendance/quick-sync',
         ];
         
         return $this->view('student/dashboard', $data);
+    }
+
+    /**
+     * Student portal: pull today's punches from fingerprint machines (chunked: main + readers).
+     * Same syncTodayChunk pipeline as staff quick sync; restricted to logged-in students.
+     */
+    public function quickSyncToday() {
+        if (!$this->requireStudentAccess()) {
+            return;
+        }
+
+        header('Content-Type: application/json; charset=UTF-8');
+        header('Cache-Control: no-store');
+
+        $last = (int) ($_SESSION['student_portal_last_quick_sync'] ?? 0);
+        $chunk = (int) ($this->get('chunk', $this->post('chunk', 0)));
+        $chunk = max(0, min(20, $chunk));
+        // Soft throttle: at most one full run every 45s (chunk 0 starts a run)
+        if ($chunk === 0 && $last > 0 && (time() - $last) < 45) {
+            echo json_encode([
+                'success' => true,
+                'ok' => true,
+                'done' => true,
+                'chunk' => 0,
+                'next_chunk' => 0,
+                'total' => 0,
+                'skipped' => true,
+                'message' => 'Synced recently — calendar already up to date',
+                'summary' => 'Synced recently — calendar already up to date',
+            ]);
+            return;
+        }
+
+        @set_time_limit(55);
+        try {
+            require_once BASE_PATH . '/core/StudentDeviceAttendanceSyncService.php';
+            $svc = new StudentDeviceAttendanceSyncService();
+            $row = $svc->syncTodayChunk($chunk, 35);
+
+            if ($chunk === 0) {
+                $_SESSION['student_portal_quick_run'] = [
+                    'started_at' => date('Y-m-d H:i:s'),
+                    'saved' => 0,
+                    'retrieved' => 0,
+                    'online' => 0,
+                ];
+            }
+            $run = $_SESSION['student_portal_quick_run'] ?? [
+                'started_at' => date('Y-m-d H:i:s'),
+                'saved' => 0,
+                'retrieved' => 0,
+                'online' => 0,
+            ];
+            if (empty($row['skipped'])) {
+                $run['saved'] += (int) ($row['saved'] ?? 0);
+                $run['retrieved'] += (int) ($row['records_retrieved'] ?? 0);
+                if (!empty($row['ok'])) {
+                    $run['online']++;
+                }
+            }
+            $_SESSION['student_portal_quick_run'] = $run;
+
+            if (!empty($row['done'])) {
+                $_SESSION['student_portal_last_quick_sync'] = time();
+                $row['run'] = $run;
+                $row['summary'] = sprintf(
+                    'Today sync done — %d/%d reader(s) OK, retrieved %d, saved %d',
+                    (int) $run['online'],
+                    (int) ($row['total'] ?? 0),
+                    (int) $run['retrieved'],
+                    (int) $run['saved']
+                );
+            }
+
+            echo json_encode(['success' => true] + $row);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'ok' => false,
+                'done' => true,
+                'message' => 'Quick sync failed: ' . $e->getMessage(),
+            ]);
+        }
     }
 
     /**

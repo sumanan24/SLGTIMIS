@@ -59,6 +59,9 @@ $attLabel = $totalDays === 0 ? 'No records yet' : ($attendancePercentage >= 85 ?
 $ringDeg = (int) round(max(0, min(100, $attendancePercentage)) * 3.6);
 $currentMonth = $currentMonth ?? date('Y-m');
 $attendanceRecords = $attendanceRecords ?? [];
+$attendanceDayMap = is_array($attendanceDayMap ?? null) ? $attendanceDayMap : [];
+$autoQuickSync = !empty($autoQuickSync);
+$quickSyncUrl = (string) ($quickSyncUrl ?? (rtrim(APP_URL, '/') . '/student/attendance/quick-sync'));
 
 // One combined, newest-first payment list
 $payRows = [];
@@ -522,20 +525,82 @@ $shortcuts = [
     width: 100%;
     aspect-ratio: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: .1rem;
+    gap: .05rem;
     border-radius: 7px;
     font-weight: 600;
     font-size: clamp(.62rem, 2.2vw, .8rem);
     min-height: 0;
+    padding: .15rem .1rem;
+    line-height: 1.1;
 }
+.sd-cal-rich .attendance-calendar-day {
+    aspect-ratio: auto;
+    min-height: 2.6rem;
+}
+.sd-day-num {
+    display: inline-flex;
+    align-items: center;
+    gap: .12rem;
+}
+.sd-day-times {
+    display: block;
+    font-size: .52rem;
+    font-weight: 600;
+    opacity: .85;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sd-att-rule {
+    margin: 0;
+    font-size: .78rem;
+    color: var(--sd-muted);
+}
+.attendance-pad { visibility: hidden; }
 .attendance-present { background: #d4edda; color: #155724; }
+.attendance-present-finger { background: #ecfdf5; color: #047857; }
+.attendance-present-manual { background: #e0f2fe; color: #0369a1; }
 .attendance-absent { background: #f8d7da; color: #721c24; }
 .attendance-holiday { background: #fff3cd; color: #856404; }
 .attendance-empty { background: #eef0f3; color: #6c757d; }
 .attendance-weekend { background: #f8f9fa; color: #b6bdc4; }
 .attendance-today { outline: 2px solid var(--sd-blue); outline-offset: 1px; }
+.sd-sync-bar {
+    display: none;
+    margin: .85rem 0 0;
+    padding: .55rem .7rem;
+    border-radius: 8px;
+    border: 1px solid #cfe2ff;
+    background: #f0f7ff;
+    font-size: .78rem;
+    color: #1e3a5f;
+}
+.sd-sync-bar.show { display: block; }
+.sd-sync-bar.ok { border-color: #badbcc; background: #edf7f0; color: #0f5132; }
+.sd-sync-bar.bad { border-color: #f5c2c7; background: #f8d7da; color: #842029; }
+.sd-sync-bar .sd-sync-track {
+    height: 4px;
+    background: rgba(15, 23, 42, .08);
+    border-radius: 999px;
+    margin-top: .4rem;
+    overflow: hidden;
+}
+.sd-sync-bar .sd-sync-fill {
+    height: 100%;
+    width: 0;
+    background: var(--sd-blue, #0d6efd);
+    transition: width .25s ease;
+}
+.sd-att-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    align-items: center;
+}
 .sd-legend {
     display: flex;
     flex-wrap: wrap;
@@ -809,9 +874,101 @@ $shortcuts = [
     </nav>
 
     <div class="row g-2 g-md-3 mb-3">
-        <!-- Left column -->
+        <!-- Left column: attendance calendar first (existing 7h P/A), then enrollment -->
         <div class="col-12 col-lg-8 min-w-0">
             <section class="sd-card mb-2 mb-md-3">
+                <div class="sd-card-h">
+                    <h2><i class="fas fa-calendar-check"></i><span>Attendance · <?php echo $e(date('F Y', strtotime($currentMonth . '-01'))); ?></span></h2>
+                    <div class="sd-att-actions">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="sdQuickSyncBtn" title="Pull today's punches from fingerprint readers">
+                            <i class="fas fa-sync-alt"></i> Quick sync
+                        </button>
+                        <a href="<?php echo APP_URL; ?>/student/attendance">Full calendar</a>
+                    </div>
+                </div>
+                <div class="sd-card-b">
+                    <p class="sd-att-rule mb-2">Fingerprint: <strong>Present</strong> if In→Out &gt; 7 hours · otherwise <strong>Absent</strong>. Manual marks override.</p>
+                    <?php
+                    $firstDay = strtotime($currentMonth . '-01');
+                    $daysInMonth = (int) date('t', $firstDay);
+                    $firstDayOfWeek = (int) date('w', $firstDay);
+                    $weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+                    $weekDaysFull = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                    $todayYmd = date('Y-m-d');
+                    ?>
+                    <div class="sd-cal sd-cal-rich" id="sdAttendanceCal">
+                        <?php foreach ($weekDaysFull as $i => $day): ?>
+                            <div class="sd-cal-hd"><span class="d-none d-sm-inline"><?php echo $day; ?></span><span class="d-sm-none"><?php echo $weekDays[$i]; ?></span></div>
+                        <?php endforeach; ?>
+                        <?php
+                        for ($i = 0; $i < $firstDayOfWeek; $i++) {
+                            echo '<div class="attendance-calendar-day attendance-pad"></div>';
+                        }
+                        for ($day = 1; $day <= $daysInMonth; $day++) {
+                            $date = $currentMonth . '-' . str_pad((string) $day, 2, '0', STR_PAD_LEFT);
+                            $cell = $attendanceDayMap[$date] ?? null;
+                            $status = is_array($cell) ? ($cell['status'] ?? null) : null;
+                            $source = is_array($cell) ? (string) ($cell['source'] ?? '') : '';
+                            $label = is_array($cell) ? (string) ($cell['label'] ?? '') : '';
+                            $timeIn = is_array($cell) ? trim((string) ($cell['time_in'] ?? '')) : '';
+                            $timeOut = is_array($cell) ? trim((string) ($cell['time_out'] ?? '')) : '';
+                            $durSec = is_array($cell) ? (int) ($cell['duration_seconds'] ?? 0) : 0;
+
+                            $class = 'attendance-empty';
+                            $icon = '';
+                            if ($status === 'weekend') {
+                                $class = 'attendance-weekend';
+                            } elseif ($status === 'present') {
+                                $class = $source === 'manual' ? 'attendance-present-manual' : 'attendance-present-finger';
+                                $icon = '<i class="fas fa-check"></i>';
+                            } elseif ($status === 'absent') {
+                                $class = 'attendance-absent';
+                                $icon = '<i class="fas fa-times"></i>';
+                            } elseif ($status === 'holiday') {
+                                $class = 'attendance-holiday';
+                                $icon = '<i class="fas fa-star"></i>';
+                            }
+                            if ($date === $todayYmd) {
+                                $class .= ' attendance-today';
+                            }
+                            $titleBits = [date('l, F j, Y', strtotime($date))];
+                            if ($label !== '') {
+                                $titleBits[] = $label;
+                            }
+                            if ($timeIn !== '' || $timeOut !== '') {
+                                $titleBits[] = 'In ' . ($timeIn !== '' ? $timeIn : '—') . ' / Out ' . ($timeOut !== '' ? $timeOut : '—');
+                            }
+                            if ($durSec > 0) {
+                                $titleBits[] = sprintf('%dh %02dm', intdiv($durSec, 3600), intdiv($durSec % 3600, 60));
+                            }
+                            $inner = '<span class="sd-day-num">' . $icon . $day . '</span>';
+                            if ($status !== 'weekend' && ($timeIn !== '' || $timeOut !== '')) {
+                                $inner .= '<span class="sd-day-times">' . $e(($timeIn !== '' ? $timeIn : '—') . '–' . ($timeOut !== '' ? $timeOut : '—')) . '</span>';
+                            }
+                            echo '<div class="attendance-calendar-day ' . $class . '" title="' . $e(implode(' · ', $titleBits)) . '">' . $inner . '</div>';
+                        }
+                        ?>
+                    </div>
+                    <div class="sd-legend">
+                        <span><span class="sw attendance-present-finger"></span>Present (&gt;7h)</span>
+                        <span><span class="sw attendance-present-manual"></span>Present (manual)</span>
+                        <span><span class="sw attendance-absent"></span>Absent (&lt;7h / incomplete)</span>
+                        <span><span class="sw attendance-holiday"></span>Holiday</span>
+                        <span><span class="sw attendance-empty"></span>No record</span>
+                        <span><span class="sw attendance-weekend" style="border:1px solid #e3e6ea;"></span>Weekend</span>
+                    </div>
+                    <div class="sd-sync-bar" id="sdQuickSyncBar" role="status" aria-live="polite">
+                        <div>
+                            <strong id="sdQuickSyncTitle">Syncing today…</strong>
+                            <span id="sdQuickSyncSpin" class="ms-1"><i class="fas fa-spinner fa-spin"></i></span>
+                        </div>
+                        <div id="sdQuickSyncMsg">Connecting to readers…</div>
+                        <div class="sd-sync-track"><div class="sd-sync-fill" id="sdQuickSyncProgress"></div></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="sd-card mb-2 mb-lg-0">
                 <div class="sd-card-h"><h2><i class="fas fa-university"></i>Academic enrollment</h2></div>
                 <div class="sd-card-b">
                     <?php if ($currentEnrollment): ?>
@@ -828,63 +985,6 @@ $shortcuts = [
                     <?php else: ?>
                         <div class="sd-empty"><i class="fas fa-graduation-cap"></i>No current enrollment is linked to this account.</div>
                     <?php endif; ?>
-                </div>
-            </section>
-
-            <section class="sd-card mb-2 mb-lg-0">
-                <div class="sd-card-h">
-                    <h2><i class="fas fa-calendar-check"></i><span>Attendance · <?php echo $e(date('F Y', strtotime($currentMonth . '-01'))); ?></span></h2>
-                    <a href="<?php echo APP_URL; ?>/student/attendance">Full calendar</a>
-                </div>
-                <div class="sd-card-b">
-                    <?php
-                    $firstDay = strtotime($currentMonth . '-01');
-                    $daysInMonth = (int) date('t', $firstDay);
-                    $firstDayOfWeek = (int) date('w', $firstDay);
-                    $weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-                    $weekDaysFull = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                    $todayYmd = date('Y-m-d');
-                    ?>
-                    <div class="sd-cal">
-                        <?php foreach ($weekDaysFull as $i => $day): ?>
-                            <div class="sd-cal-hd"><span class="d-none d-sm-inline"><?php echo $day; ?></span><span class="d-sm-none"><?php echo $weekDays[$i]; ?></span></div>
-                        <?php endforeach; ?>
-                        <?php
-                        for ($i = 0; $i < $firstDayOfWeek; $i++) {
-                            echo '<div></div>';
-                        }
-                        for ($day = 1; $day <= $daysInMonth; $day++) {
-                            $date = $currentMonth . '-' . str_pad((string) $day, 2, '0', STR_PAD_LEFT);
-                            $dayOfWeek = (int) date('w', strtotime($date));
-                            $st = $attendanceRecords[$date] ?? null;
-                            $class = 'attendance-empty';
-                            $icon = '';
-                            if ($dayOfWeek === 0 || $dayOfWeek === 6) {
-                                $class = 'attendance-weekend';
-                            } elseif ($st === 1) {
-                                $class = 'attendance-present';
-                                $icon = '<i class="fas fa-check"></i>';
-                            } elseif ($st === 0) {
-                                $class = 'attendance-absent';
-                                $icon = '<i class="fas fa-times"></i>';
-                            } elseif ($st === -1) {
-                                $class = 'attendance-holiday';
-                                $icon = '<i class="fas fa-star"></i>';
-                            }
-                            if ($date === $todayYmd) {
-                                $class .= ' attendance-today';
-                            }
-                            echo '<div class="attendance-calendar-day ' . $class . '" title="' . $e(date('l, F j, Y', strtotime($date))) . '">' . $icon . $day . '</div>';
-                        }
-                        ?>
-                    </div>
-                    <div class="sd-legend">
-                        <span><span class="sw attendance-present"></span>Present</span>
-                        <span><span class="sw attendance-absent"></span>Absent</span>
-                        <span><span class="sw attendance-holiday"></span>Holiday</span>
-                        <span><span class="sw attendance-empty"></span>No record</span>
-                        <span><span class="sw attendance-weekend" style="border:1px solid #e3e6ea;"></span>Weekend</span>
-                    </div>
                 </div>
             </section>
         </div>
@@ -1112,5 +1212,140 @@ document.querySelectorAll('.st-pw-toggle').forEach(function (btn) {
         }
         form.classList.add('was-validated');
     });
+})();
+
+(function () {
+    var autoRun = <?php echo $autoQuickSync ? 'true' : 'false'; ?>;
+    var baseUrl = <?php echo json_encode($quickSyncUrl, JSON_UNESCAPED_SLASHES); ?>;
+    if (!baseUrl) return;
+
+    var bar = document.getElementById('sdQuickSyncBar');
+    var titleEl = document.getElementById('sdQuickSyncTitle');
+    var msgEl = document.getElementById('sdQuickSyncMsg');
+    var prog = document.getElementById('sdQuickSyncProgress');
+    var spin = document.getElementById('sdQuickSyncSpin');
+    var btn = document.getElementById('sdQuickSyncBtn');
+    var running = false;
+    var savedTotal = 0;
+
+    function setBusy(on) {
+        running = on;
+        if (btn) {
+            btn.disabled = on;
+            var icon = btn.querySelector('i');
+            if (icon) icon.className = on ? 'fas fa-spinner fa-spin' : 'fas fa-sync-alt';
+        }
+    }
+
+    function showBar(title) {
+        if (!bar) return;
+        bar.classList.add('show');
+        bar.classList.remove('ok', 'bad');
+        if (spin) spin.style.display = '';
+        if (titleEl) titleEl.textContent = title;
+        if (prog) prog.style.width = '0%';
+    }
+
+    function finish(ok, summary, reload) {
+        setBusy(false);
+        if (spin) spin.style.display = 'none';
+        if (bar) {
+            bar.classList.add('show');
+            bar.classList.toggle('ok', !!ok);
+            bar.classList.toggle('bad', !ok);
+        }
+        if (titleEl) titleEl.textContent = ok ? 'Quick sync complete' : 'Quick sync issue';
+        if (msgEl) msgEl.textContent = summary || (ok ? 'Done' : 'Failed');
+        if (ok && reload) {
+            setTimeout(function () {
+                var u = new URL(window.location.href);
+                u.searchParams.set('nosync', '1');
+                window.location.href = u.toString();
+            }, 700);
+        }
+    }
+
+    function fetchJson(url) {
+        return fetch(url, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function (r) {
+            return r.text().then(function (text) {
+                var j = null;
+                try { j = JSON.parse(text); } catch (e) { j = null; }
+                if (!j || j.success === undefined) {
+                    throw new Error((j && j.message) || ('HTTP ' + r.status));
+                }
+                return j;
+            });
+        });
+    }
+
+    function runQuickSync(forceReload) {
+        if (running || !baseUrl) return;
+        setBusy(true);
+        savedTotal = 0;
+        showBar('Today sync (readers)');
+        if (msgEl) msgEl.textContent = 'Syncing fingerprint machines…';
+
+        function step(chunk) {
+            if (msgEl) msgEl.textContent = 'Reader ' + (chunk + 1) + '…';
+            var url = baseUrl + (baseUrl.indexOf('?') >= 0 ? '&' : '?') + 'chunk=' + encodeURIComponent(String(chunk));
+            return fetchJson(url).then(function (data) {
+                if (!data || data.success === false) {
+                    throw new Error((data && data.message) || 'Chunk failed');
+                }
+                if (data.skipped && data.done) {
+                    finish(true, data.summary || data.message || 'Already synced', false);
+                    return;
+                }
+                var total = parseInt(data.total, 10) || 0;
+                var label = data.label || data.host || ('#' + (chunk + 1));
+                savedTotal += parseInt(data.saved, 10) || 0;
+                if (prog && total > 0) {
+                    var pct = Math.round(((parseInt(data.chunk, 10) || chunk) + 1) / total * 100);
+                    prog.style.width = pct + '%';
+                }
+                if (msgEl) {
+                    msgEl.textContent = label + ': ' + (data.message || (data.ok ? 'OK' : 'Failed'))
+                        + (total ? (' (' + (chunk + 1) + '/' + total + ')') : '');
+                }
+                if (data.done) {
+                    finish(true, data.summary || ('Saved ' + savedTotal + ' new punch(es)'), forceReload !== false);
+                    return;
+                }
+                return step(parseInt(data.next_chunk, 10) || (chunk + 1));
+            });
+        }
+
+        step(0).catch(function (err) {
+            finish(false, (err && err.message) ? err.message : 'Quick sync failed', false);
+        });
+    }
+
+    if (btn) {
+        btn.addEventListener('click', function () {
+            runQuickSync(true);
+        });
+    }
+
+    // Existing 7h calendar is already rendered from DB; sync machines after it is visible.
+    function startAutoSyncAfterCalendar() {
+        if (!autoRun) return;
+        var start = function () {
+            window.setTimeout(function () {
+                runQuickSync(true);
+            }, 1200);
+        };
+        if (document.readyState === 'complete') {
+            requestAnimationFrame(function () { requestAnimationFrame(start); });
+            return;
+        }
+        window.addEventListener('load', function () {
+            requestAnimationFrame(function () { requestAnimationFrame(start); });
+        });
+    }
+    startAutoSyncAfterCalendar();
 })();
 </script>
