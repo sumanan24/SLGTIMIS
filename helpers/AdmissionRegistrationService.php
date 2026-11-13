@@ -657,7 +657,11 @@ class AdmissionRegistrationService {
             return null;
         }
         $relLower = strtolower($rel);
-        $allowed = ['uploads/student_applications/', 'uploads/students_applications/'];
+        $allowed = [
+            'uploads/student_applications/',
+            'uploads/students_applications/',
+            'uploads/student_documents/',
+        ];
         $ok = false;
         foreach ($allowed as $prefix) {
             if (strncmp($relLower, $prefix, strlen($prefix)) === 0) {
@@ -672,7 +676,7 @@ class AdmissionRegistrationService {
         if ($full === false || !is_file($full)) {
             return null;
         }
-        foreach (['student_applications', 'students_applications'] as $dirname) {
+        foreach (['student_applications', 'students_applications', 'student_documents'] as $dirname) {
             $base = realpath(BASE_PATH . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $dirname);
             if ($base !== false && strpos($full, $base . DIRECTORY_SEPARATOR) === 0) {
                 return $full;

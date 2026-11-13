@@ -188,9 +188,16 @@ class StudentDashboardController extends Controller {
         }
 
         $respond = static function (array $payload, int $code = 200) use ($jsonFlags): void {
+            // Must exit: index.php treats a null return as HTTP 500 HTML and corrupts JSON.
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
             http_response_code($code);
+            header('Content-Type: application/json; charset=UTF-8');
+            header('Cache-Control: no-store');
             $out = json_encode($payload, $jsonFlags);
             echo $out !== false ? $out : '{"success":false,"ok":false,"done":true,"message":"JSON encode failed"}';
+            exit;
         };
 
         $last = (int) ($_SESSION['student_portal_last_quick_sync'] ?? 0);
@@ -209,14 +216,14 @@ class StudentDashboardController extends Controller {
                 'message' => 'Synced recently — calendar already up to date',
                 'summary' => 'Synced recently — calendar already up to date',
             ]);
-            return;
         }
 
-        @set_time_limit(55);
+        @set_time_limit(40);
         try {
             require_once BASE_PATH . '/core/StudentDeviceAttendanceSyncService.php';
             $svc = new StudentDeviceAttendanceSyncService();
-            $row = $svc->syncTodayReadersChunk($chunk, 30);
+            // Short timeout so offline readers fail fast (LAN devices should answer quickly).
+            $row = $svc->syncTodayReadersChunk($chunk, 12);
 
             if ($chunk === 0) {
                 $_SESSION['student_portal_quick_run'] = [
@@ -244,12 +251,17 @@ class StudentDashboardController extends Controller {
             if (!empty($row['done'])) {
                 $_SESSION['student_portal_last_quick_sync'] = time();
                 $row['run'] = $run;
-                $row['summary'] = sprintf(
-                    'Today sync done — %d/3 reader(s) OK (.29/.28/.27), retrieved %d, saved %d',
-                    (int) $run['online'],
-                    (int) $run['retrieved'],
-                    (int) $run['saved']
-                );
+                $online = (int) $run['online'];
+                if ($online === 0) {
+                    $row['summary'] = 'No readers reachable (.29 / .28 / .27). Check LAN connection to fingerprint devices.';
+                } else {
+                    $row['summary'] = sprintf(
+                        'Today sync done — %d/3 reader(s) OK (.29/.28/.27), retrieved %d, saved %d',
+                        $online,
+                        (int) $run['retrieved'],
+                        (int) $run['saved']
+                    );
+                }
             }
 
             $respond(['success' => true] + $row);

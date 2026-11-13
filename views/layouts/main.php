@@ -999,6 +999,12 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                         </a>
                                     </li>
                                     <li>
+                                        <a href="<?php echo APP_URL; ?>/admin/backup-student-docs" download>
+                                            <i class="fas fa-user-graduate"></i>
+                                            <span>Student Docs &amp; Photos ZIP</span>
+                                        </a>
+                                    </li>
+                                    <li>
                                         <a href="<?php echo APP_URL; ?>/admin/sms-gateway" class="<?php echo (isset($page) && $page === 'admin-sms-gateway') ? 'active' : ''; ?>">
                                             <i class="fas fa-sms"></i>
                                             <span>SMS Gateway Test</span>

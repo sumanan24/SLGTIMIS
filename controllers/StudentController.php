@@ -251,6 +251,219 @@ class StudentController extends Controller {
     }
 
     /**
+     * ZIP backup for one student: profile photo + original admission documents + combined PDF.
+     */
+    public function studentDocumentsZip() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        if (!class_exists('ZipArchive')) {
+            $_SESSION['error'] = 'ZIP download requires the PHP ZipArchive extension.';
+            $this->redirect(($_SESSION['user_table'] ?? '') === 'student' ? 'student/dashboard' : 'students');
+            return;
+        }
+
+        require_once BASE_PATH . '/helpers/AdmissionRegistrationService.php';
+        $service = new AdmissionRegistrationService();
+        $requested = trim((string) $this->get('id', ''));
+        $studentId = '';
+        $isStudent = (($_SESSION['user_table'] ?? '') === 'student');
+
+        if ($isStudent) {
+            $studentId = $service->resolveStudentPortalId((string) ($_SESSION['user_name'] ?? ''));
+            if ($studentId && $requested !== '' && strcasecmp($requested, $studentId) !== 0) {
+                $_SESSION['error'] = 'You can only download your own documents.';
+                $this->redirect('student/dashboard');
+                return;
+            }
+        } else {
+            require_once BASE_PATH . '/models/UserModel.php';
+            require_once BASE_PATH . '/core/AccessControl.php';
+            $userModel = new UserModel();
+            $uid = (int) $_SESSION['user_id'];
+            $allowed = $userModel->canViewApplicationAdmissionSchedules($uid)
+                || AccessControl::can($uid, 'students', 'view')
+                || AccessControl::can($uid, 'students', 'download');
+            if (!$allowed) {
+                $_SESSION['error'] = 'You do not have permission to download student documents.';
+                $this->redirect('dashboard');
+                return;
+            }
+            $studentId = $requested;
+            if (!$this->canAccessStudentRecord($studentId)) {
+                $_SESSION['error'] = 'Access denied. You can only view students of your own department.';
+                $this->redirect('students');
+                return;
+            }
+        }
+
+        if ($studentId === '') {
+            $_SESSION['error'] = 'Student record not found.';
+            $this->redirect($isStudent ? 'student/dashboard' : 'students');
+            return;
+        }
+
+        $studentModel = $this->model('StudentModel');
+        $student = $studentModel->find($studentId);
+        if (!$student) {
+            $_SESSION['error'] = 'Student record not found.';
+            $this->redirect($isStudent ? 'student/dashboard' : 'students');
+            return;
+        }
+
+        $safeId = preg_replace('/[^A-Za-z0-9._-]+/', '_', $studentId) ?: 'student';
+        $tmp = tempnam(sys_get_temp_dir(), 'stdoc_');
+        if ($tmp === false) {
+            $_SESSION['error'] = 'Could not create temporary zip file.';
+            $this->redirect($isStudent ? 'student/profile' : ('students/view?id=' . urlencode($studentId)));
+            return;
+        }
+        $zipPath = $tmp . '.zip';
+        @unlink($tmp);
+
+        $zip = new ZipArchive();
+        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            $_SESSION['error'] = 'Could not create zip archive.';
+            $this->redirect($isStudent ? 'student/profile' : ('students/view?id=' . urlencode($studentId)));
+            return;
+        }
+
+        $root = $safeId . '/';
+        $included = [];
+        $missing = [];
+
+        // Profile photo
+        $photoAbs = $studentModel->getProfileImageAbsolutePath($student);
+        if ($photoAbs !== null) {
+            $ext = strtolower(pathinfo($photoAbs, PATHINFO_EXTENSION) ?: 'jpg');
+            $photoName = 'profile/profile_photo.' . $ext;
+            if ($zip->addFile($photoAbs, $root . $photoName)) {
+                $included[] = $photoName;
+            }
+        } else {
+            $missing[] = 'Profile photo';
+        }
+
+        // Admission document originals
+        $application = $service->findApplicationForStudent($studentId);
+        $docIndex = 1;
+        if ($application) {
+            foreach ($service->applicationDocuments($application) as $doc) {
+                $label = (string) ($doc['label'] ?? 'document');
+                if (empty($doc['available']) || empty($doc['absolute'])) {
+                    if (($doc['path'] ?? '') !== '') {
+                        $missing[] = $label;
+                    }
+                    continue;
+                }
+                $abs = (string) $doc['absolute'];
+                $ext = strtolower(pathinfo($abs, PATHINFO_EXTENSION) ?: 'bin');
+                $slug = preg_replace('/[^A-Za-z0-9._-]+/', '_', $label) ?: 'document';
+                $name = sprintf('documents/%02d_%s.%s', $docIndex, $slug, $ext);
+                if ($zip->addFile($abs, $root . $name)) {
+                    $included[] = $name;
+                    $docIndex++;
+                } else {
+                    $missing[] = $label;
+                }
+            }
+        } else {
+            $missing[] = 'Admission application (not linked)';
+        }
+
+        // Stored combined PDF under uploads/student_documents/{id}.pdf
+        $combinedStored = BASE_PATH . '/uploads/student_documents/' . $safeId . '.pdf';
+        if (is_file($combinedStored)) {
+            $name = 'documents/combined_documents.pdf';
+            if ($zip->addFile($combinedStored, $root . $name)) {
+                $included[] = $name;
+            }
+        } elseif ($application) {
+            try {
+                $skipped = [];
+                $binary = $service->buildCombinedPdfBinary($application, $studentId, $skipped);
+                if ($binary !== '') {
+                    $name = 'documents/combined_documents.pdf';
+                    $zip->addFromString($root . $name, $binary);
+                    $included[] = $name;
+                }
+            } catch (Throwable $e) {
+                $missing[] = 'Combined PDF (' . $e->getMessage() . ')';
+            }
+        }
+
+        $readme = "SLGTI student documents backup\r\n"
+            . 'Student ID: ' . $studentId . "\r\n"
+            . 'Name: ' . trim((string) ($student['student_fullname'] ?? '')) . "\r\n"
+            . 'Generated: ' . date('Y-m-d H:i:s') . "\r\n\r\n"
+            . "Included (" . count($included) . "):\r\n- "
+            . (count($included) ? implode("\r\n- ", $included) : '(none)') . "\r\n\r\n"
+            . "Missing / unavailable (" . count($missing) . "):\r\n- "
+            . (count($missing) ? implode("\r\n- ", $missing) : '(none)') . "\r\n";
+        $zip->addFromString($root . 'README.txt', $readme);
+        $zip->close();
+
+        if (!is_file($zipPath) || filesize($zipPath) === 0) {
+            @unlink($zipPath);
+            $_SESSION['error'] = 'No documents or profile photo were available to zip.';
+            $this->redirect($isStudent ? 'student/profile' : ('students/view?id=' . urlencode($studentId)));
+            return;
+        }
+
+        $fn = 'student_documents_' . $safeId . '_' . date('Y-m-d') . '.zip';
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . $fn . '"');
+        header('Content-Length: ' . (string) filesize($zipPath));
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store');
+        readfile($zipPath);
+        @unlink($zipPath);
+        exit;
+    }
+
+    /**
+     * Full backup ZIP: all admission uploads + combined student PDFs + profile photos.
+     * Staff with students download permission / ADM / system admin.
+     */
+    public function documentsBackupZip() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        if ((($_SESSION['user_table'] ?? '') === 'student')) {
+            $_SESSION['error'] = 'Access denied.';
+            $this->redirect('student/dashboard');
+            return;
+        }
+
+        require_once BASE_PATH . '/models/UserModel.php';
+        require_once BASE_PATH . '/core/AccessControl.php';
+        $uid = (int) $_SESSION['user_id'];
+        $userModel = new UserModel();
+        $allowed = $userModel->isAdmin($uid)
+            || $userModel->isAdminOrADM($uid)
+            || AccessControl::can($uid, 'students', 'download')
+            || AccessControl::can($uid, 'students', 'view');
+        if (!$allowed) {
+            $_SESSION['error'] = 'You do not have permission to download the documents backup.';
+            $this->redirect('dashboard');
+            return;
+        }
+
+        try {
+            require_once BASE_PATH . '/helpers/BackupHelper.php';
+            $filename = 'student_documents_photos_backup_' . date('Y-m-d_H-i-s') . '.zip';
+            require_once BASE_PATH . '/core/ActivityLogger.php';
+            (new ActivityLogger())->log('student_docs_backup', 'Student documents & photos zip downloaded', 'success');
+            BackupHelper::streamFoldersZip(BackupHelper::studentDocumentsBackupDirs(), $filename);
+        } catch (Throwable $e) {
+            $_SESSION['error'] = 'Documents backup failed: ' . $e->getMessage();
+            $this->redirect('students');
+        }
+    }
+
+    /**
      * First-login personal + parent/guardian details (required before the dashboard).
      */
     public function completeFirstLoginProfile() {

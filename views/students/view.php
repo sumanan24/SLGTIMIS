@@ -421,6 +421,9 @@
                 <a href="<?php echo APP_URL; ?>/student/documents-pdf?id=<?php echo urlencode($student['student_id']); ?>" class="cv-btn cv-btn-outline" target="_blank" rel="noopener">
                     <i class="fas fa-file-pdf"></i>View Student Documents PDF
                 </a>
+                <a href="<?php echo APP_URL; ?>/students/documents-zip?id=<?php echo urlencode($student['student_id']); ?>" class="cv-btn cv-btn-outline">
+                    <i class="fas fa-file-archive"></i>Download ZIP (docs + photo)
+                </a>
                 <a href="<?php echo APP_URL; ?>/students" class="cv-btn cv-btn-outline">
                     <i class="fas fa-arrow-left"></i>Back
                 </a>
@@ -432,6 +435,9 @@
             <div class="cv-actions">
                 <a href="<?php echo APP_URL; ?>/student/documents-pdf" class="cv-btn cv-btn-outline" target="_blank" rel="noopener">
                     <i class="fas fa-file-pdf"></i>Download All Documents
+                </a>
+                <a href="<?php echo APP_URL; ?>/student/documents-zip" class="cv-btn cv-btn-outline">
+                    <i class="fas fa-file-archive"></i>Download ZIP (docs + photo)
                 </a>
                 <a href="<?php echo APP_URL; ?>/student/profile/edit" class="cv-btn cv-btn-primary">
                     <i class="fas fa-edit"></i>Edit My Profile

@@ -1951,46 +1951,56 @@ class StudentModel extends Model {
      * Returns: assets/img/Studnet_profile/filename.jpg format
      */
     public function getProfileImagePath($student) {
-        // Ensure student_profile_img column exists
+        $relative = $this->resolveProfileImageRelativePath($student);
+        if ($relative === null) {
+            return null;
+        }
+        return APP_URL . '/assets/' . $relative;
+    }
+
+    /**
+     * Absolute filesystem path to the student profile photo, or null.
+     *
+     * @param array<string,mixed>|null $student
+     */
+    public function getProfileImageAbsolutePath($student): ?string {
+        $relative = $this->resolveProfileImageRelativePath($student);
+        if ($relative === null) {
+            return null;
+        }
+        $full = realpath(BASE_PATH . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative));
+        return ($full !== false && is_file($full)) ? $full : null;
+    }
+
+    /**
+     * Relative path under assets/ (e.g. img/Studnet_profile/file.jpg), or null if missing.
+     *
+     * @param array<string,mixed>|null $student
+     */
+    public function resolveProfileImageRelativePath($student): ?string {
         $this->addStudentProfileImgColumnIfNotExists();
-        
-        // Check both student_profile_img and file_path (for backward compatibility)
+
         $imagePath = $student['student_profile_img'] ?? $student['file_path'] ?? null;
-        
         if (empty($imagePath)) {
             return null;
         }
-        
-        // Remove leading slash if present
-        $imagePath = ltrim($imagePath, '/');
-        
-        // Remove 'assets/' prefix if present (shouldn't be, but handle it)
+
+        $imagePath = ltrim((string) $imagePath, '/');
         if (strpos($imagePath, 'assets/') === 0) {
             $imagePath = substr($imagePath, 7);
         }
-        
-        // Convert old paths to new Studnet_profile path
         if (strpos($imagePath, 'img/student_profile/') === 0) {
             $imagePath = str_replace('img/student_profile/', 'img/Studnet_profile/', $imagePath);
         }
         if (strpos($imagePath, 'img/Student_profile/') === 0) {
             $imagePath = str_replace('img/Student_profile/', 'img/Studnet_profile/', $imagePath);
         }
-        
-        // If path doesn't start with 'img/Studnet_profile/', assume it's just a filename
         if (strpos($imagePath, 'img/Studnet_profile/') !== 0) {
-            // If it's just a filename, prepend the standard path
             $imagePath = 'img/Studnet_profile/' . basename($imagePath);
         }
-        
-        // Check if file exists in assets directory
+
         $fullPath = BASE_PATH . '/assets/' . $imagePath;
-        if (file_exists($fullPath)) {
-            // Return in format: assets/img/Studnet_profile/filename.jpg
-            return APP_URL . '/assets/' . $imagePath;
-        }
-        
-        return null;
+        return file_exists($fullPath) ? $imagePath : null;
     }
 
     /**

@@ -1322,7 +1322,14 @@ document.querySelectorAll('.st-pw-toggle').forEach(function (btn) {
                 }
                 // Continue other readers even if one is offline
                 if (data.done) {
-                    finish(true, data.summary || ('Saved ' + savedTotal + ' new punch(es)'), forceReload !== false && savedTotal >= 0);
+                    var summary = data.summary || ('Saved ' + savedTotal + ' new punch(es)');
+                    var anyOnline = !!(data.run && parseInt(data.run.online, 10) > 0);
+                    // Still success=true for API shape; show warning when all readers offline
+                    if (!anyOnline && savedTotal === 0 && !(data.skipped)) {
+                        finish(false, summary, false);
+                    } else {
+                        finish(true, summary, forceReload !== false && (savedTotal > 0 || anyOnline));
+                    }
                     return;
                 }
                 return step(parseInt(data.next_chunk, 10) || (chunk + 1));

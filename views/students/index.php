@@ -65,6 +65,9 @@ $staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsa
                 </a>
                 <?php endif; ?>
                 <?php if (isset($canExport) && $canExport): ?>
+                <a href="<?php echo APP_URL; ?>/students/documents-backup-zip" class="btn btn-outline-secondary btn-sm" title="Backup all student admission documents and profile photos">
+                    <i class="fas fa-file-archive me-1"></i>Docs &amp; Photos ZIP
+                </a>
                 <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#exportModal">
                     <i class="fas fa-file-excel me-1"></i>Export to Excel
                 </button>

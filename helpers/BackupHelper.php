@@ -413,6 +413,22 @@ class BackupHelper {
         return ['uploads', 'assets'];
     }
 
+    /**
+     * Student documents + profile photos only (smaller, focused backup).
+     *
+     * @return list<string>
+     */
+    public static function studentDocumentsBackupDirs(): array {
+        return [
+            'uploads/student_applications',
+            'uploads/students_applications',
+            'uploads/student_documents',
+            'assets/img/Studnet_profile',
+            'assets/img/student_profile',
+            'assets/img/Student_profile',
+        ];
+    }
+
     private static function exportTable(mysqli $conn, string $table): string {
         $sql = "\n\n-- Table: `$table` --\n";
         $sql .= "DROP TABLE IF EXISTS `$table`;\n";
