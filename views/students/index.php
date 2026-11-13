@@ -1,346 +1,415 @@
+<?php
+$staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsapp_header) ? $staff_whatsapp_header : [];
+$selectedProvinces = is_array($filters['provinces'] ?? null) ? $filters['provinces'] : [];
+$selectedProvinceKeys = [];
+foreach ($selectedProvinces as $sp) {
+    $key = strtolower(trim(preg_replace('/\s+province$/i', '', (string) $sp) ?? ''));
+    if ($key !== '') {
+        $selectedProvinceKeys[$key] = true;
+    }
+}
+$hasActiveFilters = !empty($filters['search']) || !empty($filters['status']) || !empty($filters['district'])
+    || !empty($filters['gender']) || !empty($filters['department_id']) || !empty($filters['course_id'])
+    || !empty($filters['academic_year']) || !empty($filters['course_mode']) || !empty($filters['group_id'])
+    || !empty($filters['provinces']);
+$smsQuery = http_build_query(array_filter([
+    'academic_year' => $filters['academic_year'] ?? '',
+    'department_id' => $filters['department_id'] ?? '',
+    'course_id' => $filters['course_id'] ?? '',
+], 'strlen'));
+?>
 <style>
-/* Students Page Button Styling */
-.students-actions .btn {
-    min-width: 38px;
-    height: 32px;
-    padding: 0.375rem 0.75rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.875rem;
-    transition: all 0.3s ease;
-    border-radius: 0.375rem;
-}
-
-.students-actions .btn-group {
-    display: inline-flex;
-}
-
-.students-actions .btn-group > .btn:not(:first-child) {
-    margin-left: 0.25rem;
-}
-
-.students-actions .btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-.students-actions .btn-outline-primary:hover {
-    background-color: var(--primary-navy);
-    border-color: var(--primary-navy);
-    color: white;
-}
-
-.students-actions .btn-outline-danger:hover {
-    background-color: #dc3545;
-    border-color: #dc3545;
-    color: white;
+.stu-page { --stu-navy:#0b2545; --stu-ink:#1e293b; --stu-muted:#64748b; --stu-line:#dbe4f0; --stu-soft:#f5f8fd; --stu-accent:#1d4ed8; color:var(--stu-ink); }
+.stu-page .stu-head { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1.1rem; }
+.stu-page .stu-title { margin:0; font-size:1.35rem; font-weight:700; color:var(--stu-navy); letter-spacing:-.02em; }
+.stu-page .stu-sub { margin:.2rem 0 0; color:var(--stu-muted); font-size:.86rem; max-width:36rem; }
+.stu-page .stu-actions { display:flex; flex-wrap:wrap; gap:.45rem; align-items:center; }
+.stu-page .stu-btn { display:inline-flex; align-items:center; gap:.4rem; border-radius:.45rem; font-size:.82rem; font-weight:600; padding:.42rem .8rem; border:1px solid transparent; text-decoration:none; line-height:1.2; }
+.stu-page .stu-btn-primary { background:var(--stu-navy); color:#fff; }
+.stu-page .stu-btn-primary:hover { background:#163a66; color:#fff; }
+.stu-page .stu-btn-ghost { background:#fff; color:var(--stu-navy); border-color:var(--stu-line); }
+.stu-page .stu-btn-ghost:hover { background:var(--stu-soft); color:var(--stu-navy); }
+.stu-page .stu-btn-soft { background:var(--stu-soft); color:var(--stu-navy); border-color:var(--stu-line); }
+.stu-page .stu-btn-soft:hover { background:#e8eef8; color:var(--stu-navy); }
+.stu-page .stu-panel { background:#fff; border:1px solid var(--stu-line); border-radius:.7rem; margin-bottom:1rem; overflow:hidden; }
+.stu-page .stu-panel-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.6rem; padding:.75rem 1rem; background:var(--stu-soft); border-bottom:1px solid var(--stu-line); }
+.stu-page .stu-panel-head h2 { margin:0; font-size:.92rem; font-weight:700; color:var(--stu-navy); }
+.stu-page .stu-panel-body { padding:1rem; }
+.stu-page .stu-label { display:block; font-size:.68rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--stu-muted); margin-bottom:.28rem; }
+.stu-page .stu-field .form-control,
+.stu-page .stu-field .form-select { font-size:.86rem; border-color:#cfd9e6; border-radius:.45rem; min-height:2.15rem; }
+.stu-page .stu-field .form-control:focus,
+.stu-page .stu-field .form-select:focus { border-color:#93b4e0; box-shadow:0 0 0 .2rem rgba(29,78,216,.12); }
+.stu-page .stu-search { position:relative; }
+.stu-page .stu-search i { position:absolute; left:.75rem; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:.85rem; pointer-events:none; }
+.stu-page .stu-search .form-control { padding-left:2.15rem; }
+.stu-page .stu-prov-bar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.55rem; }
+.stu-page .stu-prov-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr)); gap:.4rem; }
+.stu-page .stu-chip { position:relative; margin:0; }
+.stu-page .stu-chip input { position:absolute; opacity:0; pointer-events:none; }
+.stu-page .stu-chip span { display:block; text-align:center; padding:.42rem .55rem; border:1px solid #cfd9e6; border-radius:.4rem; background:#fff; color:#334155; font-size:.78rem; font-weight:600; cursor:pointer; transition:background .15s ease,border-color .15s ease,color .15s ease; }
+.stu-page .stu-chip span:hover { border-color:#93b4e0; background:#f8fbff; }
+.stu-page .stu-chip input:checked + span { background:var(--stu-navy); border-color:var(--stu-navy); color:#fff; }
+.stu-page .stu-chip input:focus-visible + span { outline:2px solid #93b4e0; outline-offset:2px; }
+.stu-page .stu-filter-foot { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; margin-top:1rem; padding-top:.85rem; border-top:1px solid #eef2f7; }
+.stu-page .stu-hint { color:var(--stu-muted); font-size:.78rem; margin:0; }
+.stu-page .stu-meta { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.85rem; }
+.stu-page .stu-count { font-size:.86rem; color:var(--stu-muted); }
+.stu-page .stu-count strong { color:var(--stu-navy); }
+.stu-page .stu-note { font-size:.76rem; color:#7c8aa0; }
+.stu-page .stu-table-wrap { overflow-x:auto; }
+.stu-page table.stu-table { width:100%; border-collapse:collapse; font-size:.86rem; margin:0; }
+.stu-page table.stu-table th { background:var(--stu-navy); color:#fff; font-size:.68rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:.65rem .75rem; white-space:nowrap; border:0; }
+.stu-page table.stu-table td { padding:.6rem .75rem; border-bottom:1px solid #eef2f7; vertical-align:middle; }
+.stu-page table.stu-table tbody tr:hover td { background:#f7faff; }
+.stu-page .stu-id { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.8rem; font-weight:700; color:var(--stu-accent); }
+.stu-page .stu-name { font-weight:600; color:var(--stu-ink); }
+.stu-page .stu-avatar { width:40px; height:40px; border-radius:50%; object-fit:cover; border:2px solid #e2e8f0; display:block; }
+.stu-page .stu-avatar-fallback { width:40px; height:40px; border-radius:50%; border:2px solid #e2e8f0; background:#eef2f7; color:#94a3b8; display:inline-flex; align-items:center; justify-content:center; }
+.stu-page .stu-status { display:inline-flex; align-items:center; gap:.35rem; padding:.22rem .55rem; border-radius:.35rem; font-size:.72rem; font-weight:700; }
+.stu-page .stu-status.ok { background:#dcfce7; color:#166534; }
+.stu-page .stu-status.info { background:#dbeafe; color:#1e40af; }
+.stu-page .stu-status.warn { background:#fef3c7; color:#92400e; }
+.stu-page .students-actions .btn { min-width:34px; height:30px; padding:0 .55rem; display:inline-flex; align-items:center; justify-content:center; font-size:.8rem; border-radius:.35rem; }
+.stu-page .students-actions .btn-group { gap:.25rem; }
+.stu-page .students-actions .btn-group > .btn { border-radius:.35rem !important; }
+.stu-page .students-actions .btn-outline-primary { color:var(--stu-navy); border-color:#c5d3e6; }
+.stu-page .students-actions .btn-outline-primary:hover { background:var(--stu-navy); border-color:var(--stu-navy); color:#fff; }
+.stu-page .students-actions .btn-outline-danger:hover { background:#dc3545; border-color:#dc3545; color:#fff; }
+.stu-page .stu-empty { text-align:center; padding:2.8rem 1rem; color:var(--stu-muted); }
+.stu-page .stu-empty i { font-size:2.2rem; margin-bottom:.7rem; opacity:.55; }
+.stu-page .stu-pager { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; padding:1rem; border-top:1px solid #eef2f7; }
+.stu-page .pagination .page-link { color:var(--stu-navy); border-color:var(--stu-line); }
+.stu-page .pagination .page-item.active .page-link { background:var(--stu-navy); border-color:var(--stu-navy); }
+.stu-page .dropdown-menu { border-color:var(--stu-line); box-shadow:0 10px 28px rgba(15,23,42,.08); }
+.stu-page .dropdown-item { font-size:.84rem; }
+@media (max-width:767.98px) {
+    .stu-page .stu-title { font-size:1.15rem; }
 }
 </style>
 
-<?php
-$staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsapp_header) ? $staff_whatsapp_header : [];
-?>
-
-<div class="container-fluid px-4 py-3">
-    <div class="card shadow-sm border-0">
-        <div class="card-header bg-primary text-white">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                        <h5 class="mb-0 fw-bold"><i class="fas fa-user-graduate me-2"></i>Students Management</h5>
-                <div class="d-flex gap-2 flex-wrap mt-2 mt-md-0">
-                <?php if (!empty($staff_whatsapp_header['url'])): ?>
-                <a href="<?php echo htmlspecialchars($staff_whatsapp_header['url'], ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-sm btn-wa-outline" target="_blank" rel="noopener noreferrer"
-                   title="WhatsApp <?php echo htmlspecialchars($staff_whatsapp_header['display'], ENT_QUOTES, 'UTF-8'); ?>">
-                    <i class="fab fa-whatsapp me-1" aria-hidden="true"></i><?php echo htmlspecialchars($staff_whatsapp_header['display'], ENT_QUOTES, 'UTF-8'); ?>
-                </a>
-                <?php endif; ?>
-                <?php if (isset($canEdit) && $canEdit): ?>
-                <a href="<?php echo APP_URL; ?>/students/create" class="btn btn-light btn-sm">
-                    <i class="fas fa-plus me-1"></i>Add New Student
-                </a>
-                <?php endif; ?>
-                <?php if (isset($isADM) && $isADM): ?>
-                <a href="<?php echo APP_URL; ?>/students/import-images" class="btn btn-info btn-sm" onclick="return confirm('This will scan the img/Studnet_profile directory and update student records with matching image files. Continue?');">
-                    <i class="fas fa-images me-1"></i>Import Profile Images
-                </a>
-                <?php endif; ?>
-                <?php if (isset($canExport) && $canExport): ?>
-                <a href="<?php echo APP_URL; ?>/students/documents-backup-zip" class="btn btn-outline-secondary btn-sm" title="Backup all student admission documents and profile photos">
-                    <i class="fas fa-file-archive me-1"></i>Docs &amp; Photos ZIP
-                </a>
-                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#exportModal">
-                    <i class="fas fa-file-excel me-1"></i>Export to Excel
-                </button>
-                <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#envelopeModal">
-                    <i class="fas fa-envelope me-1"></i>Download Envelopes / Name List
-                </button>
-                <button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#callingLetterModal">
-                    <i class="fas fa-file-alt me-1"></i>Calling Letters
-                </button>
-                <?php
-                $smsQuery = http_build_query(array_filter([
-                    'academic_year' => $filters['academic_year'] ?? '',
-                    'department_id' => $filters['department_id'] ?? '',
-                    'course_id' => $filters['course_id'] ?? '',
-                ], 'strlen'));
-                ?>
-                <a href="<?php echo APP_URL; ?>/students/bulk-sms<?php echo $smsQuery !== '' ? '?' . $smsQuery : ''; ?>" class="btn btn-info btn-sm">
-                    <i class="fas fa-sms me-1"></i>Bulk SMS
-                </a>
-                <a href="<?php echo APP_URL; ?>/students/intake-checklist<?php echo $smsQuery !== '' ? '?' . $smsQuery : ''; ?>" class="btn btn-outline-danger btn-sm">
-                    <i class="fas fa-clipboard-check me-1"></i>Intake Checklist
-                </a>
-                <?php endif; ?>
-                </div>
-            </div>
+<div class="container-fluid px-4 py-3 stu-page">
+    <div class="stu-head">
+        <div>
+            <h1 class="stu-title">Students</h1>
+            <p class="stu-sub">Browse and manage current enrolments. Following and Internship only — Dropout, Completed, and Long Absent are excluded.</p>
         </div>
-        <div class="card-body">
-            <?php if (isset($message)): ?>
-                <div class="alert alert-success alert-dismissible fade show d-flex align-items-center" role="alert">
-                    <i class="fas fa-check-circle me-2"></i>
-                    <div><?php echo htmlspecialchars($message); ?></div>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
+        <div class="stu-actions">
+            <?php if (!empty($staff_whatsapp_header['url'])): ?>
+            <a href="<?php echo htmlspecialchars($staff_whatsapp_header['url'], ENT_QUOTES, 'UTF-8'); ?>" class="stu-btn stu-btn-ghost btn-wa-outline" target="_blank" rel="noopener noreferrer"
+               title="WhatsApp <?php echo htmlspecialchars($staff_whatsapp_header['display'], ENT_QUOTES, 'UTF-8'); ?>">
+                <i class="fab fa-whatsapp" aria-hidden="true"></i><?php echo htmlspecialchars($staff_whatsapp_header['display'], ENT_QUOTES, 'UTF-8'); ?>
+            </a>
             <?php endif; ?>
-            
-            <?php if (isset($error)): ?>
-                <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center" role="alert">
-                    <i class="fas fa-exclamation-circle me-2"></i>
-                    <div><?php echo htmlspecialchars($error); ?></div>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
+            <?php if (isset($canEdit) && $canEdit): ?>
+            <a href="<?php echo APP_URL; ?>/students/create" class="stu-btn stu-btn-primary">
+                <i class="fas fa-plus"></i>Add student
+            </a>
             <?php endif; ?>
-            
-            <!-- Filters Section -->
-            <div class="card border mb-4 shadow-sm">
-                <div class="card-body bg-light">
-                    <h6 class="mb-3 fw-bold text-primary"><i class="fas fa-filter me-2"></i>Filter Students</h6>
-                    <form method="GET" action="<?php echo APP_URL; ?>/students" class="row g-3 align-items-end">
-                        <div class="col-md-6 col-lg-3">
-                            <label for="search" class="form-label fw-bold small">Search</label>
-                            <input type="text" class="form-control form-control-sm" id="search" name="search" 
-                                   value="<?php echo htmlspecialchars($filters['search'] ?? ''); ?>" 
-                                   placeholder="Name, ID, Email, NIC">
-                        </div>
-                        <?php if (!isset($isHOD) || !$isHOD): ?>
-                        <div class="col-md-6 col-lg-2">
-                            <label for="status" class="form-label fw-bold small">Status</label>
-                            <select class="form-select form-select-sm" id="status" name="status">
-                                <option value="">All Status</option>
-                                <?php foreach ($statuses as $status): ?>
-                                    <option value="<?php echo htmlspecialchars($status); ?>" 
-                                            <?php echo (isset($filters['status']) && $filters['status'] === $status) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($status); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <?php endif; ?>
-                        <div class="col-md-6 col-lg-2">
-                            <label for="gender" class="form-label fw-bold small">Gender</label>
-                            <select class="form-select form-select-sm" id="gender" name="gender">
-                                <option value="">All Genders</option>
-                                <?php foreach ($genders as $gender): ?>
-                                    <option value="<?php echo htmlspecialchars($gender); ?>" 
-                                            <?php echo (isset($filters['gender']) && $filters['gender'] === $gender) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($gender); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-6 col-lg-2">
-                            <label for="department_id" class="form-label fw-bold small">Department</label>
-                            <select class="form-select form-select-sm" id="department_id" name="department_id">
-                                <option value="">All Departments</option>
-                                <?php foreach ($departments as $dept): ?>
-                                    <option value="<?php echo htmlspecialchars($dept['department_id']); ?>" 
-                                            <?php echo (isset($filters['department_id']) && $filters['department_id'] === $dept['department_id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($dept['department_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-6 col-lg-2">
-                            <label for="course_id" class="form-label fw-bold small">Course</label>
-                            <select class="form-select form-select-sm" id="course_id" name="course_id">
-                                <option value="">All Courses</option>
-                                <?php foreach ($courses as $course): ?>
-                                    <option value="<?php echo htmlspecialchars($course['course_id']); ?>" 
-                                            data-department-id="<?php echo htmlspecialchars($course['department_id']); ?>"
-                                            <?php echo (isset($filters['course_id']) && $filters['course_id'] === $course['course_id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($course['course_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-6 col-lg-2">
-                            <label for="academic_year" class="form-label fw-bold small">Academic Year</label>
-                            <select class="form-select form-select-sm" id="academic_year" name="academic_year">
-                                <option value="">All Years</option>
-                                <?php foreach ($academicYears as $year): ?>
-                                    <option value="<?php echo htmlspecialchars($year); ?>" 
-                                            <?php echo (isset($filters['academic_year']) && $filters['academic_year'] === $year) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($year); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-6 col-lg-2">
-                            <label for="course_mode" class="form-label fw-bold small">Course Mode</label>
-                            <select class="form-select form-select-sm" id="course_mode" name="course_mode">
-                                <option value="">All Modes</option>
-                                <option value="Full" <?php echo (isset($filters['course_mode']) && $filters['course_mode'] === 'Full') ? 'selected' : ''; ?>>Full Time</option>
-                                <option value="Part" <?php echo (isset($filters['course_mode']) && $filters['course_mode'] === 'Part') ? 'selected' : ''; ?>>Part Time</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 col-lg-2">
-                            <label for="group_id" class="form-label fw-bold small">Group</label>
-                            <select class="form-select form-select-sm" id="group_id" name="group_id">
-                                <option value="">All Groups</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 col-lg-2">
-                            <label for="district" class="form-label fw-bold small">District</label>
-                            <select class="form-select form-select-sm" id="district" name="district">
-                                <option value="">All Districts</option>
-                                <?php foreach ($districts as $district): ?>
-                                    <option value="<?php echo htmlspecialchars($district); ?>" 
-                                            <?php echo (isset($filters['district']) && $filters['district'] === $district) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($district); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-12 col-lg-auto">
-                            <button type="submit" class="btn btn-primary btn-sm me-2">
-                                <i class="fas fa-filter me-1"></i>Filter
-                            </button>
-                            <a href="<?php echo APP_URL; ?>/students" class="btn btn-secondary btn-sm">
-                                <i class="fas fa-times me-1"></i>Clear
-                            </a>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap">
-                <div class="text-muted small mb-2 mb-md-0">
-                    <i class="fas fa-info-circle me-1"></i>
-                    Showing <strong><?php echo count($students); ?></strong> of <strong><?php echo number_format($total); ?></strong> students
-                    <span class="d-block">Following and Internship only. Dropout, Completed, and Long Absent are not included.</span>
-                    <?php if (!empty($filters['search']) || !empty($filters['status']) || !empty($filters['district']) || !empty($filters['gender']) || !empty($filters['department_id']) || !empty($filters['course_id']) || !empty($filters['academic_year']) || !empty($filters['course_mode']) || !empty($filters['group_id'])): ?>
-                        <a href="<?php echo APP_URL; ?>/students" class="text-primary ms-2 text-decoration-none">
-                            <i class="fas fa-times-circle me-1"></i>Clear filters
-                        </a>
+            <?php if ((isset($canExport) && $canExport) || (isset($isADM) && $isADM)): ?>
+            <div class="dropdown">
+                <button class="stu-btn stu-btn-soft dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-ellipsis-h"></i>Tools
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <?php if (isset($canExport) && $canExport): ?>
+                    <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#exportModal"><i class="fas fa-file-excel me-2 text-success"></i>Export to Excel</button></li>
+                    <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#envelopeModal"><i class="fas fa-envelope me-2 text-warning"></i>Envelopes / Name list</button></li>
+                    <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#callingLetterModal"><i class="fas fa-file-alt me-2"></i>Calling letters</button></li>
+                    <li><a class="dropdown-item" href="<?php echo APP_URL; ?>/students/bulk-sms<?php echo $smsQuery !== '' ? '?' . $smsQuery : ''; ?>"><i class="fas fa-sms me-2 text-info"></i>Bulk SMS</a></li>
+                    <li><a class="dropdown-item" href="<?php echo APP_URL; ?>/students/registration-checklist<?php echo $smsQuery !== '' ? '?' . $smsQuery : ''; ?>"><i class="fas fa-clipboard-list me-2 text-primary"></i>Registration checklist</a></li>
+                    <li><a class="dropdown-item" href="<?php echo APP_URL; ?>/students/intake-checklist<?php echo $smsQuery !== '' ? '?' . $smsQuery : ''; ?>"><i class="fas fa-clipboard-check me-2 text-danger"></i>Intake checklist</a></li>
+                    <li><a class="dropdown-item" href="<?php echo APP_URL; ?>/students/documents-backup-zip"><i class="fas fa-file-archive me-2"></i>Docs &amp; photos ZIP</a></li>
                     <?php endif; ?>
-                </div>
+                    <?php if (isset($isADM) && $isADM): ?>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="<?php echo APP_URL; ?>/students/import-images" onclick="return confirm('This will scan the img/Studnet_profile directory and update student records with matching image files. Continue?');"><i class="fas fa-images me-2"></i>Import profile images</a></li>
+                    <?php endif; ?>
+                </ul>
             </div>
+            <?php endif; ?>
+        </div>
+    </div>
 
-            <?php if (!empty($students)): ?>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
+    <?php if (isset($message)): ?>
+        <div class="alert alert-success alert-dismissible fade show d-flex align-items-center" role="alert">
+            <i class="fas fa-check-circle me-2"></i>
+            <div><?php echo htmlspecialchars($message); ?></div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
+
+    <?php if (isset($error)): ?>
+        <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            <div><?php echo htmlspecialchars($error); ?></div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
+
+    <div class="stu-panel">
+        <div class="stu-panel-head">
+            <h2><i class="fas fa-sliders-h me-2"></i>Filters</h2>
+            <?php if ($hasActiveFilters): ?>
+            <a href="<?php echo APP_URL; ?>/students" class="stu-btn stu-btn-ghost" style="padding:.28rem .65rem; font-size:.75rem;">
+                <i class="fas fa-times"></i>Reset all
+            </a>
+            <?php endif; ?>
+        </div>
+        <div class="stu-panel-body">
+            <form method="GET" action="<?php echo APP_URL; ?>/students">
+                <div class="row g-3">
+                    <div class="col-12 col-lg-4 stu-field">
+                        <label for="search" class="stu-label">Search</label>
+                        <div class="stu-search">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="text" class="form-control" id="search" name="search"
+                                   value="<?php echo htmlspecialchars($filters['search'] ?? ''); ?>"
+                                   placeholder="Name, ID, email, or NIC">
+                        </div>
+                    </div>
+                    <?php if (!isset($isHOD) || !$isHOD): ?>
+                    <div class="col-6 col-md-4 col-lg-2 stu-field">
+                        <label for="status" class="stu-label">Status</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="">All</option>
+                            <?php foreach ($statuses as $status): ?>
+                                <option value="<?php echo htmlspecialchars($status); ?>"
+                                        <?php echo (isset($filters['status']) && $filters['status'] === $status) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($status); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
+                    <div class="col-6 col-md-4 col-lg-2 stu-field">
+                        <label for="gender" class="stu-label">Gender</label>
+                        <select class="form-select" id="gender" name="gender">
+                            <option value="">All</option>
+                            <?php foreach ($genders as $gender): ?>
+                                <option value="<?php echo htmlspecialchars($gender); ?>"
+                                        <?php echo (isset($filters['gender']) && $filters['gender'] === $gender) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($gender); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-4 col-lg-2 stu-field">
+                        <label for="academic_year" class="stu-label">Academic year</label>
+                        <select class="form-select" id="academic_year" name="academic_year">
+                            <option value="">All</option>
+                            <?php foreach ($academicYears as $year): ?>
+                                <option value="<?php echo htmlspecialchars($year); ?>"
+                                        <?php echo (isset($filters['academic_year']) && $filters['academic_year'] === $year) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($year); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-4 col-lg-2 stu-field">
+                        <label for="course_mode" class="stu-label">Mode</label>
+                        <select class="form-select" id="course_mode" name="course_mode">
+                            <option value="">All</option>
+                            <option value="Full" <?php echo (isset($filters['course_mode']) && $filters['course_mode'] === 'Full') ? 'selected' : ''; ?>>Full Time</option>
+                            <option value="Part" <?php echo (isset($filters['course_mode']) && $filters['course_mode'] === 'Part') ? 'selected' : ''; ?>>Part Time</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 col-lg-3 stu-field">
+                        <label for="department_id" class="stu-label">Department</label>
+                        <select class="form-select" id="department_id" name="department_id">
+                            <option value="">All departments</option>
+                            <?php foreach ($departments as $dept): ?>
+                                <option value="<?php echo htmlspecialchars($dept['department_id']); ?>"
+                                        <?php echo (isset($filters['department_id']) && $filters['department_id'] === $dept['department_id']) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($dept['department_name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-6 col-lg-3 stu-field">
+                        <label for="course_id" class="stu-label">Course</label>
+                        <select class="form-select" id="course_id" name="course_id">
+                            <option value="">All courses</option>
+                            <?php foreach ($courses as $course): ?>
+                                <option value="<?php echo htmlspecialchars($course['course_id']); ?>"
+                                        data-department-id="<?php echo htmlspecialchars($course['department_id']); ?>"
+                                        <?php echo (isset($filters['course_id']) && $filters['course_id'] === $course['course_id']) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($course['course_name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-6 col-lg-3 stu-field">
+                        <label for="group_id" class="stu-label">Group</label>
+                        <select class="form-select" id="group_id" name="group_id">
+                            <option value="">All groups</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 col-lg-3 stu-field">
+                        <label for="district" class="stu-label">District</label>
+                        <select class="form-select" id="district" name="district">
+                            <option value="">All districts</option>
+                            <?php foreach ($districts as $district): ?>
+                                <option value="<?php echo htmlspecialchars($district); ?>"
+                                        <?php echo (isset($filters['district']) && $filters['district'] === $district) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($district); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <div class="stu-prov-bar">
+                            <label class="stu-label mb-0">Provinces</label>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary" id="filterProvAll">Select all</button>
+                                <button type="button" class="btn btn-outline-secondary" id="filterProvNone">Clear</button>
+                            </div>
+                        </div>
+                        <div class="stu-prov-grid" id="filterProvinceBox">
+                            <?php foreach (($provinces ?? []) as $provinceName):
+                                $provKey = strtolower(trim(preg_replace('/\s+province$/i', '', (string) $provinceName) ?? ''));
+                                $provId = 'filter_prov_' . preg_replace('/[^A-Za-z0-9]+/', '_', (string) $provinceName);
+                                $checked = isset($selectedProvinceKeys[$provKey]);
+                            ?>
+                            <label class="stu-chip" for="<?php echo htmlspecialchars($provId); ?>">
+                                <input class="filter-province" type="checkbox"
+                                       name="provinces[]"
+                                       value="<?php echo htmlspecialchars((string) $provinceName); ?>"
+                                       id="<?php echo htmlspecialchars($provId); ?>"
+                                       <?php echo $checked ? 'checked' : ''; ?>>
+                                <span><?php echo htmlspecialchars((string) $provinceName); ?></span>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+                <div class="stu-filter-foot">
+                    <p class="stu-hint">Leave provinces empty to include every province.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="<?php echo APP_URL; ?>/students" class="stu-btn stu-btn-ghost">Clear</a>
+                        <button type="submit" class="stu-btn stu-btn-primary">
+                            <i class="fas fa-filter"></i>Apply filters
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="stu-meta">
+        <div>
+            <div class="stu-count">
+                Showing <strong><?php echo count($students); ?></strong> of <strong><?php echo number_format($total); ?></strong> students
+            </div>
+            <div class="stu-note">Select rows to use with Envelopes / Name list from Tools.</div>
+        </div>
+        <?php if ($hasActiveFilters): ?>
+        <a href="<?php echo APP_URL; ?>/students" class="stu-btn stu-btn-ghost" style="padding:.3rem .7rem; font-size:.78rem;">
+            <i class="fas fa-times-circle"></i>Clear filters
+        </a>
+        <?php endif; ?>
+    </div>
+
+    <div class="stu-panel" style="margin-bottom:0;">
+        <?php if (!empty($students)): ?>
+            <div class="stu-table-wrap">
+                <table class="stu-table">
+                    <thead>
+                        <tr>
+                            <?php if (!empty($canExport)): ?>
+                            <th style="width:40px;"><input type="checkbox" class="form-check-input" id="envSelectAll" title="Select all on this page"></th>
+                            <?php endif; ?>
+                            <th style="width:56px;">No</th>
+                            <th style="width:72px;">Photo</th>
+                            <th>Student ID</th>
+                            <th>Full name</th>
+                            <th>Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $rowNumber = (($currentPage - 1) * 20) + 1;
+                        require_once BASE_PATH . '/models/StudentModel.php';
+                        $studentModelHelper = new StudentModel();
+
+                        foreach ($students as $student):
+                            $profileImageUrl = $studentModelHelper->getProfileImagePath($student);
+                            $waDigits = StudentModel::digitsForWhatsAppMe($student);
+                            $statusClass = $student['student_status'] === 'Active' ? 'ok' : ($student['student_status'] === 'Graduated' ? 'info' : 'warn');
+                        ?>
                             <tr>
                                 <?php if (!empty($canExport)): ?>
-                                <th style="width: 40px;"><input type="checkbox" class="form-check-input" id="envSelectAll" title="Select all on this page"></th>
+                                <td><input type="checkbox" class="form-check-input env-select" value="<?php echo htmlspecialchars($student['student_id']); ?>" title="Select student"></td>
                                 <?php endif; ?>
-                                <th class="fw-bold" style="width: 60px;">No</th>
-                                <th class="fw-bold" style="width: 80px;">Photo</th>
-                                <th class="fw-bold">Student ID</th>
-                                <th class="fw-bold">Full Name</th>
-                                <th class="fw-bold">Status</th>
-                                <th class="fw-bold text-end">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php 
-                            $rowNumber = (($currentPage - 1) * 20) + 1; // Calculate row number based on pagination
-                            require_once BASE_PATH . '/models/StudentModel.php';
-                            $studentModelHelper = new StudentModel();
-                            
-                            foreach ($students as $student): 
-                                $profileImageUrl = $studentModelHelper->getProfileImagePath($student);
-                                $waDigits = StudentModel::digitsForWhatsAppMe($student);
-                            ?>
-                                <tr>
-                                    <?php if (!empty($canExport)): ?>
-                                    <td><input type="checkbox" class="form-check-input env-select" value="<?php echo htmlspecialchars($student['student_id']); ?>" title="Select student"></td>
+                                <td class="text-muted"><?php echo $rowNumber++; ?></td>
+                                <td>
+                                    <?php if ($profileImageUrl): ?>
+                                        <img src="<?php echo htmlspecialchars($profileImageUrl); ?>"
+                                             alt="<?php echo htmlspecialchars($student['student_fullname']); ?>"
+                                             class="stu-avatar">
+                                    <?php else: ?>
+                                        <div class="stu-avatar-fallback"><i class="fas fa-user"></i></div>
                                     <?php endif; ?>
-                                    <td class="text-muted"><?php echo $rowNumber++; ?></td>
-                                    <td>
-                                        <?php if ($profileImageUrl): ?>
-                                            <img src="<?php echo htmlspecialchars($profileImageUrl); ?>" 
-                                                 alt="<?php echo htmlspecialchars($student['student_fullname']); ?>" 
-                                                 class="rounded-circle" 
-                                                 style="width: 40px; height: 40px; object-fit: cover; border: 2px solid #dee2e6;">
-                                        <?php else: ?>
-                                            <div class="rounded-circle bg-light d-flex align-items-center justify-content-center" 
-                                                 style="width: 40px; height: 40px; border: 2px solid #dee2e6;">
-                                                <i class="fas fa-user text-muted"></i>
-                                            </div>
+                                </td>
+                                <td><span class="stu-id"><?php echo htmlspecialchars($student['student_id']); ?></span></td>
+                                <td><span class="stu-name"><?php echo htmlspecialchars($student['student_fullname']); ?></span></td>
+                                <td>
+                                    <span class="stu-status <?php echo $statusClass; ?>">
+                                        <?php echo htmlspecialchars($student['student_status']); ?>
+                                    </span>
+                                </td>
+                                <td class="text-end students-actions">
+                                    <div class="btn-group" role="group">
+                                        <a href="<?php echo APP_URL; ?>/students/view?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-primary" title="View">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <?php if ($waDigits !== null): ?>
+                                        <a href="<?php echo htmlspecialchars('https://wa.me/' . $waDigits, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-wa-outline" target="_blank" rel="noopener noreferrer"
+                                           title="WhatsApp chat — <?php echo htmlspecialchars($waDigits, ENT_QUOTES, 'UTF-8'); ?>">
+                                            <i class="fab fa-whatsapp" aria-hidden="true"></i>
+                                        </a>
                                         <?php endif; ?>
-                                    </td>
-                                    <td><span class="fw-semibold text-primary"><?php echo htmlspecialchars($student['student_id']); ?></span></td>
-                                    <td><?php echo htmlspecialchars($student['student_fullname']); ?></td>
-                                    <td>
-                                        <span class="badge bg-<?php echo $student['student_status'] === 'Active' ? 'success' : ($student['student_status'] === 'Graduated' ? 'info' : 'warning'); ?> rounded-pill px-3 py-2">
-                                            <i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i>
-                                            <?php echo htmlspecialchars($student['student_status']); ?>
-                                        </span>
-                                    </td>
-                                    <td class="text-end students-actions">
-                                        <div class="btn-group" role="group">
-                                            <a href="<?php echo APP_URL; ?>/students/view?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-primary" title="View">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                            <?php if ($waDigits !== null): ?>
-                                            <a href="<?php echo htmlspecialchars('https://wa.me/' . $waDigits, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-wa-outline" target="_blank" rel="noopener noreferrer"
-                                               title="WhatsApp chat — <?php echo htmlspecialchars($waDigits, ENT_QUOTES, 'UTF-8'); ?>">
-                                                <i class="fab fa-whatsapp" aria-hidden="true"></i>
-                                            </a>
-                                            <?php endif; ?>
-                                            <?php if (!empty($isADM)): ?>
-                                            <a href="<?php echo APP_URL; ?>/students/id-card?student_id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-primary" title="Preview ID Card">
-                                                <i class="fas fa-id-card"></i>
-                                            </a>
-                                            <?php endif; ?>
-                                            <?php if (isset($canEdit) && $canEdit): ?>
-                                            <a href="<?php echo APP_URL; ?>/students/edit?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-primary" title="Edit">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            <?php 
-                                            // Build delete URL with current filters
-                                            $deleteUrl = APP_URL . '/students/delete?id=' . urlencode($student['student_id']);
-                                            if (!empty($filters)) {
-                                                $filterParams = [];
-                                                foreach ($filters as $key => $value) {
-                                                    if (!empty($value) && $key !== 'page') {
-                                                        $filterParams[$key] = $value;
-                                                    }
-                                                }
-                                                if (!empty($filterParams)) {
-                                                    $deleteUrl .= '&' . http_build_query($filterParams);
+                                        <?php if (!empty($isADM)): ?>
+                                        <a href="<?php echo APP_URL; ?>/students/id-card?student_id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-primary" title="Preview ID Card">
+                                            <i class="fas fa-id-card"></i>
+                                        </a>
+                                        <?php endif; ?>
+                                        <?php if (isset($canEdit) && $canEdit): ?>
+                                        <a href="<?php echo APP_URL; ?>/students/edit?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-primary" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <?php
+                                        $deleteUrl = APP_URL . '/students/delete?id=' . urlencode($student['student_id']);
+                                        if (!empty($filters)) {
+                                            $filterParams = [];
+                                            foreach ($filters as $key => $value) {
+                                                if (!empty($value) && $key !== 'page') {
+                                                    $filterParams[$key] = $value;
                                                 }
                                             }
-                                            ?>
-                                            <a href="<?php echo $deleteUrl; ?>" class="btn btn-outline-danger" onclick="return confirm('Are you sure you want to delete this student?');" title="Delete">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
-                                            <?php endif; ?>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
+                                            if (!empty($filterParams)) {
+                                                $deleteUrl .= '&' . http_build_query($filterParams);
+                                            }
+                                        }
+                                        ?>
+                                        <a href="<?php echo $deleteUrl; ?>" class="btn btn-outline-danger" onclick="return confirm('Are you sure you want to delete this student?');" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
 
-                <?php if ($totalPages > 1): ?>
-                    <?php
-                    // Helper function to build query string with all filters
+            <?php if ($totalPages > 1): ?>
+                <?php
+                if (!function_exists('buildPaginationQuery')) {
                     function buildPaginationQuery($page, $filters) {
                         $params = ['page' => $page];
-                        // Include all filter parameters
                         if (!empty($filters['search'])) $params['search'] = $filters['search'];
                         if (!empty($filters['status'])) $params['status'] = $filters['status'];
                         if (!empty($filters['district'])) $params['district'] = $filters['district'];
@@ -350,77 +419,71 @@ $staff_whatsapp_header = isset($staff_whatsapp_header) && is_array($staff_whatsa
                         if (!empty($filters['academic_year'])) $params['academic_year'] = $filters['academic_year'];
                         if (!empty($filters['course_mode'])) $params['course_mode'] = $filters['course_mode'];
                         if (!empty($filters['group_id'])) $params['group_id'] = $filters['group_id'];
+                        if (!empty($filters['provinces']) && is_array($filters['provinces'])) {
+                            $params['provinces'] = array_values($filters['provinces']);
+                        }
                         return '?' . http_build_query($params);
                     }
-                    ?>
-                    <div class="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-3">
-                        <div class="text-muted small">
-                            Page <strong><?php echo $currentPage; ?></strong> of <strong><?php echo $totalPages; ?></strong>
-                        </div>
-                        <nav aria-label="Page navigation">
-                            <ul class="pagination pagination-sm mb-0">
-                                <?php if ($currentPage > 1): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="<?php echo buildPaginationQuery($currentPage - 1, $filters); ?>">
-                                            <i class="fas fa-chevron-left"></i> Previous
-                                        </a>
-                                    </li>
+                }
+                $startPage = max(1, $currentPage - 2);
+                $endPage = min($totalPages, $currentPage + 2);
+                ?>
+                <div class="stu-pager">
+                    <div class="stu-note">Page <strong><?php echo $currentPage; ?></strong> of <strong><?php echo $totalPages; ?></strong></div>
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination pagination-sm mb-0">
+                            <?php if ($currentPage > 1): ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="<?php echo buildPaginationQuery($currentPage - 1, $filters); ?>">
+                                        <i class="fas fa-chevron-left"></i> Previous
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                            <?php if ($startPage > 1): ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="<?php echo buildPaginationQuery(1, $filters); ?>">1</a>
+                                </li>
+                                <?php if ($startPage > 2): ?>
+                                    <li class="page-item disabled"><span class="page-link">...</span></li>
                                 <?php endif; ?>
-                                
-                                <?php
-                                // Show page numbers with ellipsis for large page counts
-                                $startPage = max(1, $currentPage - 2);
-                                $endPage = min($totalPages, $currentPage + 2);
-                                
-                                if ($startPage > 1): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="<?php echo buildPaginationQuery(1, $filters); ?>">1</a>
-                                    </li>
-                                    <?php if ($startPage > 2): ?>
-                                        <li class="page-item disabled"><span class="page-link">...</span></li>
-                                    <?php endif; ?>
+                            <?php endif; ?>
+                            <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
+                                <li class="page-item <?php echo $i == $currentPage ? 'active' : ''; ?>">
+                                    <a class="page-link" href="<?php echo buildPaginationQuery($i, $filters); ?>"><?php echo $i; ?></a>
+                                </li>
+                            <?php endfor; ?>
+                            <?php if ($endPage < $totalPages): ?>
+                                <?php if ($endPage < $totalPages - 1): ?>
+                                    <li class="page-item disabled"><span class="page-link">...</span></li>
                                 <?php endif; ?>
-                                
-                                <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
-                                    <li class="page-item <?php echo $i == $currentPage ? 'active' : ''; ?>">
-                                        <a class="page-link" href="<?php echo buildPaginationQuery($i, $filters); ?>">
-                                            <?php echo $i; ?>
-                                        </a>
-                                    </li>
-                                <?php endfor; ?>
-                                
-                                <?php if ($endPage < $totalPages): ?>
-                                    <?php if ($endPage < $totalPages - 1): ?>
-                                        <li class="page-item disabled"><span class="page-link">...</span></li>
-                                    <?php endif; ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="<?php echo buildPaginationQuery($totalPages, $filters); ?>"><?php echo $totalPages; ?></a>
-                                    </li>
-                                <?php endif; ?>
-                                
-                                <?php if ($currentPage < $totalPages): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="<?php echo buildPaginationQuery($currentPage + 1, $filters); ?>">
-                                            Next <i class="fas fa-chevron-right"></i>
-                                        </a>
-                                    </li>
-                                <?php endif; ?>
-                            </ul>
-                        </nav>
-                    </div>
-                <?php endif; ?>
-            <?php else: ?>
-                <div class="text-center py-5">
-                    <i class="fas fa-user-slash fa-3x text-muted mb-3"></i>
-                    <p class="text-muted mb-3">No students found. <?php if (!empty($search)): ?>Try a different search term.<?php endif; ?></p>
-                    <?php if (empty($search)): ?>
-                        <a href="<?php echo APP_URL; ?>/students/create" class="btn btn-primary">
-                            <i class="fas fa-plus me-1"></i>Create one now
-                        </a>
-                    <?php endif; ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="<?php echo buildPaginationQuery($totalPages, $filters); ?>"><?php echo $totalPages; ?></a>
+                                </li>
+                            <?php endif; ?>
+                            <?php if ($currentPage < $totalPages): ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="<?php echo buildPaginationQuery($currentPage + 1, $filters); ?>">
+                                        Next <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                        </ul>
+                    </nav>
                 </div>
             <?php endif; ?>
-        </div>
+        <?php else: ?>
+            <div class="stu-empty">
+                <i class="fas fa-user-slash d-block"></i>
+                <p class="mb-3">No students match these filters.<?php if (!empty($filters['search'])): ?> Try a different search term.<?php endif; ?></p>
+                <?php if (isset($canEdit) && $canEdit && empty($filters['search'])): ?>
+                    <a href="<?php echo APP_URL; ?>/students/create" class="stu-btn stu-btn-primary">
+                        <i class="fas fa-plus"></i>Add student
+                    </a>
+                <?php elseif ($hasActiveFilters): ?>
+                    <a href="<?php echo APP_URL; ?>/students" class="stu-btn stu-btn-ghost">Clear filters</a>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -433,7 +496,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectedGroupId = '<?php echo htmlspecialchars($filters['group_id'] ?? ''); ?>';
     
     // Store all course options
-    const allCourseOptions = Array.from(courseSelect.options).slice(1); // Exclude "All Courses"
+    const allCourseOptions = courseSelect ? Array.from(courseSelect.options).slice(1) : []; // Exclude "All Courses"
     
     // Load groups by course and academic year
     function loadFilterGroups() {
@@ -459,6 +522,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Function to filter courses by department
     function filterCoursesByDepartment(departmentId) {
+        if (!courseSelect) return;
         // Clear current options except "All Courses"
         courseSelect.innerHTML = '<option value="">All Courses</option>';
         
@@ -494,23 +558,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Handle department change - live filter
-    departmentSelect.addEventListener('change', function() {
-        const selectedDepartmentId = this.value;
-        filterCoursesByDepartment(selectedDepartmentId);
-        loadFilterGroups();
-    });
-    
+    if (departmentSelect) {
+        departmentSelect.addEventListener('change', function() {
+            filterCoursesByDepartment(this.value);
+            loadFilterGroups();
+        });
+        if (departmentSelect.value) {
+            filterCoursesByDepartment(departmentSelect.value);
+        }
+    }
+
     // Handle course and academic year change - load groups
     if (courseSelect && academicYearSelect) {
         courseSelect.addEventListener('change', loadFilterGroups);
         academicYearSelect.addEventListener('change', loadFilterGroups);
     }
-    
-    // Initialize on page load if department is already selected
-    const initialDept = departmentSelect.value;
-    if (initialDept) {
-        filterCoursesByDepartment(initialDept);
-    }
+
     loadFilterGroups();
 });
 </script>
@@ -957,6 +1020,22 @@ document.addEventListener('DOMContentLoaded', function() {
             if (courseSelect.selectedOptions[0] && courseSelect.selectedOptions[0].hidden) {
                 courseSelect.value = '';
             }
+        });
+    }
+
+    var filterProvAll = document.getElementById('filterProvAll');
+    var filterProvNone = document.getElementById('filterProvNone');
+    function filterProvinceBoxes() {
+        return Array.prototype.slice.call(document.querySelectorAll('.filter-province'));
+    }
+    if (filterProvAll) {
+        filterProvAll.addEventListener('click', function() {
+            filterProvinceBoxes().forEach(function(cb) { cb.checked = true; });
+        });
+    }
+    if (filterProvNone) {
+        filterProvNone.addEventListener('click', function() {
+            filterProvinceBoxes().forEach(function(cb) { cb.checked = false; });
         });
     }
 

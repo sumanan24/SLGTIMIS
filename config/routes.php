@@ -68,6 +68,8 @@ return [
     'students/calling-letters' => 'StudentController@callingLetters',
     'students/bulk-sms' => 'StudentController@bulkSms',
     'students/intake-checklist' => 'StudentController@intakeChecklist',
+    'students/registration-checklist' => 'StudentRegistrationChecklistController@index',
+    'students/registration-checklist/form' => 'StudentRegistrationChecklistController@form',
     // Student ID card (ADM only)
     'students/id-card-select' => 'StudentController@idCardSelect',
     'students/id-card' => 'StudentController@idCard',

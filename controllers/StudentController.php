@@ -680,6 +680,15 @@ class StudentController extends Controller {
         $userDepartmentId = $this->getUserDepartment();
         $isDepartmentRestricted = $this->isDepartmentRestricted();
         
+        $provinceRaw = $this->get('provinces', []);
+        if (!is_array($provinceRaw)) {
+            $provinceRaw = trim((string) $provinceRaw) === '' ? [] : [trim((string) $provinceRaw)];
+        }
+        $provinceRaw = array_values(array_filter(array_map(
+            static fn ($v) => trim((string) $v),
+            $provinceRaw
+        ), 'strlen'));
+
         // HOD, IN1, IN2, IN3: locked to own department + Active; allow search and enrollment filters (year, course, mode, group); ignore district/gender
         if ($isDepartmentRestricted) {
             $filters = [
@@ -693,6 +702,7 @@ class StudentController extends Controller {
                 'academic_year' => $this->get('academic_year', ''),
                 'course_mode' => $this->get('course_mode', ''),
                 'group_id' => $this->get('group_id', ''),
+                'provinces' => $provinceRaw,
                 'current_enrollment' => true
             ];
         } else {
@@ -706,6 +716,7 @@ class StudentController extends Controller {
                 'academic_year' => $this->get('academic_year', ''),
                 'course_mode' => $this->get('course_mode', ''),
                 'group_id' => $this->get('group_id', ''),
+                'provinces' => $provinceRaw,
                 'current_enrollment' => true
             ];
         }
@@ -4929,7 +4940,7 @@ class StudentController extends Controller {
 
     /**
      * @param array{academic_year?:string,department_id?:string,course_id?:string,status?:string,current_enrollment?:bool} $filters
-     * @return list<array{student_id:string,name:string,department:string,course:string,academic_year:string,token:string}>
+     * @return list<array<string,mixed>>
      */
     private function intakeChecklistRows(array $filters): array {
         $year = trim((string) ($filters['academic_year'] ?? ''));
@@ -4937,9 +4948,12 @@ class StudentController extends Controller {
             return [];
         }
 
+        require_once BASE_PATH . '/models/StudentRegistrationChecklistModel.php';
+
         $db = Database::getInstance();
         $sql = "SELECT DISTINCT s.`student_id`, s.`student_title`, s.`student_fullname`, s.`student_ininame`,
-                       se.`academic_year`, c.`course_name`, d.`department_name`
+                       s.`student_nic`, s.`student_phone`, s.`student_whatsapp`, s.`student_address`, s.`student_provice`,
+                       se.`academic_year`, c.`course_name`, c.`course_nvq_level`, d.`department_name`
                 FROM `student` s
                 INNER JOIN `student_enroll` se ON se.`student_id` = s.`student_id`
                 LEFT JOIN `course` c ON c.`course_id` = se.`course_id`
@@ -4992,13 +5006,29 @@ class StudentController extends Controller {
             $title = trim((string) ($r['student_title'] ?? ''));
             $fullname = trim((string) ($r['student_fullname'] ?? ''));
             $name = trim($title . ' ' . $fullname);
+            $phone = trim((string) ($r['student_whatsapp'] ?? ''));
+            if ($phone === '') {
+                $phone = trim((string) ($r['student_phone'] ?? ''));
+            }
+            $province = trim((string) ($r['student_provice'] ?? ''));
+            $feeInfo = StudentRegistrationChecklistModel::calculateFee(
+                $province,
+                (string) ($r['course_nvq_level'] ?? '')
+            );
             $rows[] = [
                 'student_id' => $sid,
                 'name' => $name,
+                'nic' => trim((string) ($r['student_nic'] ?? '')),
+                'phone' => $phone,
+                'address' => trim((string) ($r['student_address'] ?? '')),
+                'province' => $province,
                 'department' => trim((string) ($r['department_name'] ?? '')),
                 'course' => trim((string) ($r['course_name'] ?? '')),
+                'nvq' => $feeInfo['nvq'],
+                'is_northern' => $feeInfo['is_northern'],
+                'applicable_fee' => $feeInfo['applicable_fee'],
+                'fee_category' => $feeInfo['category'],
                 'academic_year' => trim((string) ($r['academic_year'] ?? $year)),
-                // No dedicated token column in MIS — left blank on the PDF for handwriting.
                 'token' => '',
             ];
         }
@@ -5027,24 +5057,38 @@ class StudentController extends Controller {
             return;
         }
 
-        $ids = $this->post('student_ids', []);
-        $ids = is_array($ids)
-            ? array_values(array_unique(array_filter(array_map('trim', array_map('strval', $ids)), 'strlen')))
-            : [];
-        if ($ids === []) {
-            $_SESSION['error'] = 'Select at least one student.';
+        $allowRows = $this->intakeChecklistRows($filters);
+        if ($allowRows === []) {
+            $_SESSION['error'] = 'No matching students found for the selected criteria.';
             $this->redirect($back);
             return;
         }
 
+        $downloadAll = (string) $this->post('download_all', '') === '1';
+        $ids = $this->post('student_ids', []);
+        $ids = is_array($ids)
+            ? array_values(array_unique(array_filter(array_map('trim', array_map('strval', $ids)), 'strlen')))
+            : [];
+
         $allow = [];
-        foreach ($this->intakeChecklistRows($filters) as $row) {
+        foreach ($allowRows as $row) {
             $allow[(string) $row['student_id']] = $row;
         }
+
         $selected = [];
-        foreach ($ids as $id) {
-            if (isset($allow[$id])) {
-                $selected[] = $allow[$id];
+        if ($downloadAll) {
+            // Bulk by academic year / filters: every matching student
+            $selected = array_values($allow);
+        } else {
+            if ($ids === []) {
+                $_SESSION['error'] = 'Select at least one student, or use Download all PDF.';
+                $this->redirect($back);
+                return;
+            }
+            foreach ($ids as $id) {
+                if (isset($allow[$id])) {
+                    $selected[] = $allow[$id];
+                }
             }
         }
         if ($selected === []) {
