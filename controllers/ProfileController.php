@@ -264,6 +264,10 @@ class ProfileController extends Controller {
 
             $_SESSION['user_name'] = $userName;
             $_SESSION['user_email'] = $userEmail;
+            if ($newPasswordHash !== null && $newPassword !== '') {
+                require_once BASE_PATH . '/helpers/SisLdap.php';
+                SisLdap::syncPasswordForUserId((int) $userId, $newPassword);
+            }
 
             $this->logActivity('UPDATE', 'profile', (string) $userId, 'Profile updated by the user ('
                 . $userName . ')' . ($newPasswordHash !== null ? ', password changed' : ''), null, null);

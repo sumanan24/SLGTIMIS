@@ -197,6 +197,8 @@ class AdminController extends Controller {
             $result = $userModel->resetPassword($userId, $passwordHash, $_SESSION['user_id']);
             
             if ($result) {
+                require_once BASE_PATH . '/helpers/SisLdap.php';
+                SisLdap::syncPasswordForUserId((int) $userId, (string) $newPassword);
                 // Log the action
                 $activityLogger->log(
                     'password_reset',
@@ -482,6 +484,64 @@ class AdminController extends Controller {
             'page' => 'admin-sms-gateway',
             'csrf_token' => (string) $_SESSION['sms_test_csrf'],
             'results' => $results,
+            'error' => $error,
+        ]);
+    }
+
+    /**
+     * Active SIS accounts and their EDUROAM LDAP status.
+     */
+    public function ldapSync() {
+        if (!$this->checkAdmin()) {
+            return;
+        }
+        require_once BASE_PATH . '/helpers/SisLdap.php';
+
+        $message = $_SESSION['message'] ?? null;
+        $error = $_SESSION['error'] ?? null;
+        unset($_SESSION['message'], $_SESSION['error']);
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $result = SisLdap::addMissingAccounts();
+            if (($result['errors'] ?? 0) > 0 && ($result['added'] ?? 0) === 0 && ($result['present'] ?? 0) === 0) {
+                $_SESSION['error'] = (string) ($result['message'] ?? 'LDAP sync failed.');
+            } else {
+                $_SESSION['message'] = (string) ($result['message'] ?? 'Sync finished.');
+            }
+            $keep = array_filter([
+                'q' => (string) $this->get('q', ''),
+                'type' => (string) $this->get('type', ''),
+                'department' => (string) $this->get('department', ''),
+                'status' => (string) $this->get('status', ''),
+                'page' => (string) $this->get('page', ''),
+            ], static function ($v) {
+                return $v !== '';
+            });
+            $this->redirect('admin/ldap-sync' . ($keep === [] ? '' : '?' . http_build_query($keep)));
+            return;
+        }
+
+        $filters = [
+            'q' => trim((string) $this->get('q', '')),
+            'type' => strtolower(trim((string) $this->get('type', ''))),
+            'department' => trim((string) $this->get('department', '')),
+            'status' => strtolower(trim((string) $this->get('status', ''))),
+        ];
+        $page = max(1, (int) $this->get('page', 1));
+        $monitor = SisLdap::monitor($filters, $page);
+
+        return $this->view('admin/ldap-sync', [
+            'title' => 'EDUROAM LDAP sync',
+            'page' => 'admin-ldap-sync',
+            'filters' => $filters,
+            'rows' => $monitor['rows'],
+            'counts' => $monitor['counts'],
+            'departments' => $monitor['departments'],
+            'pageNo' => $monitor['page'],
+            'pages' => $monitor['pages'],
+            'filtered' => $monitor['filtered'],
+            'ldapError' => $monitor['ldap_error'],
+            'message' => $message,
             'error' => $error,
         ]);
     }

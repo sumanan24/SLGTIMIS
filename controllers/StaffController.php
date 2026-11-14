@@ -85,6 +85,8 @@ class StaffController extends Controller {
             $stmt->bind_param('ss', $hash, $staffId);
             $ok = $stmt->execute();
             if ($ok && $stmt->affected_rows > 0) {
+                require_once BASE_PATH . '/helpers/SisLdap.php';
+                SisLdap::syncPassword((string) $staffId, self::DEFAULT_STAFF_PASSWORD);
                 return true;
             }
             if (!$ok) {
@@ -95,7 +97,12 @@ class StaffController extends Controller {
             $check->bind_param('s', $staffId);
             $check->execute();
             $res = $check->get_result();
-            return $res && $res->num_rows > 0;
+            if ($res && $res->num_rows > 0) {
+                require_once BASE_PATH . '/helpers/SisLdap.php';
+                SisLdap::syncPassword((string) $staffId, self::DEFAULT_STAFF_PASSWORD);
+                return true;
+            }
+            return false;
         } catch (Throwable $e) {
             error_log('StaffController::setDefaultStaffPassword - ' . $e->getMessage());
             return false;

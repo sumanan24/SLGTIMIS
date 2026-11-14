@@ -1010,6 +1010,12 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                             <span>SMS Gateway Test</span>
                                         </a>
                                     </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/admin/ldap-sync" class="<?php echo (isset($page) && $page === 'admin-ldap-sync') ? 'active' : ''; ?>">
+                                            <i class="fas fa-wifi"></i>
+                                            <span>EDUROAM LDAP</span>
+                                        </a>
+                                    </li>
                                     <?php endif; ?>
                                 </ul>
                             </li>

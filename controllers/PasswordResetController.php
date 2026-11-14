@@ -343,6 +343,8 @@ class PasswordResetController extends Controller {
 
             $this->otpModel()->invalidateAllForUser($userId);
             $db->commit();
+            require_once BASE_PATH . '/helpers/SisLdap.php';
+            SisLdap::syncPasswordForUserId((int) $userId, $newPassword);
         } catch (Throwable $e) {
             try {
                 $db->rollback();

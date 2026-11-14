@@ -98,6 +98,8 @@ class AccountController extends Controller {
                 return;
             }
 
+            require_once BASE_PATH . '/helpers/SisLdap.php';
+            SisLdap::syncPasswordForUserId((int) $userId, $new);
             $this->logActivity('UPDATE', 'user_password', (string) $userId, 'Password changed after first login / reset', null, null);
             $_SESSION['message'] = 'Password changed. Welcome!';
             $this->redirect($userModel->isHOD($userId) ? 'hod/dashboard' : 'dashboard');

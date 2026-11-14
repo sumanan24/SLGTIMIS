@@ -355,6 +355,11 @@ class AdmissionRegistrationService {
             $db->commit();
 
             $this->students->syncUserActiveWithStudentStatus($studentId);
+            require_once BASE_PATH . '/helpers/SisLdap.php';
+            SisLdap::addIfMissing(
+                (string) $account['username'],
+                !empty($account['created']) ? $nic : null
+            );
 
             return [
                 'ok' => true,

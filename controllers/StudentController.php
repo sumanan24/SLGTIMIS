@@ -169,6 +169,8 @@ class StudentController extends Controller {
             $update->bind_param('si', $newHash, $_SESSION['user_id']);
             $update->execute();
             $userModel->clearMustChangePassword((int) $_SESSION['user_id']);
+            require_once BASE_PATH . '/helpers/SisLdap.php';
+            SisLdap::syncPasswordForUserId((int) $_SESSION['user_id'], $newPassword);
 
             $_SESSION['message'] = 'Password changed successfully. Please complete your personal and parent details.';
             require_once BASE_PATH . '/helpers/StudentPortalGuard.php';
@@ -2705,6 +2707,8 @@ class StudentController extends Controller {
                 $updateStmt = $db->prepare("UPDATE `user` SET user_password_hash = ? WHERE user_id = ?");
                 $updateStmt->bind_param("si", $hashedPassword, $user['user_id']);
                 $updateStmt->execute();
+                require_once BASE_PATH . '/helpers/SisLdap.php';
+                SisLdap::syncPasswordForUserId((int) $user['user_id'], $newPassword);
                 
                 $_SESSION['message'] = 'Password reset successfully.';
                 $this->redirect('students/view?id=' . urlencode($id));
