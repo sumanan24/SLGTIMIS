@@ -443,6 +443,7 @@ class AccessControl {
         $uri = strtolower(trim((string) $uri, '/'));
         $public = [
             '', 'home', 'login', 'logout',
+            'guidelines', 'guidelines/sinhala', 'guidelines/tamil',
             'forgot-password', 'forgot-password/verify', 'forgot-password/reset',
             'verify/certificate', 'alumni/portal',
             'student-application/api/check-application',
@@ -454,7 +455,7 @@ class AccessControl {
         $prefixes = [
             'student/', 'student-application', 'level04application', 'level05application',
             'application-admission/public', 'application-admission/interview-letter',
-            'devices/qr/',
+            'devices/qr/', 'guidelines/',
         ];
         foreach ($prefixes as $prefix) {
             if ($uri === rtrim($prefix, '/') || strpos($uri, $prefix) === 0) {

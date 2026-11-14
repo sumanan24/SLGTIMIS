@@ -6,6 +6,8 @@
 return [
     '' => 'HomeController@index',
     'home' => 'HomeController@index',
+    'guidelines' => 'HomeController@guidelines',
+    'guidelines/{lang}' => 'HomeController@guidelinesWatch',
     'login' => 'AuthController@login',
     'logout' => 'AuthController@logout',
     'forgot-password' => 'PasswordResetController@requestForm',
@@ -68,6 +70,7 @@ return [
     'students/name-list' => 'StudentController@studentNameList',
     'students/calling-letters' => 'StudentController@callingLetters',
     'students/bulk-sms' => 'StudentController@bulkSms',
+    'students/bulk-sms/update-language' => 'StudentController@bulkSmsUpdateLanguage',
     'students/intake-checklist' => 'StudentController@intakeChecklist',
     'students/registration-checklist' => 'StudentRegistrationChecklistController@index',
     'students/registration-checklist/form' => 'StudentRegistrationChecklistController@form',

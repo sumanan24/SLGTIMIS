@@ -125,6 +125,16 @@ class StudentModel extends Model {
             $params[] = $filters['gender'];
             $types .= 's';
         }
+
+        // Language filter (stored in student_nationality: Sinhala / Tamil / English / other)
+        $language = strtolower(trim((string) ($filters['language'] ?? ($filters['student_nationality'] ?? ''))));
+        if (in_array($language, ['sinhala', 'tamil', 'english'], true)) {
+            $conditions[] = "LOWER(TRIM(IFNULL(s.`student_nationality`, ''))) = ?";
+            $params[] = $language;
+            $types .= 's';
+        } elseif ($language === 'other' || $language === 'others') {
+            $conditions[] = "(TRIM(IFNULL(s.`student_nationality`, '')) = '' OR LOWER(TRIM(s.`student_nationality`)) NOT IN ('sinhala', 'tamil', 'english'))";
+        }
         
         // Department filter
         if (!empty($filters['department_id'])) {
@@ -340,6 +350,16 @@ class StudentModel extends Model {
             $conditions[] = "s.student_gender = ?";
             $params[] = $filters['gender'];
             $types .= 's';
+        }
+
+        // Language filter (stored in student_nationality: Sinhala / Tamil / English / other)
+        $language = strtolower(trim((string) ($filters['language'] ?? ($filters['student_nationality'] ?? ''))));
+        if (in_array($language, ['sinhala', 'tamil', 'english'], true)) {
+            $conditions[] = "LOWER(TRIM(IFNULL(s.`student_nationality`, ''))) = ?";
+            $params[] = $language;
+            $types .= 's';
+        } elseif ($language === 'other' || $language === 'others') {
+            $conditions[] = "(TRIM(IFNULL(s.`student_nationality`, '')) = '' OR LOWER(TRIM(s.`student_nationality`)) NOT IN ('sinhala', 'tamil', 'english'))";
         }
         
         // Department filter

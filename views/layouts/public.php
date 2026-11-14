@@ -27,6 +27,8 @@
             <p class="mb-1 app-form-footer-brand">SLGTI — Sri Lanka German Training Institute</p>
             <?php if (($page ?? '') === 'public-interview-letter'): ?>
             <p class="mb-0 app-form-footer-meta">Contact Student Affairs Office 0703060138 / 021 492 7799</p>
+            <?php elseif (in_array(($page ?? ''), ['guidelines', 'guidelines-watch'], true)): ?>
+            <p class="mb-0 app-form-footer-meta">Guideline videos · &copy; <?php echo date('Y'); ?></p>
             <?php else: ?>
             <p class="mb-0 app-form-footer-meta">SLGTI apply online 2026 · &copy; <?php echo date('Y'); ?></p>
             <?php endif; ?>

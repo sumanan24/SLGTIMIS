@@ -3980,6 +3980,12 @@ class StudentController extends Controller {
     private function bulkSmsFilters(array $src): array {
         $userDepartmentId = $this->getUserDepartment();
         $restricted = $this->isDepartmentRestricted();
+        $language = strtolower(trim((string) ($src['language'] ?? '')));
+        if (!in_array($language, ['sinhala', 'tamil', 'english', 'other', 'others'], true)) {
+            $language = '';
+        } elseif ($language === 'others') {
+            $language = 'other';
+        }
         return [
             'status' => $restricted ? 'Active' : '',
             'department_id' => $restricted
@@ -3987,6 +3993,7 @@ class StudentController extends Controller {
                 : ($userDepartmentId ?: trim((string) ($src['department_id'] ?? ''))),
             'course_id' => trim((string) ($src['course_id'] ?? '')),
             'academic_year' => trim((string) ($src['academic_year'] ?? '')),
+            'language' => $language,
             'current_enrollment' => true,
         ];
     }
@@ -4043,6 +4050,11 @@ class StudentController extends Controller {
         }
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $action = trim((string) $this->post('action', ''));
+            if ($action === 'update_language') {
+                $this->bulkSmsUpdateLanguage();
+                return;
+            }
             $this->bulkSmsSend($sms);
             return;
         }
@@ -4066,12 +4078,27 @@ class StudentController extends Controller {
                 if ($number !== null) {
                     $withNumber++;
                 }
+                $langRaw = trim((string) ($s['student_nationality'] ?? ''));
+                $langKey = strtolower($langRaw);
+                if ($langKey === 'sinhala') {
+                    $langLabel = 'Sinhala';
+                } elseif ($langKey === 'tamil') {
+                    $langLabel = 'Tamil';
+                } elseif ($langKey === 'english') {
+                    $langLabel = 'English';
+                } else {
+                    $langLabel = $langRaw !== '' ? $langRaw : 'Other';
+                }
                 $rows[] = [
                     'student_id' => (string) ($s['student_id'] ?? ''),
                     'name' => trim((string) ($s['student_fullname'] ?? '')),
                     'phone' => trim((string) ($s['student_phone'] ?? '')) !== ''
                         ? trim((string) $s['student_phone'])
                         : trim((string) ($s['student_whatsapp'] ?? '')),
+                    'language' => $langLabel,
+                    'language_value' => $langKey === 'sinhala' ? 'Sinhala'
+                        : ($langKey === 'tamil' ? 'Tamil'
+                        : ($langKey === 'english' ? 'English' : '')),
                     'valid' => $number !== null,
                 ];
             }
@@ -4107,9 +4134,144 @@ class StudentController extends Controller {
             'draft' => (string) ($_SESSION['bulk_sms_draft'] ?? ''),
             'draftNumbers' => (string) ($_SESSION['bulk_sms_numbers'] ?? ''),
             'error' => $_SESSION['error'] ?? null,
+            'message' => $_SESSION['message'] ?? null,
         ];
-        unset($_SESSION['error'], $_SESSION['bulk_sms_draft'], $_SESSION['bulk_sms_numbers']);
+        unset($_SESSION['error'], $_SESSION['message'], $_SESSION['bulk_sms_draft'], $_SESSION['bulk_sms_numbers']);
         return $this->view('students/bulk_sms', $data);
+    }
+
+    /**
+     * Update student language (student_nationality) from Bulk SMS page.
+     * URL: /students/bulk-sms/update-language
+     */
+    public function bulkSmsUpdateLanguage(): void {
+        if (!$this->requireBulkSmsAccess()) {
+            return;
+        }
+
+        $wantsJson = !empty($_SERVER['HTTP_X_REQUESTED_WITH'])
+            || str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json')
+            || (string) $this->post('ajax', '') === '1';
+
+        $filters = $this->bulkSmsFilters($_POST);
+        $back = 'students/bulk-sms?' . http_build_query(array_filter([
+            'academic_year' => $filters['academic_year'],
+            'department_id' => $_POST['department_id'] ?? '',
+            'course_id' => $filters['course_id'],
+            'language' => $filters['language'] ?? '',
+        ], 'strlen'));
+
+        $sent = (string) $this->post('csrf_token', '');
+        if ($sent === '' || !hash_equals((string) ($_SESSION['bulk_sms_csrf'] ?? ''), $sent)) {
+            if ($wantsJson) {
+                $this->json(['success' => false, 'error' => 'Session expired. Refresh and try again.'], 403);
+                return;
+            }
+            $_SESSION['error'] = 'Your session expired. Please try again.';
+            $this->redirect($back);
+            return;
+        }
+
+        $rawLang = trim((string) $this->post('new_language', $this->post('language_value', '')));
+        $map = [
+            'sinhala' => 'Sinhala',
+            'tamil' => 'Tamil',
+            'english' => 'English',
+            '' => '',
+            'other' => '',
+            'others' => '',
+        ];
+        $key = strtolower($rawLang);
+        if (!array_key_exists($key, $map) && !in_array($rawLang, ['Sinhala', 'Tamil', 'English'], true)) {
+            if ($wantsJson) {
+                $this->json(['success' => false, 'error' => 'Invalid language.'], 400);
+                return;
+            }
+            $_SESSION['error'] = 'Choose Sinhala, Tamil, English, or clear (Other).';
+            $this->redirect($back);
+            return;
+        }
+        $newValue = $map[$key] ?? $rawLang;
+
+        $ids = $this->post('student_ids', []);
+        if (!is_array($ids)) {
+            $ids = [];
+        }
+        $single = trim((string) $this->post('student_id', ''));
+        if ($single !== '') {
+            $ids[] = $single;
+        }
+        $ids = array_values(array_unique(array_filter(array_map(
+            static fn ($v) => trim((string) $v),
+            $ids
+        ), 'strlen')));
+
+        if ($ids === []) {
+            if ($wantsJson) {
+                $this->json(['success' => false, 'error' => 'Select at least one student.'], 400);
+                return;
+            }
+            $_SESSION['error'] = 'Select at least one student to update language.';
+            $this->redirect($back);
+            return;
+        }
+
+        if ($filters['academic_year'] === '') {
+            if ($wantsJson) {
+                $this->json(['success' => false, 'error' => 'Academic year is required.'], 400);
+                return;
+            }
+            $_SESSION['error'] = 'Select an academic year first.';
+            $this->redirect($back);
+            return;
+        }
+
+        // Scope: only students in the current filter set (ignore language filter so edits can move out of list)
+        $scopeFilters = $filters;
+        $scopeFilters['language'] = '';
+        $allow = [];
+        foreach ($this->model('StudentModel')->getStudents(1, 100000, $scopeFilters) as $s) {
+            $sid = (string) ($s['student_id'] ?? '');
+            if ($sid !== '') {
+                $allow[$sid] = true;
+            }
+        }
+
+        $studentModel = $this->model('StudentModel');
+        $updated = 0;
+        $skipped = 0;
+        foreach ($ids as $id) {
+            if (!isset($allow[$id])) {
+                $skipped++;
+                continue;
+            }
+            if ($studentModel->update($id, ['student_nationality' => $newValue])) {
+                $updated++;
+            } else {
+                $skipped++;
+            }
+        }
+
+        $label = $newValue !== '' ? $newValue : 'Other (cleared)';
+        if ($wantsJson) {
+            $this->json([
+                'success' => $updated > 0,
+                'updated' => $updated,
+                'skipped' => $skipped,
+                'language' => $label,
+                'language_value' => $newValue,
+            ]);
+            return;
+        }
+
+        if ($updated > 0) {
+            $_SESSION['message'] = 'Language updated to ' . $label . ' for ' . $updated . ' student(s).'
+                . ($skipped > 0 ? ' (' . $skipped . ' skipped.)' : '');
+            $_SESSION['bulk_sms_csrf'] = bin2hex(random_bytes(32));
+        } else {
+            $_SESSION['error'] = 'No student language was updated.';
+        }
+        $this->redirect($back);
     }
 
     private function bulkSmsSend(MobitelSmsService $sms): void {
@@ -4118,6 +4280,7 @@ class StudentController extends Controller {
             'academic_year' => $filters['academic_year'],
             'department_id' => $_POST['department_id'] ?? '',
             'course_id' => $filters['course_id'],
+            'language' => $filters['language'] ?? '',
         ], 'strlen'));
 
         $sent = (string) $this->post('csrf_token', '');

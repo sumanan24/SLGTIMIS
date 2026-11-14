@@ -38,13 +38,17 @@ $withoutNumber = max(0, count($rows) - $withNumber);
 .stu-page .stu-filter-grid { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:.85rem 1rem; align-items:end; }
 .stu-page .stu-span-3 { grid-column:span 3; }
 .stu-page .stu-span-4 { grid-column:span 4; }
-.stu-page .stu-span-auto { grid-column:span 2; }
+.stu-page .stu-span-auto { grid-column:span 3; }
 .stu-page .stu-layout { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(280px,.9fr); gap:1rem; align-items:start; }
 .stu-page .stu-stats { display:flex; flex-wrap:wrap; gap:.4rem; }
 .stu-page .stu-chip { display:inline-flex; align-items:center; gap:.3rem; padding:.22rem .55rem; border-radius:.35rem; font-size:.72rem; font-weight:700; background:#e2e8f0; color:#334155; }
 .stu-page .stu-chip.ok { background:#dcfce7; color:#166534; }
 .stu-page .stu-chip.bad { background:#fee2e2; color:#991b1b; }
 .stu-page .stu-chip.info { background:#dbeafe; color:#1e40af; }
+.stu-page .stu-lang-select { font-size:.78rem; min-height:1.85rem; padding:.15rem .4rem; border-color:#cfd9e6; border-radius:.35rem; max-width:8.5rem; }
+.stu-page .stu-lang-bar { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; padding:.65rem 1rem; background:#fffbeb; border-bottom:1px solid #fde68a; }
+.stu-page .stu-lang-bar .stu-label { margin:0; }
+.stu-page .stu-lang-saving { opacity:.55; pointer-events:none; }
 .stu-page .stu-search { position:relative; min-width:180px; max-width:240px; flex:1; }
 .stu-page .stu-search i { position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:.8rem; pointer-events:none; }
 .stu-page .stu-search .form-control { padding-left:2rem; font-size:.82rem; min-height:2rem; }
@@ -92,6 +96,12 @@ $withoutNumber = max(0, count($rows) - $withNumber);
         </div>
     </div>
 
+    <?php if (!empty($message)): ?>
+        <div class="alert alert-success alert-dismissible fade show">
+            <i class="fas fa-check-circle me-2"></i><?php echo $e($message); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
     <?php if (!empty($error)): ?>
         <div class="alert alert-danger alert-dismissible fade show">
             <i class="fas fa-exclamation-circle me-2"></i><?php echo $e($error); ?>
@@ -167,7 +177,7 @@ $withoutNumber = max(0, count($rows) - $withNumber);
                     </select>
                 </div>
                 <?php endif; ?>
-                <div class="stu-field stu-span-4">
+                <div class="stu-field stu-span-3">
                     <label for="course_id" class="stu-label">Course</label>
                     <select class="form-select" id="course_id" name="course_id">
                         <option value="">All courses</option>
@@ -178,6 +188,16 @@ $withoutNumber = max(0, count($rows) - $withNumber);
                                 <?php echo $e($course['course_name']); ?>
                             </option>
                         <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="stu-field stu-span-3">
+                    <label for="language" class="stu-label">Language</label>
+                    <select class="form-select" id="language" name="language">
+                        <option value="">All languages</option>
+                        <option value="sinhala" <?php echo ($filters['language'] ?? '') === 'sinhala' ? 'selected' : ''; ?>>Sinhala</option>
+                        <option value="tamil" <?php echo ($filters['language'] ?? '') === 'tamil' ? 'selected' : ''; ?>>Tamil</option>
+                        <option value="english" <?php echo ($filters['language'] ?? '') === 'english' ? 'selected' : ''; ?>>English</option>
+                        <option value="other" <?php echo ($filters['language'] ?? '') === 'other' ? 'selected' : ''; ?>>Others</option>
                     </select>
                 </div>
                 <div class="stu-field stu-span-auto">
@@ -194,6 +214,7 @@ $withoutNumber = max(0, count($rows) - $withNumber);
         <input type="hidden" name="academic_year" value="<?php echo $e($filters['academic_year'] ?? ''); ?>">
         <input type="hidden" name="department_id" value="<?php echo $e($deptForForm); ?>">
         <input type="hidden" name="course_id" value="<?php echo $e($filters['course_id'] ?? ''); ?>">
+        <input type="hidden" name="language" value="<?php echo $e($filters['language'] ?? ''); ?>">
 
         <div class="stu-layout">
             <div>
@@ -230,28 +251,56 @@ $withoutNumber = max(0, count($rows) - $withNumber);
                             <input type="search" id="rowFilter" class="form-control" placeholder="Search name / ID / phone">
                         </div>
                     </div>
+                    <div class="stu-lang-bar">
+                        <label class="stu-label" for="bulkNewLanguage">Edit language</label>
+                        <select id="bulkNewLanguage" class="form-select form-select-sm stu-lang-select" style="max-width:9rem;">
+                            <option value="Sinhala">Sinhala</option>
+                            <option value="Tamil">Tamil</option>
+                            <option value="English">English</option>
+                            <option value="">Other (clear)</option>
+                        </select>
+                        <button type="button" class="stu-btn stu-btn-ghost" id="bulkLangUpdateBtn" style="padding:.3rem .65rem; font-size:.78rem;">
+                            <i class="fas fa-save"></i>Apply to selected
+                        </button>
+                        <span class="stu-hint mb-0">Or change language in the row dropdown.</span>
+                    </div>
                     <div class="stu-table-wrap">
                         <table class="stu-table">
                             <thead>
                                 <tr>
-                                    <th style="width:40px;"><input type="checkbox" class="form-check-input" id="smsSelectAll" checked title="Select all with a mobile number"></th>
+                                    <th style="width:40px;"><input type="checkbox" class="form-check-input" id="smsSelectAll" checked title="Select all visible students"></th>
                                     <th style="width:48px;">No</th>
                                     <th>Student ID</th>
                                     <th>Name</th>
+                                    <th style="width:120px;">Language</th>
                                     <th>Phone</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($rows as $i => $r): ?>
+                                <?php foreach ($rows as $i => $r):
+                                    $lv = (string) ($r['language_value'] ?? '');
+                                ?>
                                     <tr class="sms-row<?php echo $r['valid'] ? '' : ' sms-warn'; ?>">
                                         <td>
                                             <input type="checkbox" class="form-check-input sms-pick" name="student_ids[]"
                                                    value="<?php echo $e($r['student_id']); ?>"
-                                                   <?php echo $r['valid'] ? 'checked' : 'disabled'; ?>>
+                                                   <?php echo $r['valid'] ? 'checked' : ''; ?>
+                                                   title="<?php echo $r['valid'] ? 'Select for SMS' : 'No valid mobile — can still update language'; ?>">
                                         </td>
                                         <td class="text-muted"><?php echo $i + 1; ?></td>
                                         <td><span class="stu-id"><?php echo $e($r['student_id']); ?></span></td>
                                         <td><?php echo $e($r['name']); ?></td>
+                                        <td>
+                                            <select class="form-select stu-lang-select js-lang-edit"
+                                                    data-student-id="<?php echo $e($r['student_id']); ?>"
+                                                    data-prev="<?php echo $e($lv); ?>"
+                                                    title="Edit language">
+                                                <option value="Sinhala" <?php echo $lv === 'Sinhala' ? 'selected' : ''; ?>>Sinhala</option>
+                                                <option value="Tamil" <?php echo $lv === 'Tamil' ? 'selected' : ''; ?>>Tamil</option>
+                                                <option value="English" <?php echo $lv === 'English' ? 'selected' : ''; ?>>English</option>
+                                                <option value="" <?php echo $lv === '' ? 'selected' : ''; ?>>Other</option>
+                                            </select>
+                                        </td>
                                         <td>
                                             <?php if ($r['valid']): ?>
                                                 <?php echo $e($r['phone']); ?>
@@ -400,6 +449,87 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sending...';
     });
+
+    var langUrl = <?php echo json_encode(APP_URL . '/students/bulk-sms/update-language'); ?>;
+    var csrf = <?php echo json_encode((string) ($csrfToken ?? '')); ?>;
+    var filterYear = <?php echo json_encode((string) ($filters['academic_year'] ?? '')); ?>;
+    var filterDept = <?php echo json_encode((string) $deptForForm); ?>;
+    var filterCourse = <?php echo json_encode((string) ($filters['course_id'] ?? '')); ?>;
+    var filterLang = <?php echo json_encode((string) ($filters['language'] ?? '')); ?>;
+
+    function saveLanguage(studentIds, newLanguage, onDone) {
+        var body = new FormData();
+        body.append('csrf_token', csrf);
+        body.append('ajax', '1');
+        body.append('academic_year', filterYear);
+        body.append('department_id', filterDept);
+        body.append('course_id', filterCourse);
+        body.append('language', filterLang);
+        body.append('new_language', newLanguage);
+        studentIds.forEach(function(id) { body.append('student_ids[]', id); });
+        fetch(langUrl, {
+            method: 'POST',
+            body: body,
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            onDone(data);
+        }).catch(function() {
+            onDone({ success: false, error: 'Network error. Try again.' });
+        });
+    }
+
+    document.querySelectorAll('.js-lang-edit').forEach(function(sel) {
+        sel.addEventListener('change', function() {
+            var el = sel;
+            var prev = el.getAttribute('data-prev') || '';
+            var sid = el.getAttribute('data-student-id');
+            var val = el.value;
+            if (val === prev) return;
+            el.classList.add('stu-lang-saving');
+            saveLanguage([sid], val, function(data) {
+                el.classList.remove('stu-lang-saving');
+                if (!data || !data.success) {
+                    el.value = prev;
+                    alert((data && data.error) ? data.error : 'Could not update language.');
+                    return;
+                }
+                el.setAttribute('data-prev', val);
+                // If list is filtered by language, reload so student leaves this filtered view
+                if (filterLang !== '') {
+                    window.location.reload();
+                }
+            });
+        });
+    });
+
+    var bulkLangBtn = document.getElementById('bulkLangUpdateBtn');
+    var bulkLangSel = document.getElementById('bulkNewLanguage');
+    if (bulkLangBtn && bulkLangSel) {
+        bulkLangBtn.addEventListener('click', function() {
+            var ids = picks.filter(function(p) { return p.checked; }).map(function(p) { return p.value; });
+            if (ids.length === 0) {
+                alert('Tick at least one student to update language.');
+                return;
+            }
+            var val = bulkLangSel.value;
+            var label = val !== '' ? val : 'Other (clear)';
+            if (!confirm('Set language to ' + label + ' for ' + ids.length + ' selected student(s)?')) {
+                return;
+            }
+            bulkLangBtn.disabled = true;
+            bulkLangBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+            saveLanguage(ids, val, function(data) {
+                bulkLangBtn.disabled = false;
+                bulkLangBtn.innerHTML = '<i class="fas fa-save"></i>Apply to selected';
+                if (!data || !data.success) {
+                    alert((data && data.error) ? data.error : 'Could not update language.');
+                    return;
+                }
+                window.location.reload();
+            });
+        });
+    }
 
     refresh();
 });
