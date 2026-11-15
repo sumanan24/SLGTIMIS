@@ -5048,6 +5048,34 @@ class StudentController extends Controller {
     }
 
     /**
+     * Courses for the intake checklist department filter.
+     * URL: /students/intake-checklist/courses?department_id=
+     */
+    public function intakeChecklistCourses() {
+        if (!$this->requireIntakeChecklistAccess()) {
+            return;
+        }
+        $departmentId = trim((string) $this->get('department_id', ''));
+        $userDepartmentId = $this->getUserDepartment();
+        if ($this->isDepartmentRestricted() || $userDepartmentId) {
+            $departmentId = (string) $userDepartmentId;
+        }
+        $courses = [];
+        if ($departmentId !== '' && $departmentId !== '__none__') {
+            $courseModel = $this->model('CourseModel');
+            foreach ($courseModel->getCoursesWithDepartment(['department_id' => $departmentId]) as $course) {
+                $courses[] = [
+                    'course_id' => (string) ($course['course_id'] ?? ''),
+                    'course_name' => (string) ($course['course_name'] ?? ''),
+                ];
+            }
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => true, 'courses' => $courses]);
+        exit;
+    }
+
+    /**
      * Student Intake Checklist: filter by academic year / department, pick students,
      * download one A4 checklist page per selected student (bulk PDF).
      * URL: /students/intake-checklist
@@ -5073,10 +5101,16 @@ class StudentController extends Controller {
         $restricted = $this->isDepartmentRestricted();
 
         $filters = $this->bulkSmsFilters($_GET);
-        $rows = $filters['academic_year'] !== ''
+        $filtersReady = $filters['academic_year'] !== ''
+            && $filters['department_id'] !== ''
+            && $filters['department_id'] !== '__none__';
+        $rows = $filtersReady
             ? $this->intakeChecklistRows($filters)
             : [];
 
+        $selectedDepartment = ($filters['department_id'] ?? '') !== '__none__'
+            ? (string) ($filters['department_id'] ?? '')
+            : '';
         if ($userDepartmentId) {
             $departments = array_filter([$departmentModel->getById($userDepartmentId)]);
             $courses = $courseModel->getCoursesWithDepartment(['department_id' => $userDepartmentId]);
@@ -5085,7 +5119,9 @@ class StudentController extends Controller {
             $courses = [];
         } else {
             $departments = $departmentModel->getAll();
-            $courses = $courseModel->all('course_name ASC');
+            $courses = $selectedDepartment !== ''
+                ? $courseModel->getCoursesWithDepartment(['department_id' => $selectedDepartment])
+                : [];
         }
 
         $data = [
@@ -5097,6 +5133,7 @@ class StudentController extends Controller {
             'courses' => $courses,
             'academicYears' => $studentModel->getAcademicYears(),
             'isHOD' => $restricted,
+            'filtersReady' => $filtersReady,
             'csrfToken' => (string) $_SESSION['intake_checklist_csrf'],
             'error' => $_SESSION['error'] ?? null,
             'message' => $_SESSION['message'] ?? null,
@@ -5263,6 +5300,11 @@ class StudentController extends Controller {
 
         if ($filters['academic_year'] === '') {
             $_SESSION['error'] = 'Select an academic year first.';
+            $this->redirect($back);
+            return;
+        }
+        if ($filters['department_id'] === '' || $filters['department_id'] === '__none__') {
+            $_SESSION['error'] = 'Select a department before downloading.';
             $this->redirect($back);
             return;
         }

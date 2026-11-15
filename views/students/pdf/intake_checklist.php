@@ -266,7 +266,7 @@ table.pay td { font-weight: bold; }
 </table>
 
 <div class="footer">
-    <?php echo $e($instName); ?> · Student Registration Checklist · One page A4
+    <?php echo $e($instName); ?> · Student Registration Checklist
 </div>
 
 </body>

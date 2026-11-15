@@ -6,6 +6,7 @@ $e = static function ($v): string {
 $filters = $filters ?? [];
 $rows = $rows ?? [];
 $yearChosen = ($filters['academic_year'] ?? '') !== '';
+$filtersReady = !empty($filtersReady);
 $deptValue = (string) ($filters['department_id'] ?? '');
 $deptForForm = ($deptValue === '__none__') ? '' : $deptValue;
 $rowCount = count($rows);
@@ -51,7 +52,7 @@ $rowCount = count($rows);
     <div class="stu-head">
         <div>
             <h1 class="stu-title">Registration checklist</h1>
-            <p class="stu-sub">Download one common attendance sheet for the selected students, and a checklist letter for each student. The series number on the sheet is the same number on that student’s checklist letter.</p>
+            <p class="stu-sub">Select the academic year and department. Leave the course on All courses to download every course in that department, or pick one course.</p>
         </div>
         <a class="stu-btn stu-btn-ghost" href="<?php echo APP_URL; ?>/students">
             <i class="fas fa-arrow-left"></i>Students
@@ -90,9 +91,9 @@ $rowCount = count($rows);
                 </div>
                 <?php if (empty($isHOD)): ?>
                 <div class="stu-field stu-span-3">
-                    <label for="department_id" class="stu-label">Department</label>
-                    <select class="form-select" id="department_id" name="department_id">
-                        <option value="">All departments</option>
+                    <label for="department_id" class="stu-label">Department <span class="text-danger">*</span></label>
+                    <select class="form-select" id="department_id" name="department_id" required>
+                        <option value="">Select department</option>
                         <?php foreach ($departments as $dept): ?>
                             <option value="<?php echo $e($dept['department_id']); ?>" <?php echo $deptValue === (string) $dept['department_id'] ? 'selected' : ''; ?>>
                                 <?php echo $e($dept['department_name']); ?>
@@ -103,8 +104,8 @@ $rowCount = count($rows);
                 <?php endif; ?>
                 <div class="stu-field stu-span-3">
                     <label for="course_id" class="stu-label">Course</label>
-                    <select class="form-select" id="course_id" name="course_id">
-                        <option value="">All courses</option>
+                    <select class="form-select" id="course_id" name="course_id"<?php echo (empty($isHOD) && $deptForForm === '') ? ' disabled' : ''; ?>>
+                        <option value=""<?php echo ($filters['course_id'] ?? '') === '' ? ' selected' : ''; ?>><?php echo ($deptForForm !== '' || !empty($isHOD)) ? 'All courses' : 'Select course'; ?></option>
                         <?php foreach ($courses as $course): ?>
                             <option value="<?php echo $e($course['course_id']); ?>"
                                     data-department="<?php echo $e($course['department_id'] ?? ''); ?>"
@@ -114,18 +115,13 @@ $rowCount = count($rows);
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="stu-field stu-span-auto d-flex flex-wrap gap-2">
-                    <button type="submit" class="stu-btn stu-btn-primary">
-                        <i class="fas fa-users"></i>Show students
-                    </button>
-                </div>
             </form>
         </div>
     </div>
 
-    <?php if (!$yearChosen): ?>
+    <?php if (!$yearChosen || !$filtersReady): ?>
         <div class="stu-panel">
-            <div class="stu-empty">Choose an academic year, then show students to download the attendance sheet and the checklist letter.</div>
+            <div class="stu-empty">Select an academic year and a department. The list opens for every course in that department. Choose one course when you want only that course.</div>
         </div>
     <?php else: ?>
         <form method="POST" action="<?php echo APP_URL; ?>/students/intake-checklist" id="intakeChecklistForm">
@@ -133,7 +129,7 @@ $rowCount = count($rows);
             <input type="hidden" name="academic_year" value="<?php echo $e($filters['academic_year'] ?? ''); ?>">
             <input type="hidden" name="department_id" value="<?php echo $e($deptForForm); ?>">
             <input type="hidden" name="course_id" value="<?php echo $e($filters['course_id'] ?? ''); ?>">
-            <input type="hidden" name="download_all" id="icDownloadAll" value="0">
+            <input type="hidden" name="download_all" id="icDownloadAll" value="1">
             <input type="hidden" name="document" id="icDocument" value="checklist">
 
             <div class="stu-panel" style="margin-bottom:0;">
@@ -145,22 +141,15 @@ $rowCount = count($rows);
                         <?php endif; ?>
                         <div class="small text-muted mt-1">
                             <span class="stu-chip"><?php echo $rowCount; ?> students</span>
-                            <span class="ms-2" id="icSelectedCount">0 selected</span>
                         </div>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
                         <?php if ($rowCount > 0): ?>
-                        <button type="submit" class="stu-btn stu-btn-ghost ic-dl" data-document="attendance" data-all="1">
-                            <i class="fas fa-clipboard-list"></i>All attendance (<?php echo $rowCount; ?>)
-                        </button>
-                        <button type="submit" class="stu-btn stu-btn-primary ic-dl" data-document="attendance" data-all="0" id="icAttendanceBtn" disabled>
+                        <button type="submit" class="stu-btn stu-btn-primary ic-dl" data-document="attendance" data-all="1">
                             <i class="fas fa-clipboard-list"></i>Attendance sheet
                         </button>
-                        <button type="submit" class="stu-btn stu-btn-ghost ic-dl" data-document="checklist" data-all="1">
-                            <i class="fas fa-file-pdf"></i>All checklist (<?php echo $rowCount; ?>)
-                        </button>
-                        <button type="submit" class="stu-btn stu-btn-pdf ic-dl" data-document="checklist" data-all="0" id="icDownloadBtn" disabled>
-                            <i class="fas fa-file-pdf"></i>Checklist letter
+                        <button type="submit" class="stu-btn stu-btn-pdf ic-dl" data-document="checklist" data-all="1">
+                            <i class="fas fa-file-pdf"></i>Checklist
                         </button>
                         <?php endif; ?>
                     </div>
@@ -170,15 +159,12 @@ $rowCount = count($rows);
                     <input type="search" class="form-control form-control-sm" id="icSearch" placeholder="Search name or ID…" style="max-width:240px;">
                 </div>
                 <?php if (!$rows): ?>
-                    <div class="stu-empty">No students found for this academic year / department.</div>
+                    <div class="stu-empty">No students found for this department and course.</div>
                 <?php else: ?>
                     <div class="table-responsive" style="max-height:560px; overflow:auto;">
                         <table class="stu-table" id="icTable">
                             <thead>
                                 <tr>
-                                    <th style="width:42px;">
-                                        <input type="checkbox" class="form-check-input" id="icSelectAll" title="Select all" checked>
-                                    </th>
                                     <th style="width:88px;">Series No.</th>
                                     <th>Registration no.</th>
                                     <th>Student name</th>
@@ -189,10 +175,6 @@ $rowCount = count($rows);
                             <tbody>
                             <?php foreach ($rows as $row): ?>
                                 <tr data-search="<?php echo $e(strtolower($row['student_id'] . ' ' . $row['name'] . ' ' . $row['department'] . ' ' . $row['course'])); ?>">
-                                    <td>
-                                        <input type="checkbox" class="form-check-input ic-select" name="student_ids[]"
-                                               value="<?php echo $e($row['student_id']); ?>" checked>
-                                    </td>
                                     <td><span class="stu-id"><?php echo $e($row['series_no'] ?? ''); ?></span></td>
                                     <td><span class="stu-id"><?php echo $e($row['student_id']); ?></span></td>
                                     <td><?php echo $e($row['name']); ?></td>
@@ -211,43 +193,73 @@ $rowCount = count($rows);
 
 <script>
 (function () {
-    var form = document.getElementById('intakeChecklistForm');
-    if (!form) return;
-    var selectAll = document.getElementById('icSelectAll');
-    var boxes = function () { return Array.prototype.slice.call(document.querySelectorAll('.ic-select')); };
-    var countEl = document.getElementById('icSelectedCount');
-    var btn = document.getElementById('icDownloadBtn');
-    var attendanceBtn = document.getElementById('icAttendanceBtn');
-    var downloadAllField = document.getElementById('icDownloadAll');
-    var documentField = document.getElementById('icDocument');
-    var search = document.getElementById('icSearch');
+    var filterForm = document.getElementById('icFilterForm');
+    var year = document.getElementById('academic_year');
     var dept = document.getElementById('department_id');
     var course = document.getElementById('course_id');
 
-    function visibleBoxes() {
-        return boxes().filter(function (cb) {
-            var tr = cb.closest('tr');
-            return tr && tr.style.display !== 'none';
-        });
+    function showStudents() {
+        if (!filterForm || !year) return;
+        if (year.value === '') return;
+        if (dept && dept.value === '') return;
+        if (course && course.disabled) return;
+        filterForm.submit();
     }
-    function refresh() {
-        var checked = boxes().filter(function (cb) { return cb.checked; }).length;
-        if (countEl) countEl.textContent = checked + ' selected';
-        if (btn) btn.disabled = checked === 0;
-        if (attendanceBtn) attendanceBtn.disabled = checked === 0;
-        var vis = visibleBoxes();
-        if (selectAll) {
-            selectAll.checked = vis.length > 0 && vis.every(function (cb) { return cb.checked; });
-            selectAll.indeterminate = vis.some(function (cb) { return cb.checked; }) && !selectAll.checked;
+
+    function esc(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/"/g, '&quot;');
+    }
+    function fillCourses(list) {
+        if (!course) return;
+        var html = '<option value="">All courses</option>';
+        list.forEach(function (item) {
+            html += '<option value="' + esc(item.course_id) + '">' + esc(item.course_name) + '</option>';
+        });
+        course.innerHTML = html;
+        course.disabled = !dept || dept.value === '';
+    }
+    function loadCourses(departmentId) {
+        if (!course) return;
+        if (!departmentId) {
+            fillCourses([]);
+            return;
         }
-    }
-    if (selectAll) {
-        selectAll.addEventListener('change', function () {
-            visibleBoxes().forEach(function (cb) { cb.checked = selectAll.checked; });
-            refresh();
+        course.disabled = true;
+        course.innerHTML = '<option value="">Loading courses…</option>';
+        fetch('<?php echo APP_URL; ?>/students/intake-checklist/courses?department_id=' + encodeURIComponent(departmentId), {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+        }).then(function (response) {
+            if (!response.ok) throw new Error('courses');
+            return response.json();
+        }).then(function (data) {
+            fillCourses(data && data.courses ? data.courses : []);
+        }).catch(function () {
+            fillCourses([]);
         });
     }
-    boxes().forEach(function (cb) { cb.addEventListener('change', refresh); });
+    if (dept) {
+        dept.addEventListener('change', function () {
+            if (course) course.value = '';
+            if (year && year.value !== '' && dept.value !== '') {
+                filterForm.submit();
+                return;
+            }
+            loadCourses(dept.value);
+        });
+    }
+    if (course) course.addEventListener('change', showStudents);
+    if (year) year.addEventListener('change', showStudents);
+
+    var form = document.getElementById('intakeChecklistForm');
+    if (!form) return;
+    var downloadAllField = document.getElementById('icDownloadAll');
+    var documentField = document.getElementById('icDocument');
+    var search = document.getElementById('icSearch');
+
     if (search) {
         search.addEventListener('input', function () {
             var q = search.value.trim().toLowerCase();
@@ -255,7 +267,6 @@ $rowCount = count($rows);
                 var hay = tr.getAttribute('data-search') || '';
                 tr.style.display = (!q || hay.indexOf(q) !== -1) ? '' : 'none';
             });
-            refresh();
         });
     }
 
@@ -275,34 +286,12 @@ $rowCount = count($rows);
         });
     });
 
-    form.addEventListener('submit', function (ev) {
-        var isAll = downloadAllField && downloadAllField.value === '1';
-        var checked = boxes().filter(function (cb) { return cb.checked; }).length;
-        if (!isAll && checked === 0) {
-            ev.preventDefault();
-            alert('Select at least one student, or download all.');
-            return;
-        }
+    form.addEventListener('submit', function () {
+        if (downloadAllField) downloadAllField.value = '1';
         var active = document.activeElement;
         var label = documentField && documentField.value === 'attendance' ? 'Preparing attendance…' : 'Preparing checklist…';
-        var target = active && active.classList && active.classList.contains('ic-dl') ? active : btn;
-        // Disable only after the browser has accepted this submit. Disabling the
-        // button during click/submit cancels the PDF download.
+        var target = active && active.classList && active.classList.contains('ic-dl') ? active : null;
         setTimeout(function () { startBusy(target, label); }, 0);
     });
-
-    function filterCourses() {
-        if (!dept || !course) return;
-        var d = dept.value;
-        Array.prototype.forEach.call(course.options, function (opt, i) {
-            if (i === 0) { opt.hidden = false; return; }
-            var od = opt.getAttribute('data-department') || '';
-            opt.hidden = d !== '' && od !== '' && od !== d;
-            if (opt.hidden && opt.selected) course.value = '';
-        });
-    }
-    if (dept) dept.addEventListener('change', filterCourses);
-    filterCourses();
-    refresh();
 })();
 </script>
