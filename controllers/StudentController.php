@@ -5293,15 +5293,50 @@ class StudentController extends Controller {
         $institute = ComplaintLetterPdfHelper::institutePostFrom();
         $document = (string) $this->post('document', 'checklist');
         $isAttendance = $document === 'attendance';
-        $viewPath = BASE_PATH . '/views/students/pdf/' . ($isAttendance ? 'intake_attendance.php' : 'intake_checklist.php');
+        $isSticker = $document === 'sticker' || $document === 'barcode';
+        $label = preg_replace('/[^A-Za-z0-9_-]+/', '_', $filters['academic_year']) ?: 'intake';
+        if ($isSticker) {
+            usort($selected, static function (array $a, array $b): int {
+                $bySeries = ((int) ($a['series_no'] ?? 0)) <=> ((int) ($b['series_no'] ?? 0));
+                if ($bySeries !== 0) {
+                    return $bySeries;
+                }
+                return strcmp((string) ($a['student_id'] ?? ''), (string) ($b['student_id'] ?? ''));
+            });
+            ExamPdfHelper::prepareBulkPdfJob();
+            session_write_close();
+            try {
+                ExamPdfHelper::streamRollStickersPdf(
+                    $selected,
+                    1,
+                    'student_reg_stickers_' . $label . '_' . date('Ymd_His') . '.pdf'
+                );
+            } catch (Throwable $e) {
+                error_log('StudentController::intakeChecklistDownload stickers: ' . $e->getMessage());
+                @session_start();
+                $_SESSION['error'] = 'Could not generate the registration stickers. Please try again.';
+                $this->redirect($back);
+            }
+            return;
+        }
+        if ($isAttendance) {
+            $viewFile = 'intake_attendance.php';
+        } else {
+            $viewFile = 'intake_checklist.php';
+        }
+        $viewPath = BASE_PATH . '/views/students/pdf/' . $viewFile;
         if (!is_file($viewPath)) {
             $_SESSION['error'] = 'Intake document template missing.';
             $this->redirect($back);
             return;
         }
 
-        $label = preg_replace('/[^A-Za-z0-9_-]+/', '_', $filters['academic_year']) ?: 'intake';
-        $filename = ($isAttendance ? 'student_intake_attendance_' : 'student_intake_checklist_') . $label . '_' . date('Ymd_His') . '.pdf';
+        if ($isAttendance) {
+            $filePrefix = 'student_intake_attendance_';
+        } else {
+            $filePrefix = 'student_intake_checklist_';
+        }
+        $filename = $filePrefix . $label . '_' . date('Ymd_His') . '.pdf';
 
         $renderOne = static function (array $student) use ($viewPath, $logoSrc, $institute): string {
             extract([

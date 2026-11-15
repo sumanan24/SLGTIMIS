@@ -151,6 +151,9 @@ $rowCount = count($rows);
                         <button type="submit" class="stu-btn stu-btn-pdf ic-dl" data-document="checklist" data-all="1">
                             <i class="fas fa-file-pdf"></i>Checklist
                         </button>
+                        <button type="submit" class="stu-btn stu-btn-ghost ic-dl" data-document="sticker" data-all="1" title="2 inch by 1 inch sticker of each registration number">
+                            <i class="fas fa-tag"></i>Reg. stickers
+                        </button>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -289,7 +292,8 @@ $rowCount = count($rows);
     form.addEventListener('submit', function () {
         if (downloadAllField) downloadAllField.value = '1';
         var active = document.activeElement;
-        var label = documentField && documentField.value === 'attendance' ? 'Preparing attendance…' : 'Preparing checklist…';
+        var kind = documentField ? documentField.value : '';
+        var label = kind === 'attendance' ? 'Preparing attendance…' : (kind === 'sticker' ? 'Preparing stickers…' : 'Preparing checklist…');
         var target = active && active.classList && active.classList.contains('ic-dl') ? active : null;
         setTimeout(function () { startBusy(target, label); }, 0);
     });
