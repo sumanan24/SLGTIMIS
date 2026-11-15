@@ -24,6 +24,7 @@ return [
     'admin/backup-files' => 'AdminController@backupFiles',
     'admin/backup-student-docs' => 'StudentController@documentsBackupZip',
     'admin/sms-gateway' => 'AdminController@smsGateway',
+    'admin/sms-messages' => 'AdminController@smsMessages',
     'admin/ldap-sync' => 'AdminController@ldapSync',
     'account/change-password' => 'AccountController@changePassword',
     'profile' => 'ProfileController@index',

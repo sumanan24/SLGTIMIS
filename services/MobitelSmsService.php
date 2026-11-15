@@ -25,9 +25,18 @@ class MobitelSmsService {
         '171' => 'invalid_number',
     ];
 
+    private string $logSource = 'app';
+    private ?string $logSentBy = null;
+
     public function __construct() {
         $this->loadEnv();
         require_once BASE_PATH . '/services/mobitel/ESMSWS.php';
+    }
+
+    /** Optional context stored in the local SMS outbox for ADM review. */
+    public function setLogContext(string $source, ?string $sentBy = null): void {
+        $this->logSource = $source !== '' ? $source : 'app';
+        $this->logSentBy = $sentBy;
     }
 
     /**
@@ -108,6 +117,12 @@ class MobitelSmsService {
                     $parsed = $this->failure('soap', 'connection');
                 }
                 $this->log($parsed['ok'] ? 'bulk_accepted' : 'bulk_rejected', '', $parsed['result_code'] . ' x' . count($batch));
+                $this->persistOutbound(
+                    $batch,
+                    $message,
+                    $parsed['ok'] ? 'accepted' : 'failed',
+                    (string) $parsed['result_code']
+                );
                 if ($parsed['ok']) {
                     $result['accepted'] += count($batch);
                 } else {
@@ -126,6 +141,115 @@ class MobitelSmsService {
 
         $result['ok'] = $result['accepted'] > 0 && $result['failed'] === 0;
         return $result;
+    }
+
+    /**
+     * Pull sent-message reports from Mobitel for the alias (date range Y-m-d).
+     *
+     * @return array{ok:bool,imported:int,error:?string,rows:list<array<string,mixed>>}
+     */
+    public function syncSentReports(string $startDate, string $endDate): array {
+        $out = ['ok' => false, 'imported' => 0, 'error' => null, 'rows' => []];
+        $configError = $this->configurationError();
+        if ($configError !== null) {
+            $out['error'] = $configError;
+            return $out;
+        }
+        $session = null;
+        try {
+            $session = createSession('', $this->username(), $this->password(), '');
+            if (!$this->sessionIsUsable($session)) {
+                $out['error'] = 'auth_failed';
+                return $out;
+            }
+            $raw = getSentMessageReports($session, $startDate, $endDate, $this->alias());
+            $list = $this->normalizeSoapList($raw);
+            require_once BASE_PATH . '/models/SmsLogModel.php';
+            $log = new SmsLogModel();
+            foreach ($list as $item) {
+                $row = $this->mapSentReport($item);
+                if ($row === null) {
+                    continue;
+                }
+                $out['rows'][] = $row;
+                if ($log->upsertGatewaySent($row)) {
+                    $out['imported']++;
+                }
+            }
+            $out['ok'] = true;
+            return $out;
+        } catch (Throwable $e) {
+            $out['error'] = $this->safeFault($e);
+            $this->log('sync_sent_failed', '', $out['error']);
+            return $out;
+        } finally {
+            $this->closeSession($session);
+        }
+    }
+
+    /**
+     * Pull inbound replies from configured long number and/or short code.
+     *
+     * @return array{ok:bool,imported:int,error:?string,rows:list<array<string,mixed>>}
+     */
+    public function syncInboxReplies(): array {
+        $out = ['ok' => false, 'imported' => 0, 'error' => null, 'rows' => []];
+        $configError = $this->configurationError();
+        if ($configError !== null) {
+            $out['error'] = $configError;
+            return $out;
+        }
+        $longNumber = trim((string) EnvLoader::get('MOBITEL_SMS_LONG_NUMBER', ''));
+        $shortCode = trim((string) EnvLoader::get('MOBITEL_SMS_SHORTCODE', ''));
+        if ($longNumber === '' && $shortCode === '') {
+            $out['error'] = 'Set MOBITEL_SMS_LONG_NUMBER and/or MOBITEL_SMS_SHORTCODE in the server .env to fetch replies.';
+            return $out;
+        }
+
+        $session = null;
+        try {
+            $session = createSession('', $this->username(), $this->password(), '');
+            if (!$this->sessionIsUsable($session)) {
+                $out['error'] = 'auth_failed';
+                return $out;
+            }
+            require_once BASE_PATH . '/models/SmsLogModel.php';
+            $log = new SmsLogModel();
+            if ($longNumber !== '') {
+                $raw = getMessagesFromLongNumber($session, $longNumber);
+                foreach ($this->normalizeSoapList($raw) as $item) {
+                    $row = $this->mapInboundMessage($item, 'long_number');
+                    if ($row === null) {
+                        continue;
+                    }
+                    $out['rows'][] = $row;
+                    if ($log->upsertInbox($row)) {
+                        $out['imported']++;
+                    }
+                }
+            }
+            if ($shortCode !== '') {
+                $raw = getMessagesFromShortCode($session, $shortCode);
+                foreach ($this->normalizeSoapList($raw) as $item) {
+                    $row = $this->mapInboundMessage($item, 'shortcode');
+                    if ($row === null) {
+                        continue;
+                    }
+                    $out['rows'][] = $row;
+                    if ($log->upsertInbox($row)) {
+                        $out['imported']++;
+                    }
+                }
+            }
+            $out['ok'] = true;
+            return $out;
+        } catch (Throwable $e) {
+            $out['error'] = $this->safeFault($e);
+            $this->log('sync_inbox_failed', '', $out['error']);
+            return $out;
+        } finally {
+            $this->closeSession($session);
+        }
     }
 
     /**
@@ -379,6 +503,12 @@ class MobitelSmsService {
             $code = sendMessages($session, $alias, $message, [$mobile], $messageType);
             $parsed = $this->validateResponse($code);
             $this->log($parsed['ok'] ? 'accepted' : 'rejected', $mobile, $parsed['result_code']);
+            $this->persistOutbound(
+                [$mobile],
+                $message,
+                $parsed['ok'] ? 'accepted' : 'failed',
+                (string) $parsed['result_code']
+            );
             return $parsed;
         } catch (Throwable $e) {
             $this->log('connection', $mobile, $this->safeFault($e));
@@ -386,6 +516,113 @@ class MobitelSmsService {
         } finally {
             $this->closeSession($session);
         }
+    }
+
+    /**
+     * @param list<string> $mobiles
+     */
+    private function persistOutbound(array $mobiles, string $message, string $status, string $resultCode): void {
+        try {
+            require_once BASE_PATH . '/models/SmsLogModel.php';
+            (new SmsLogModel())->logOutboundBatch(
+                $mobiles,
+                $message,
+                $this->logSource,
+                $this->logSentBy,
+                $status,
+                $resultCode
+            );
+        } catch (Throwable $e) {
+            error_log('[MobitelSMS] outbox log failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * @param mixed $raw
+     * @return list<object|array<string,mixed>>
+     */
+    private function normalizeSoapList($raw): array {
+        if ($raw === null || $raw === false || $raw === '') {
+            return [];
+        }
+        if (is_array($raw)) {
+            return array_values($raw);
+        }
+        if (is_object($raw)) {
+            return [$raw];
+        }
+        return [];
+    }
+
+    /**
+     * @param object|array<string,mixed> $item
+     * @return array{gateway_message_id:string,mobile:string,message:string,status:string,time_sent:?string,time_delivered:?string}|null
+     */
+    private function mapSentReport($item): ?array {
+        $obj = is_array($item) ? (object) $item : $item;
+        if (!is_object($obj)) {
+            return null;
+        }
+        $mobile = trim((string) ($obj->recipient ?? ''));
+        $message = (string) ($obj->message ?? '');
+        if ($mobile === '' || $message === '') {
+            return null;
+        }
+        return [
+            'gateway_message_id' => trim((string) ($obj->id ?? '')),
+            'mobile' => $mobile,
+            'message' => $message,
+            'status' => trim((string) ($obj->status ?? 'gateway')),
+            'time_sent' => $this->normalizeDateTime($obj->timeSent ?? null),
+            'time_delivered' => $this->normalizeDateTime($obj->timeDelivered ?? null),
+        ];
+    }
+
+    /**
+     * @param object|array<string,mixed> $item
+     * @return array{gateway_message_id:string,mobile:string,message:string,received_at:?string,channel:string,raw_json:string}|null
+     */
+    private function mapInboundMessage($item, string $channel): ?array {
+        $obj = is_array($item) ? (object) $item : $item;
+        if (!is_object($obj)) {
+            return null;
+        }
+        $message = (string) ($obj->message ?? '');
+        $sender = trim((string) ($obj->sender ?? ''));
+        if ($sender === '' && isset($obj->recipients)) {
+            $recipients = $obj->recipients;
+            if (is_array($recipients) && isset($recipients[0])) {
+                $sender = trim((string) $recipients[0]);
+            } elseif (is_string($recipients)) {
+                $sender = trim($recipients);
+            }
+        }
+        if ($sender === '' || $message === '') {
+            return null;
+        }
+        return [
+            'gateway_message_id' => trim((string) ($obj->messageId ?? '')),
+            'mobile' => $sender,
+            'message' => $message,
+            'received_at' => $this->normalizeDateTime($obj->time ?? null),
+            'channel' => $channel,
+            'raw_json' => json_encode($obj, JSON_UNESCAPED_UNICODE) ?: null,
+        ];
+    }
+
+    private function normalizeDateTime($value): ?string {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if ($value instanceof DateTimeInterface) {
+            return $value->format('Y-m-d H:i:s');
+        }
+        $text = trim((string) $value);
+        if ($text === '') {
+            return null;
+        }
+        $ts = strtotime($text);
+        return $ts ? date('Y-m-d H:i:s', $ts) : null;
     }
 
     /**

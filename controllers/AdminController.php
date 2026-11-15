@@ -26,6 +26,22 @@ class AdminController extends Controller {
         
         return true;
     }
+
+    /** System admin or staff ADM position. */
+    private function checkAdminOrAdm() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return false;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        if (!$userModel->isAdminOrADM($_SESSION['user_id'])) {
+            $_SESSION['error'] = 'Access denied. ADM privileges required.';
+            $this->redirect('dashboard');
+            return false;
+        }
+        return true;
+    }
     
     /**
      * User Management - List all users with lock status and filters
@@ -433,6 +449,93 @@ class AdminController extends Controller {
     }
 
     /**
+     * ADM / Admin: view sent SMS (local + Mobitel sync) and inbound replies.
+     */
+    public function smsMessages() {
+        if (!$this->checkAdminOrAdm()) {
+            return;
+        }
+
+        require_once BASE_PATH . '/core/EnvLoader.php';
+        EnvLoader::load();
+        require_once BASE_PATH . '/services/MobitelSmsService.php';
+        require_once BASE_PATH . '/models/SmsLogModel.php';
+
+        if (empty($_SESSION['sms_messages_csrf'])) {
+            $_SESSION['sms_messages_csrf'] = bin2hex(random_bytes(32));
+        }
+
+        $tab = strtolower(trim((string) $this->get('tab', 'sent')));
+        if (!in_array($tab, ['sent', 'replies'], true)) {
+            $tab = 'sent';
+        }
+        $search = trim((string) $this->get('q', ''));
+        $page = max(1, (int) $this->get('page', 1));
+        $message = $_SESSION['message'] ?? null;
+        $error = $_SESSION['error'] ?? null;
+        unset($_SESSION['message'], $_SESSION['error']);
+
+        $sms = new MobitelSmsService();
+        $log = new SmsLogModel();
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $sent = (string) $this->post('csrf_token', '');
+            $known = (string) ($_SESSION['sms_messages_csrf'] ?? '');
+            if ($sent === '' || !hash_equals($known, $sent)) {
+                $_SESSION['error'] = 'The form expired. Please try again.';
+            } else {
+                $_SESSION['sms_messages_csrf'] = bin2hex(random_bytes(32));
+                $action = (string) $this->post('action', '');
+                if ($action === 'sync_sent') {
+                    $start = trim((string) $this->post('start_date', date('Y-m-d', strtotime('-7 days'))));
+                    $end = trim((string) $this->post('end_date', date('Y-m-d')));
+                    $res = $sms->syncSentReports($start, $end);
+                    if (!empty($res['ok'])) {
+                        $_SESSION['message'] = 'Synced ' . (int) $res['imported'] . ' sent message(s) from Mobitel (' . $start . ' to ' . $end . ').';
+                    } else {
+                        $_SESSION['error'] = 'Could not sync sent messages: ' . (string) ($res['error'] ?? 'unknown error');
+                    }
+                    $this->redirect('admin/sms-messages?tab=sent');
+                    return;
+                }
+                if ($action === 'sync_replies') {
+                    $res = $sms->syncInboxReplies();
+                    if (!empty($res['ok'])) {
+                        $_SESSION['message'] = 'Synced ' . (int) $res['imported'] . ' reply message(s) from Mobitel.';
+                    } else {
+                        $_SESSION['error'] = 'Could not sync replies: ' . (string) ($res['error'] ?? 'unknown error');
+                    }
+                    $this->redirect('admin/sms-messages?tab=replies');
+                    return;
+                }
+            }
+            $this->redirect('admin/sms-messages?tab=' . urlencode($tab));
+            return;
+        }
+
+        $list = $tab === 'replies'
+            ? $log->listInbox($page, 50, $search)
+            : $log->listOutbox($page, 50, $search);
+
+        return $this->view('admin/sms-messages', [
+            'title' => 'SMS messages',
+            'page' => 'admin-sms-messages',
+            'tab' => $tab,
+            'search' => $search,
+            'currentPage' => $page,
+            'total' => (int) ($list['total'] ?? 0),
+            'totalPages' => max(1, (int) ceil(((int) ($list['total'] ?? 0)) / 50)),
+            'rows' => $list['rows'] ?? [],
+            'csrf_token' => (string) $_SESSION['sms_messages_csrf'],
+            'message' => $message,
+            'error' => $error,
+            'hasLongNumber' => trim((string) (class_exists('EnvLoader', false) ? EnvLoader::get('MOBITEL_SMS_LONG_NUMBER', '') : '')) !== '',
+            'hasShortCode' => trim((string) (class_exists('EnvLoader', false) ? EnvLoader::get('MOBITEL_SMS_SHORTCODE', '') : '')) !== '',
+            'alias' => trim((string) (class_exists('EnvLoader', false) ? EnvLoader::get('MOBITEL_SMS_ALIAS', '') : '')),
+        ]);
+    }
+
+    /**
      * Admin-only Mobitel gateway check. Credentials stay on the server.
      */
     public function smsGateway() {
@@ -466,6 +569,7 @@ class AdminController extends Controller {
                 $mobile = trim((string) $this->post('test_mobile', ''));
                 $send = $this->post('send_test', '') === '1';
                 try {
+                    $sms->setLogContext('gateway_test', (string) ($_SESSION['user_name'] ?? 'admin'));
                     $results = $sms->runAdminTests($mobile, $send);
                     foreach ($results as $row) {
                         if (($row['name'] ?? '') === 'Last SMS response code') {

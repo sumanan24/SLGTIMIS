@@ -934,9 +934,10 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                     if ($isADM) {
                                         $adminPages[] = 'admin-import-images';
                                         $adminPages[] = 'admin-deleted-students';
+                                        $adminPages[] = 'admin-sms-messages';
                                     }
                                     if ($isAdminUser) {
-                                        $adminPages = array_merge($adminPages, ['admin-users', 'admin-locked-accounts', 'admin-activity-logs', 'admin-backup-db', 'admin-backup-files', 'admin-sms-gateway']);
+                                        $adminPages = array_merge($adminPages, ['admin-users', 'admin-locked-accounts', 'admin-activity-logs', 'admin-backup-db', 'admin-backup-files', 'admin-sms-gateway', 'admin-sms-messages']);
                                     }
                             ?>
                             <!-- Administration Branch -->
@@ -959,6 +960,12 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                         <a href="<?php echo APP_URL; ?>/admin/deleted-students" class="<?php echo (isset($page) && $page === 'admin-deleted-students') ? 'active' : ''; ?>">
                                             <i class="fas fa-user-slash"></i>
                                             <span>Deleted Students</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/admin/sms-messages" class="<?php echo (isset($page) && $page === 'admin-sms-messages') ? 'active' : ''; ?>">
+                                            <i class="fas fa-sms"></i>
+                                            <span>SMS Sent &amp; Replies</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
@@ -1010,6 +1017,14 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                             <span>SMS Gateway Test</span>
                                         </a>
                                     </li>
+                                    <?php if (!$isADM): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/admin/sms-messages" class="<?php echo (isset($page) && $page === 'admin-sms-messages') ? 'active' : ''; ?>">
+                                            <i class="fas fa-inbox"></i>
+                                            <span>SMS Sent &amp; Replies</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
                                     <li>
                                         <a href="<?php echo APP_URL; ?>/admin/ldap-sync" class="<?php echo (isset($page) && $page === 'admin-ldap-sync') ? 'active' : ''; ?>">
                                             <i class="fas fa-wifi"></i>

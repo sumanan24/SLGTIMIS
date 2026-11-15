@@ -220,6 +220,7 @@ class PasswordResetController extends Controller {
 
         $message = "Dear SLGTI User, Your password reset OTP is {$otp}. This OTP is valid for 5 minutes. Do not share this code with anyone. - SLGTI MIS";
         try {
+            $sms->setLogContext('password_reset', null);
             $result = $sms->sendSms($mobile, $message);
         } catch (Throwable $e) {
             $model->markSmsResult($otpId, null, 'exception', true);

@@ -90,6 +90,9 @@ $withoutNumber = max(0, count($rows) - $withNumber);
             <p class="stu-sub">Filter students by year and course, tick recipients, then send one shared message. You can also type numbers directly.</p>
         </div>
         <div class="stu-actions">
+            <a class="stu-btn stu-btn-ghost" href="<?php echo APP_URL; ?>/admin/sms-messages">
+                <i class="fas fa-inbox"></i>Sent &amp; replies
+            </a>
             <a class="stu-btn stu-btn-ghost" href="<?php echo APP_URL; ?>/students">
                 <i class="fas fa-arrow-left"></i>Back to students
             </a>

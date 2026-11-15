@@ -385,6 +385,24 @@ function getMessagesFromLongNumber($session,$longNumber)
 	
 }
 
+// Sent-message report for an alias between startDate and endDate (portal date format).
+function getSentMessageReports($session, $startDate, $endDate, $alias)
+{
+	$client = getClient();
+
+	$req = new stdClass();
+	$req->session = $session;
+	$req->startDate = $startDate;
+	$req->endDate = $endDate;
+	$req->alias = $alias;
+
+	$resp = $client->getSentMessageReports($req);
+	if (is_object($resp) && property_exists($resp, 'return')) {
+		return $resp->return;
+	}
+	return null;
+}
+
 
 
 

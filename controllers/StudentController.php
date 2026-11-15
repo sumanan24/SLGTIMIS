@@ -4367,6 +4367,7 @@ class StudentController extends Controller {
 
         // Release the session lock while the gateway works.
         $by = (string) ($_SESSION['user_name'] ?? $_SESSION['user_id']);
+        $sms->setLogContext('bulk_sms', $by);
         session_write_close();
         $res = $sms->sendBulk(array_values($numbers), $message);
         error_log('[BulkSMS] by=' . $by . ' recipients=' . count($numbers) . ' typed=' . $typedCount . ' accepted=' . $res['accepted'] . ' failed=' . $res['failed']);
