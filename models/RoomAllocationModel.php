@@ -10,16 +10,91 @@ class RoomAllocationModel extends Model {
         return 'id';
     }
 
+    public function __construct() {
+        parent::__construct();
+        $this->ensureUtf8mb4UnicodeCollation();
+    }
+
+    /**
+     * Keep hostel tables on utf8mb4_unicode_ci so JOINs with student/course work.
+     */
+    public function ensureUtf8mb4UnicodeCollation(): void {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+        $done = true;
+        try {
+            $sql = "SELECT TABLE_COLLATION FROM information_schema.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'hostel_allocations' LIMIT 1";
+            $result = $this->db->query($sql);
+            $row = $result ? $result->fetch_assoc() : null;
+            $collation = strtolower((string) ($row['TABLE_COLLATION'] ?? ''));
+            if ($collation === '' || $collation === 'utf8mb4_unicode_ci') {
+                return;
+            }
+            $this->db->query('SET FOREIGN_KEY_CHECKS = 0');
+            foreach ([
+                'hostels',
+                'hostel_blocks',
+                'hostel_rooms',
+                'hostel_allocations',
+                'hostel_requests',
+                'hostel_fee_payments',
+            ] as $table) {
+                $exists = $this->db->query("SHOW TABLES LIKE '" . $this->db->escape($table) . "'");
+                if (!$exists || $exists->num_rows === 0) {
+                    continue;
+                }
+                $this->db->query(
+                    "ALTER TABLE `{$table}` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+                );
+            }
+            $this->db->query('SET FOREIGN_KEY_CHECKS = 1');
+        } catch (Throwable $e) {
+            error_log('RoomAllocationModel::ensureUtf8mb4UnicodeCollation: ' . $e->getMessage());
+            try {
+                $this->db->query('SET FOREIGN_KEY_CHECKS = 1');
+            } catch (Throwable $ignored) {
+            }
+        }
+    }
+
     /**
      * Enrollment joins required when filtering by department or academic year.
      */
     private function getDepartmentFilterJoins() {
-        return " LEFT JOIN `student_enroll` se ON s.student_id = se.student_id AND se.student_enroll_status = 'Following'
-                 LEFT JOIN `course` c ON se.course_id = c.course_id";
+        // COLLATE avoids illegal mix when hostel_* is still utf8mb4_0900_ai_ci.
+        return " LEFT JOIN `student_enroll` se
+                    ON s.student_id = se.student_id COLLATE utf8mb4_unicode_ci
+                   AND se.student_enroll_status = 'Following'
+                 LEFT JOIN `course` c
+                    ON se.course_id = c.course_id COLLATE utf8mb4_unicode_ci";
     }
 
     private function needsEnrollmentJoin($filters) {
         return !empty($filters['department_id']) || !empty($filters['academic_year']);
+    }
+
+    /**
+     * @param list<mixed> $params
+     * @return mysqli_result|false
+     */
+    private function runFilteredQuery(string $sql, string $types, array $params) {
+        if ($params === []) {
+            return $this->db->query($sql);
+        }
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            error_log('RoomAllocationModel prepare failed: ' . ($this->db->getConnection()->error ?? '') . ' | SQL: ' . $sql);
+            return false;
+        }
+        $stmt->bind_param($types, ...$params);
+        if (!$stmt->execute()) {
+            error_log('RoomAllocationModel execute failed: ' . ($stmt->error ?: ''));
+            return false;
+        }
+        return $stmt->get_result();
     }
 
     /**
@@ -101,7 +176,7 @@ class RoomAllocationModel extends Model {
                 h.name as hostel_name, h.gender as hostel_gender,
                 d.department_name
                 FROM `{$this->table}` ha
-                LEFT JOIN `student` s ON ha.student_id = s.student_id
+                LEFT JOIN `student` s ON ha.student_id COLLATE utf8mb4_unicode_ci = s.student_id
                 LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
                 LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
                 LEFT JOIN `hostels` h ON b.hostel_id = h.id";
@@ -121,14 +196,7 @@ class RoomAllocationModel extends Model {
         $params[] = $offset;
         $types .= 'ii';
         
-        if (!empty($params)) {
-            $stmt = $this->db->prepare($sql);
-            $stmt->bind_param($types, ...$params);
-            $stmt->execute();
-            $result = $stmt->get_result();
-        } else {
-            $result = $this->db->query($sql);
-        }
+        $result = $this->runFilteredQuery($sql, $types, $params);
         
         $data = [];
         if ($result && $result->num_rows > 0) {
@@ -151,7 +219,7 @@ class RoomAllocationModel extends Model {
                 h.name as hostel_name, h.gender as hostel_gender,
                 d.department_name
                 FROM `{$this->table}` ha
-                LEFT JOIN `student` s ON ha.student_id = s.student_id
+                LEFT JOIN `student` s ON ha.student_id COLLATE utf8mb4_unicode_ci = s.student_id
                 LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
                 LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
                 LEFT JOIN `hostels` h ON b.hostel_id = h.id";
@@ -167,15 +235,8 @@ class RoomAllocationModel extends Model {
         $this->appendAllocationFilters($sql, $filters, $params, $types);
         
         $sql .= " ORDER BY ha.allocated_at DESC";
-        
-        if (!empty($params)) {
-            $stmt = $this->db->prepare($sql);
-            $stmt->bind_param($types, ...$params);
-            $stmt->execute();
-            $result = $stmt->get_result();
-        } else {
-            $result = $this->db->query($sql);
-        }
+
+        $result = $this->runFilteredQuery($sql, $types, $params);
         
         $data = [];
         if ($result && $result->num_rows > 0) {
@@ -192,7 +253,7 @@ class RoomAllocationModel extends Model {
      */
     public function getTotalAllocations($filters = []) {
         $sql = "SELECT COUNT(DISTINCT ha.id) as total FROM `{$this->table}` ha
-                LEFT JOIN `student` s ON ha.student_id = s.student_id
+                LEFT JOIN `student` s ON ha.student_id COLLATE utf8mb4_unicode_ci = s.student_id
                 LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
                 LEFT JOIN `hostel_blocks` b ON r.block_id = b.id";
 
@@ -206,18 +267,13 @@ class RoomAllocationModel extends Model {
         $types = '';
         
         $this->appendAllocationFilters($sql, $filters, $params, $types);
-        
-        if (!empty($params)) {
-            $stmt = $this->db->prepare($sql);
-            $stmt->bind_param($types, ...$params);
-            $stmt->execute();
-            $result = $stmt->get_result();
-        } else {
-            $result = $this->db->query($sql);
+
+        $result = $this->runFilteredQuery($sql, $types, $params);
+        if (!$result) {
+            return 0;
         }
-        
         $row = $result->fetch_assoc();
-        return $row['total'];
+        return (int) ($row['total'] ?? 0);
     }
     
     /**
@@ -230,18 +286,14 @@ class RoomAllocationModel extends Model {
                 b.name as block_name,
                 h.name as hostel_name, h.gender as hostel_gender, h.id as hostel_id
                 FROM `{$this->table}` ha
-                LEFT JOIN `student` s ON ha.student_id = s.student_id
+                LEFT JOIN `student` s ON ha.student_id COLLATE utf8mb4_unicode_ci = s.student_id
                 LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
                 LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
                 LEFT JOIN `hostels` h ON b.hostel_id = h.id
                 WHERE ha.id = ?";
         
-        $stmt = $this->db->prepare($sql);
-        $stmt->bind_param("s", $id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        return $result->fetch_assoc();
+        $result = $this->runFilteredQuery($sql, 's', [$id]);
+        return $result ? $result->fetch_assoc() : null;
     }
     
     /**
@@ -256,16 +308,12 @@ class RoomAllocationModel extends Model {
                 LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
                 LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
                 LEFT JOIN `hostels` h ON b.hostel_id = h.id
-                WHERE ha.student_id = ? AND ha.status = 'active'
+                WHERE ha.student_id COLLATE utf8mb4_unicode_ci = ? AND ha.status = 'active'
                 ORDER BY ha.allocated_at DESC
                 LIMIT 1";
-        
-        $stmt = $this->db->prepare($sql);
-        $stmt->bind_param("s", $studentId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        return $result->fetch_assoc();
+
+        $result = $this->runFilteredQuery($sql, 's', [$studentId]);
+        return $result ? $result->fetch_assoc() : null;
     }
     
     /**
@@ -283,12 +331,11 @@ class RoomAllocationModel extends Model {
                 h.name as hostel_name,
                 d.department_name
                 FROM `{$this->table}` ha
-                LEFT JOIN `student` s ON ha.student_id = s.student_id
+                LEFT JOIN `student` s ON ha.student_id COLLATE utf8mb4_unicode_ci = s.student_id
                 LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
                 LEFT JOIN `hostel_blocks` b ON r.block_id = b.id
-                LEFT JOIN `hostels` h ON b.hostel_id = h.id
-                LEFT JOIN `student_enroll` se ON s.student_id = se.student_id AND se.student_enroll_status = 'Following'
-                LEFT JOIN `course` c ON se.course_id = c.course_id
+                LEFT JOIN `hostels` h ON b.hostel_id = h.id"
+                . $this->getDepartmentFilterJoins() . "
                 LEFT JOIN `department` d ON c.department_id = d.department_id
                 WHERE ha.room_id = ?";
         
@@ -329,11 +376,8 @@ class RoomAllocationModel extends Model {
         }
         
         $sql .= " ORDER BY ha.allocated_at DESC";
-        
-        $stmt = $this->db->prepare($sql);
-        $stmt->bind_param($types, ...$params);
-        $stmt->execute();
-        $result = $stmt->get_result();
+
+        $result = $this->runFilteredQuery($sql, $types, $params);
         
         $data = [];
         if ($result && $result->num_rows > 0) {
@@ -364,18 +408,17 @@ class RoomAllocationModel extends Model {
                 s.student_id, s.student_fullname, s.student_phone, s.student_nic, s.student_gender,
                 d.department_name, c.course_name
                 FROM `{$this->table}` ha
-                LEFT JOIN `student` s ON ha.student_id = s.student_id
-                LEFT JOIN `student_enroll` se ON s.student_id = se.student_id AND se.student_enroll_status = 'Following'
-                LEFT JOIN `course` c ON se.course_id = c.course_id
+                LEFT JOIN `student` s ON ha.student_id COLLATE utf8mb4_unicode_ci = s.student_id"
+                . $this->getDepartmentFilterJoins() . "
                 LEFT JOIN `department` d ON c.department_id = d.department_id
                 WHERE ha.status = 'active' AND ha.room_id IN ($placeholders)
                 ORDER BY ha.room_id ASC, s.student_fullname ASC";
 
         $types = str_repeat('s', count($roomIds));
-        $stmt = $this->db->prepare($sql);
-        $stmt->bind_param($types, ...$roomIds);
-        $stmt->execute();
-        $result = $stmt->get_result();
+        $result = $this->runFilteredQuery($sql, $types, $roomIds);
+        if (!$result) {
+            return [];
+        }
 
         $byRoom = [];
         while ($row = $result->fetch_assoc()) {
