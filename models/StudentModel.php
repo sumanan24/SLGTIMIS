@@ -1887,6 +1887,90 @@ class StudentModel extends Model {
             // Silently continue
         }
     }
+
+    /**
+     * Upgrade latin1 student text columns to utf8mb4 so Sinhala/Tamil values
+     * can be saved (avoids MySQL error 3988 on prepared inserts).
+     * Prefer running database/migrations/2026_11_15_utf8mb4_student_core.sql
+     * for a full CONVERT; this only patches registration-critical columns.
+     */
+    public function ensureUtf8mb4TextColumns(): void {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+        $done = true;
+
+        try {
+            $sql = "SELECT CHARACTER_SET_NAME FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'student'
+                      AND COLUMN_NAME = 'student_fullname'
+                    LIMIT 1";
+            $result = $this->db->query($sql);
+            $row = $result ? $result->fetch_assoc() : null;
+            $charset = strtolower((string) ($row['CHARACTER_SET_NAME'] ?? ''));
+            if ($charset === '' || $charset === 'utf8mb4') {
+                return;
+            }
+
+            $columns = [
+                'student_title' => "VARCHAR(5) NULL",
+                'student_fullname' => "VARCHAR(255) NOT NULL",
+                'student_ininame' => "VARCHAR(255) NULL",
+                'student_gender' => "VARCHAR(10) NULL",
+                'student_civil' => "VARCHAR(10) NULL",
+                'student_nic' => "VARCHAR(20) NOT NULL",
+                'student_dob' => "VARCHAR(10) NULL",
+                'student_address' => "VARCHAR(255) NULL",
+                'student_district' => "VARCHAR(20) NULL",
+                'student_divisions' => "VARCHAR(50) NULL",
+                'student_provice' => "VARCHAR(100) NULL",
+                'student_blood' => "VARCHAR(5) NULL",
+                'student_em_name' => "VARCHAR(255) NULL",
+                'student_em_address' => "VARCHAR(255) NULL",
+                'student_em_relation' => "VARCHAR(20) NULL",
+                'student_status' => "VARCHAR(15) NULL",
+                'student_nationality' => "VARCHAR(50) NULL",
+                'student_whatsapp' => "VARCHAR(20) NULL",
+                'student_religion' => "VARCHAR(20) NULL",
+                'student_documents_pdf' => "VARCHAR(255) NULL",
+            ];
+
+            foreach ($columns as $name => $definition) {
+                $check = $this->db->query("SHOW COLUMNS FROM `{$this->table}` LIKE '" . $this->db->escape($name) . "'");
+                if (!$check || $check->num_rows === 0) {
+                    continue;
+                }
+                $alter = "ALTER TABLE `{$this->table}` MODIFY COLUMN `{$name}` {$definition}
+                          CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
+                $this->db->query($alter);
+            }
+
+            // Enrollment string/enum columns used during registration.
+            $enrollCheck = $this->db->query(
+                "SELECT CHARACTER_SET_NAME FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'student_enroll'
+                   AND COLUMN_NAME = 'course_mode'
+                 LIMIT 1"
+            );
+            $enrollRow = $enrollCheck ? $enrollCheck->fetch_assoc() : null;
+            $enrollCharset = strtolower((string) ($enrollRow['CHARACTER_SET_NAME'] ?? ''));
+            if ($enrollCharset !== '' && $enrollCharset !== 'utf8mb4') {
+                $this->db->query(
+                    "ALTER TABLE `student_enroll`
+                     MODIFY COLUMN `course_mode` ENUM('Part','Full')
+                     CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+                     MODIFY COLUMN `student_enroll_status`
+                     ENUM('Following','Dropout','Completed','Long Absent','Internship')
+                     CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Following'"
+                );
+            }
+        } catch (Throwable $e) {
+            error_log('StudentModel::ensureUtf8mb4TextColumns: ' . $e->getMessage());
+        }
+    }
     
     /**
      * Add student_conduct_accepted_at column to student table if it doesn't exist

@@ -39,6 +39,13 @@ class Database {
                 if (!$this->connection->set_charset(DB_CHARSET)) {
                     error_log("Database::connect - Failed to set charset: " . $this->connection->error);
                 }
+
+                // MySQL 8 defaults utf8mb4 connections to utf8mb4_0900_ai_ci; this schema
+                // uses utf8mb4_unicode_ci. Align connection collation to avoid illegal
+                // mix errors when comparing bound parameters to table columns.
+                if (defined('DB_CHARSET') && strtolower((string) DB_CHARSET) === 'utf8mb4') {
+                    @$this->connection->query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+                }
                 
                 error_log("Database::connect - Connection successful to " . DB_NAME);
             } catch (Exception $e) {

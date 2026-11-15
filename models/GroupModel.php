@@ -13,8 +13,41 @@ class GroupModel extends Model {
     public function __construct() {
         parent::__construct();
         $this->ensureCourseVersionColumn();
+        $this->ensureUtf8mb4UnicodeCollation();
         require_once BASE_PATH . '/helpers/SchedulingSchema.php';
         SchedulingSchema::ensure();
+    }
+
+    /**
+     * Keep groups tables on utf8mb4_unicode_ci so JOINs with course/student work
+     * after the latin1 → utf8mb4 student-core migration.
+     */
+    public function ensureUtf8mb4UnicodeCollation(): void {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+        $done = true;
+        try {
+            $sql = "SELECT TABLE_COLLATION FROM information_schema.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'groups' LIMIT 1";
+            $result = $this->db->query($sql);
+            $row = $result ? $result->fetch_assoc() : null;
+            $collation = strtolower((string) ($row['TABLE_COLLATION'] ?? ''));
+            if ($collation === '' || $collation === 'utf8mb4_unicode_ci') {
+                return;
+            }
+            $this->db->query('SET FOREIGN_KEY_CHECKS = 0');
+            $this->db->query('ALTER TABLE `groups` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+            $this->db->query('ALTER TABLE `group_students` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+            $this->db->query('SET FOREIGN_KEY_CHECKS = 1');
+        } catch (Throwable $e) {
+            error_log('GroupModel::ensureUtf8mb4UnicodeCollation: ' . $e->getMessage());
+            try {
+                $this->db->query('SET FOREIGN_KEY_CHECKS = 1');
+            } catch (Throwable $ignored) {
+            }
+        }
     }
 
     /**

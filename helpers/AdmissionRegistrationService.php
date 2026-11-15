@@ -45,6 +45,7 @@ class AdmissionRegistrationService {
         $this->users = new UserModel();
         $this->users->ensureMustChangePasswordColumn();
         $this->students->addStudentDocumentsPdfColumnIfNotExists();
+        $this->students->ensureUtf8mb4TextColumns();
     }
 
     public function assignmentOptions(?string $preferredCourseId = null, ?string $preferredCourseName = null): array {
