@@ -34,9 +34,34 @@ class StudentModel extends Model {
     /**
      * Get students with pagination and filters
      */
+    /**
+     * Filter by code-of-conduct acceptance (student_conduct_accepted_at).
+     * Values: accepted | pending (also yes/no aliases).
+     *
+     * @param array<string, mixed> $filters
+     * @param list<string> $conditions
+     */
+    private function appendConductAcceptedFilter(array $filters, array &$conditions): void {
+        $raw = strtolower(trim((string) ($filters['conduct_accepted'] ?? ($filters['code_of_conduct'] ?? ''))));
+        if ($raw === '') {
+            return;
+        }
+        $this->addStudentConductAcceptedAtColumnIfNotExists();
+        if (in_array($raw, ['accepted', 'yes', '1', 'accepted_yes'], true)) {
+            $conditions[] = "s.`student_conduct_accepted_at` IS NOT NULL
+                AND CAST(s.`student_conduct_accepted_at` AS CHAR) NOT IN ('', '0000-00-00 00:00:00', '0000-00-00')";
+            return;
+        }
+        if (in_array($raw, ['pending', 'not_accepted', 'no', '0', 'unaccepted'], true)) {
+            $conditions[] = "(s.`student_conduct_accepted_at` IS NULL
+                OR CAST(s.`student_conduct_accepted_at` AS CHAR) IN ('', '0000-00-00 00:00:00', '0000-00-00'))";
+        }
+    }
+
     public function getStudents($page = 1, $perPage = 20, $filters = []) {
         // Ensure student_profile_img column exists
         $this->addStudentProfileImgColumnIfNotExists();
+        $this->addStudentConductAcceptedAtColumnIfNotExists();
         
         $offset = ($page - 1) * $perPage;
         
@@ -204,6 +229,8 @@ class StudentModel extends Model {
             $params[] = $filters['group_id'];
             $types .= 'i';
         }
+
+        $this->appendConductAcceptedFilter($filters, $conditions);
         
         if (!empty($conditions)) {
             $sql .= " WHERE " . implode(' AND ', $conditions);
@@ -286,6 +313,7 @@ class StudentModel extends Model {
      * student_status is applied only when that filter is set.
      */
     public function getTotalStudents($filters = []) {
+        $this->addStudentConductAcceptedAtColumnIfNotExists();
         $sql = "SELECT COUNT(DISTINCT s.student_id) as total FROM `{$this->table}` s";
         $joins = [];
         $conditions = [];
@@ -427,6 +455,8 @@ class StudentModel extends Model {
             $params[] = $filters['group_id'];
             $types .= 'i';
         }
+
+        $this->appendConductAcceptedFilter($filters, $conditions);
         
         // Add WHERE clause with all conditions
         if (!empty($conditions)) {

@@ -691,6 +691,11 @@ class StudentController extends Controller {
             $provinceRaw
         ), 'strlen'));
 
+        $conductAccepted = strtolower(trim((string) $this->get('conduct_accepted', '')));
+        if (!in_array($conductAccepted, ['accepted', 'pending'], true)) {
+            $conductAccepted = '';
+        }
+
         // HOD, IN1, IN2, IN3: locked to own department + Active; allow search and enrollment filters (year, course, mode, group); ignore district/gender
         if ($isDepartmentRestricted) {
             $filters = [
@@ -705,6 +710,7 @@ class StudentController extends Controller {
                 'course_mode' => $this->get('course_mode', ''),
                 'group_id' => $this->get('group_id', ''),
                 'provinces' => $provinceRaw,
+                'conduct_accepted' => $conductAccepted,
                 'current_enrollment' => true
             ];
         } else {
@@ -719,6 +725,7 @@ class StudentController extends Controller {
                 'course_mode' => $this->get('course_mode', ''),
                 'group_id' => $this->get('group_id', ''),
                 'provinces' => $provinceRaw,
+                'conduct_accepted' => $conductAccepted,
                 'current_enrollment' => true
             ];
         }

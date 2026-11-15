@@ -11,7 +11,7 @@ foreach ($selectedProvinces as $sp) {
 $hasActiveFilters = !empty($filters['search']) || !empty($filters['status']) || !empty($filters['district'])
     || !empty($filters['gender']) || !empty($filters['department_id']) || !empty($filters['course_id'])
     || !empty($filters['academic_year']) || !empty($filters['course_mode']) || !empty($filters['group_id'])
-    || !empty($filters['provinces']);
+    || !empty($filters['provinces']) || !empty($filters['conduct_accepted']);
 $smsQuery = http_build_query(array_filter([
     'academic_year' => $filters['academic_year'] ?? '',
     'department_id' => $filters['department_id'] ?? '',
@@ -257,6 +257,14 @@ $smsQuery = http_build_query(array_filter([
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <div class="col-md-6 col-lg-3 stu-field">
+                        <label for="conduct_accepted" class="stu-label">Code of conduct</label>
+                        <select class="form-select" id="conduct_accepted" name="conduct_accepted">
+                            <option value="">All</option>
+                            <option value="accepted" <?php echo (($filters['conduct_accepted'] ?? '') === 'accepted') ? 'selected' : ''; ?>>Accepted</option>
+                            <option value="pending" <?php echo (($filters['conduct_accepted'] ?? '') === 'pending') ? 'selected' : ''; ?>>Not accepted</option>
+                        </select>
+                    </div>
                     <div class="col-12">
                         <div class="stu-prov-bar">
                             <label class="stu-label mb-0">Provinces</label>
@@ -324,6 +332,7 @@ $smsQuery = http_build_query(array_filter([
                             <th>Student ID</th>
                             <th>Full name</th>
                             <th>Status</th>
+                            <th>Conduct</th>
                             <th class="text-end">Actions</th>
                         </tr>
                     </thead>
@@ -337,6 +346,8 @@ $smsQuery = http_build_query(array_filter([
                             $profileImageUrl = $studentModelHelper->getProfileImagePath($student);
                             $waDigits = StudentModel::digitsForWhatsAppMe($student);
                             $statusClass = $student['student_status'] === 'Active' ? 'ok' : ($student['student_status'] === 'Graduated' ? 'info' : 'warn');
+                            $conductAt = trim((string) ($student['student_conduct_accepted_at'] ?? ''));
+                            $conductAccepted = $conductAt !== '' && $conductAt !== '0000-00-00 00:00:00' && $conductAt !== '0000-00-00';
                         ?>
                             <tr>
                                 <?php if (!empty($canExport)): ?>
@@ -358,6 +369,13 @@ $smsQuery = http_build_query(array_filter([
                                     <span class="stu-status <?php echo $statusClass; ?>">
                                         <?php echo htmlspecialchars($student['student_status']); ?>
                                     </span>
+                                </td>
+                                <td>
+                                    <?php if ($conductAccepted): ?>
+                                        <span class="stu-status ok" title="<?php echo htmlspecialchars($conductAt); ?>">Accepted</span>
+                                    <?php else: ?>
+                                        <span class="stu-status warn">Pending</span>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="text-end students-actions">
                                     <div class="btn-group" role="group">
@@ -419,6 +437,7 @@ $smsQuery = http_build_query(array_filter([
                         if (!empty($filters['academic_year'])) $params['academic_year'] = $filters['academic_year'];
                         if (!empty($filters['course_mode'])) $params['course_mode'] = $filters['course_mode'];
                         if (!empty($filters['group_id'])) $params['group_id'] = $filters['group_id'];
+                        if (!empty($filters['conduct_accepted'])) $params['conduct_accepted'] = $filters['conduct_accepted'];
                         if (!empty($filters['provinces']) && is_array($filters['provinces'])) {
                             $params['provinces'] = array_values($filters['provinces']);
                         }
