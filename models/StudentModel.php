@@ -2168,16 +2168,40 @@ class StudentModel extends Model {
     }
     
     /**
-     * Get profile image path for a student
-     * Database stores path relative to assets (e.g., "img/Studnet_profile/filename.jpg")
-     * Returns: assets/img/Studnet_profile/filename.jpg format
+     * Canonical + legacy folders under assets/img where student photos may live.
+     * (Legacy typo "Studnet" and accidental "Studnet_profile1" are kept on purpose.)
+     *
+     * @return list<string>
+     */
+    public static function profileImageDirectories(): array {
+        return [
+            'img/Studnet_profile',
+            'img/Studnet_profile1',
+            'img/student_profile',
+            'img/Student_profile',
+        ];
+    }
+
+    /**
+     * Ensure the canonical upload folder exists.
+     */
+    public function ensureProfileImageDirectory(): string {
+        $dir = BASE_PATH . '/assets/img/Studnet_profile';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+        return $dir;
+    }
+
+    /**
+     * Get profile image URL for a student, or null when no readable file exists.
      */
     public function getProfileImagePath($student) {
         $relative = $this->resolveProfileImageRelativePath($student);
         if ($relative === null) {
             return null;
         }
-        return APP_URL . '/assets/' . $relative;
+        return APP_URL . '/assets/' . str_replace('\\', '/', $relative);
     }
 
     /**
@@ -2196,33 +2220,116 @@ class StudentModel extends Model {
 
     /**
      * Relative path under assets/ (e.g. img/Studnet_profile/file.jpg), or null if missing.
+     * Accepts bare filenames, legacy folder names, and assets/-prefixed values.
      *
      * @param array<string,mixed>|null $student
      */
     public function resolveProfileImageRelativePath($student): ?string {
         $this->addStudentProfileImgColumnIfNotExists();
-
-        $imagePath = $student['student_profile_img'] ?? $student['file_path'] ?? null;
-        if (empty($imagePath)) {
+        if (!is_array($student)) {
             return null;
         }
 
-        $imagePath = ltrim((string) $imagePath, '/');
-        if (strpos($imagePath, 'assets/') === 0) {
-            $imagePath = substr($imagePath, 7);
-        }
-        if (strpos($imagePath, 'img/student_profile/') === 0) {
-            $imagePath = str_replace('img/student_profile/', 'img/Studnet_profile/', $imagePath);
-        }
-        if (strpos($imagePath, 'img/Student_profile/') === 0) {
-            $imagePath = str_replace('img/Student_profile/', 'img/Studnet_profile/', $imagePath);
-        }
-        if (strpos($imagePath, 'img/Studnet_profile/') !== 0) {
-            $imagePath = 'img/Studnet_profile/' . basename($imagePath);
+        $raw = trim((string) ($student['student_profile_img'] ?? $student['file_path'] ?? ''));
+        $studentId = trim((string) ($student['student_id'] ?? ''));
+        $candidates = [];
+
+        if ($raw !== '') {
+            $path = str_replace('\\', '/', $raw);
+            // Strip scheme/host if a full URL was stored.
+            if (preg_match('#^https?://#i', $path)) {
+                $path = (string) (parse_url($path, PHP_URL_PATH) ?? '');
+            }
+            $path = ltrim($path, '/');
+            if (strpos($path, 'assets/') === 0) {
+                $path = substr($path, 7);
+            }
+            // Ignore known placeholder that is not a real photo.
+            if ($path === 'img/user.jpg' || $path === 'user.jpg') {
+                $path = '';
+            }
+
+            if ($path !== '') {
+                $candidates[] = $path;
+                $base = basename($path);
+                if ($base !== '' && $base !== $path) {
+                    $candidates[] = $base;
+                }
+                // Normalize known folder aliases to the basename for directory search.
+                foreach (self::profileImageDirectories() as $dir) {
+                    $prefix = $dir . '/';
+                    if (stripos($path, $prefix) === 0) {
+                        $candidates[] = $prefix . basename($path);
+                    } else {
+                        $candidates[] = $prefix . basename($path);
+                    }
+                }
+            }
         }
 
-        $fullPath = BASE_PATH . '/assets/' . $imagePath;
-        return file_exists($fullPath) ? $imagePath : null;
+        // Fallback: derive common import filenames from student_id (2025/AUT/4AM001 → 2025_AUT_4AM001.jpg).
+        if ($studentId !== '') {
+            $safe = preg_replace('/[^A-Za-z0-9._-]+/', '_', $studentId) ?: '';
+            if ($safe !== '') {
+                foreach (['.jpg', '.jpeg', '.png', '.gif', '.JPG', '.JPEG', '.PNG'] as $ext) {
+                    $candidates[] = $safe . $ext;
+                    foreach (self::profileImageDirectories() as $dir) {
+                        $candidates[] = $dir . '/' . $safe . $ext;
+                    }
+                }
+            }
+        }
+
+        $seen = [];
+        foreach ($candidates as $rel) {
+            $rel = ltrim(str_replace('\\', '/', (string) $rel), '/');
+            if ($rel === '' || isset($seen[$rel])) {
+                continue;
+            }
+            $seen[$rel] = true;
+
+            // Bare filename: probe each known profile directory.
+            if (strpos($rel, '/') === false) {
+                foreach (self::profileImageDirectories() as $dir) {
+                    $try = $dir . '/' . $rel;
+                    if ($this->profileImageFileExists($try)) {
+                        return $try;
+                    }
+                }
+                // Also allow assets/img/<file> (legacy).
+                $try = 'img/' . $rel;
+                if ($this->profileImageFileExists($try)) {
+                    return $try;
+                }
+                continue;
+            }
+
+            if ($this->profileImageFileExists($rel)) {
+                return $rel;
+            }
+
+            // If path used a wrong profile folder name, retry basename in known dirs.
+            $base = basename($rel);
+            if ($base !== '' && stripos($rel, 'img/') === 0) {
+                foreach (self::profileImageDirectories() as $dir) {
+                    $try = $dir . '/' . $base;
+                    if ($this->profileImageFileExists($try)) {
+                        return $try;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function profileImageFileExists(string $relativeUnderAssets): bool {
+        $relativeUnderAssets = ltrim(str_replace('\\', '/', $relativeUnderAssets), '/');
+        if ($relativeUnderAssets === '' || strpos($relativeUnderAssets, '..') !== false) {
+            return false;
+        }
+        $full = BASE_PATH . '/assets/' . $relativeUnderAssets;
+        return is_file($full);
     }
 
     /**

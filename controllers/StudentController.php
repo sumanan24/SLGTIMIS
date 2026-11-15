@@ -1659,30 +1659,10 @@ class StudentController extends Controller {
                 if (!$canUpdateProfileImage && ($removeImage === '1' || $hasImageUpload)) {
                     $_SESSION['error'] = 'Only SAO and ADM can update the profile image.';
                 } elseif ($removeImage === '1') {
-                    // Remove existing image
-                    $currentImagePath = $student['student_profile_img'] ?? $student['file_path'] ?? '';
-                    if (!empty($currentImagePath)) {
-                        // Normalize path - remove leading slash, ensure it's relative to assets
-                        $normalizedPath = ltrim($currentImagePath, '/');
-                        if (strpos($normalizedPath, 'assets/') === 0) {
-                            $normalizedPath = substr($normalizedPath, 7);
-                        }
-                                // Convert old paths to new Studnet_profile path
-                                if (strpos($normalizedPath, 'img/student_profile/') === 0) {
-                                    $normalizedPath = str_replace('img/student_profile/', 'img/Studnet_profile/', $normalizedPath);
-                                }
-                                if (strpos($normalizedPath, 'img/Student_profile/') === 0) {
-                                    $normalizedPath = str_replace('img/Student_profile/', 'img/Studnet_profile/', $normalizedPath);
-                                }
-                                if (strpos($normalizedPath, 'img/Studnet_profile/') !== 0) {
-                                    $normalizedPath = 'img/Studnet_profile/' . basename($normalizedPath);
-                                }
-                        $oldImagePath = BASE_PATH . '/assets/' . $normalizedPath;
-                        if (file_exists($oldImagePath)) {
-                            @unlink($oldImagePath);
-                        }
+                    $oldAbsolute = $studentModel->getProfileImageAbsolutePath($student);
+                    if ($oldAbsolute !== null) {
+                        @unlink($oldAbsolute);
                     }
-                    // Update database to remove image path
                     $studentModel->updateStudentImage($id, '');
                     $successMessage .= ' Profile image removed.';
                 } elseif ($hasImageUpload) {
@@ -1693,46 +1673,22 @@ class StudentController extends Controller {
                     $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
                     
                     if (in_array($fileExtension, $allowedExtensions) && in_array($file['type'], $allowedMimeTypes)) {
-                        // Standardized directory: assets/img/Studnet_profile
-                        $imageDirectory = BASE_PATH . '/assets/img/Studnet_profile';
-                        
-                        // Create directory if it doesn't exist
+                        $imageDirectory = $studentModel->ensureProfileImageDirectory();
                         if (!is_dir($imageDirectory)) {
-                            if (!mkdir($imageDirectory, 0755, true)) {
-                                $_SESSION['error'] = 'Could not create image directory. Please check folder permissions.';
-                            }
+                            $_SESSION['error'] = 'Could not create image directory. Please check folder permissions.';
                         }
                         
                         if (is_dir($imageDirectory)) {
-                            // Delete old image if exists
-                            $currentImagePath = $student['student_profile_img'] ?? $student['file_path'] ?? '';
-                            if (!empty($currentImagePath)) {
-                                // Normalize path - remove leading slash, ensure it's relative to assets
-                                $normalizedPath = ltrim($currentImagePath, '/');
-                                if (strpos($normalizedPath, 'assets/') === 0) {
-                                    $normalizedPath = substr($normalizedPath, 7);
-                                }
-                                // Convert old paths to new Studnet_profile path
-                                if (strpos($normalizedPath, 'img/student_profile/') === 0) {
-                                    $normalizedPath = str_replace('img/student_profile/', 'img/Studnet_profile/', $normalizedPath);
-                                }
-                                if (strpos($normalizedPath, 'img/Student_profile/') === 0) {
-                                    $normalizedPath = str_replace('img/Student_profile/', 'img/Studnet_profile/', $normalizedPath);
-                                }
-                                if (strpos($normalizedPath, 'img/Studnet_profile/') !== 0) {
-                                    $normalizedPath = 'img/Studnet_profile/' . basename($normalizedPath);
-                                }
-                                $oldImagePath = BASE_PATH . '/assets/' . $normalizedPath;
-                                if (file_exists($oldImagePath)) {
-                                    @unlink($oldImagePath);
-                                }
+                            $oldAbsolute = $studentModel->getProfileImageAbsolutePath($student);
+                            if ($oldAbsolute !== null) {
+                                @unlink($oldAbsolute);
                             }
-                            
+
                             // Generate unique filename
                             $safeStudentId = preg_replace('/[^a-zA-Z0-9._-]/', '_', $id);
                             $newFilename = $safeStudentId . '_' . time() . '.' . $fileExtension;
                             $targetPath = $imageDirectory . '/' . $newFilename;
-                            
+
                             // Move uploaded file
                             if (move_uploaded_file($file['tmp_name'], $targetPath)) {
                                 // Store path relative to assets: img/Studnet_profile/filename.jpg
@@ -2063,30 +2019,14 @@ class StudentController extends Controller {
             return ['success' => false, 'message' => 'Please use a JPG, PNG, or GIF image.'];
         }
 
-        $imageDirectory = BASE_PATH . '/assets/img/Studnet_profile';
-        if (!is_dir($imageDirectory) && !mkdir($imageDirectory, 0755, true)) {
+        $imageDirectory = $studentModel->ensureProfileImageDirectory();
+        if (!is_dir($imageDirectory)) {
             return ['success' => false, 'message' => 'Could not create the image folder.'];
         }
 
-        $currentImagePath = $student['student_profile_img'] ?? $student['file_path'] ?? '';
-        if ($currentImagePath !== '') {
-            $normalizedPath = ltrim($currentImagePath, '/');
-            if (strpos($normalizedPath, 'assets/') === 0) {
-                $normalizedPath = substr($normalizedPath, 7);
-            }
-            if (strpos($normalizedPath, 'img/student_profile/') === 0) {
-                $normalizedPath = str_replace('img/student_profile/', 'img/Studnet_profile/', $normalizedPath);
-            }
-            if (strpos($normalizedPath, 'img/Student_profile/') === 0) {
-                $normalizedPath = str_replace('img/Student_profile/', 'img/Studnet_profile/', $normalizedPath);
-            }
-            if (strpos($normalizedPath, 'img/Studnet_profile/') !== 0) {
-                $normalizedPath = 'img/Studnet_profile/' . basename($normalizedPath);
-            }
-            $oldImagePath = BASE_PATH . '/assets/' . $normalizedPath;
-            if (is_file($oldImagePath)) {
-                @unlink($oldImagePath);
-            }
+        $oldAbsolute = $studentModel->getProfileImageAbsolutePath($student);
+        if ($oldAbsolute !== null) {
+            @unlink($oldAbsolute);
         }
 
         $safeStudentId = preg_replace('/[^a-zA-Z0-9._-]/', '_', $id);
@@ -3440,53 +3380,49 @@ class StudentController extends Controller {
         
         // GET request - show image selection interface
         $studentModel = $this->model('StudentModel');
-        
-        // Standardized directory: assets/img/Student_profile
-        $imageDirectory = BASE_PATH . '/assets/img/Student_profile';
-        
-        // Create directory if it doesn't exist
-        if (!is_dir($imageDirectory)) {
-            @mkdir($imageDirectory, 0755, true);
-        }
-        
-        $targetDir = $imageDirectory;
-        $imagePathPrefix = 'img/Studnet_profile';
-        
+        $studentModel->ensureProfileImageDirectory();
+
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
         $existingImages = [];
-        
-        if ($targetDir && is_dir($targetDir)) {
-            $files = scandir($targetDir);
-            
+        $seenFiles = [];
+        $scannedDirs = [];
+
+        foreach (StudentModel::profileImageDirectories() as $imagePathPrefix) {
+            $targetDir = BASE_PATH . '/assets/' . $imagePathPrefix;
+            if (!is_dir($targetDir)) {
+                continue;
+            }
+            $scannedDirs[] = $imagePathPrefix;
+            $files = scandir($targetDir) ?: [];
+
             foreach ($files as $file) {
                 if ($file === '.' || $file === '..') {
                     continue;
                 }
-                
+
                 $filePath = $targetDir . '/' . $file;
-                
-                if (!is_file($filePath)) {
+                $dedupeKey = strtolower($imagePathPrefix . '/' . $file);
+                if (!is_file($filePath) || isset($seenFiles[$dedupeKey])) {
                     continue;
                 }
-                
+                $seenFiles[$dedupeKey] = true;
+
                 $fileExtension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-                
-                if (!in_array($fileExtension, $allowedExtensions)) {
+                if (!in_array($fileExtension, $allowedExtensions, true)) {
                     continue;
                 }
-                
-                // Try to match student ID
+
                 $filenameWithoutExt = pathinfo($file, PATHINFO_FILENAME);
                 $studentId = null;
                 $studentName = null;
                 $matchStatus = 'not_found';
-                
+
                 $potentialStudentIds = [
                     $filenameWithoutExt,
                     str_replace('_', '/', $filenameWithoutExt),
                     str_replace(['_', ' '], '', $filenameWithoutExt),
                 ];
-                
+
                 foreach ($potentialStudentIds as $potentialId) {
                     $cleanId = trim($potentialId);
                     if ($studentModel->exists($cleanId)) {
@@ -3497,7 +3433,7 @@ class StudentController extends Controller {
                         break;
                     }
                 }
-                
+
                 if (!$studentId) {
                     $parts = explode('_', $filenameWithoutExt);
                     foreach ($parts as $part) {
@@ -3510,25 +3446,22 @@ class StudentController extends Controller {
                         }
                     }
                 }
-                
-                // Check if already imported
+
                 $isImported = false;
                 if ($studentId) {
                     $student = $studentModel->find($studentId);
-                    if (!empty($student['student_profile_img']) || !empty($student['file_path'])) {
+                    if ($studentModel->resolveProfileImageRelativePath($student) !== null) {
                         $isImported = true;
                         $matchStatus = 'already_imported';
                     }
                 }
-                
-                $imageUrl = APP_URL . '/assets/' . $imagePathPrefix . '/' . $file;
-                $fileSize = filesize($filePath);
-                
+
                 $existingImages[] = [
                     'filename' => $file,
                     'path' => $filePath,
-                    'url' => $imageUrl,
-                    'size' => $fileSize,
+                    'relative_path' => $imagePathPrefix . '/' . $file,
+                    'url' => APP_URL . '/assets/' . $imagePathPrefix . '/' . rawurlencode($file),
+                    'size' => filesize($filePath),
                     'student_id' => $studentId,
                     'student_name' => $studentName,
                     'match_status' => $matchStatus,
@@ -3536,12 +3469,13 @@ class StudentController extends Controller {
                 ];
             }
         }
-        
+
         $data = [
             'title' => 'Import Existing Student Images',
             'page' => 'admin-import-images',
-            'targetDir' => $targetDir,
-            'imagePathPrefix' => $imagePathPrefix,
+            'targetDir' => !empty($scannedDirs) ? (BASE_PATH . '/assets/' . $scannedDirs[0]) : $studentModel->ensureProfileImageDirectory(),
+            'imagePathPrefix' => $scannedDirs[0] ?? 'img/Studnet_profile',
+            'scannedDirs' => $scannedDirs,
             'existingImages' => $existingImages,
             'error' => $_SESSION['error'] ?? null,
             'message' => $_SESSION['message'] ?? null
@@ -3564,46 +3498,58 @@ class StudentController extends Controller {
         }
         
         $studentModel = $this->model('StudentModel');
-        
-        // Standardized directory: assets/img/Student_profile
-        $imageDirectory = BASE_PATH . '/assets/img/Student_profile';
-        
-        // Create directory if it doesn't exist
-        if (!is_dir($imageDirectory)) {
-            if (!mkdir($imageDirectory, 0755, true)) {
-                $_SESSION['error'] = 'Image directory does not exist and could not be created.';
-                $this->redirect('students/import-images');
-                return;
-            }
-        }
-        
-        $targetDir = $imageDirectory;
-        $imagePathPrefix = 'img/Studnet_profile';
-        
+        $studentModel->ensureProfileImageDirectory();
+
         $processed = 0;
         $skipped = 0;
         $errors = [];
-        
+
         foreach ($selectedFiles as $filename) {
-            $filename = basename($filename); // Security: only get filename
-            $filePath = $targetDir . '/' . $filename;
-            
-            if (!file_exists($filePath) || !is_file($filePath)) {
-                $errors[] = "File not found: $filename";
+            // Accept either bare filename or relative path under assets (img/.../file.jpg)
+            $raw = str_replace('\\', '/', (string) $filename);
+            $raw = ltrim($raw, '/');
+            if (strpos($raw, 'assets/') === 0) {
+                $raw = substr($raw, 7);
+            }
+
+            $imagePath = null;
+            $filePath = null;
+            if (strpos($raw, '/') !== false) {
+                $candidate = $raw;
+                $full = BASE_PATH . '/assets/' . $candidate;
+                if (is_file($full)) {
+                    $imagePath = $candidate;
+                    $filePath = $full;
+                }
+            }
+
+            $baseName = basename($raw);
+            if ($imagePath === null) {
+                foreach (StudentModel::profileImageDirectories() as $prefix) {
+                    $full = BASE_PATH . '/assets/' . $prefix . '/' . $baseName;
+                    if (is_file($full)) {
+                        $imagePath = $prefix . '/' . $baseName;
+                        $filePath = $full;
+                        break;
+                    }
+                }
+            }
+
+            if ($imagePath === null || $filePath === null) {
+                $errors[] = "File not found: $baseName";
                 $skipped++;
                 continue;
             }
-            
-            // Try to match student ID
-            $filenameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
+
+            $filenameWithoutExt = pathinfo($baseName, PATHINFO_FILENAME);
             $studentId = null;
-            
+
             $potentialStudentIds = [
                 $filenameWithoutExt,
                 str_replace('_', '/', $filenameWithoutExt),
                 str_replace(['_', ' '], '', $filenameWithoutExt),
             ];
-            
+
             foreach ($potentialStudentIds as $potentialId) {
                 $cleanId = trim($potentialId);
                 if ($studentModel->exists($cleanId)) {
@@ -3611,7 +3557,7 @@ class StudentController extends Controller {
                     break;
                 }
             }
-            
+
             if (!$studentId) {
                 $parts = explode('_', $filenameWithoutExt);
                 foreach ($parts as $part) {
@@ -3621,17 +3567,13 @@ class StudentController extends Controller {
                     }
                 }
             }
-            
+
             if (!$studentId) {
-                $errors[] = "Could not match student ID for: $filename";
+                $errors[] = "Could not match student ID for: $baseName";
                 $skipped++;
                 continue;
             }
-            
-            // Build image path
-            $imagePath = $imagePathPrefix . '/' . $filename;
-            
-            // Update student record
+
             $updateResult = $studentModel->updateStudentImage($studentId, $imagePath);
             
             if ($updateResult) {
@@ -3703,36 +3645,18 @@ class StudentController extends Controller {
         // GET request - show upload form
         $studentModel = $this->model('StudentModel');
         
-        // Get directory info - use Studnet_profile as standard
-        $imageDirectory = BASE_PATH . '/assets/img/Studnet_profile';
-        $imageDirectoryAlt = BASE_PATH . '/assets/img/student_profile';
-        $imageDirectoryAlt2 = BASE_PATH . '/assets/img/Student_profile';
-        
-        $targetDir = null;
+        $targetDir = $studentModel->ensureProfileImageDirectory();
         $imagePathPrefix = 'img/Studnet_profile';
-        $dirExists = false;
-        
-        // Check for Studnet_profile first (preferred)
-        if (is_dir($imageDirectory)) {
-            $targetDir = $imageDirectory;
-            $imagePathPrefix = 'img/Studnet_profile';
-            $dirExists = true;
-        } elseif (is_dir($imageDirectoryAlt2)) {
-            $targetDir = $imageDirectoryAlt2;
-            $imagePathPrefix = 'img/Student_profile';
-            $dirExists = true;
-        } elseif (is_dir($imageDirectoryAlt)) {
-            $targetDir = $imageDirectoryAlt;
-            $imagePathPrefix = 'img/student_profile';
-            $dirExists = true;
-        }
-        
-        // If directory doesn't exist, create it with Studnet_profile
-        if (!$dirExists) {
-            if (mkdir($imageDirectory, 0755, true)) {
-                $targetDir = $imageDirectory;
-                $imagePathPrefix = 'img/Studnet_profile';
+        $dirExists = is_dir($targetDir);
+        foreach (StudentModel::profileImageDirectories() as $prefix) {
+            $candidate = BASE_PATH . '/assets/' . $prefix;
+            if (is_dir($candidate)) {
+                $targetDir = $candidate;
+                $imagePathPrefix = $prefix;
                 $dirExists = true;
+                if ($prefix === 'img/Studnet_profile') {
+                    break;
+                }
             }
         }
         
