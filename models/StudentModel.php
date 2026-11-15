@@ -494,13 +494,42 @@ class StudentModel extends Model {
      * Get unique academic years for filter dropdown
      */
     public function findByNic(string $nic): ?array {
-        $nic = strtoupper(trim($nic));
+        $nic = strtoupper(preg_replace('/\s+/', '', trim($nic)) ?? '');
         if ($nic === '') {
             return null;
         }
-        $sql = "SELECT * FROM `{$this->table}` WHERE UPPER(TRIM(`student_nic`)) = ? LIMIT 1";
+        // Normalize both sides to utf8mb4_unicode_ci so mixed table/connection
+        // collations cannot hide an existing NIC during admission registration.
+        $sql = "SELECT * FROM `{$this->table}`
+                WHERE UPPER(TRIM(CONVERT(`student_nic` USING utf8mb4))) COLLATE utf8mb4_unicode_ci
+                    = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci
+                LIMIT 1";
         $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            error_log('StudentModel::findByNic prepare: ' . ($this->db->getConnection()->error ?? ''));
+            return null;
+        }
         $stmt->bind_param('s', $nic);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        return $row ?: null;
+    }
+
+    public function findByEmail(string $email): ?array {
+        $email = trim($email);
+        if ($email === '') {
+            return null;
+        }
+        $sql = "SELECT * FROM `{$this->table}`
+                WHERE LOWER(TRIM(CONVERT(`student_email` USING utf8mb4))) COLLATE utf8mb4_unicode_ci
+                    = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci
+                LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return null;
+        }
+        $emailLower = strtolower($email);
+        $stmt->bind_param('s', $emailLower);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         return $row ?: null;
@@ -627,6 +656,7 @@ class StudentModel extends Model {
      * Generate a default email if student_email is NULL to avoid trigger errors
      */
     public function createStudent($data) {
+        $this->lastSqlError = '';
         // Generate a default email if student_email is NULL or empty
         // This is needed because database triggers may create user accounts that require email
         if (empty($data['student_email']) && !empty($data['student_id'])) {
@@ -656,27 +686,34 @@ class StudentModel extends Model {
         $placeholdersStr = implode(', ', $placeholders);
         
         $sql = "INSERT INTO `{$this->table}` ($columnsStr) VALUES ($placeholdersStr)";
-        $stmt = $this->db->prepare($sql);
-        
-        if (!$stmt) {
-            error_log("SQL Error in createStudent: " . $this->db->error . " | SQL: " . $sql);
-            return false;
-        }
-        
-        if (!empty($values)) {
-            $stmt->bind_param($types, ...$values);
-        }
-        
-        if ($stmt->execute()) {
-            // For string primary keys (student_id), return the student_id instead of lastInsertId()
-            // lastInsertId() works for auto-increment integer keys, not string keys
-            if (isset($data['student_id'])) {
-                return $data['student_id'];
+        try {
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                $this->lastSqlError = $this->db->getConnection()->error ?: 'Prepare failed (student insert)';
+                error_log("SQL Error in createStudent: " . $this->lastSqlError . " | SQL: " . $sql);
+                return false;
             }
-            // Fallback to lastInsertId() for integer keys
-            return $this->db->lastInsertId();
-        } else {
-            error_log("SQL Execute Error in createStudent: " . $stmt->error . " | SQL: " . $sql);
+
+            if (!empty($values)) {
+                $stmt->bind_param($types, ...$values);
+            }
+
+            if ($stmt->execute()) {
+                // For string primary keys (student_id), return the student_id instead of lastInsertId()
+                // lastInsertId() works for auto-increment integer keys, not string keys
+                if (isset($data['student_id'])) {
+                    return $data['student_id'];
+                }
+                // Fallback to lastInsertId() for integer keys
+                return $this->db->lastInsertId();
+            }
+
+            $this->lastSqlError = $stmt->error ?: 'Execute failed (student insert)';
+            error_log("SQL Execute Error in createStudent: " . $this->lastSqlError . " | SQL: " . $sql);
+            return false;
+        } catch (Throwable $e) {
+            $this->lastSqlError = $e->getMessage();
+            error_log("SQL Exception in createStudent: " . $this->lastSqlError . " | SQL: " . $sql);
             return false;
         }
     }

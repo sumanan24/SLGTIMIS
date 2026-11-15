@@ -34,6 +34,8 @@ class AdmissionRegistrationService {
     private CourseModel $courses;
     private GroupModel $groups;
     private UserModel $users;
+    /** Set by createStudentFromApplication when a new student row was inserted. */
+    private bool $lastStudentCreateWasInsert = false;
 
     public function __construct() {
         $this->students = new StudentModel();
@@ -284,15 +286,38 @@ class AdmissionRegistrationService {
 
         $application = $ctx['application'];
         $nic = $this->normalizeNic((string) ($application['student_nic'] ?? ''));
-        $existingStudent = $ctx['student'];
+        // Re-check NIC at save time (context may be stale / prior partial create).
+        $existingStudent = $ctx['student'] ?: $this->students->findByNic($nic);
 
         if ($existingStudent) {
             $dup = $this->enrollments->findEnrollment((string) $existingStudent['student_id'], $courseId, $academicYear);
             if ($dup) {
+                // Idempotent: already registered — return the same success summary.
+                $this->markEntrySelected($scheduleId, $entryId);
+                $email = trim((string) ($existingStudent['student_email'] ?? $application['student_email'] ?? ''));
+                $account = $this->users->linkOrCreateStudentAccount(
+                    $nic,
+                    (string) $existingStudent['student_id'],
+                    $email,
+                    false
+                );
+                $groupRow = $selectedGroup ?? $this->activeGroupForStudent((string) $existingStudent['student_id']);
                 return [
-                    'ok' => false,
-                    'errors' => ['This student is already enrolled in the selected course for this academic year.'],
-                    'summary' => null,
+                    'ok' => true,
+                    'errors' => [],
+                    'summary' => $this->buildRegistrationSummary(
+                        $application,
+                        $existingStudent,
+                        $course,
+                        $courseId,
+                        $academicYear,
+                        $courseMode,
+                        $groupRow,
+                        $account,
+                        false,
+                        ['stored' => !empty($existingStudent['student_documents_pdf']), 'count' => 0, 'skipped' => []],
+                        true
+                    ),
                 ];
             }
         }
@@ -316,7 +341,7 @@ class AdmissionRegistrationService {
                 if (!$student) {
                     throw new RuntimeException('The student record could not be created.');
                 }
-                $newStudent = true;
+                $newStudent = $this->lastStudentCreateWasInsert;
             }
 
             $exitDate = $this->enrollmentExitDate($academicYear);
@@ -331,6 +356,31 @@ class AdmissionRegistrationService {
             ]);
             if (!$enrolled) {
                 $detail = trim((string) $this->enrollments->getLastSqlError());
+                // Concurrent / prior enrollment — finish as already registered when row exists.
+                $dupNow = $this->enrollments->findEnrollment($studentId, $courseId, $academicYear);
+                if ($dupNow) {
+                    $db->commit();
+                    $email = trim((string) ($student['student_email'] ?? $application['student_email'] ?? ''));
+                    $account = $this->users->linkOrCreateStudentAccount($nic, $studentId, $email, false);
+                    $groupRow = $selectedGroup ?? $this->activeGroupForStudent($studentId);
+                    return [
+                        'ok' => true,
+                        'errors' => [],
+                        'summary' => $this->buildRegistrationSummary(
+                            $application,
+                            $student,
+                            $course,
+                            $courseId,
+                            $academicYear,
+                            $courseMode,
+                            $groupRow,
+                            $account,
+                            false,
+                            ['stored' => !empty($student['student_documents_pdf']), 'count' => 0, 'skipped' => []],
+                            true
+                        ),
+                    ];
+                }
                 throw new RuntimeException(
                     $detail !== ''
                         ? 'Enrollment could not be saved. ' . $detail
@@ -365,26 +415,19 @@ class AdmissionRegistrationService {
             return [
                 'ok' => true,
                 'errors' => [],
-                'summary' => [
-                    'student_id' => $studentId,
-                    'student_name' => (string) ($student['student_fullname'] ?? $application['student_full_name'] ?? ''),
-                    'nic' => $nic,
-                    'course_id' => $courseId,
-                    'course_name' => (string) ($course['course_name'] ?? $courseId),
-                    'academic_year' => $academicYear,
-                    'course_mode' => $courseMode,
-                    'course_mode_label' => self::COURSE_MODES[$courseMode] ?? $courseMode,
-                    'group_name' => $selectedGroup['name'] ?? 'Not assigned (no matching group)',
-                    'username' => $account['username'],
-                    'account_created' => !empty($account['created']) || $newStudent,
-                    'account_existing' => empty($account['created']) && !$newStudent,
-                    'must_change_password' => true,
-                    'default_password_note' => 'Initial password is the student NIC. The student must change the password and complete personal and parent details at first login.',
-                    'student_created' => $newStudent,
-                    'documents_pdf' => $pdfInfo['stored'] ?? false,
-                    'documents_skipped' => $pdfInfo['skipped'] ?? [],
-                    'document_count' => $pdfInfo['count'] ?? 0,
-                ],
+                'summary' => $this->buildRegistrationSummary(
+                    $application,
+                    $student,
+                    $course,
+                    $courseId,
+                    $academicYear,
+                    $courseMode,
+                    $selectedGroup,
+                    $account,
+                    $newStudent,
+                    $pdfInfo,
+                    false
+                ),
             ];
         } catch (Throwable $e) {
             $db->rollback();
@@ -456,7 +499,13 @@ class AdmissionRegistrationService {
     }
 
     private function createStudentFromApplication(array $application, string $courseId, string $academicYear, string $courseMode): string {
+        $this->lastStudentCreateWasInsert = false;
         $nic = $this->normalizeNic((string) ($application['student_nic'] ?? ''));
+        $existing = $this->students->findByNic($nic);
+        if ($existing) {
+            return (string) $existing['student_id'];
+        }
+
         $fullName = trim((string) ($application['student_full_name'] ?? ''));
         if ($fullName === '') {
             throw new RuntimeException('The application has no student name.');
@@ -468,7 +517,12 @@ class AdmissionRegistrationService {
         }
 
         $email = trim((string) ($application['student_email'] ?? ''));
-        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || $this->users->findByEmail($email)) {
+        if (
+            $email === ''
+            || !filter_var($email, FILTER_VALIDATE_EMAIL)
+            || $this->users->findByEmail($email)
+            || $this->students->findByEmail($email)
+        ) {
             $email = strtolower(preg_replace('/[^A-Za-z0-9]+/', '', $studentId) ?: 'student') . '@slgtimis.local';
         }
 
@@ -538,9 +592,69 @@ class AdmissionRegistrationService {
 
         $created = $this->students->createStudent($data);
         if (!$created) {
-            throw new RuntimeException('The student record could not be created. Check that the NIC and email are unique.');
+            // Race / prior partial create: reuse the existing NIC row when present.
+            $existingAfter = $this->students->findByNic($nic);
+            if ($existingAfter) {
+                return (string) $existingAfter['student_id'];
+            }
+            $detail = trim((string) $this->students->getLastSqlError());
+            throw new RuntimeException(
+                $detail !== ''
+                    ? 'The student record could not be created. ' . $detail
+                    : 'The student record could not be created. Check that the NIC and email are unique.'
+            );
         }
+        $this->lastStudentCreateWasInsert = true;
         return $studentId;
+    }
+
+    /**
+     * @param array<string, mixed> $application
+     * @param array<string, mixed> $student
+     * @param array<string, mixed>|null $course
+     * @param array<string, mixed>|null $groupRow
+     * @param array<string, mixed> $account
+     * @param array<string, mixed> $pdfInfo
+     * @return array<string, mixed>
+     */
+    private function buildRegistrationSummary(
+        array $application,
+        array $student,
+        ?array $course,
+        string $courseId,
+        string $academicYear,
+        string $courseMode,
+        ?array $groupRow,
+        array $account,
+        bool $newStudent,
+        array $pdfInfo,
+        bool $alreadyRegistered
+    ): array {
+        $note = 'Initial password is the student NIC. The student must change the password and complete personal and parent details at first login.';
+        if ($alreadyRegistered) {
+            $note = 'This applicant was already registered. ' . $note;
+        }
+        return [
+            'student_id' => (string) ($student['student_id'] ?? ''),
+            'student_name' => (string) ($student['student_fullname'] ?? $application['student_full_name'] ?? ''),
+            'nic' => $this->normalizeNic((string) ($application['student_nic'] ?? $student['student_nic'] ?? '')),
+            'course_id' => $courseId,
+            'course_name' => (string) ($course['course_name'] ?? $courseId),
+            'academic_year' => $academicYear,
+            'course_mode' => $courseMode,
+            'course_mode_label' => self::COURSE_MODES[$courseMode] ?? $courseMode,
+            'group_name' => (string) ($groupRow['name'] ?? 'Not assigned (no matching group)'),
+            'username' => (string) ($account['username'] ?? ''),
+            'account_created' => !empty($account['created']) || $newStudent,
+            'account_existing' => empty($account['created']) && !$newStudent,
+            'must_change_password' => true,
+            'default_password_note' => $note,
+            'student_created' => $newStudent,
+            'already_registered' => $alreadyRegistered,
+            'documents_pdf' => $pdfInfo['stored'] ?? false,
+            'documents_skipped' => $pdfInfo['skipped'] ?? [],
+            'document_count' => $pdfInfo['count'] ?? 0,
+        ];
     }
 
     private function storeCombinedDocumentsPdf(array $application, string $studentId): array {

@@ -176,28 +176,34 @@ class StudentEnrollmentModel extends Model {
                 (`student_id`, `course_id`, `course_version`, `academic_year`, `course_mode`, `student_enroll_status`, `student_enroll_date`, `student_enroll_exit_date`) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         
-        $stmt = $this->db->prepare($sql);
-        if (!$stmt) {
-            $this->lastSqlError = $this->db->getConnection()->error ?? 'Prepare failed (student_enroll insert)';
-            error_log('createEnrollment prepare: ' . $this->lastSqlError);
+        try {
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                $this->lastSqlError = $this->db->getConnection()->error ?? 'Prepare failed (student_enroll insert)';
+                error_log('createEnrollment prepare: ' . $this->lastSqlError);
+                return false;
+            }
+            $stmt->bind_param("ssisssss",
+                $data['student_id'],
+                $data['course_id'],
+                $courseVersion,
+                $data['academic_year'],
+                $data['course_mode'],
+                $data['student_enroll_status'],
+                $data['student_enroll_date'],
+                $data['student_enroll_exit_date']
+            );
+
+            if (!$stmt->execute()) {
+                $this->lastSqlError = $stmt->error ?: 'Execute failed (student_enroll insert)';
+                return false;
+            }
+            return true;
+        } catch (Throwable $e) {
+            $this->lastSqlError = $e->getMessage();
+            error_log('createEnrollment exception: ' . $this->lastSqlError);
             return false;
         }
-        $stmt->bind_param("ssisssss",
-            $data['student_id'],
-            $data['course_id'],
-            $courseVersion,
-            $data['academic_year'],
-            $data['course_mode'],
-            $data['student_enroll_status'],
-            $data['student_enroll_date'],
-            $data['student_enroll_exit_date']
-        );
-        
-        if (!$stmt->execute()) {
-            $this->lastSqlError = $stmt->error ?: 'Execute failed (student_enroll insert)';
-            return false;
-        }
-        return true;
     }
     
     /**

@@ -2671,7 +2671,10 @@ class ApplicationAdmissionController extends Controller {
             $this->redirect('application-admission/register?schedule_id=' . $scheduleId . '&entry_id=' . $entryId);
         }
         $_SESSION['admission_registration_summary'] = $result['summary'];
-        $_SESSION['success'] = 'Student registration completed for ' . ($result['summary']['student_id'] ?? 'the applicant') . '.';
+        $sid = (string) ($result['summary']['student_id'] ?? 'the applicant');
+        $_SESSION['success'] = !empty($result['summary']['already_registered'])
+            ? ('Student ' . $sid . ' was already registered for this course and year.')
+            : ('Student registration completed for ' . $sid . '.');
         $this->redirect('application-admission/register?schedule_id=' . $scheduleId . '&entry_id=' . $entryId);
     }
 
