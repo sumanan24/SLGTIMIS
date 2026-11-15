@@ -2183,6 +2183,12 @@ class StudentModel extends Model {
     }
 
     /**
+     * Sri Lanka ID / passport photo size (35×45 mm @ ~600 dpi).
+     */
+    public const ID_PHOTO_WIDTH = 826;
+    public const ID_PHOTO_HEIGHT = 1062;
+
+    /**
      * Ensure the canonical upload folder exists.
      */
     public function ensureProfileImageDirectory(): string {
@@ -2191,6 +2197,80 @@ class StudentModel extends Model {
             @mkdir($dir, 0755, true);
         }
         return $dir;
+    }
+
+    /**
+     * Center-crop / resize an image file to official ID photo size (35×45 mm).
+     * Saves as JPEG. Returns the final absolute path (may change extension to .jpg).
+     */
+    public function normalizeToIdPhotoSize(string $absolutePath): ?string {
+        if (!is_file($absolutePath) || !function_exists('imagecreatetruecolor')) {
+            return is_file($absolutePath) ? $absolutePath : null;
+        }
+
+        $info = @getimagesize($absolutePath);
+        if ($info === false || empty($info[0]) || empty($info[1])) {
+            return $absolutePath;
+        }
+
+        $srcW = (int) $info[0];
+        $srcH = (int) $info[1];
+        $type = (int) ($info[2] ?? 0);
+        $src = null;
+        if ($type === IMAGETYPE_JPEG) {
+            $src = @imagecreatefromjpeg($absolutePath);
+        } elseif ($type === IMAGETYPE_PNG) {
+            $src = @imagecreatefrompng($absolutePath);
+        } elseif ($type === IMAGETYPE_GIF) {
+            $src = @imagecreatefromgif($absolutePath);
+        } elseif (defined('IMAGETYPE_WEBP') && $type === IMAGETYPE_WEBP && function_exists('imagecreatefromwebp')) {
+            $src = @imagecreatefromwebp($absolutePath);
+        }
+        if (!$src) {
+            return $absolutePath;
+        }
+
+        $dstW = self::ID_PHOTO_WIDTH;
+        $dstH = self::ID_PHOTO_HEIGHT;
+        $srcAspect = $srcW / max(1, $srcH);
+        $dstAspect = $dstW / max(1, $dstH);
+
+        if ($srcAspect > $dstAspect) {
+            $cropH = $srcH;
+            $cropW = (int) round($srcH * $dstAspect);
+            $srcX = (int) max(0, round(($srcW - $cropW) / 2));
+            $srcY = 0;
+        } else {
+            $cropW = $srcW;
+            $cropH = (int) round($srcW / $dstAspect);
+            $srcX = 0;
+            $srcY = (int) max(0, round(($srcH - $cropH) / 2));
+        }
+        $cropW = max(1, min($cropW, $srcW - $srcX));
+        $cropH = max(1, min($cropH, $srcH - $srcY));
+
+        $dst = imagecreatetruecolor($dstW, $dstH);
+        if (!$dst) {
+            imagedestroy($src);
+            return $absolutePath;
+        }
+        $white = imagecolorallocate($dst, 137, 207, 240);
+        imagefilledrectangle($dst, 0, 0, $dstW, $dstH, $white);
+        imagecopyresampled($dst, $src, 0, 0, $srcX, $srcY, $dstW, $dstH, $cropW, $cropH);
+        imagedestroy($src);
+
+        $dir = dirname($absolutePath);
+        $base = pathinfo($absolutePath, PATHINFO_FILENAME);
+        $jpgPath = $dir . DIRECTORY_SEPARATOR . $base . '.jpg';
+        $ok = imagejpeg($dst, $jpgPath, 92);
+        imagedestroy($dst);
+        if (!$ok) {
+            return $absolutePath;
+        }
+        if (realpath($jpgPath) !== realpath($absolutePath) && is_file($absolutePath)) {
+            @unlink($absolutePath);
+        }
+        return $jpgPath;
     }
 
     /**

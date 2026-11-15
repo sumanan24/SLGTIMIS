@@ -62,43 +62,166 @@
             .student-edit-page .edit-actions .btn {
                 width: 100%;
             }
-            .student-edit-page #profileWebcam {
-                max-width: 100%;
-            }
+        }
+
+        /* Profile image + webcam capture */
+        .profile-photo-circle {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid #dee2e6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fa;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .profile-photo-circle img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Sri Lanka ID / passport photo frame: 35×45 mm (7:9) */
+        #webcamPanel {
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        .profile-cam-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
         }
         .profile-cam-frame {
             position: relative;
-            width: 100%;
-            max-width: 320px;
-            height: 280px;
+            width: min(260px, 100%);
+            max-width: 100%;
+            aspect-ratio: 35 / 45;
+            height: auto;
             overflow: hidden;
-            border-radius: 8px;
-            background: #ffffff;
+            border-radius: 10px;
+            background: #111827;
             border: 1px solid #dee2e6;
+            margin-left: auto;
+            margin-right: auto;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
         }
         .profile-cam-frame video {
             position: absolute;
+            inset: 0;
             width: 100%;
             height: 100%;
             opacity: 0;
             pointer-events: none;
+            object-fit: cover;
         }
         .profile-cam-frame canvas {
+            position: absolute;
+            inset: 0;
             width: 100%;
             height: 100%;
             display: block;
-            object-fit: contain;
+            object-fit: cover;
         }
-        .bg-swatch {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            border: 2px solid #ced4da;
-            padding: 0;
+        .profile-cam-guide {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 2;
         }
-        .bg-swatch.is-selected {
-            border-color: #0d6efd;
-            box-shadow: 0 0 0 3px #0d6efd;
+        .profile-cam-guide::before {
+            content: '';
+            position: absolute;
+            left: 12%;
+            right: 12%;
+            top: 10%;
+            height: 58%;
+            border: 2px dashed rgba(15, 23, 42, 0.45);
+            border-radius: 50% 50% 45% 45%;
+            box-sizing: border-box;
+        }
+        .profile-cam-size-hint {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-top: 0.5rem;
+            text-align: center;
+            width: 100%;
+            max-width: 320px;
+            line-height: 1.35;
+            padding: 0 0.25rem;
+        }
+        .profile-cam-actions,
+        .profile-cam-zoom,
+        .profile-cam-open {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .profile-photo-circle {
+                width: 120px;
+                height: 120px;
+            }
+            .profile-cam-frame {
+                width: min(72vw, 280px);
+                max-width: min(72vw, 280px);
+            }
+            .profile-cam-size-hint {
+                font-size: 0.78rem;
+                max-width: min(92vw, 320px);
+            }
+            .profile-cam-open,
+            .profile-cam-actions,
+            .profile-cam-zoom {
+                width: 100%;
+            }
+            .profile-cam-open .btn,
+            .profile-cam-actions .btn {
+                flex: 1 1 calc(50% - 0.5rem);
+                min-height: 42px;
+                font-size: 0.875rem;
+            }
+            .profile-cam-actions #btnCaptureWebcam {
+                flex: 1 1 100%;
+            }
+            .profile-cam-zoom {
+                justify-content: center;
+            }
+            .profile-cam-zoom .btn {
+                min-width: 44px;
+                min-height: 42px;
+            }
+            #imagePreview img {
+                max-width: 110px !important;
+                max-height: 142px !important;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .profile-cam-frame {
+                width: min(78vw, 240px);
+                max-width: min(78vw, 240px);
+            }
+            .profile-cam-open .btn,
+            .profile-cam-actions .btn {
+                flex: 1 1 100%;
+            }
+        }
+
+        @media (orientation: landscape) and (max-height: 500px) {
+            .profile-cam-frame {
+                width: min(34vh, 180px);
+                max-width: min(34vh, 180px);
+            }
         }
     </style>
     <div class="row justify-content-center">
@@ -180,12 +303,11 @@
                                                 $profileImageUrl = $studentModelHelper->getProfileImagePath($student);
                                                 ?>
                                                 <div class="position-relative d-inline-block">
-                                                    <div style="width: 150px; height: 150px; border-radius: 50%; overflow: hidden; border: 3px solid #dee2e6; display: flex; align-items: center; justify-content: center; background: #f8f9fa;">
+                                                    <div class="profile-photo-circle">
                                                         <?php if ($profileImageUrl): ?>
                                                             <img src="<?php echo htmlspecialchars($profileImageUrl); ?>" 
                                                                  alt="<?php echo htmlspecialchars($student['student_fullname']); ?>" 
-                                                                 id="currentProfileImage"
-                                                                 style="width: 100%; height: 100%; object-fit: cover;">
+                                                                 id="currentProfileImage">
                                                         <?php else: ?>
                                                             <i class="fas fa-user fa-4x text-muted" id="currentProfileImageIcon"></i>
                                                         <?php endif; ?>
@@ -212,23 +334,27 @@
                                                     <label for="profile_image" class="form-label fw-semibold">Upload New Profile Image</label>
                                                     <input type="file" class="form-control" id="profile_image" name="profile_image" 
                                                            accept="image/jpeg,image/jpg,image/png,image/gif" onchange="previewImage(this)">
-                                                    <div class="form-text">Accepted formats: JPG, PNG, GIF (Max 5MB). SAO and ADM only.</div>
+                                                    <div class="form-text">Accepted formats: JPG, PNG, GIF (Max 5MB). ID size 35×45 mm. SAO and ADM only.</div>
                                                 </div>
-                                                <div class="mb-3 d-flex flex-wrap gap-2">
+                                                <div class="mb-3 profile-cam-open">
                                                     <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenWebcam" data-facing="user">
-                                                        <i class="fas fa-user me-1"></i>Webcam
+                                                        <i class="fas fa-user me-1"></i>Front camera
                                                     </button>
                                                     <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenBackCamera" data-facing="environment">
                                                         <i class="fas fa-camera me-1"></i>Back camera
                                                     </button>
                                                 </div>
                                                 <div id="webcamPanel" class="mb-3" style="display: none;">
-                                                    <div class="profile-cam-frame" id="profileCamFrame">
-                                                        <video id="profileWebcam" autoplay playsinline muted></video>
-                                                        <canvas id="profileCamPreview"></canvas>
+                                                    <div class="profile-cam-wrap">
+                                                        <div class="profile-cam-frame" id="profileCamFrame">
+                                                            <video id="profileWebcam" autoplay playsinline muted></video>
+                                                            <canvas id="profileCamPreview"></canvas>
+                                                            <div class="profile-cam-guide" aria-hidden="true"></div>
+                                                        </div>
+                                                        <div class="profile-cam-size-hint">ID photo size: <strong>35 × 45 mm</strong> (portrait). Keep the face inside the oval.</div>
                                                     </div>
                                                     <canvas id="profileWebcamCanvas" hidden></canvas>
-                                                    <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
+                                                    <div class="mt-2 profile-cam-zoom">
                                                         <button type="button" class="btn btn-outline-secondary btn-sm" id="btnZoomOut" title="Zoom out">
                                                             <i class="fas fa-search-minus"></i>
                                                         </button>
@@ -237,22 +363,7 @@
                                                             <i class="fas fa-search-plus"></i>
                                                         </button>
                                                     </div>
-                                                    <div class="form-check mt-2 mb-0">
-                                                        <input class="form-check-input" type="checkbox" id="aiBackgroundFilter" checked>
-                                                        <label class="form-check-label small" for="aiBackgroundFilter">AI background filter</label>
-                                                    </div>
-                                                    <div class="mt-2">
-                                                        <div class="small fw-semibold mb-1">Background color</div>
-                                                        <div class="d-flex flex-wrap gap-2" id="bgColorChoices">
-                                                            <button type="button" class="bg-swatch is-selected" data-color="#ffffff" style="background:#ffffff;" title="White" aria-label="White"></button>
-                                                            <button type="button" class="bg-swatch" data-color="#dbeafe" style="background:#dbeafe;" title="Light blue" aria-label="Light blue"></button>
-                                                            <button type="button" class="bg-swatch" data-color="#1d4ed8" style="background:#1d4ed8;" title="Blue" aria-label="Blue"></button>
-                                                            <button type="button" class="bg-swatch" data-color="#dc2626" style="background:#dc2626;" title="Red" aria-label="Red"></button>
-                                                            <button type="button" class="bg-swatch" data-color="#16a34a" style="background:#16a34a;" title="Green" aria-label="Green"></button>
-                                                            <button type="button" class="bg-swatch" data-color="#111827" style="background:#111827;" title="Black" aria-label="Black"></button>
-                                                        </div>
-                                                    </div>
-                                                    <div class="mt-2 d-flex flex-wrap gap-2">
+                                                    <div class="mt-2 profile-cam-actions">
                                                         <button type="button" class="btn btn-primary btn-sm" id="btnCaptureWebcam">
                                                             <i class="fas fa-camera me-1"></i>Capture and update
                                                         </button>
@@ -264,7 +375,7 @@
                                                 </div>
                                                 <div id="profileImageStatus" class="small mb-2" style="display: none;"></div>
                                                 <div id="imagePreview" class="mb-3" style="display: none;">
-                                                    <img id="previewImg" src="" alt="Preview" style="max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #dee2e6;">
+                                                    <img id="previewImg" src="" alt="Preview" style="max-width: 120px; max-height: 155px; aspect-ratio: 35/45; object-fit: cover; border-radius: 8px; border: 2px solid #dee2e6;">
                                                     <div class="mt-2">
                                                         <small class="text-info"><i class="fas fa-info-circle me-1"></i>Image Preview</small>
                                                     </div>
@@ -791,22 +902,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const webcamVideo = document.getElementById('profileWebcam');
     const webcamCanvas = document.getElementById('profileWebcamCanvas');
     const previewCanvas = document.getElementById('profileCamPreview');
-    const aiFilterToggle = document.getElementById('aiBackgroundFilter');
     const captureBtn = document.getElementById('btnCaptureWebcam');
     const cancelWebcamBtn = document.getElementById('btnCancelWebcam');
     const zoomInBtn = document.getElementById('btnZoomIn');
     const zoomOutBtn = document.getElementById('btnZoomOut');
     const zoomLabel = document.getElementById('zoomLabel');
-    const camFrame = document.getElementById('profileCamFrame');
-    const colorChoices = document.getElementById('bgColorChoices');
     let webcamStream = null;
     let facingMode = 'user';
     let cameraZoom = 1;
-    let backgroundColor = '#ffffff';
+    // Sri Lanka ID / passport photo: 35×45 mm @ ~600 dpi
+    const ID_PHOTO_W = 826;
+    const ID_PHOTO_H = 1062;
+    const ID_PREVIEW_W = 280;
+    const ID_PREVIEW_H = 360;
     let previewTimer = null;
-    let segmenter = null;
-    let segmenterPromise = null;
-    let maskCanvas = document.createElement('canvas');
 
     function stopCameraTracks() {
         if (webcamStream) {
@@ -862,144 +971,45 @@ document.addEventListener('DOMContentLoaded', function() {
             webcamVideo.style.transform = mirror + 'scale(' + cameraZoom + ')';
             webcamVideo.style.transformOrigin = 'center center';
         }
-        if (camFrame) {
-            camFrame.style.background = backgroundColor;
-        }
         if (zoomLabel) {
             zoomLabel.textContent = Math.round(cameraZoom * 100) + '%';
         }
     }
 
-    function setProfileStatus(text, kind) {
-        const status = document.getElementById('profileImageStatus');
-        if (!status) {
-            return;
-        }
-        status.style.display = 'block';
-        status.className = 'small mb-2 text-' + (kind || 'muted');
-        status.textContent = text;
-    }
-
-    function ensureSegmenter() {
-        if (segmenter) {
-            return Promise.resolve(segmenter);
-        }
-        if (segmenterPromise) {
-            return segmenterPromise;
-        }
-        segmenterPromise = import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.17/+esm')
-            .then(function (vision) {
-                return vision.FilesetResolver.forVisionTasks(
-                    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.17/wasm'
-                ).then(function (fileset) {
-                    const options = {
-                        baseOptions: {
-                            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/1/selfie_segmenter.tflite'
-                        },
-                        runningMode: 'VIDEO',
-                        outputCategoryMask: false,
-                        outputConfidenceMasks: true
-                    };
-                    return vision.ImageSegmenter.createFromOptions(fileset, options).catch(function () {
-                        options.baseOptions.delegate = 'CPU';
-                        return vision.ImageSegmenter.createFromOptions(fileset, options);
-                    });
-                });
-            })
-            .then(function (created) {
-                segmenter = created;
-                return created;
-            })
-            .catch(function () {
-                segmenterPromise = null;
-                return null;
-            });
-        return segmenterPromise;
-    }
-
-    function personMask(result) {
-        const masks = result && result.confidenceMasks ? result.confidenceMasks : [];
-        if (!masks.length) {
-            return null;
-        }
-        return masks.length > 1 ? masks[1] : masks[0];
-    }
-
-    function paintPhoto(target, size) {
+    function paintPhoto(target, outW, outH) {
         if (!webcamVideo || !webcamVideo.videoWidth) {
             return false;
         }
-        target.width = size;
-        target.height = size;
+        outW = Math.max(1, Math.round(outW || ID_PHOTO_W));
+        outH = Math.max(1, Math.round(outH || ID_PHOTO_H));
+        target.width = outW;
+        target.height = outH;
         const ctx = target.getContext('2d');
         const vw = webcamVideo.videoWidth;
         const vh = webcamVideo.videoHeight;
-        const aspect = vw / vh;
-        let drawW = size;
-        let drawH = size / aspect;
-        if (drawH > size) {
-            drawH = size;
-            drawW = size * aspect;
+        const canvasAspect = outW / outH;
+        const videoAspect = vw / vh;
+        // Cover-fit into 35×45 frame, then apply zoom.
+        let drawW;
+        let drawH;
+        if (videoAspect > canvasAspect) {
+            drawH = outH;
+            drawW = outH * videoAspect;
+        } else {
+            drawW = outW;
+            drawH = outW / videoAspect;
         }
         drawW *= cameraZoom;
         drawH *= cameraZoom;
 
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, size, size);
+        ctx.clearRect(0, 0, outW, outH);
         ctx.save();
-        ctx.translate(size / 2, size / 2);
+        ctx.translate(outW / 2, outH / 2);
         if (facingMode === 'user') {
             ctx.scale(-1, 1);
         }
         ctx.drawImage(webcamVideo, -drawW / 2, -drawH / 2, drawW, drawH);
-        ctx.restore();
-
-        const useFilter = aiFilterToggle && aiFilterToggle.checked && segmenter;
-        if (useFilter) {
-            let result = null;
-            try {
-                result = segmenter.segmentForVideo(webcamVideo, performance.now());
-            } catch (error) {
-                result = null;
-            }
-            const mask = personMask(result);
-            if (mask) {
-                const values = mask.getAsFloat32Array();
-                maskCanvas.width = mask.width;
-                maskCanvas.height = mask.height;
-                const maskCtx = maskCanvas.getContext('2d');
-                const image = maskCtx.createImageData(mask.width, mask.height);
-                for (let i = 0; i < values.length; i++) {
-                    const alpha = Math.min(1, Math.max(0, (values[i] - 0.35) / 0.4));
-                    const pixel = i * 4;
-                    image.data[pixel] = 255;
-                    image.data[pixel + 1] = 255;
-                    image.data[pixel + 2] = 255;
-                    image.data[pixel + 3] = Math.round(alpha * 255);
-                }
-                maskCtx.putImageData(image, 0, 0);
-                ctx.save();
-                ctx.globalCompositeOperation = 'destination-in';
-                ctx.translate(size / 2, size / 2);
-                if (facingMode === 'user') {
-                    ctx.scale(-1, 1);
-                }
-                ctx.drawImage(maskCanvas, -drawW / 2, -drawH / 2, drawW, drawH);
-                ctx.restore();
-            }
-            if (result && result.confidenceMasks) {
-                result.confidenceMasks.forEach(function (item) {
-                    if (item && typeof item.close === 'function') {
-                        item.close();
-                    }
-                });
-            }
-        }
-
-        ctx.save();
-        ctx.globalCompositeOperation = 'destination-over';
-        ctx.fillStyle = backgroundColor;
-        ctx.fillRect(0, 0, size, size);
         ctx.restore();
         return true;
     }
@@ -1010,7 +1020,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         previewTimer = setInterval(function () {
             if (previewCanvas) {
-                paintPhoto(previewCanvas, 480);
+                paintPhoto(previewCanvas, ID_PREVIEW_W, ID_PREVIEW_H);
             }
         }, 80);
     }
@@ -1023,8 +1033,13 @@ document.addEventListener('DOMContentLoaded', function() {
         facingMode = facing === 'environment' ? 'environment' : 'user';
         stopCameraTracks();
         applyCameraView();
+        const isMobileCam = window.matchMedia('(max-width: 768px)').matches;
         navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: facingMode } },
+            video: {
+                facingMode: { ideal: facingMode },
+                width: { ideal: isMobileCam ? 960 : 1280 },
+                height: { ideal: isMobileCam ? 1280 : 720 }
+            },
             audio: false
         })
             .then(function (stream) {
@@ -1032,16 +1047,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 webcamVideo.srcObject = stream;
                 webcamPanel.style.display = 'block';
                 startPreview();
-                if (aiFilterToggle && aiFilterToggle.checked) {
-                    setProfileStatus('Loading AI background filter...', 'muted');
-                    ensureSegmenter().then(function (ready) {
-                        if (ready) {
-                            setProfileStatus('AI background filter is ready.', 'success');
-                        } else {
-                            setProfileStatus('AI filter could not load. The photo will keep the camera background.', 'danger');
-                        }
-                    });
-                }
                 return webcamVideo.play();
             })
             .catch(function () {
@@ -1077,33 +1082,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 applyCameraView();
             });
         }
-        if (colorChoices) {
-            colorChoices.addEventListener('click', function (event) {
-                const swatch = event.target.closest('.bg-swatch');
-                if (!swatch) {
-                    return;
-                }
-                backgroundColor = swatch.getAttribute('data-color') || '#ffffff';
-                colorChoices.querySelectorAll('.bg-swatch').forEach(function (button) {
-                    button.classList.toggle('is-selected', button === swatch);
-                });
-                applyCameraView();
-            });
-        }
 
         if (captureBtn) {
             captureBtn.addEventListener('click', function () {
                 if (!webcamVideo.videoWidth) {
                     return;
                 }
-                if (!paintPhoto(webcamCanvas, 640)) {
+                if (!paintPhoto(webcamCanvas, ID_PHOTO_W, ID_PHOTO_H)) {
                     return;
                 }
                 webcamCanvas.toBlob(function (blob) {
                     if (!blob) {
                         return;
                     }
-                    const file = new File([blob], 'webcam-profile.jpg', { type: 'image/jpeg' });
+                    const file = new File([blob], 'webcam-id-35x45.jpg', { type: 'image/jpeg' });
                     const status = document.getElementById('profileImageStatus');
                     const formData = new FormData();
                     formData.append('update_section', 'profile_image');

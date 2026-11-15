@@ -1691,6 +1691,10 @@ class StudentController extends Controller {
 
                             // Move uploaded file
                             if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+                                $normalized = $studentModel->normalizeToIdPhotoSize($targetPath);
+                                if ($normalized !== null && is_file($normalized)) {
+                                    $newFilename = basename($normalized);
+                                }
                                 // Store path relative to assets: img/Studnet_profile/filename.jpg
                                 $newImagePath = 'img/Studnet_profile/' . $newFilename;
                                 $studentModel->updateStudentImage($id, $newImagePath);
@@ -2034,6 +2038,12 @@ class StudentController extends Controller {
         $targetPath = $imageDirectory . '/' . $newFilename;
         if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
             return ['success' => false, 'message' => 'Failed to save the profile image.'];
+        }
+
+        $normalized = $studentModel->normalizeToIdPhotoSize($targetPath);
+        if ($normalized !== null && is_file($normalized)) {
+            $targetPath = $normalized;
+            $newFilename = basename($normalized);
         }
 
         $newImagePath = 'img/Studnet_profile/' . $newFilename;
