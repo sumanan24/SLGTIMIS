@@ -327,6 +327,8 @@ class AdmissionRegistrationService {
         (new CourseModel())->ensureCourseVersionTable();
         $this->enrollments->ensureCourseVersionColumn();
         $this->users->ensureMustChangePasswordColumn();
+        // Production may still be latin1 — convert before inserting Sinhala/Tamil fields.
+        $this->students->ensureUtf8mb4TextColumns(true);
 
         $db = Database::getInstance();
         $db->begin_transaction();

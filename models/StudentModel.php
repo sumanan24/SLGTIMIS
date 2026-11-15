@@ -1926,86 +1926,137 @@ class StudentModel extends Model {
     }
 
     /**
-     * Upgrade latin1 student text columns to utf8mb4 so Sinhala/Tamil values
-     * can be saved (avoids MySQL error 3988 on prepared inserts).
-     * Prefer running database/migrations/2026_11_15_utf8mb4_student_core.sql
-     * for a full CONVERT; this only patches registration-critical columns.
+     * Upgrade legacy latin1 student/course tables to utf8mb4 so Sinhala/Tamil
+     * values can be saved (avoids MySQL error 3988 on prepared inserts).
+     * Safe to call repeatedly; no-op when already utf8mb4.
+     *
+     * @throws RuntimeException when conversion is required but fails
      */
-    public function ensureUtf8mb4TextColumns(): void {
+    public function ensureUtf8mb4TextColumns(bool $throwOnFailure = false): void {
         static $done = false;
         if ($done) {
             return;
         }
-        $done = true;
 
         try {
-            $sql = "SELECT CHARACTER_SET_NAME FROM information_schema.COLUMNS
-                    WHERE TABLE_SCHEMA = DATABASE()
-                      AND TABLE_NAME = 'student'
-                      AND COLUMN_NAME = 'student_fullname'
-                    LIMIT 1";
-            $result = $this->db->query($sql);
-            $row = $result ? $result->fetch_assoc() : null;
-            $charset = strtolower((string) ($row['CHARACTER_SET_NAME'] ?? ''));
-            if ($charset === '' || $charset === 'utf8mb4') {
+            if (!$this->tableHasNonUtf8mb4Columns('student')) {
+                $done = true;
                 return;
             }
 
-            $columns = [
-                'student_title' => "VARCHAR(5) NULL",
-                'student_fullname' => "VARCHAR(255) NOT NULL",
-                'student_ininame' => "VARCHAR(255) NULL",
-                'student_gender' => "VARCHAR(10) NULL",
-                'student_civil' => "VARCHAR(10) NULL",
-                'student_nic' => "VARCHAR(20) NOT NULL",
-                'student_dob' => "VARCHAR(10) NULL",
-                'student_address' => "VARCHAR(255) NULL",
-                'student_district' => "VARCHAR(20) NULL",
-                'student_divisions' => "VARCHAR(50) NULL",
-                'student_provice' => "VARCHAR(100) NULL",
-                'student_blood' => "VARCHAR(5) NULL",
-                'student_em_name' => "VARCHAR(255) NULL",
-                'student_em_address' => "VARCHAR(255) NULL",
-                'student_em_relation' => "VARCHAR(20) NULL",
-                'student_status' => "VARCHAR(15) NULL",
-                'student_nationality' => "VARCHAR(50) NULL",
-                'student_whatsapp' => "VARCHAR(20) NULL",
-                'student_religion' => "VARCHAR(20) NULL",
-                'student_documents_pdf' => "VARCHAR(255) NULL",
-            ];
-
-            foreach ($columns as $name => $definition) {
-                $check = $this->db->query("SHOW COLUMNS FROM `{$this->table}` LIKE '" . $this->db->escape($name) . "'");
-                if (!$check || $check->num_rows === 0) {
+            // Full CONVERT is required on production (sis.slgti.ac.lk) where the
+            // schema is still latin1_swedish_ci while the app connects as utf8mb4.
+            $this->db->query('SET FOREIGN_KEY_CHECKS = 0');
+            foreach (['academic', 'department', 'course', 'student', 'student_enroll', 'staff', 'user'] as $table) {
+                if (!$this->tableExists($table)) {
                     continue;
                 }
-                $alter = "ALTER TABLE `{$this->table}` MODIFY COLUMN `{$name}` {$definition}
-                          CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
-                $this->db->query($alter);
+                if (!$this->tableHasNonUtf8mb4Columns($table)) {
+                    continue;
+                }
+                $ok = $this->db->query(
+                    "ALTER TABLE `{$table}` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+                );
+                if ($ok === false) {
+                    $err = $this->db->getConnection()->error ?: ('CONVERT failed for ' . $table);
+                    throw new RuntimeException($err);
+                }
+            }
+            $this->db->query('SET FOREIGN_KEY_CHECKS = 1');
+
+            // Fallback: patch registration columns if CONVERT left any latin1 text fields.
+            if ($this->tableHasNonUtf8mb4Columns('student')) {
+                $this->modifyStudentTextColumnsToUtf8mb4();
             }
 
-            // Enrollment string/enum columns used during registration.
-            $enrollCheck = $this->db->query(
-                "SELECT CHARACTER_SET_NAME FROM information_schema.COLUMNS
-                 WHERE TABLE_SCHEMA = DATABASE()
-                   AND TABLE_NAME = 'student_enroll'
-                   AND COLUMN_NAME = 'course_mode'
-                 LIMIT 1"
-            );
-            $enrollRow = $enrollCheck ? $enrollCheck->fetch_assoc() : null;
-            $enrollCharset = strtolower((string) ($enrollRow['CHARACTER_SET_NAME'] ?? ''));
-            if ($enrollCharset !== '' && $enrollCharset !== 'utf8mb4') {
-                $this->db->query(
-                    "ALTER TABLE `student_enroll`
-                     MODIFY COLUMN `course_mode` ENUM('Part','Full')
-                     CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-                     MODIFY COLUMN `student_enroll_status`
-                     ENUM('Following','Dropout','Completed','Long Absent','Internship')
-                     CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Following'"
+            if ($this->tableHasNonUtf8mb4Columns('student')) {
+                throw new RuntimeException(
+                    'The student table is still not utf8mb4. Run database/migrations/2026_11_15_utf8mb4_student_core.sql on this database.'
                 );
             }
+            $done = true;
         } catch (Throwable $e) {
+            try {
+                $this->db->query('SET FOREIGN_KEY_CHECKS = 1');
+            } catch (Throwable $ignored) {
+            }
             error_log('StudentModel::ensureUtf8mb4TextColumns: ' . $e->getMessage());
+            if ($throwOnFailure) {
+                throw new RuntimeException(
+                    'Could not convert student tables to utf8mb4 (needed for Sinhala/Tamil text): ' . $e->getMessage(),
+                    0,
+                    $e instanceof Exception ? $e : null
+                );
+            }
+        }
+    }
+
+    private function tableExists(string $table): bool {
+        $table = preg_replace('/[^a-zA-Z0-9_]/', '', $table) ?? '';
+        if ($table === '') {
+            return false;
+        }
+        $result = $this->db->query("SHOW TABLES LIKE '" . $this->db->escape($table) . "'");
+        return $result && $result->num_rows > 0;
+    }
+
+    private function tableHasNonUtf8mb4Columns(string $table): bool {
+        $table = preg_replace('/[^a-zA-Z0-9_]/', '', $table) ?? '';
+        if ($table === '') {
+            return false;
+        }
+        $sql = "SELECT 1 FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = '{$table}'
+                  AND CHARACTER_SET_NAME IS NOT NULL
+                  AND CHARACTER_SET_NAME <> 'utf8mb4'
+                LIMIT 1";
+        $result = $this->db->query($sql);
+        return $result && $result->num_rows > 0;
+    }
+
+    private function modifyStudentTextColumnsToUtf8mb4(): void {
+        $columns = [
+            'student_title' => 'VARCHAR(5) NULL',
+            'student_fullname' => 'VARCHAR(255) NOT NULL',
+            'student_ininame' => 'VARCHAR(255) NULL',
+            'student_gender' => 'VARCHAR(10) NULL',
+            'student_civil' => 'VARCHAR(10) NULL',
+            'student_email' => 'VARCHAR(254) NOT NULL',
+            'student_nic' => 'VARCHAR(20) NOT NULL',
+            'student_dob' => 'VARCHAR(10) NULL',
+            'student_address' => 'VARCHAR(255) NULL',
+            'student_district' => 'VARCHAR(20) NULL',
+            'student_divisions' => 'VARCHAR(50) NULL',
+            'student_provice' => 'VARCHAR(100) NULL',
+            'student_blood' => 'VARCHAR(5) NULL',
+            'student_em_name' => 'VARCHAR(255) NULL',
+            'student_em_address' => 'VARCHAR(255) NULL',
+            'student_em_relation' => 'VARCHAR(20) NULL',
+            'student_status' => 'VARCHAR(15) NULL',
+            'student_nationality' => 'VARCHAR(50) NULL',
+            'student_whatsapp' => 'VARCHAR(20) NULL',
+            'student_religion' => 'VARCHAR(20) NULL',
+            'student_documents_pdf' => 'VARCHAR(255) NULL',
+        ];
+
+        foreach ($columns as $name => $definition) {
+            $check = $this->db->query(
+                "SELECT CHARACTER_SET_NAME FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'student'
+                   AND COLUMN_NAME = '" . $this->db->escape($name) . "'
+                 LIMIT 1"
+            );
+            $row = $check ? $check->fetch_assoc() : null;
+            $charset = strtolower((string) ($row['CHARACTER_SET_NAME'] ?? ''));
+            if ($charset === '' || $charset === 'utf8mb4') {
+                continue;
+            }
+            $this->db->query(
+                "ALTER TABLE `{$this->table}` MODIFY COLUMN `{$name}` {$definition}
+                 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+            );
         }
     }
     
