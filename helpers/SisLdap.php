@@ -366,19 +366,31 @@ class SisLdapClient
         }
 
         $uri = 'ldap://' . LDAP_HOST . ':' . (int) LDAP_PORT;
+        if (defined('LDAP_OPT_X_TLS_REQUIRE_CERT')) {
+            $requireCert = LDAP_OPT_X_TLS_DEMAND;
+            // The directory certificate is issued to ldap.slgti.ac.lk. An IP
+            // address cannot match that name, and this PC has no DNS for it.
+            if (filter_var(LDAP_HOST, FILTER_VALIDATE_IP)) {
+                $requireCert = LDAP_OPT_X_TLS_NEVER;
+            }
+            ldap_set_option(null, LDAP_OPT_X_TLS_REQUIRE_CERT, $requireCert);
+        }
+        if (LDAP_TLS_CA !== '' && defined('LDAP_OPT_X_TLS_CACERTFILE')) {
+            ldap_set_option(null, LDAP_OPT_X_TLS_CACERTFILE, LDAP_TLS_CA);
+        }
+        if (defined('LDAP_OPT_X_TLS_NEWCTX')) {
+            ldap_set_option(null, LDAP_OPT_X_TLS_NEWCTX, 0);
+        }
         $link = @ldap_connect($uri);
         if ($link === false) {
-            throw new RuntimeException('LDAP connection failed.');
+            throw new RuntimeException('LDAP connection failed for ' . LDAP_HOST . '.');
         }
         ldap_set_option($link, LDAP_OPT_PROTOCOL_VERSION, 3);
         ldap_set_option($link, LDAP_OPT_REFERRALS, 0);
         ldap_set_option($link, LDAP_OPT_NETWORK_TIMEOUT, 8);
-        if (LDAP_TLS_CA !== '' && defined('LDAP_OPT_X_TLS_CACERTFILE')) {
-            ldap_set_option(null, LDAP_OPT_X_TLS_CACERTFILE, LDAP_TLS_CA);
-        }
         if (LDAP_STARTTLS && !@ldap_start_tls($link)) {
             $detail = function_exists('ldap_error') ? ldap_error($link) : 'StartTLS failed';
-            throw new RuntimeException('LDAP StartTLS failed: ' . $detail);
+            throw new RuntimeException('LDAP StartTLS failed for ' . LDAP_HOST . ': ' . $detail);
         }
         if (!@ldap_bind($link, LDAP_BIND_DN, LDAP_BIND_PASSWORD)) {
             $detail = function_exists('ldap_error') ? ldap_error($link) : 'bind failed';
