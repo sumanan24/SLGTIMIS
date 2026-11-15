@@ -51,7 +51,7 @@ $rowCount = count($rows);
     <div class="stu-head">
         <div>
             <h1 class="stu-title">Registration checklist</h1>
-            <p class="stu-sub">Select an academic year, optionally filter by department/course, then bulk-download one A4 checklist page per student as a single PDF.</p>
+            <p class="stu-sub">Download one common attendance sheet for the selected students, and a checklist letter for each student. The series number on the sheet is the same number on that student’s checklist letter.</p>
         </div>
         <a class="stu-btn stu-btn-ghost" href="<?php echo APP_URL; ?>/students">
             <i class="fas fa-arrow-left"></i>Students
@@ -125,7 +125,7 @@ $rowCount = count($rows);
 
     <?php if (!$yearChosen): ?>
         <div class="stu-panel">
-            <div class="stu-empty">Choose an academic year, then show students to bulk-download the registration checklist PDF.</div>
+            <div class="stu-empty">Choose an academic year, then show students to download the attendance sheet and the checklist letter.</div>
         </div>
     <?php else: ?>
         <form method="POST" action="<?php echo APP_URL; ?>/students/intake-checklist" id="intakeChecklistForm">
@@ -134,6 +134,7 @@ $rowCount = count($rows);
             <input type="hidden" name="department_id" value="<?php echo $e($deptForForm); ?>">
             <input type="hidden" name="course_id" value="<?php echo $e($filters['course_id'] ?? ''); ?>">
             <input type="hidden" name="download_all" id="icDownloadAll" value="0">
+            <input type="hidden" name="document" id="icDocument" value="checklist">
 
             <div class="stu-panel" style="margin-bottom:0;">
                 <div class="stu-bulk-bar">
@@ -149,11 +150,17 @@ $rowCount = count($rows);
                     </div>
                     <div class="d-flex flex-wrap gap-2">
                         <?php if ($rowCount > 0): ?>
-                        <button type="submit" class="stu-btn stu-btn-pdf" id="icDownloadAllBtn" title="Download checklist PDF for every student in this filter">
-                            <i class="fas fa-file-pdf"></i>Download all PDF (<?php echo $rowCount; ?>)
+                        <button type="submit" class="stu-btn stu-btn-ghost ic-dl" data-document="attendance" data-all="1">
+                            <i class="fas fa-clipboard-list"></i>All attendance (<?php echo $rowCount; ?>)
                         </button>
-                        <button type="submit" class="stu-btn stu-btn-primary" id="icDownloadBtn" disabled>
-                            <i class="fas fa-file-pdf"></i>Download selected
+                        <button type="submit" class="stu-btn stu-btn-primary ic-dl" data-document="attendance" data-all="0" id="icAttendanceBtn" disabled>
+                            <i class="fas fa-clipboard-list"></i>Attendance sheet
+                        </button>
+                        <button type="submit" class="stu-btn stu-btn-ghost ic-dl" data-document="checklist" data-all="1">
+                            <i class="fas fa-file-pdf"></i>All checklist (<?php echo $rowCount; ?>)
+                        </button>
+                        <button type="submit" class="stu-btn stu-btn-pdf ic-dl" data-document="checklist" data-all="0" id="icDownloadBtn" disabled>
+                            <i class="fas fa-file-pdf"></i>Checklist letter
                         </button>
                         <?php endif; ?>
                     </div>
@@ -172,7 +179,7 @@ $rowCount = count($rows);
                                     <th style="width:42px;">
                                         <input type="checkbox" class="form-check-input" id="icSelectAll" title="Select all" checked>
                                     </th>
-                                    <th style="width:56px;">No</th>
+                                    <th style="width:88px;">Series No.</th>
                                     <th>Registration no.</th>
                                     <th>Student name</th>
                                     <th>Department</th>
@@ -180,13 +187,13 @@ $rowCount = count($rows);
                                 </tr>
                             </thead>
                             <tbody>
-                            <?php $n = 1; foreach ($rows as $row): ?>
+                            <?php foreach ($rows as $row): ?>
                                 <tr data-search="<?php echo $e(strtolower($row['student_id'] . ' ' . $row['name'] . ' ' . $row['department'] . ' ' . $row['course'])); ?>">
                                     <td>
                                         <input type="checkbox" class="form-check-input ic-select" name="student_ids[]"
                                                value="<?php echo $e($row['student_id']); ?>" checked>
                                     </td>
-                                    <td class="text-muted"><?php echo $n++; ?></td>
+                                    <td><span class="stu-id"><?php echo $e($row['series_no'] ?? ''); ?></span></td>
                                     <td><span class="stu-id"><?php echo $e($row['student_id']); ?></span></td>
                                     <td><?php echo $e($row['name']); ?></td>
                                     <td><?php echo $e($row['department'] !== '' ? $row['department'] : '—'); ?></td>
@@ -210,8 +217,9 @@ $rowCount = count($rows);
     var boxes = function () { return Array.prototype.slice.call(document.querySelectorAll('.ic-select')); };
     var countEl = document.getElementById('icSelectedCount');
     var btn = document.getElementById('icDownloadBtn');
-    var allBtn = document.getElementById('icDownloadAllBtn');
+    var attendanceBtn = document.getElementById('icAttendanceBtn');
     var downloadAllField = document.getElementById('icDownloadAll');
+    var documentField = document.getElementById('icDocument');
     var search = document.getElementById('icSearch');
     var dept = document.getElementById('department_id');
     var course = document.getElementById('course_id');
@@ -226,6 +234,7 @@ $rowCount = count($rows);
         var checked = boxes().filter(function (cb) { return cb.checked; }).length;
         if (countEl) countEl.textContent = checked + ' selected';
         if (btn) btn.disabled = checked === 0;
+        if (attendanceBtn) attendanceBtn.disabled = checked === 0;
         var vis = visibleBoxes();
         if (selectAll) {
             selectAll.checked = vis.length > 0 && vis.every(function (cb) { return cb.checked; });
@@ -252,35 +261,34 @@ $rowCount = count($rows);
 
     function startBusy(el, label) {
         if (!el) return;
-        el.disabled = true;
         el.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (label || 'Preparing PDF…');
-        if (btn && el !== btn) btn.disabled = true;
-        if (allBtn && el !== allBtn) allBtn.disabled = true;
+        Array.prototype.forEach.call(form.querySelectorAll('.ic-dl'), function (other) {
+            other.disabled = true;
+        });
     }
 
-    if (allBtn) {
-        allBtn.addEventListener('click', function () {
-            if (downloadAllField) downloadAllField.value = '1';
-            startBusy(allBtn, 'Preparing bulk PDF…');
+    Array.prototype.forEach.call(form.querySelectorAll('.ic-dl'), function (el) {
+        el.addEventListener('click', function () {
+            var isAll = el.getAttribute('data-all') === '1';
+            if (downloadAllField) downloadAllField.value = isAll ? '1' : '0';
+            if (documentField) documentField.value = el.getAttribute('data-document') || 'checklist';
         });
-    }
-    if (btn) {
-        btn.addEventListener('click', function () {
-            if (downloadAllField) downloadAllField.value = '0';
-        });
-    }
+    });
 
     form.addEventListener('submit', function (ev) {
         var isAll = downloadAllField && downloadAllField.value === '1';
         var checked = boxes().filter(function (cb) { return cb.checked; }).length;
         if (!isAll && checked === 0) {
             ev.preventDefault();
-            alert('Select at least one student, or use Download all PDF.');
+            alert('Select at least one student, or download all.');
             return;
         }
-        if (!isAll) {
-            startBusy(btn, 'Preparing PDF…');
-        }
+        var active = document.activeElement;
+        var label = documentField && documentField.value === 'attendance' ? 'Preparing attendance…' : 'Preparing checklist…';
+        var target = active && active.classList && active.classList.contains('ic-dl') ? active : btn;
+        // Disable only after the browser has accepted this submit. Disabling the
+        // button during click/submit cancels the PDF download.
+        setTimeout(function () { startBusy(target, label); }, 0);
     });
 
     function filterCourses() {

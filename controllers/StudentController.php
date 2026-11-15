@@ -5196,11 +5196,54 @@ class StudentController extends Controller {
                 'applicable_fee' => $feeInfo['applicable_fee'],
                 'fee_category' => $feeInfo['category'],
                 'academic_year' => trim((string) ($r['academic_year'] ?? $year)),
+                'series_no' => '',
                 'token' => '',
             ];
         }
         $stmt->close();
+
+        $series = $this->intakeChecklistSeriesMap($year);
+        foreach ($rows as &$row) {
+            $n = $series[(string) $row['student_id']] ?? 0;
+            $row['series_no'] = $n > 0 ? str_pad((string) $n, 4, '0', STR_PAD_LEFT) : '';
+        }
+        unset($row);
         return $rows;
+    }
+
+    /**
+     * Stable series number for the academic year, ordered by registration number.
+     * The same number is printed on the attendance sheet and the checklist letter.
+     *
+     * @return array<string,int>
+     */
+    private function intakeChecklistSeriesMap(string $year): array {
+        $db = Database::getInstance();
+        $sql = "SELECT DISTINCT s.`student_id`
+                FROM `student` s
+                INNER JOIN `student_enroll` se ON se.`student_id` = s.`student_id`
+                WHERE se.`academic_year` = ?
+                  AND se.`student_enroll_status` IN ('Following', 'Internship')
+                ORDER BY s.`student_id` ASC";
+        $stmt = $db->prepare($sql);
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param('s', $year);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $map = [];
+        $n = 0;
+        while ($result && ($r = $result->fetch_assoc())) {
+            $sid = trim((string) ($r['student_id'] ?? ''));
+            if ($sid === '' || isset($map[$sid])) {
+                continue;
+            }
+            $n++;
+            $map[$sid] = $n;
+        }
+        $stmt->close();
+        return $map;
     }
 
     private function intakeChecklistDownload(): void {
@@ -5274,15 +5317,17 @@ class StudentController extends Controller {
 
         $logoSrc = ComplaintLetterPdfHelper::logoDataUri();
         $institute = ComplaintLetterPdfHelper::institutePostFrom();
-        $viewPath = BASE_PATH . '/views/students/pdf/intake_checklist.php';
+        $document = (string) $this->post('document', 'checklist');
+        $isAttendance = $document === 'attendance';
+        $viewPath = BASE_PATH . '/views/students/pdf/' . ($isAttendance ? 'intake_attendance.php' : 'intake_checklist.php');
         if (!is_file($viewPath)) {
-            $_SESSION['error'] = 'Intake checklist template missing.';
+            $_SESSION['error'] = 'Intake document template missing.';
             $this->redirect($back);
             return;
         }
 
         $label = preg_replace('/[^A-Za-z0-9_-]+/', '_', $filters['academic_year']) ?: 'intake';
-        $filename = 'student_intake_checklist_' . $label . '_' . date('Ymd_His') . '.pdf';
+        $filename = ($isAttendance ? 'student_intake_attendance_' : 'student_intake_checklist_') . $label . '_' . date('Ymd_His') . '.pdf';
 
         $renderOne = static function (array $student) use ($viewPath, $logoSrc, $institute): string {
             extract([
@@ -5298,13 +5343,36 @@ class StudentController extends Controller {
         ExamPdfHelper::prepareBulkPdfJob();
         session_write_close();
         try {
+            if ($isAttendance) {
+                extract([
+                    'students' => $selected,
+                    'logoSrc' => $logoSrc,
+                    'institute' => $institute,
+                ], EXTR_SKIP);
+                ob_start();
+                include $viewPath;
+                $html = (string) ob_get_clean();
+                $pdf = ExamPdfHelper::renderPdfBytes($html, 'A4', 'portrait');
+                $safe = preg_replace('/[^a-zA-Z0-9._-]+/', '_', $filename) ?: 'intake_attendance.pdf';
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: attachment; filename="' . $safe . '"');
+                header('Content-Length: ' . strlen($pdf));
+                echo $pdf;
+                exit;
+            }
+
             $pdfChunks = [];
             foreach (array_chunk($selected, 20) as $batch) {
                 if (function_exists('set_time_limit')) {
                     @set_time_limit(180);
                 }
                 foreach ($batch as $row) {
-                    $pdfChunks[] = ExamPdfHelper::renderPdfBytes($renderOne($row), 'A4', 'portrait');
+                    $html = $renderOne($row);
+                    $pdfChunks[] = ExamPdfHelper::renderPdfBytes($html, 'A4', 'portrait');
+                    unset($html);
+                }
+                if (function_exists('gc_collect_cycles')) {
+                    gc_collect_cycles();
                 }
             }
             if (count($pdfChunks) === 1) {
