@@ -26,22 +26,6 @@ class AdminController extends Controller {
         
         return true;
     }
-
-    /** System admin or staff ADM position. */
-    private function checkAdminOrAdm() {
-        if (!isset($_SESSION['user_id'])) {
-            $this->redirect('login');
-            return false;
-        }
-        require_once BASE_PATH . '/models/UserModel.php';
-        $userModel = new UserModel();
-        if (!$userModel->isAdminOrADM($_SESSION['user_id'])) {
-            $_SESSION['error'] = 'Access denied. ADM privileges required.';
-            $this->redirect('dashboard');
-            return false;
-        }
-        return true;
-    }
     
     /**
      * User Management - List all users with lock status and filters
@@ -452,7 +436,7 @@ class AdminController extends Controller {
      * ADM / Admin: view sent SMS (local + Mobitel sync) and inbound replies.
      */
     public function smsMessages() {
-        if (!$this->checkAdminOrAdm()) {
+        if (!$this->checkAdminOrADM()) {
             return;
         }
 
