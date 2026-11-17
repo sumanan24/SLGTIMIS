@@ -13,6 +13,22 @@ class PaymentTypeModel extends Model {
     /**
      * Main types can exist before any sub type is added.
      */
+    public function ensureDefaultAmountColumn() {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+        $ready = true;
+        $check = $this->db->query("SHOW COLUMNS FROM `{$this->table}` LIKE 'default_amount'");
+        if ($check && $check->num_rows > 0) {
+            return;
+        }
+        $this->db->query(
+            "ALTER TABLE `{$this->table}`
+             ADD COLUMN `default_amount` decimal(10,2) NULL DEFAULT NULL AFTER `payment_type`"
+        );
+    }
+
     public function ensureMainTypeTable() {
         $sql = "CREATE TABLE IF NOT EXISTS `payment_main_type` (
                     `payment_type` varchar(100) NOT NULL,
@@ -140,7 +156,8 @@ class PaymentTypeModel extends Model {
      * Get all payment type / reason entries
      */
     public function getAll() {
-        $sql = "SELECT payment_reason, payment_type FROM `{$this->table}` ORDER BY payment_type ASC, payment_reason ASC";
+        $this->ensureDefaultAmountColumn();
+        $sql = "SELECT payment_reason, payment_type, default_amount FROM `{$this->table}` ORDER BY payment_type ASC, payment_reason ASC";
         $result = $this->db->query($sql);
 
         $data = [];
@@ -175,7 +192,8 @@ class PaymentTypeModel extends Model {
      * Find entry by composite key
      */
     public function findByKey($reason, $type) {
-        $sql = "SELECT payment_reason, payment_type FROM `{$this->table}` WHERE payment_reason = ? AND payment_type = ?";
+        $this->ensureDefaultAmountColumn();
+        $sql = "SELECT payment_reason, payment_type, default_amount FROM `{$this->table}` WHERE payment_reason = ? AND payment_type = ?";
         $stmt = $this->db->prepare($sql);
         $stmt->bind_param('ss', $reason, $type);
         $stmt->execute();
@@ -194,24 +212,27 @@ class PaymentTypeModel extends Model {
     /**
      * Create payment type / reason entry
      */
-    public function createEntry($reason, $type, &$sqlError = null) {
+    public function createEntry($reason, $type, $defaultAmount = null, &$sqlError = null) {
+        $this->ensureDefaultAmountColumn();
         return $this->create([
             'payment_reason' => $reason,
             'payment_type' => $type,
+            'default_amount' => $defaultAmount,
         ], $sqlError);
     }
 
     /**
      * Update payment type / reason entry
      */
-    public function updateEntry($oldReason, $oldType, $newReason, $newType, &$sqlError = null) {
+    public function updateEntry($oldReason, $oldType, $newReason, $newType, $defaultAmount = null, &$sqlError = null) {
+        $this->ensureDefaultAmountColumn();
         $db = $this->db;
         if (!$db->begin_transaction()) {
             $sqlError = 'Could not start the update.';
             return false;
         }
 
-        $lookup = $db->prepare("UPDATE `{$this->table}` SET payment_reason = ?, payment_type = ? WHERE payment_reason = ? AND payment_type = ?");
+        $lookup = $db->prepare("UPDATE `{$this->table}` SET payment_reason = ?, payment_type = ?, default_amount = ? WHERE payment_reason = ? AND payment_type = ?");
         $pays = $db->prepare("UPDATE `pays` SET payment_reason = ?, payment_type = ? WHERE payment_reason = ? AND payment_type = ?");
         if (!$lookup || !$pays) {
             $db->rollback();
@@ -219,7 +240,7 @@ class PaymentTypeModel extends Model {
             return false;
         }
 
-        $lookup->bind_param('ssss', $newReason, $newType, $oldReason, $oldType);
+        $lookup->bind_param('sssss', $newReason, $newType, $defaultAmount, $oldReason, $oldType);
         $pays->bind_param('ssss', $newReason, $newType, $oldReason, $oldType);
         if (!$lookup->execute() || !$pays->execute()) {
             $sqlError = $lookup->error ?: $pays->error;

@@ -12,7 +12,13 @@ foreach ($paymentReasons as $row) {
     if ($typeName === '' || $reasonName === '') {
         continue;
     }
-    $typeGroups[$typeName][] = $reasonName;
+    $defaultAmount = $row['default_amount'] ?? null;
+    $typeGroups[$typeName][] = [
+        'name' => $reasonName,
+        'amount' => ($defaultAmount === null || $defaultAmount === '' || (float) $defaultAmount <= 0)
+            ? ''
+            : number_format((float) $defaultAmount, 2, '.', ''),
+    ];
 }
 ?>
 <style>
@@ -192,11 +198,19 @@ foreach ($paymentReasons as $row) {
     padding: 0.55rem 0;
     border-bottom: 1px solid #eef1f4;
 }
-.pos-cart-item button {
+.pos-bill-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex: 0 0 auto;
+}
+.pos-cart-item button,
+.pos-bill-item button {
     border: 0;
     background: transparent;
     color: #9b1c1c;
     padding: 0 0.15rem;
+    line-height: 1;
 }
 .pos-mobile-bar {
     display: none;
@@ -259,7 +273,7 @@ foreach ($paymentReasons as $row) {
         <input type="hidden" name="payment_type" id="payment_type" value="">
         <input type="hidden" name="payment_reason" id="payment_reason" value="">
         <input type="hidden" name="payment_method" id="payment_method" value="">
-        <input type="hidden" name="approved" id="approved" value="0">
+        <input type="hidden" name="approved" id="approved" value="1">
 
         <div class="row g-3">
             <div class="col-lg-8">
@@ -354,9 +368,10 @@ foreach ($paymentReasons as $row) {
                             </button>
                         <?php endforeach; ?>
                     </div>
+                    <div id="methodError" class="text-danger small mt-2 d-none">Select Cash, Bank, or Online transfer.</div>
                     <div id="referenceWrap" class="mt-3 d-none">
                         <label for="reference_no" class="form-label fw-semibold">Reference number <span class="text-muted fw-normal">(optional)</span></label>
-                        <input type="text" class="form-control" id="reference_no" name="reference_no" placeholder="Bank slip, cheque, or transfer reference">
+                        <input type="text" class="form-control" id="reference_no" name="reference_no" placeholder="Bank slip or transfer reference">
                         <div class="form-text">Leave blank to use the day’s common number for each payment category.</div>
                     </div>
                     <div class="mt-3">
@@ -382,13 +397,7 @@ foreach ($paymentReasons as $row) {
                         <div class="pos-summary-line"><span>Items</span><b id="sumCount">0</b></div>
                         <div id="sumItems"></div>
                         <div class="pos-summary-line"><span>Method</span><b id="sumMethod">—</b></div>
-                        <div class="mt-3">
-                            <div class="form-label fw-semibold mb-2">Approval status</div>
-                            <div class="pos-choice-grid">
-                                <button type="button" class="pos-choice is-selected" data-approved="0" id="approvePending">Pending</button>
-                                <button type="button" class="pos-choice" data-approved="1" id="approveYes">Approved</button>
-                            </div>
-                        </div>
+                        <div class="pos-summary-line"><span>Approval status</span><b>Approved</b></div>
                         <button type="submit" class="btn btn-lg w-100 mt-3 text-white" id="collectBtn" style="background:#0c2340;">
                             <i class="fas fa-check me-1"></i>Collect Payment
                         </button>
@@ -426,7 +435,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var methodInput = document.getElementById('payment_method');
     var amountInput = document.getElementById('payment_amount');
     var qtyInput = document.getElementById('pays_qty');
-    var approvedInput = document.getElementById('approved');
     var reasonChoices = document.getElementById('reasonChoices');
     var referenceWrap = document.getElementById('referenceWrap');
     var collectBtn = document.getElementById('collectBtn');
@@ -500,8 +508,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 '<input type="hidden" name="items[' + index + '][pays_qty]" value="' + item.qty + '">';
         }).join('');
         document.getElementById('sumCount').textContent = String(cart.length);
-        document.getElementById('sumItems').innerHTML = cart.map(function (item) {
-            return '<div class="pos-bill-item"><span>' + escapeHtml(item.reason) + '</span><b>' + money(item.amount * item.qty) + '</b></div>';
+        document.getElementById('sumItems').innerHTML = cart.map(function (item, index) {
+            return '<div class="pos-bill-item"><span>' + escapeHtml(item.reason) + '</span>' +
+                '<span class="pos-bill-actions"><b>' + money(item.amount * item.qty) + '</b>' +
+                '<button type="button" data-remove="' + index + '" title="Delete this payment" aria-label="Delete ' + escapeHtml(item.reason) + '">' +
+                '<i class="fas fa-trash"></i></button></span></div>';
         }).join('');
     }
 
@@ -709,7 +720,11 @@ document.addEventListener('DOMContentLoaded', function () {
             reasonChoices.innerHTML = '<span class="text-muted small">No reasons configured for this type.</span>';
         } else {
             reasonChoices.innerHTML = reasons.map(function (reason) {
-                return '<button type="button" class="pos-choice" data-reason="' + escapeHtml(reason) + '">' + escapeHtml(reason) + '</button>';
+                var name = reason.name || '';
+                var preset = reason.amount || '';
+                var amountNote = preset ? '<span class="d-block small fw-normal">Rs. ' + escapeHtml(preset) + '</span>' : '';
+                return '<button type="button" class="pos-choice" data-reason="' + escapeHtml(name) + '" data-amount="' + escapeHtml(preset) + '">' +
+                    escapeHtml(name) + amountNote + '</button>';
             }).join('');
             if (reasons.length === 1) {
                 reasonChoices.querySelector('[data-reason]').click();
@@ -728,6 +743,11 @@ document.addEventListener('DOMContentLoaded', function () {
             item.classList.toggle('is-selected', item === button);
         });
         reasonInput.value = button.getAttribute('data-reason');
+        var preset = parseFloat(button.getAttribute('data-amount') || '');
+        if (!isNaN(preset) && preset > 0) {
+            amountInput.value = preset.toFixed(2);
+            document.getElementById('amountError').classList.add('d-none');
+        }
         document.getElementById('typeError').classList.add('d-none');
         refreshSummary();
         amountInput.focus();
@@ -742,6 +762,7 @@ document.addEventListener('DOMContentLoaded', function () {
             item.classList.toggle('is-selected', item === button);
         });
         methodInput.value = button.getAttribute('data-method');
+        document.getElementById('methodError').classList.add('d-none');
         refreshSummary();
     });
 
@@ -794,25 +815,16 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    itemList.addEventListener('click', function (event) {
+    function removeCartItem(event) {
         var button = event.target.closest('[data-remove]');
         if (!button) {
             return;
         }
         cart.splice(parseInt(button.getAttribute('data-remove'), 10), 1);
         refreshSummary();
-    });
-
-    document.getElementById('approvePending').addEventListener('click', function () {
-        approvedInput.value = '0';
-        document.getElementById('approvePending').classList.add('is-selected');
-        document.getElementById('approveYes').classList.remove('is-selected');
-    });
-    document.getElementById('approveYes').addEventListener('click', function () {
-        approvedInput.value = '1';
-        document.getElementById('approveYes').classList.add('is-selected');
-        document.getElementById('approvePending').classList.remove('is-selected');
-    });
+    }
+    itemList.addEventListener('click', removeCartItem);
+    document.getElementById('sumItems').addEventListener('click', removeCartItem);
 
     function showError(id) {
         document.getElementById(id).classList.remove('d-none');
@@ -828,6 +840,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('typeError').classList.add('d-none');
         document.getElementById('amountError').classList.add('d-none');
         document.getElementById('itemError').classList.add('d-none');
+        document.getElementById('methodError').classList.add('d-none');
         if (!studentIdInput.value) {
             showError('studentError');
             searchInput.focus();
@@ -850,6 +863,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (valid && cart.length === 0) {
             document.getElementById('itemError').textContent = 'Add at least one payment item.';
             showError('itemError');
+            valid = false;
+        }
+        if (!methodInput.value || !methodLabels[methodInput.value]) {
+            showError('methodError');
             valid = false;
         }
         if (!valid) {

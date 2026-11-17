@@ -64,7 +64,11 @@ $colsBeforeAmount++; // Qty
                     <?php if ($basis !== 'department'): ?>
                         <td><?php echo htmlspecialchars($payment['pays_department_name'] ?? $payment['department_name'] ?? '—'); ?></td>
                     <?php endif; ?>
-                    <td><?php echo htmlspecialchars($payment['payment_method'] ?? '—'); ?></td>
+                    <td><?php
+                        $methodCode = strtoupper(trim((string) ($payment['payment_method'] ?? '')));
+                        $methodLabels = ['CASH' => 'Cash', 'BANK' => 'Bank', 'ONLINE' => 'Online transfer'];
+                        echo htmlspecialchars($methodLabels[$methodCode] ?? (($payment['payment_method'] ?? '') !== '' ? $payment['payment_method'] : '—'));
+                    ?></td>
                     <td class="text-end"><?php echo $qty; ?></td>
                     <td class="text-end">Rs. <?php echo number_format($rowTotal, 2); ?></td>
                 </tr>

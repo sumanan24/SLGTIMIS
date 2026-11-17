@@ -37,11 +37,23 @@ $editQuery = $kind === 'main'
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div class="mb-4">
+                            <div class="mb-3">
                                 <label for="payment_reason" class="form-label fw-semibold">Sub type <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="payment_reason" name="payment_reason" maxlength="50" required
                                        value="<?php echo htmlspecialchars($entry['payment_reason']); ?>">
                                 <div class="form-text">Renaming also updates payments already collected with this sub type.</div>
+                            </div>
+                            <?php
+                            $defaultAmount = $entry['default_amount'] ?? '';
+                            if ($defaultAmount !== '' && $defaultAmount !== null) {
+                                $defaultAmount = number_format((float) $defaultAmount, 2, '.', '');
+                            }
+                            ?>
+                            <div class="mb-4">
+                                <label for="default_amount" class="form-label fw-semibold">Default amount (Rs.)</label>
+                                <input type="number" class="form-control" id="default_amount" name="default_amount" min="0.01" max="999999.99" step="0.01"
+                                       value="<?php echo htmlspecialchars((string) $defaultAmount); ?>" placeholder="Optional">
+                                <div class="form-text">Leave blank if the cashier should type the amount.</div>
                             </div>
                         <?php endif; ?>
                         <div class="d-flex flex-wrap gap-2">

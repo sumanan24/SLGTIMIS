@@ -101,8 +101,16 @@ class PaymentTypeController extends Controller {
                 return;
             }
 
+            $amountError = null;
+            $defaultAmount = $this->parseDefaultAmount($this->post('default_amount', ''), $amountError);
+            if ($defaultAmount === false) {
+                $_SESSION['error'] = $amountError;
+                $this->redirect($back);
+                return;
+            }
+
             $sqlError = null;
-            $result = $paymentTypeModel->createEntry($paymentReason, $paymentType, $sqlError);
+            $result = $paymentTypeModel->createEntry($paymentReason, $paymentType, $defaultAmount, $sqlError);
             if ($result !== false) {
                 $_SESSION['message'] = 'Sub type added.';
                 $this->redirect('payment-types');
@@ -234,15 +242,20 @@ class PaymentTypeController extends Controller {
                 return;
             }
 
-            if ($paymentReason === $oldReason && $paymentType === $oldType) {
-                $_SESSION['message'] = 'Sub type saved.';
-                $this->redirect('payment-types');
+            $amountError = null;
+            $defaultAmount = $this->parseDefaultAmount($this->post('default_amount', ''), $amountError);
+            if ($defaultAmount === false) {
+                $_SESSION['error'] = $amountError;
+                $this->redirect($back);
                 return;
             }
 
             $sqlError = null;
-            if ($paymentTypeModel->updateEntry($oldReason, $oldType, $paymentReason, $paymentType, $sqlError)) {
-                $_SESSION['message'] = 'Sub type updated. Existing payments now use the new name.';
+            if ($paymentTypeModel->updateEntry($oldReason, $oldType, $paymentReason, $paymentType, $defaultAmount, $sqlError)) {
+                $renamed = $paymentReason !== $oldReason || $paymentType !== $oldType;
+                $_SESSION['message'] = $renamed
+                    ? 'Sub type updated. Existing payments now use the new name.'
+                    : 'Default amount saved.';
                 $this->redirect('payment-types');
             } else {
                 $_SESSION['error'] = $sqlError ? 'Failed to update sub type: ' . $sqlError : 'Failed to update sub type.';
@@ -354,5 +367,28 @@ class PaymentTypeController extends Controller {
             'subtypeCount' => 0,
         ];
         return $this->view('payment-types/delete', $data);
+    }
+
+    /**
+     * Blank means no default. Zero is stored as no default.
+     *
+     * @return string|null|false
+     */
+    private function parseDefaultAmount($raw, &$error) {
+        $raw = trim(str_replace(',', '', (string) $raw));
+        if ($raw === '' || $raw === '0' || $raw === '0.0' || $raw === '0.00') {
+            return null;
+        }
+        if (!is_numeric($raw)) {
+            $error = 'Default amount must be a number, or left blank.';
+            return false;
+        }
+        $amount = round((float) $raw, 2);
+        if ($amount < 0 || $amount > 999999.99) {
+            $error = 'Default amount must be between 0.01 and 999,999.99, or left blank.';
+            return false;
+        }
+
+        return number_format($amount, 2, '.', '');
     }
 }

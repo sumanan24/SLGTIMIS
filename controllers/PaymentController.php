@@ -131,7 +131,7 @@ class PaymentController extends Controller {
             $paymentMethod = strtoupper(trim($this->post('payment_method', '')));
             $paysNote = trim($this->post('payment_notes', ''));
             $referenceNo = trim($this->post('reference_no', ''));
-            $approved = $this->post('approved', '0') == '1' ? 1 : 0;
+            $approved = 1;
 
             if ($studentId === '' || $paysDate === '') {
                 $_SESSION['error'] = 'Student and payment date are required.';
@@ -146,9 +146,9 @@ class PaymentController extends Controller {
                 return;
             }
 
-            $allowedMethods = $this->posPaymentMethods($paymentModel);
-            if ($paymentMethod !== '' && !isset($allowedMethods[$paymentMethod])) {
-                $_SESSION['error'] = 'Select a payment method from the counter options.';
+            $allowedMethods = $this->posPaymentMethods();
+            if (!isset($allowedMethods[$paymentMethod])) {
+                $_SESSION['error'] = 'Select a payment method: Cash, Bank, or Online transfer.';
                 $this->redirect('payments/create');
                 return;
             }
@@ -179,7 +179,10 @@ class PaymentController extends Controller {
             $enrollment = $studentEnrollmentModel->getCurrentEnrollment($studentId);
             $paysDepartment = $enrollment['department_id'] ?? '';
             $collectedBy = $this->resolveCollectingOfficerName();
+            $approvedBy = function_exists('mb_substr') ? mb_substr($collectedBy, 0, 50) : substr($collectedBy, 0, 50);
+            $approvedAt = date('Y-m-d H:i:s');
 
+            $paymentModel->ensureCollectedByColumn();
             $db = Database::getInstance();
             if (!$db->begin_transaction()) {
                 $_SESSION['error'] = 'Could not start the payment. Nothing was recorded.';
@@ -215,6 +218,8 @@ class PaymentController extends Controller {
                     'reference_no' => $itemReference,
                     'pays_department' => $paysDepartment,
                     'approved' => $approved,
+                    'approved_by' => $approvedBy,
+                    'approved_at' => $approvedAt,
                     'collected_by' => $collectedBy,
                 ]);
                 if (!$result) {
@@ -245,7 +250,7 @@ class PaymentController extends Controller {
                 'title' => 'Student Payment Counter',
                 'page' => 'payments-create',
                 'paymentReasons' => $paymentReasons,
-                'paymentMethods' => $this->posPaymentMethods($paymentModel),
+                'paymentMethods' => $this->posPaymentMethods(),
                 'cashierName' => $this->resolveCollectingOfficerName(),
                 'formToken' => $_SESSION['payment_form_token'],
                 'error' => $_SESSION['error'] ?? null
@@ -407,7 +412,7 @@ class PaymentController extends Controller {
             $paysNote = trim($this->post('payment_notes', ''));
             $paysQty = (int)$this->post('pays_qty', 1);
             $referenceNo = trim($this->post('reference_no', ''));
-            $approved = $this->post('approved', '0') == '1' ? 1 : 0;
+            $approved = 1;
             
             // Validation
             if (empty($studentId) || empty($paysDate) || empty($paysAmount) || empty($paymentReason) || empty($paymentType)) {
@@ -442,8 +447,7 @@ class PaymentController extends Controller {
             $enrollment = $studentEnrollmentModel->getCurrentEnrollment($studentId);
             $paysDepartment = $enrollment['department_id'] ?? $payment['pays_department'] ?? '';
             
-            // Update payment
-            $result = $paymentModel->updatePayment($id, [
+            $update = [
                 'student_id' => $studentId,
                 'pays_date' => $paysDate,
                 'pays_amount' => $paysAmount,
@@ -454,8 +458,14 @@ class PaymentController extends Controller {
                 'pays_qty' => $paysQty,
                 'reference_no' => $referenceNo,
                 'pays_department' => $paysDepartment,
-                'approved' => $approved
-            ]);
+                'approved' => $approved,
+            ];
+            if (empty($payment['approved']) || empty($payment['approved_at'])) {
+                $approver = $this->resolveCollectingOfficerName();
+                $update['approved_by'] = function_exists('mb_substr') ? mb_substr($approver, 0, 50) : substr($approver, 0, 50);
+                $update['approved_at'] = date('Y-m-d H:i:s');
+            }
+            $result = $paymentModel->updatePayment($id, $update);
             
             if ($result) {
                 $_SESSION['message'] = 'Payment updated successfully.';
@@ -712,25 +722,12 @@ class PaymentController extends Controller {
      * Methods the counter can collect. Starts from the form options already used
      * by payments, then adds any other method codes stored on past payments.
      */
-    private function posPaymentMethods($paymentModel) {
-        $methods = [
+    private function posPaymentMethods() {
+        return [
             'CASH' => ['label' => 'Cash', 'icon' => 'fa-money-bill-wave'],
-            'BANK' => ['label' => 'Bank Transfer', 'icon' => 'fa-university'],
-            'CHEQUE' => ['label' => 'Cheque', 'icon' => 'fa-money-check'],
-            'ONLINE' => ['label' => 'Online Payment', 'icon' => 'fa-globe'],
-            'SLGTI' => ['label' => 'SLGTI', 'icon' => 'fa-landmark'],
-            'OTHER' => ['label' => 'Other', 'icon' => 'fa-ellipsis-h'],
+            'BANK' => ['label' => 'Bank', 'icon' => 'fa-university'],
+            'ONLINE' => ['label' => 'Online transfer', 'icon' => 'fa-exchange-alt'],
         ];
-
-        foreach ($paymentModel->getUsedPaymentMethods() as $code) {
-            $code = strtoupper(trim((string) $code));
-            if ($code === '' || isset($methods[$code])) {
-                continue;
-            }
-            $methods[$code] = ['label' => $code, 'icon' => 'fa-wallet'];
-        }
-
-        return $methods;
     }
 
     private function studentPhotoUrl($relativePath) {

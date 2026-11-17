@@ -243,6 +243,10 @@ table.pay td { font-weight: bold; }
                             <td>_______________</td>
                         </tr>
                         <tr>
+                            <th>Payment method</th>
+                            <td>Cash / Bank / Online transfer</td>
+                        </tr>
+                        <tr>
                             <th>Payment status</th>
                             <td>Unpaid / Partial / Paid</td>
                         </tr>

@@ -29,7 +29,7 @@ foreach ($entries as $entry) {
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             <?php endif; ?>
-            <p class="text-muted mb-0">Main types and sub types are managed separately. A sub type always belongs to one main type.</p>
+            <p class="text-muted mb-0">Each sub type belongs to one main type. Add a default amount and the payment counter fills it when that sub type is selected.</p>
         </div>
     </div>
 
@@ -93,6 +93,7 @@ foreach ($entries as $entry) {
                                     <tr>
                                         <th>Main type</th>
                                         <th>Sub type</th>
+                                        <th class="text-end">Default amount</th>
                                         <th class="text-end">Actions</th>
                                     </tr>
                                 </thead>
@@ -103,6 +104,13 @@ foreach ($entries as $entry) {
                                             <tr>
                                                 <td><?php echo htmlspecialchars($typeName); ?></td>
                                                 <td class="fw-semibold"><?php echo htmlspecialchars($entry['payment_reason']); ?></td>
+                                                <td class="text-end">
+                                                    <?php if ($entry['default_amount'] === null || $entry['default_amount'] === ''): ?>
+                                                        <span class="text-muted">—</span>
+                                                    <?php else: ?>
+                                                        Rs. <?php echo number_format((float) $entry['default_amount'], 2); ?>
+                                                    <?php endif; ?>
+                                                </td>
                                                 <td class="text-end">
                                                     <a href="<?php echo APP_URL; ?>/payment-types/edit?<?php echo htmlspecialchars($subQuery); ?>" class="btn btn-outline-primary btn-sm" title="Edit"><i class="fas fa-edit"></i></a>
                                                     <a href="<?php echo APP_URL; ?>/payment-types/delete?<?php echo htmlspecialchars($subQuery); ?>" class="btn btn-outline-danger btn-sm" title="Delete"><i class="fas fa-trash"></i></a>

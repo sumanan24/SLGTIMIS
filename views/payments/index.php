@@ -114,7 +114,11 @@
                                     <td><span class="fw-bold text-success">Rs. <?php echo number_format($rowTotal, 2); ?></span></td>
                                     <td><?php echo htmlspecialchars($payment['payment_type'] ?? '-'); ?></td>
                                     <td><?php echo htmlspecialchars($payment['payment_reason'] ?? '-'); ?></td>
-                                    <td><?php echo htmlspecialchars($payment['payment_method'] ?? '-'); ?></td>
+                                    <td><?php
+                                    $methodCode = strtoupper(trim((string) ($payment['payment_method'] ?? '')));
+                                    $methodLabels = ['CASH' => 'Cash', 'BANK' => 'Bank', 'ONLINE' => 'Online transfer'];
+                                    echo htmlspecialchars($methodLabels[$methodCode] ?? ($payment['payment_method'] ?: '-'));
+                                ?></td>
                                     <td class="text-end">
                                         <div class="btn-group btn-group-sm" role="group">
                                             <a href="<?php echo APP_URL; ?>/payments/receipt?id=<?php echo (int)$payment['pays_id']; ?>&print=1"

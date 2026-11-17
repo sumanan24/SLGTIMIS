@@ -122,10 +122,14 @@
                         <select class="form-select" id="payment_method" name="payment_method">
                             <option value="">Select Method</option>
                             <option value="CASH" <?php echo ($payment['payment_method'] ?? '') == 'CASH' ? 'selected' : ''; ?>>Cash</option>
-                            <option value="BANK" <?php echo ($payment['payment_method'] ?? '') == 'BANK' ? 'selected' : ''; ?>>Bank Transfer</option>
-                            <option value="CHEQUE" <?php echo ($payment['payment_method'] ?? '') == 'CHEQUE' ? 'selected' : ''; ?>>Cheque</option>
-                            <option value="ONLINE" <?php echo ($payment['payment_method'] ?? '') == 'ONLINE' ? 'selected' : ''; ?>>Online Payment</option>
-                            <option value="OTHER" <?php echo ($payment['payment_method'] ?? '') == 'OTHER' ? 'selected' : ''; ?>>Other</option>
+                            <option value="BANK" <?php echo ($payment['payment_method'] ?? '') == 'BANK' ? 'selected' : ''; ?>>Bank</option>
+                            <option value="ONLINE" <?php echo ($payment['payment_method'] ?? '') == 'ONLINE' ? 'selected' : ''; ?>>Online transfer</option>
+                            <?php
+                            $currentMethod = strtoupper(trim((string) ($payment['payment_method'] ?? '')));
+                            if ($currentMethod !== '' && !in_array($currentMethod, ['CASH', 'BANK', 'ONLINE'], true)):
+                            ?>
+                            <option value="<?php echo htmlspecialchars($currentMethod); ?>" selected><?php echo htmlspecialchars($currentMethod); ?></option>
+                            <?php endif; ?>
                         </select>
                     </div>
 
@@ -136,11 +140,9 @@
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
-                        <label for="approved" class="form-label fw-semibold mb-1">Approval Status</label>
-                        <select class="form-select" id="approved" name="approved">
-                            <option value="0" <?php echo (empty($payment['approved']) || $payment['approved'] == 0) ? 'selected' : ''; ?>>Pending</option>
-                            <option value="1" <?php echo (!empty($payment['approved']) && $payment['approved'] == 1) ? 'selected' : ''; ?>>Approved</option>
-                        </select>
+                        <label class="form-label fw-semibold mb-1">Approval Status</label>
+                        <input type="hidden" name="approved" value="1">
+                        <input type="text" class="form-control" value="Approved" readonly>
                     </div>
 
                     <div class="col-12">

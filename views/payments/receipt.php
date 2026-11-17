@@ -10,7 +10,9 @@ $studentName = $p['student_fullname'] ?? '—';
 $department = $p['department_name'] ?? '';
 $paymentType = $p['payment_type'] ?? '—';
 $paymentReason = $p['payment_reason'] ?? '—';
-$paymentMethod = trim($p['payment_method'] ?? '');
+$paymentMethodCode = strtoupper(trim($p['payment_method'] ?? ''));
+$methodLabels = ['CASH' => 'Cash', 'BANK' => 'Bank', 'ONLINE' => 'Online transfer'];
+$paymentMethod = $methodLabels[$paymentMethodCode] ?? trim($p['payment_method'] ?? '');
 $notes = trim($p['pays_note'] ?? '');
 $cashierName = trim((string) ($cashierName ?? ''));
 if ($cashierName === '') {

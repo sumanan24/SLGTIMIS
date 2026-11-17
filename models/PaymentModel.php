@@ -238,10 +238,35 @@ class PaymentModel extends Model {
     }
     
     /**
+     * Cashier name is stored with the receipt. Older pays tables do not have this column.
+     */
+    public function ensureCollectedByColumn() {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+        $ready = true;
+        $check = $this->db->query("SHOW COLUMNS FROM `{$this->table}` LIKE 'collected_by'");
+        if ($check && $check->num_rows > 0) {
+            return;
+        }
+        $this->db->query(
+            "ALTER TABLE `{$this->table}`
+             ADD COLUMN `collected_by` varchar(100) NULL DEFAULT NULL AFTER `approved_by`"
+        );
+    }
+
+    /**
      * Create new payment
      */
     public function createPayment($data) {
-        return $this->create($data);
+        $this->ensureCollectedByColumn();
+        $sqlError = null;
+        $id = $this->create($data, $sqlError);
+        if ($id === false) {
+            error_log('PaymentModel::createPayment: ' . ($sqlError ?: 'insert failed'));
+        }
+        return $id;
     }
 
     /**
@@ -552,7 +577,9 @@ class PaymentModel extends Model {
      * Get all payment reasons from payment lookup table
      */
     public function getPaymentReasons() {
-        $sql = "SELECT DISTINCT payment_reason, payment_type FROM `payment` ORDER BY payment_type, payment_reason";
+        require_once BASE_PATH . '/models/PaymentTypeModel.php';
+        (new PaymentTypeModel())->ensureDefaultAmountColumn();
+        $sql = "SELECT DISTINCT payment_reason, payment_type, default_amount FROM `payment` ORDER BY payment_type, payment_reason";
         $result = $this->db->query($sql);
         
         $data = [];

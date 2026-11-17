@@ -34,10 +34,15 @@
                                     <div class="form-text text-warning">Add a main type before adding a sub type.</div>
                                 <?php endif; ?>
                             </div>
-                            <div class="mb-4">
+                            <div class="mb-3">
                                 <label for="payment_reason" class="form-label fw-semibold">Sub type <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="payment_reason" name="payment_reason" maxlength="50" required placeholder="e.g. Hostel Charges, 1st Installment">
                                 <div class="form-text">Maximum 50 characters.</div>
+                            </div>
+                            <div class="mb-4">
+                                <label for="default_amount" class="form-label fw-semibold">Default amount (Rs.)</label>
+                                <input type="number" class="form-control" id="default_amount" name="default_amount" min="0.01" max="999999.99" step="0.01" placeholder="Optional">
+                                <div class="form-text">Leave blank if the cashier should type the amount. A default amount is filled in at the payment counter.</div>
                             </div>
                         <?php endif; ?>
                         <div class="d-flex flex-wrap gap-2">
