@@ -557,6 +557,7 @@ class PaymentController extends Controller {
         }
 
         $paymentModel = $this->model('PaymentModel');
+        $paymentModel->ensureCollectedByColumn();
         $studentModel = $this->model('StudentModel');
         $paymentTypeModel = $this->model('PaymentTypeModel');
         $hodDepartmentId = $this->getHODDepartment();
@@ -582,6 +583,10 @@ class PaymentController extends Controller {
         }
         $studentId = trim((string) $this->get('student_id', ''));
         $paysDepartment = trim((string) $this->get('department', ''));
+        $officer = trim((string) $this->get('officer', ''));
+        if (strlen($officer) > 100) {
+            $officer = '';
+        }
         $format = strtolower(trim((string) $this->get('format', '')));
         $error = null;
 
@@ -620,6 +625,9 @@ class PaymentController extends Controller {
         }
         if ($paysDepartment !== '') {
             $filters['pays_department'] = $paysDepartment;
+        }
+        if ($officer !== '') {
+            $filters['officer'] = $officer;
         }
         if ($hodDepartmentId) {
             $filters['department_id'] = $hodDepartmentId;
@@ -691,6 +699,7 @@ class PaymentController extends Controller {
             'academic_year' => $academicYear,
             'student_id' => $studentId,
             'department' => $paysDepartment,
+            'officer' => $officer,
         ];
 
         $data = [
@@ -704,6 +713,7 @@ class PaymentController extends Controller {
             'paymentSubtypes' => $subtypeOptions,
             'academicYears' => $studentModel->getAcademicYears(),
             'departments' => $this->model('DepartmentModel')->getAll(),
+            'officers' => $paymentModel->getCollectingOfficers(),
             'filters' => $query,
             'basis' => $basis,
             'error' => $error,
@@ -1123,6 +1133,7 @@ class PaymentController extends Controller {
             'Payment Type',
             'Sub type',
             'Method',
+            'Officer',
             'Qty',
             'Unit Amount',
             'Total',
@@ -1165,6 +1176,7 @@ class PaymentController extends Controller {
                 $payment['payment_type'] ?? '',
                 $payment['payment_reason'] ?? '',
                 $payment['payment_method'] ?? '',
+                $this->paymentOfficerName($payment),
                 $qty,
                 number_format((float) ($payment['pays_amount'] ?? 0), 2, '.', ''),
                 number_format($this->paymentLineTotal($payment), 2, '.', ''),
@@ -1174,6 +1186,17 @@ class PaymentController extends Controller {
 
         fclose($output);
         exit();
+    }
+
+    /**
+     * Officer recorded on the receipt: collector when present, otherwise the approver.
+     */
+    private function paymentOfficerName(array $payment): string {
+        $name = trim((string) ($payment['collected_by'] ?? ''));
+        if ($name === '') {
+            $name = trim((string) ($payment['approved_by'] ?? ''));
+        }
+        return $name;
     }
 
     /**

@@ -1,5 +1,14 @@
 <?php
 $groupPayments = $group['payments'] ?? [];
+if (!isset($paymentOfficer) || !is_callable($paymentOfficer)) {
+    $paymentOfficer = static function ($payment) {
+        $stored = trim((string) ($payment['collected_by'] ?? ''));
+        if ($stored === '') {
+            $stored = trim((string) ($payment['approved_by'] ?? ''));
+        }
+        return $stored !== '' ? $stored : '—';
+    };
+}
 $colsBeforeAmount = 3; // Date, Receipt, Method always shown before qty/amount; student/type/subtype/dept optional
 if ($basis !== 'student') {
     $colsBeforeAmount++;
@@ -13,6 +22,7 @@ if ($basis !== 'subtype') {
 if ($basis !== 'department') {
     $colsBeforeAmount++;
 }
+$colsBeforeAmount++; // Officer
 $colsBeforeAmount++; // Qty
 ?>
 <div class="table-responsive">
@@ -34,6 +44,7 @@ $colsBeforeAmount++; // Qty
                     <th>Department</th>
                 <?php endif; ?>
                 <th>Method</th>
+                <th>Officer</th>
                 <th class="text-end">Qty</th>
                 <th class="text-end">Amount</th>
             </tr>
@@ -45,8 +56,8 @@ $colsBeforeAmount++; // Qty
                 $rowTotal = $lineTotal($payment);
                 ?>
                 <tr>
-                    <td><?php echo !empty($payment['pays_date']) ? date('d M Y', strtotime($payment['pays_date'])) : '—'; ?></td>
-                    <td>#<?php echo (int) $payment['pays_id']; ?></td>
+                    <td class="num"><?php echo !empty($payment['pays_date']) ? date('d M Y', strtotime($payment['pays_date'])) : '—'; ?></td>
+                    <td class="num">#<?php echo (int) $payment['pays_id']; ?></td>
                     <?php if ($basis !== 'student'): ?>
                         <td>
                             <div><?php echo htmlspecialchars($payment['student_reg_no'] ?? $payment['student_id'] ?? '—'); ?></div>
@@ -64,18 +75,19 @@ $colsBeforeAmount++; // Qty
                     <?php if ($basis !== 'department'): ?>
                         <td><?php echo htmlspecialchars($payment['pays_department_name'] ?? $payment['department_name'] ?? '—'); ?></td>
                     <?php endif; ?>
-                    <td><?php
+                    <td class="num"><?php
                         $methodCode = strtoupper(trim((string) ($payment['payment_method'] ?? '')));
                         $methodLabels = ['CASH' => 'Cash', 'BANK' => 'Bank', 'ONLINE' => 'Online transfer'];
                         echo htmlspecialchars($methodLabels[$methodCode] ?? (($payment['payment_method'] ?? '') !== '' ? $payment['payment_method'] : '—'));
                     ?></td>
-                    <td class="text-end"><?php echo $qty; ?></td>
-                    <td class="text-end">Rs. <?php echo number_format($rowTotal, 2); ?></td>
+                    <td><?php echo htmlspecialchars($paymentOfficer($payment)); ?></td>
+                    <td class="text-end num"><?php echo $qty; ?></td>
+                    <td class="text-end num">Rs. <?php echo number_format($rowTotal, 2); ?></td>
                 </tr>
             <?php endforeach; ?>
             <tr class="table-light">
                 <td colspan="<?php echo $colsBeforeAmount; ?>" class="text-end fw-bold">Section total</td>
-                <td class="text-end fw-bold">Rs. <?php echo number_format((float) ($group['total'] ?? 0), 2); ?></td>
+                <td class="text-end num fw-bold">Rs. <?php echo number_format((float) ($group['total'] ?? 0), 2); ?></td>
             </tr>
         </tbody>
     </table>

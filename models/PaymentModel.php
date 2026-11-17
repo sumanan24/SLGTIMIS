@@ -100,6 +100,8 @@ class PaymentModel extends Model {
             $params[] = $filters['department_id'];
             $types .= 's';
         }
+
+        $this->appendCollectingOfficerFilter($sql, $params, $types, $filters['officer'] ?? '');
         
         $sql .= " ORDER BY p.pays_date DESC, p.pays_id DESC";
         
@@ -223,6 +225,8 @@ class PaymentModel extends Model {
             $params[] = $filters['department_id'];
             $types .= 's';
         }
+
+        $this->appendCollectingOfficerFilter($sql, $params, $types, $filters['officer'] ?? '');
         
         if (!empty($params)) {
             $stmt = $this->db->prepare($sql);
@@ -235,6 +239,90 @@ class PaymentModel extends Model {
         
         $row = $result->fetch_assoc();
         return $row['total'] ?? 0;
+    }
+
+    /**
+     * Officers who collected a payment. Newer receipts store the staff name in
+     * collected_by; older rows only have approved_by.
+     *
+     * @return list<array{value:string,label:string}>
+     */
+    public function getCollectingOfficers(): array {
+        $this->ensureCollectedByColumn();
+        $sql = "SELECT officer FROM (
+                    SELECT TRIM(collected_by) AS officer
+                    FROM `{$this->table}`
+                    WHERE collected_by IS NOT NULL AND TRIM(collected_by) <> ''
+                    UNION
+                    SELECT TRIM(approved_by) AS officer
+                    FROM `{$this->table}`
+                    WHERE (collected_by IS NULL OR TRIM(collected_by) = '')
+                      AND approved_by IS NOT NULL AND TRIM(approved_by) <> ''
+                ) officers
+                WHERE officer <> ''";
+        $result = $this->db->query($sql);
+        $keys = [];
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $key = trim((string) ($row['officer'] ?? ''));
+                if ($key !== '') {
+                    $keys[$key] = $key;
+                }
+            }
+        }
+        if ($keys === []) {
+            return [];
+        }
+
+        $names = [];
+        $list = array_values($keys);
+        $placeholders = implode(',', array_fill(0, count($list), '?'));
+        $types = str_repeat('s', count($list));
+        $stmt = $this->db->prepare("SELECT `staff_id`, `staff_name` FROM `staff` WHERE `staff_id` IN ({$placeholders})");
+        if ($stmt) {
+            $stmt->bind_param($types, ...$list);
+            $stmt->execute();
+            $staffRows = $stmt->get_result();
+            while ($staffRows && ($staff = $staffRows->fetch_assoc())) {
+                $login = strtolower(trim((string) ($staff['staff_id'] ?? '')));
+                $name = trim((string) ($staff['staff_name'] ?? ''));
+                if ($login !== '' && $name !== '') {
+                    $names[$login] = $name;
+                }
+            }
+            $stmt->close();
+        }
+
+        $officers = [];
+        foreach ($list as $key) {
+            $label = $names[strtolower($key)] ?? $key;
+            $officers[] = ['value' => $key, 'label' => $label];
+        }
+        usort($officers, function ($a, $b) {
+            return strcasecmp($a['label'], $b['label']);
+        });
+        return $officers;
+    }
+
+    /**
+     * @param string $sql
+     * @param array<int,mixed> $params
+     */
+    private function appendCollectingOfficerFilter(&$sql, &$params, &$types, $officer) {
+        $officer = trim((string) $officer);
+        if ($officer === '') {
+            return;
+        }
+        $sql .= " AND (
+            TRIM(p.collected_by) = ?
+            OR (
+                (p.collected_by IS NULL OR TRIM(p.collected_by) = '')
+                AND TRIM(p.approved_by) = ?
+            )
+        )";
+        $params[] = $officer;
+        $params[] = $officer;
+        $types .= 'ss';
     }
     
     /**

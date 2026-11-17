@@ -9,6 +9,28 @@ $paymentSubtypes = $paymentSubtypes ?? [];
 $academicYears = $academicYears ?? [];
 $departments = $departments ?? [];
 $students = $students ?? [];
+$officers = $officers ?? [];
+
+$officerLabels = [];
+foreach ($officers as $officerOption) {
+    $officerValue = trim((string) ($officerOption['value'] ?? ''));
+    $officerText = trim((string) ($officerOption['label'] ?? ''));
+    if ($officerValue === '') {
+        continue;
+    }
+    $officerLabels[$officerValue] = $officerText !== '' ? $officerText : $officerValue;
+    $officerLabels[strtolower($officerValue)] = $officerLabels[$officerValue];
+}
+$paymentOfficer = static function ($payment) use ($officerLabels) {
+    $stored = trim((string) ($payment['collected_by'] ?? ''));
+    if ($stored === '') {
+        $stored = trim((string) ($payment['approved_by'] ?? ''));
+    }
+    if ($stored === '') {
+        return '—';
+    }
+    return $officerLabels[$stored] ?? $officerLabels[strtolower($stored)] ?? $stored;
+};
 
 $departmentLabel = '';
 foreach ($departments as $departmentOption) {
@@ -41,6 +63,10 @@ if ($departmentLabel !== '') {
 if (($filters['student_id'] ?? '') !== '') {
     $metaBits[] = $filters['student_id'];
 }
+if (($filters['officer'] ?? '') !== '') {
+    $officerKey = (string) $filters['officer'];
+    $metaBits[] = $officerLabels[$officerKey] ?? $officerLabels[strtolower($officerKey)] ?? $officerKey;
+}
 if (($filters['date_from'] ?? '') !== '' || ($filters['date_to'] ?? '') !== '') {
     $fromLabel = ($filters['date_from'] ?? '') !== '' ? date('d M Y', strtotime($filters['date_from'])) : '…';
     $toLabel = ($filters['date_to'] ?? '') !== '' ? date('d M Y', strtotime($filters['date_to'])) : '…';
@@ -57,24 +83,55 @@ $lineTotal = static function ($payment) {
 };
 ?>
 <style>
-.pay-page { width: 100%; }
+.pay-page { width: 100%; max-width: 1280px; margin: 0 auto; }
+.pay-page .card:hover { transform: none; }
+.pay-page .pay-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: .75rem 1rem;
+}
 .pay-page .pay-filters {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: .75rem 1rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .85rem 1rem;
     align-items: end;
+}
+.pay-page .pay-field { min-width: 0; }
+.pay-page .pay-field .form-label {
+    display: block;
+    margin-bottom: .3rem;
+    line-height: 1.2;
+}
+.pay-page .pay-field .form-control,
+.pay-page .pay-field .form-select {
+    width: 100%;
+    min-height: 36px;
+}
+.pay-page .pay-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: .75rem 1rem;
+    margin-top: 1rem;
+    padding-top: .9rem;
+    border-top: 1px solid #e6edf4;
 }
 .pay-page .pay-basis {
     display: flex;
     flex-wrap: wrap;
-    gap: .5rem 1rem;
+    gap: .4rem .9rem;
     align-items: center;
 }
+.pay-page .pay-basis .form-check { margin: 0; min-height: 0; }
 .pay-page .pay-actions {
     display: flex;
     flex-wrap: wrap;
     gap: .5rem;
     align-items: center;
+    justify-content: flex-end;
 }
 .pay-page .pay-stats {
     display: grid;
@@ -84,16 +141,23 @@ $lineTotal = static function ($payment) {
 .pay-page .pay-stat {
     border: 1px solid #dee2e6;
     border-radius: .5rem;
-    padding: .75rem;
+    padding: .8rem .6rem;
     text-align: center;
     background: #fff;
+    min-width: 0;
 }
-.pay-page .pay-stat .lbl { color: #6c757d; font-size: .75rem; margin-bottom: .2rem; }
-.pay-page .pay-stat .val { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+.pay-page .pay-stat .lbl { color: #6c757d; font-size: .75rem; margin-bottom: .25rem; }
+.pay-page .pay-stat .val {
+    font-size: clamp(1rem, 2vw, 1.3rem);
+    font-weight: 700;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
 .pay-page .pay-table-wrap {
     overflow: auto;
     border: 1px solid #dee2e6;
     border-radius: .5rem;
+    -webkit-overflow-scrolling: touch;
 }
 .pay-page .pay-table {
     width: 100%;
@@ -103,9 +167,10 @@ $lineTotal = static function ($payment) {
 .pay-page .pay-table th,
 .pay-page .pay-table td {
     vertical-align: middle;
-    padding: .45rem .55rem;
-    white-space: nowrap;
+    padding: .5rem .6rem;
+    white-space: normal;
 }
+.pay-page .pay-table .num { white-space: nowrap; }
 .pay-page .pay-table thead th {
     background: #f8f9fa;
     font-weight: 600;
@@ -123,16 +188,23 @@ $lineTotal = static function ($payment) {
     align-items: center;
     flex-wrap: wrap;
     gap: .5rem;
-    padding: .65rem .85rem;
+    padding: .7rem .9rem;
     background: #f8f9fa;
     border-bottom: 1px solid #dee2e6;
 }
 .pay-page .pay-print-head { display: none; text-align: center; margin-bottom: 1rem; }
-@media (max-width: 767.98px) {
+@media (max-width: 991.98px) {
+    .pay-page .pay-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 575.98px) {
+    .pay-page .pay-filters,
     .pay-page .pay-stats { grid-template-columns: 1fr; }
+    .pay-page .pay-actions { width: 100%; }
+    .pay-page .pay-actions .btn { flex: 1 1 auto; }
 }
 @media print {
     .no-print { display: none !important; }
+    .pay-page { max-width: none; }
     .pay-page .pay-print-head { display: block; }
     .pay-page .card, .pay-page .card-body { border: 0 !important; box-shadow: none !important; }
     .pay-page .pay-block { break-inside: avoid; page-break-inside: avoid; border-color: #000; }
@@ -144,7 +216,7 @@ $lineTotal = static function ($payment) {
 <div class="container-fluid px-3 px-lg-4 py-3 pay-page">
     <div class="card shadow-sm border-0">
         <div class="card-header bg-white border-bottom no-print">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="pay-head">
                 <div>
                     <h5 class="mb-0 fw-bold"><i class="fas fa-file-invoice-dollar me-2"></i>Payments Report</h5>
                     <div class="text-muted small mt-1"><?php echo htmlspecialchars($headingTitle); ?></div>
@@ -172,18 +244,42 @@ $lineTotal = static function ($payment) {
 
             <form method="GET" action="<?php echo APP_URL; ?>/payments/report" class="mb-3 no-print">
                 <div class="pay-filters">
-                    <div>
-                        <label class="form-label small fw-semibold mb-1" for="date_from">From</label>
+                    <div class="pay-field">
+                        <label class="form-label small fw-semibold" for="date_from">From</label>
                         <input type="date" class="form-control form-control-sm" id="date_from" name="date_from"
                                value="<?php echo htmlspecialchars($filters['date_from'] ?? ''); ?>">
                     </div>
-                    <div>
-                        <label class="form-label small fw-semibold mb-1" for="date_to">To</label>
+                    <div class="pay-field">
+                        <label class="form-label small fw-semibold" for="date_to">To</label>
                         <input type="date" class="form-control form-control-sm" id="date_to" name="date_to"
                                value="<?php echo htmlspecialchars($filters['date_to'] ?? ''); ?>">
                     </div>
-                    <div>
-                        <label class="form-label small fw-semibold mb-1" for="payment_type">Type</label>
+                    <div class="pay-field">
+                        <label class="form-label small fw-semibold" for="academic_year">Year</label>
+                        <select class="form-select form-select-sm" id="academic_year" name="academic_year">
+                            <option value="">All</option>
+                            <?php foreach ($academicYears as $year): ?>
+                                <option value="<?php echo htmlspecialchars($year); ?>"
+                                    <?php echo ($filters['academic_year'] ?? '') === $year ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($year); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="pay-field">
+                        <label class="form-label small fw-semibold" for="department">Department</label>
+                        <select class="form-select form-select-sm" id="department" name="department">
+                            <option value="">All</option>
+                            <?php foreach ($departments as $departmentOption): ?>
+                                <option value="<?php echo htmlspecialchars($departmentOption['department_id']); ?>"
+                                    <?php echo ($filters['department'] ?? '') === $departmentOption['department_id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($departmentOption['department_name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="pay-field">
+                        <label class="form-label small fw-semibold" for="payment_type">Type</label>
                         <select class="form-select form-select-sm" id="payment_type" name="payment_type">
                             <option value="">All</option>
                             <?php foreach ($paymentTypes as $type): ?>
@@ -194,8 +290,8 @@ $lineTotal = static function ($payment) {
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div>
-                        <label class="form-label small fw-semibold mb-1" for="payment_subtype">Sub type</label>
+                    <div class="pay-field">
+                        <label class="form-label small fw-semibold" for="payment_subtype">Sub type</label>
                         <select class="form-select form-select-sm" id="payment_subtype" name="payment_subtype">
                             <option value="">All</option>
                             <?php foreach ($paymentSubtypes as $subtype): ?>
@@ -207,32 +303,24 @@ $lineTotal = static function ($payment) {
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div>
-                        <label class="form-label small fw-semibold mb-1" for="academic_year">Year</label>
-                        <select class="form-select form-select-sm" id="academic_year" name="academic_year">
+                    <div class="pay-field">
+                        <label class="form-label small fw-semibold" for="officer">Officer</label>
+                        <select class="form-select form-select-sm" id="officer" name="officer">
                             <option value="">All</option>
-                            <?php foreach ($academicYears as $year): ?>
-                                <option value="<?php echo htmlspecialchars($year); ?>"
-                                    <?php echo ($filters['academic_year'] ?? '') === $year ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($year); ?>
+                            <?php foreach ($officers as $officerOption): ?>
+                                <?php
+                                $officerValue = (string) ($officerOption['value'] ?? '');
+                                $officerText = (string) ($officerOption['label'] ?? $officerValue);
+                                ?>
+                                <option value="<?php echo htmlspecialchars($officerValue); ?>"
+                                    <?php echo ($filters['officer'] ?? '') === $officerValue ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($officerText); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div>
-                        <label class="form-label small fw-semibold mb-1" for="department">Department</label>
-                        <select class="form-select form-select-sm" id="department" name="department">
-                            <option value="">All</option>
-                            <?php foreach ($departments as $departmentOption): ?>
-                                <option value="<?php echo htmlspecialchars($departmentOption['department_id']); ?>"
-                                    <?php echo ($filters['department'] ?? '') === $departmentOption['department_id'] ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($departmentOption['department_name']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label small fw-semibold mb-1" for="student_id">Student</label>
+                    <div class="pay-field">
+                        <label class="form-label small fw-semibold" for="student_id">Student</label>
                         <select class="form-select form-select-sm" id="student_id" name="student_id">
                             <option value="">All</option>
                             <?php foreach ($students as $student): ?>
@@ -245,9 +333,9 @@ $lineTotal = static function ($payment) {
                     </div>
                 </div>
 
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+                <div class="pay-toolbar">
                     <div class="pay-basis">
-                        <span class="small text-muted fw-semibold me-1">Group:</span>
+                        <span class="small text-muted fw-semibold">Group</span>
                         <?php foreach ($basisTitles as $value => $label): ?>
                             <div class="form-check form-check-inline mb-0">
                                 <input class="form-check-input" type="radio" name="basis" id="basis_<?php echo $value; ?>"
@@ -307,8 +395,8 @@ $lineTotal = static function ($payment) {
                             <?php foreach ($summary['types'] as $typeName => $typeRow): ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($typeName); ?></td>
-                                    <td class="text-end"><?php echo (int) $typeRow['count']; ?></td>
-                                    <td class="text-end">Rs. <?php echo number_format((float) $typeRow['amount'], 2); ?></td>
+                                    <td class="text-end num"><?php echo (int) $typeRow['count']; ?></td>
+                                    <td class="text-end num">Rs. <?php echo number_format((float) $typeRow['amount'], 2); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -330,8 +418,8 @@ $lineTotal = static function ($payment) {
                                 <tr>
                                     <td><?php echo htmlspecialchars($subtypeRow['type']); ?></td>
                                     <td><?php echo htmlspecialchars($subtypeRow['subtype']); ?></td>
-                                    <td class="text-end"><?php echo (int) $subtypeRow['count']; ?></td>
-                                    <td class="text-end">Rs. <?php echo number_format((float) $subtypeRow['amount'], 2); ?></td>
+                                    <td class="text-end num"><?php echo (int) $subtypeRow['count']; ?></td>
+                                    <td class="text-end num">Rs. <?php echo number_format((float) $subtypeRow['amount'], 2); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -352,9 +440,9 @@ $lineTotal = static function ($payment) {
                             <?php foreach ($summary['departments'] as $departmentRow): ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars(trim(($departmentRow['code'] ?? '') . ' ' . ($departmentRow['name'] ?? ''))); ?></td>
-                                    <td class="text-end"><?php echo (int) $departmentRow['count']; ?></td>
-                                    <td class="text-end"><?php echo (int) $departmentRow['students']; ?></td>
-                                    <td class="text-end">Rs. <?php echo number_format((float) $departmentRow['amount'], 2); ?></td>
+                                    <td class="text-end num"><?php echo (int) $departmentRow['count']; ?></td>
+                                    <td class="text-end num"><?php echo (int) $departmentRow['students']; ?></td>
+                                    <td class="text-end num">Rs. <?php echo number_format((float) $departmentRow['amount'], 2); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
