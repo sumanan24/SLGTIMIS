@@ -366,6 +366,46 @@ class UserModel extends Model {
         // Management Assistants of the Student Affairs Office department do the SAO's work
         return $this->isStudentAffairsAssistant($userId);
     }
+
+    /**
+     * Media team, Students Affairs, and Admin can take a student profile photo.
+     */
+    public function canTakeStudentProfilePhoto($userId) {
+        if ($this->isAdmin($userId) || $this->isAdminOrADM($userId) || $this->isSAO($userId)) {
+            return true;
+        }
+        $this->ensureMediaTeamRole();
+        $role = strtoupper(trim((string) $this->getUserRole($userId)));
+        if (in_array($role, ['MED', 'MEDIA', 'MT'], true)) {
+            return true;
+        }
+        if ($role === '') {
+            return false;
+        }
+        $stmt = $this->db->prepare('SELECT staff_position_type_name FROM `staff_position_type` WHERE staff_position_type_id = ? LIMIT 1');
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param('s', $role);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $name = strtolower(trim((string) ($row['staff_position_type_name'] ?? '')));
+
+        return $name !== '' && strpos($name, 'media') !== false;
+    }
+
+    public function ensureMediaTeamRole() {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+        $ready = true;
+        $this->db->query(
+            "INSERT IGNORE INTO `staff_position_type`
+                (`staff_position_type_id`, `staff_position_type_name`, `staff_position`)
+             VALUES ('MED', 'Media Team', 40)"
+        );
+    }
     
     /**
      * Check if user is HOD (Head of Department)

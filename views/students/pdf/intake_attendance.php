@@ -117,7 +117,7 @@ table.grid thead { display: table-header-group; }
     <?php if ($departmentLine !== ''): ?>
         · <?php echo $e($departmentLine); ?>
     <?php endif; ?>
-    · <?php echo $total; ?> students
+    · Full department · Student count: <strong><?php echo (int) $total; ?></strong>
 </div>
 
 <table class="grid">

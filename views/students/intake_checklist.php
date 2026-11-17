@@ -10,6 +10,7 @@ $filtersReady = !empty($filtersReady);
 $deptValue = (string) ($filters['department_id'] ?? '');
 $deptForForm = ($deptValue === '__none__') ? '' : $deptValue;
 $rowCount = count($rows);
+$departmentStudentCount = (int) ($departmentStudentCount ?? $rowCount);
 ?>
 <style>
 .stu-page { --stu-navy:#0b2545; --stu-ink:#1e293b; --stu-muted:#64748b; --stu-line:#dbe4f0; --stu-soft:#f5f8fd; color:var(--stu-ink); }
@@ -145,8 +146,9 @@ $rowCount = count($rows);
                     </div>
                     <div class="d-flex flex-wrap gap-2">
                         <?php if ($rowCount > 0): ?>
-                        <button type="submit" class="stu-btn stu-btn-primary ic-dl" data-document="attendance" data-all="1">
+                        <button type="submit" class="stu-btn stu-btn-primary ic-dl" data-document="attendance" data-all="1" title="Attendance sheet for every student in this department for the selected academic year">
                             <i class="fas fa-clipboard-list"></i>Attendance sheet
+                            <span class="stu-chip" style="background:#fff;color:#0b2545;"><?php echo $departmentStudentCount; ?></span>
                         </button>
                         <button type="submit" class="stu-btn stu-btn-pdf ic-dl" data-document="checklist" data-all="1">
                             <i class="fas fa-file-pdf"></i>Checklist

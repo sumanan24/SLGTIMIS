@@ -1032,6 +1032,7 @@ body.logged-in {
 .sidebar-menu-ordered > li[data-nav="management"] { order: 20; }
 .sidebar-menu-ordered > li[data-nav="staff"] { order: 25; }
 .sidebar-menu-ordered > li[data-nav="student-info"] { order: 30; }
+.sidebar-menu-ordered > li[data-nav="student-profile-photo"] { order: 32; }
 .sidebar-menu-ordered > li[data-nav="student-attendance"] { order: 40; }
 .sidebar-menu-ordered > li[data-nav="student-approval"] { order: 50; }
 .sidebar-menu-ordered > li[data-nav="exams"] { order: 60; }

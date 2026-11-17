@@ -306,6 +306,57 @@ class StudentModel extends Model {
 
         return array_values($rows);
     }
+
+    /**
+     * Find students by registration number or NIC for the profile-photo desk.
+     */
+    public function searchByNicOrRegistration($term, $limit = 12) {
+        $term = trim((string) $term);
+        $limit = max(1, min(20, (int) $limit));
+        if ($term === '') {
+            return [];
+        }
+        $this->addStudentProfileImgColumnIfNotExists();
+
+        $like = '%' . $term . '%';
+        $compact = '%' . preg_replace('/[\s\/-]+/', '', $term) . '%';
+        $sql = "SELECT s.student_id, s.student_fullname, s.student_nic, s.student_profile_img,
+                       c.course_name, d.department_name, se.academic_year
+                FROM `{$this->table}` s
+                LEFT JOIN `student_enroll` se
+                    ON s.student_id = se.student_id AND se.student_enroll_status IN ('Following', 'Internship')
+                LEFT JOIN `course` c ON se.course_id = c.course_id
+                LEFT JOIN `department` d ON c.department_id = d.department_id
+                WHERE s.student_id LIKE ?
+                   OR s.student_nic LIKE ?
+                   OR REPLACE(REPLACE(REPLACE(s.student_nic, ' ', ''), '-', ''), '/', '') LIKE ?
+                ORDER BY s.student_fullname ASC, se.academic_year DESC
+                LIMIT 40";
+
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param('sss', $like, $like, $compact);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        $rows = [];
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $id = (string) $row['student_id'];
+                if (isset($rows[$id])) {
+                    continue;
+                }
+                $rows[$id] = $row;
+                if (count($rows) >= $limit) {
+                    break;
+                }
+            }
+        }
+
+        return array_values($rows);
+    }
     
     /**
      * Count distinct Following and Internship students.

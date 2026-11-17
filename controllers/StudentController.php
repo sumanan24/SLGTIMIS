@@ -2058,6 +2058,125 @@ class StudentController extends Controller {
             'url' => $studentModel->getProfileImagePath($updated) ?: (APP_URL . '/assets/' . $newImagePath)
         ];
     }
+
+    /**
+     * Media team desk: search a student by NIC or registration number and take the profile photo.
+     */
+    public function profilePhoto() {
+        if (!$this->requireProfilePhotoAccess(false)) {
+            return;
+        }
+
+        $data = [
+            'title' => 'Profile photo',
+            'page' => 'student-profile-photo',
+            'error' => $_SESSION['error'] ?? null,
+            'message' => $_SESSION['message'] ?? null,
+        ];
+        unset($_SESSION['error'], $_SESSION['message']);
+
+        return $this->view('students/profile_photo', $data);
+    }
+
+    public function profilePhotoSearch() {
+        if (!$this->requireProfilePhotoAccess(true)) {
+            return;
+        }
+
+        $term = trim((string) $this->get('q', ''));
+        if (strlen($term) < 2) {
+            $this->json(['students' => []]);
+        }
+
+        $studentModel = $this->model('StudentModel');
+        $students = [];
+        foreach ($studentModel->searchByNicOrRegistration($term, 12) as $row) {
+            $students[] = [
+                'student_id' => $row['student_id'],
+                'student_fullname' => $row['student_fullname'] ?? '',
+                'student_nic' => $row['student_nic'] ?? '',
+                'course_name' => $row['course_name'] ?? '',
+                'department_name' => $row['department_name'] ?? '',
+                'academic_year' => $row['academic_year'] ?? '',
+                'photo_url' => $studentModel->getProfileImagePath($row) ?: '',
+            ];
+        }
+
+        $this->json(['students' => $students]);
+    }
+
+    public function profilePhotoSave() {
+        if (!$this->requireProfilePhotoAccess(true)) {
+            return;
+        }
+        if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
+            $this->json(['success' => false, 'message' => 'Use the photo form to save.'], 405);
+        }
+
+        $id = trim((string) $this->post('student_id', ''));
+        if ($id === '') {
+            $this->json(['success' => false, 'message' => 'Select a student first.'], 400);
+        }
+
+        $studentModel = $this->model('StudentModel');
+        $student = $studentModel->find($id);
+        if (!$student) {
+            $this->json(['success' => false, 'message' => 'Student not found.'], 404);
+        }
+
+        $saved = $this->storeStudentProfileImage($studentModel, $student, $id);
+        if (empty($saved['success'])) {
+            $this->json(['success' => false, 'message' => $saved['message'] ?? 'Failed to update the profile photo.'], 400);
+        }
+
+        $this->logActivity(
+            'UPDATE',
+            'student_profile_image',
+            $id,
+            "Profile photo updated for student {$id}",
+            null,
+            ['student_profile_img' => $saved['path'] ?? '']
+        );
+        $this->json([
+            'success' => true,
+            'message' => 'Profile photo updated.',
+            'url' => $saved['url'] ?? '',
+        ]);
+    }
+
+    /**
+     * @return bool
+     */
+    private function requireProfilePhotoAccess($asJson) {
+        if (!isset($_SESSION['user_id'])) {
+            if ($asJson) {
+                $this->json(['success' => false, 'students' => [], 'message' => 'Login required.'], 401);
+            }
+            $this->redirect('login');
+            return false;
+        }
+        if (isset($_SESSION['user_table']) && $_SESSION['user_table'] === 'student') {
+            if ($asJson) {
+                $this->json(['success' => false, 'message' => 'Access denied.'], 403);
+            }
+            $_SESSION['error'] = 'Access denied.';
+            $this->redirect('student/dashboard');
+            return false;
+        }
+
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        if (!$userModel->canTakeStudentProfilePhoto($_SESSION['user_id'])) {
+            if ($asJson) {
+                $this->json(['success' => false, 'students' => [], 'message' => 'Only the media team, SAO, or ADM can update profile photos.'], 403);
+            }
+            $_SESSION['error'] = 'Only the media team, SAO, or ADM can update profile photos.';
+            $this->redirect('dashboard');
+            return false;
+        }
+
+        return true;
+    }
     
     public function delete() {
         // Check authentication
@@ -5049,6 +5168,12 @@ class StudentController extends Controller {
         $rows = $filtersReady
             ? $this->intakeChecklistRows($filters)
             : [];
+        $departmentStudentCount = count($rows);
+        if ($filtersReady && trim((string) ($filters['course_id'] ?? '')) !== '') {
+            $departmentFilters = $filters;
+            $departmentFilters['course_id'] = '';
+            $departmentStudentCount = count($this->intakeChecklistRows($departmentFilters));
+        }
 
         $selectedDepartment = ($filters['department_id'] ?? '') !== '__none__'
             ? (string) ($filters['department_id'] ?? '')
@@ -5076,6 +5201,7 @@ class StudentController extends Controller {
             'academicYears' => $studentModel->getAcademicYears(),
             'isHOD' => $restricted,
             'filtersReady' => $filtersReady,
+            'departmentStudentCount' => $departmentStudentCount,
             'csrfToken' => (string) $_SESSION['intake_checklist_csrf'],
             'error' => $_SESSION['error'] ?? null,
             'message' => $_SESSION['message'] ?? null,
@@ -5249,6 +5375,9 @@ class StudentController extends Controller {
             $_SESSION['error'] = 'Select a department before downloading.';
             $this->redirect($back);
             return;
+        }
+        if ((string) $this->post('document', 'checklist') === 'attendance') {
+            $filters['course_id'] = '';
         }
 
         $allowRows = $this->intakeChecklistRows($filters);

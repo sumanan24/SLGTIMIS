@@ -340,6 +340,14 @@ class AccessControl {
                 return true;
             }
         }
+        if ($norm === 'students/profile-photo' || strpos($norm, 'students/profile-photo/') === 0) {
+            require_once BASE_PATH . '/models/UserModel.php';
+            $userModel = new UserModel();
+            $uid = (int) $_SESSION['user_id'];
+            if ($userModel->canTakeStudentProfilePhoto($uid) || $userModel->isAdminOrADM($uid)) {
+                return true;
+            }
+        }
         // Staff may open their own personal file. StaffController limits what they can change.
         if (self::isOwnStaffFileRequest($norm)) {
             return true;
@@ -390,8 +398,11 @@ class AccessControl {
             || strpos($uri, 'attendance/student-device/') === 0;
         // Student fingerprint is gated in StudentDeviceAttendanceController (SAO/ADM).
         // Keep it as view here so Add / Face ID / save-credentials are not treated as classroom attendance edit.
+        $isStudentProfilePhoto = $uri === 'students/profile-photo' || strpos($uri, 'students/profile-photo/') === 0;
         if (!$isStudentDevice) {
-            if (preg_match('#/(download)$#', $uri) || strpos($uri, '/download') !== false) {
+            if ($isStudentProfilePhoto) {
+                $action = 'view';
+            } elseif (preg_match('#/(download)$#', $uri) || strpos($uri, '/download') !== false) {
                 $action = 'download';
             } elseif (preg_match('#/(upload|photo)$#', $uri) || strpos($uri, '/upload') !== false) {
                 $action = 'upload';
@@ -417,7 +428,7 @@ class AccessControl {
             if ($uri === 'staff/file/document/download') {
                 $action = 'download';
             }
-            if ($method === 'POST' && $action === 'view') {
+            if ($method === 'POST' && $action === 'view' && !$isStudentProfilePhoto) {
                 $action = 'edit';
             }
         }

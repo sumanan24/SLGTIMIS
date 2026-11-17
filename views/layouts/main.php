@@ -143,6 +143,7 @@
                                 // Bus Season processing & payments: SAO, DIR (view), ADM, Admin
                                 $canProcessBusSeasonMenu = $userModel->canViewBusSeasonOperations($_SESSION['user_id']);
                                 $canViewPaymentsMenu = $userModel->canViewPaymentsList($_SESSION['user_id']);
+                                $canTakeStudentProfilePhoto = $userModel->canTakeStudentProfilePhoto($_SESSION['user_id']);
                             }
                             $isADMRole = ($userRole === 'ADM');
                             // HOD and assigned (Permanent / Acting / Cover-up) department heads
@@ -154,6 +155,12 @@
                             if (!isset($canViewPaymentsMenu)) {
                                 $canViewPaymentsMenu = false;
                             }
+                            if (!isset($canTakeStudentProfilePhoto)) {
+                                $canTakeStudentProfilePhoto = false;
+                            }
+                            $showProfilePhotoMenu = !empty($canTakeStudentProfilePhoto)
+                                || !empty($isAdminOrADM)
+                                || (!empty($userRole) && $userRole === 'ADM');
                             if (!isset($canViewDevices)) {
                                 $canViewDevices = false;
                             }
@@ -368,6 +375,9 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             if ($showStudentBusSeasonMenu) {
                                 $studentAffairsPages = array_merge($studentAffairsPages, $busSeasonPages);
                             }
+                            if (!empty($showProfilePhotoMenu)) {
+                                $studentAffairsPages[] = 'student-profile-photo';
+                            }
                             $studentInfoOpen = isset($page) && in_array($page, $studentAffairsPages, true);
                             $studentAppsOpen = isset($page) && in_array($page, $studentApplicationsPages, true);
                             $studentBusOpen = isset($page) && in_array($page, $busSeasonPages, true);
@@ -400,6 +410,14 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                                         <a href="<?php echo APP_URL; ?>/groups" class="<?php echo (isset($page) && $page === 'groups') ? 'active' : ''; ?>">
                                             <i class="fas fa-users"></i>
                                             <span>Groups</span>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
+                                    <?php if (!empty($showProfilePhotoMenu)): ?>
+                                    <li>
+                                        <a href="<?php echo APP_URL; ?>/students/profile-photo" class="<?php echo (isset($page) && $page === 'student-profile-photo') ? 'active' : ''; ?>">
+                                            <i class="fas fa-camera"></i>
+                                            <span>Profile photo</span>
                                         </a>
                                     </li>
                                     <?php endif; ?>
@@ -768,6 +786,14 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             </li>
                             <?php endif; ?>
 
+                            <?php if (!empty($showProfilePhotoMenu)): ?>
+                            <li data-nav="student-profile-photo">
+                                <a href="<?php echo APP_URL; ?>/students/profile-photo" class="<?php echo (isset($page) && $page === 'student-profile-photo') ? 'active' : ''; ?>">
+                                    <i class="fas fa-camera"></i>
+                                    <span>Profile photo</span>
+                                </a>
+                            </li>
+                            <?php endif; ?>
                             <?php if (!empty($userRole) && $userRole === 'ADM'): ?>
                             <!-- ID Card Print (ADM) - Main menu shortcut -->
                             <li data-nav="id-card-print">
