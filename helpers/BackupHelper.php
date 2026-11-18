@@ -68,8 +68,10 @@ class BackupHelper {
         $sql .= "SET NAMES utf8mb4;\n";
         $sql .= self::IMPORT_COMPAT_PRELUDE;
         $sql .= "SET FOREIGN_KEY_CHECKS=0;\n";
-        $sql .= "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO\";\n";
-        $sql .= "SET time_zone = \"+00:00\";\n\n";
+        // ALLOW_INVALID_DATES keeps legacy 0000-00-00 values importable under strict MySQL modes.
+        $sql .= "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO,ALLOW_INVALID_DATES\";\n";
+        // SYSTEM avoids #1298 on servers without timezone tables (common on WAMP).
+        $sql .= "SET time_zone = \"SYSTEM\";\n\n";
 
         foreach ($tables as $table) {
             $sql .= self::exportTable($conn, $table);
@@ -248,6 +250,16 @@ class BackupHelper {
                 continue;
             }
 
+            // Avoid #1298 Unknown or incorrect time zone: '+00:00' when tz tables are missing.
+            if (preg_match('/TIME_ZONE\s*=\s*[\'"]\+00:00[\'"]/i', $line)
+                || preg_match('/time_zone\s*=\s*[\'"]\+00:00[\'"]/i', $line)) {
+                $line = preg_replace(
+                    '/(TIME_ZONE|time_zone)\s*=\s*[\'"]\+00:00[\'"]/i',
+                    '$1=\'SYSTEM\'',
+                    $line
+                );
+            }
+
             // DEFINER often missing on a new PC / new MySQL user
             if (stripos($line, 'DEFINER') !== false) {
                 $line = preg_replace('/CREATE\s+DEFINER\s*=\s*`[^`]+`@`[^`]+`\s+/i', 'CREATE ', $line);
@@ -313,6 +325,13 @@ class BackupHelper {
 
         // GTID can break restore on another server when privileges differ
         $sql = preg_replace('/^SET\s+@@GLOBAL\.GTID_PURGED\s*=.*?;\s*$/im', '', $sql);
+
+        // Avoid #1298 Unknown or incorrect time zone: '+00:00' when tz tables are missing.
+        $sql = preg_replace(
+            '/(TIME_ZONE|time_zone)\s*=\s*[\'"]\+00:00[\'"]/i',
+            '$1=\'SYSTEM\'',
+            $sql
+        );
 
         // DEFINER often missing on a new PC / new MySQL user
         $sql = preg_replace(

@@ -571,7 +571,7 @@ class PaymentController extends Controller {
         }
 
         $basis = $this->get('basis', 'type');
-        if (!in_array($basis, ['type', 'subtype', 'student', 'department'], true)) {
+        if (!in_array($basis, ['type', 'subtype', 'student', 'department', 'course'], true)) {
             $basis = 'type';
         }
 
@@ -641,6 +641,8 @@ class PaymentController extends Controller {
             $groups = $this->groupPaymentsBySubtype($payments);
         } elseif ($basis === 'department') {
             $groups = $this->groupPaymentsByDepartment($payments);
+        } elseif ($basis === 'course') {
+            $groups = $this->groupPaymentsByCourse($payments);
         } else {
             $groups = $this->groupPaymentsByType($payments);
         }
@@ -851,6 +853,7 @@ class PaymentController extends Controller {
         $types = [];
         $subtypes = [];
         $departments = [];
+        $courses = [];
         $total = 0.0;
         foreach ($payments as $payment) {
             $line = $this->paymentLineTotal($payment);
@@ -895,6 +898,32 @@ class PaymentController extends Controller {
             $departments[$department['key']]['count']++;
             $departments[$department['key']]['students'][(string) ($payment['student_id'] ?? '')] = true;
             $departments[$department['key']]['amount'] += $line;
+
+            $course = $this->paymentCourseLabel($payment);
+            if (!isset($courses[$course['key']])) {
+                $courses[$course['key']] = [
+                    'code' => $course['key'],
+                    'name' => $course['name'],
+                    'department' => $course['department'],
+                    'count' => 0,
+                    'students' => [],
+                    'amount' => 0.0,
+                    'subtypes' => [],
+                ];
+            }
+            $courses[$course['key']]['count']++;
+            $courses[$course['key']]['students'][(string) ($payment['student_id'] ?? '')] = true;
+            $courses[$course['key']]['amount'] += $line;
+            if (!isset($courses[$course['key']]['subtypes'][$subtypeKey])) {
+                $courses[$course['key']]['subtypes'][$subtypeKey] = [
+                    'type' => $type,
+                    'subtype' => $subtype,
+                    'count' => 0,
+                    'amount' => 0.0,
+                ];
+            }
+            $courses[$course['key']]['subtypes'][$subtypeKey]['count']++;
+            $courses[$course['key']]['subtypes'][$subtypeKey]['amount'] += $line;
         }
         ksort($types, SORT_NATURAL | SORT_FLAG_CASE);
         uasort($subtypes, function ($a, $b) {
@@ -910,6 +939,23 @@ class PaymentController extends Controller {
         foreach ($departments as $key => $row) {
             $departments[$key]['students'] = count($row['students']);
         }
+        uasort($courses, function ($a, $b) {
+            $dept = strcasecmp((string) ($a['department'] ?? ''), (string) ($b['department'] ?? ''));
+            if ($dept !== 0) {
+                return $dept;
+            }
+            return strcasecmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''));
+        });
+        foreach ($courses as $key => $row) {
+            $courses[$key]['students'] = count($row['students']);
+            uasort($courses[$key]['subtypes'], function ($a, $b) {
+                $type = strcasecmp($a['type'], $b['type']);
+                if ($type !== 0) {
+                    return $type;
+                }
+                return strcasecmp($a['subtype'], $b['subtype']);
+            });
+        }
 
         return [
             'count' => count($payments),
@@ -918,6 +964,26 @@ class PaymentController extends Controller {
             'types' => $types,
             'subtypes' => $subtypes,
             'departments' => $departments,
+            'courses' => $courses,
+        ];
+    }
+
+    private function paymentCourseLabel($payment) {
+        $id = trim((string) ($payment['course_id'] ?? ''));
+        $name = trim((string) ($payment['course_name'] ?? ''));
+        $department = trim((string) ($payment['department_name'] ?? ''));
+        if ($department === '') {
+            $department = trim((string) ($payment['pays_department_name'] ?? ''));
+        }
+        if ($name === '') {
+            $name = $id !== '' ? $id : 'Unspecified course';
+        }
+        $key = $id !== '' ? $id : ('name:' . $name);
+
+        return [
+            'key' => $key,
+            'name' => $name,
+            'department' => $department !== '' ? $department : 'Unspecified',
         ];
     }
 
@@ -1042,6 +1108,76 @@ class PaymentController extends Controller {
         return $groups;
     }
 
+    private function groupPaymentsByCourse($payments) {
+        $groups = [];
+        foreach ($payments as $payment) {
+            $course = $this->paymentCourseLabel($payment);
+            $key = $course['key'];
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
+                    'title' => $course['name'],
+                    'code' => $course['key'],
+                    'department' => $course['department'],
+                    'payments' => [],
+                    'total' => 0.0,
+                    'subtypes' => [],
+                ];
+            }
+            $groups[$key]['payments'][] = $payment;
+            $groups[$key]['total'] += $this->paymentLineTotal($payment);
+
+            $type = trim((string) ($payment['payment_type'] ?? ''));
+            if ($type === '') {
+                $type = 'Unspecified';
+            }
+            $subtype = trim((string) ($payment['payment_reason'] ?? ''));
+            if ($subtype === '') {
+                $subtype = 'Unspecified';
+            }
+            $subtypeKey = $type . "\0" . $subtype;
+            if (!isset($groups[$key]['subtypes'][$subtypeKey])) {
+                $groups[$key]['subtypes'][$subtypeKey] = [
+                    'type' => $type,
+                    'subtype' => $subtype,
+                    'count' => 0,
+                    'amount' => 0.0,
+                ];
+            }
+            $groups[$key]['subtypes'][$subtypeKey]['count']++;
+            $groups[$key]['subtypes'][$subtypeKey]['amount'] += $this->paymentLineTotal($payment);
+        }
+
+        uasort($groups, function ($a, $b) {
+            $dept = strcasecmp((string) ($a['department'] ?? ''), (string) ($b['department'] ?? ''));
+            if ($dept !== 0) {
+                return $dept;
+            }
+            return strcasecmp((string) ($a['title'] ?? ''), (string) ($b['title'] ?? ''));
+        });
+        foreach ($groups as $key => $group) {
+            uasort($groups[$key]['subtypes'], function ($a, $b) {
+                $type = strcasecmp((string) $a['type'], (string) $b['type']);
+                if ($type !== 0) {
+                    return $type;
+                }
+                return strcasecmp((string) $a['subtype'], (string) $b['subtype']);
+            });
+            usort($groups[$key]['payments'], function ($a, $b) {
+                $type = strcasecmp((string) ($a['payment_type'] ?? ''), (string) ($b['payment_type'] ?? ''));
+                if ($type !== 0) {
+                    return $type;
+                }
+                $subtype = strcasecmp((string) ($a['payment_reason'] ?? ''), (string) ($b['payment_reason'] ?? ''));
+                if ($subtype !== 0) {
+                    return $subtype;
+                }
+                return strcmp((string) ($b['pays_date'] ?? ''), (string) ($a['pays_date'] ?? ''));
+            });
+        }
+
+        return $groups;
+    }
+
     private function groupPaymentsByStudent($payments) {
         $groups = [];
         foreach ($payments as $payment) {
@@ -1091,6 +1227,8 @@ class PaymentController extends Controller {
             $basisSlug = 'by-subtype';
         } elseif ($basis === 'department') {
             $basisSlug = 'by-department';
+        } elseif ($basis === 'course') {
+            $basisSlug = 'by-course';
         }
         $filename = 'payments-report-' . $basisSlug;
         if ($dateFrom !== '' || $dateTo !== '') {
@@ -1142,6 +1280,28 @@ class PaymentController extends Controller {
 
         if ($basis === 'department') {
             usort($rows, [$this, 'comparePaymentsByDepartment']);
+        } elseif ($basis === 'course') {
+            usort($rows, function ($a, $b) {
+                $courseA = $this->paymentCourseLabel($a);
+                $courseB = $this->paymentCourseLabel($b);
+                $dept = strcasecmp($courseA['department'], $courseB['department']);
+                if ($dept !== 0) {
+                    return $dept;
+                }
+                $name = strcasecmp($courseA['name'], $courseB['name']);
+                if ($name !== 0) {
+                    return $name;
+                }
+                $type = strcasecmp((string) ($a['payment_type'] ?? ''), (string) ($b['payment_type'] ?? ''));
+                if ($type !== 0) {
+                    return $type;
+                }
+                $subtype = strcasecmp((string) ($a['payment_reason'] ?? ''), (string) ($b['payment_reason'] ?? ''));
+                if ($subtype !== 0) {
+                    return $subtype;
+                }
+                return strcmp((string) ($b['pays_date'] ?? ''), (string) ($a['pays_date'] ?? ''));
+            });
         } elseif ($basis === 'subtype') {
             usort($rows, function ($a, $b) {
                 $type = strcasecmp((string) ($a['payment_type'] ?? ''), (string) ($b['payment_type'] ?? ''));

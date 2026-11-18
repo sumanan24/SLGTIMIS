@@ -22,6 +22,9 @@ if ($basis !== 'subtype') {
 if ($basis !== 'department') {
     $colsBeforeAmount++;
 }
+if ($basis !== 'course') {
+    $colsBeforeAmount++;
+}
 $colsBeforeAmount++; // Officer
 $colsBeforeAmount++; // Qty
 ?>
@@ -42,6 +45,9 @@ $colsBeforeAmount++; // Qty
                 <?php endif; ?>
                 <?php if ($basis !== 'department'): ?>
                     <th>Department</th>
+                <?php endif; ?>
+                <?php if ($basis !== 'course'): ?>
+                    <th>Course</th>
                 <?php endif; ?>
                 <th>Method</th>
                 <th>Officer</th>
@@ -74,6 +80,9 @@ $colsBeforeAmount++; // Qty
                     <?php endif; ?>
                     <?php if ($basis !== 'department'): ?>
                         <td><?php echo htmlspecialchars($payment['pays_department_name'] ?? $payment['department_name'] ?? '—'); ?></td>
+                    <?php endif; ?>
+                    <?php if ($basis !== 'course'): ?>
+                        <td><?php echo htmlspecialchars($payment['course_name'] ?? '—'); ?></td>
                     <?php endif; ?>
                     <td class="num"><?php
                         $methodCode = strtoupper(trim((string) ($payment['payment_method'] ?? '')));

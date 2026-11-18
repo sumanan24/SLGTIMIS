@@ -15,7 +15,8 @@ class PaymentModel extends Model {
      */
     public function getAll($filters = []) {
         $sql = "SELECT p.*, s.student_fullname, s.student_id as student_reg_no, 
-                c.course_name, d.department_name, pd.department_name AS pays_department_name, se.academic_year
+                se.course_id, c.course_name, c.department_id AS course_department_id,
+                d.department_name, pd.department_name AS pays_department_name, se.academic_year
                 FROM `{$this->table}` p
                 LEFT JOIN `student` s ON p.student_id = s.student_id
                 LEFT JOIN `student_enroll` se ON s.student_id = se.student_id AND se.student_enroll_status = 'Following'

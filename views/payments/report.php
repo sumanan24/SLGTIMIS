@@ -1,8 +1,8 @@
 <?php
 $filters = $filters ?? [];
-$basis = in_array($basis ?? '', ['type', 'subtype', 'student', 'department'], true) ? $basis : 'type';
+$basis = in_array($basis ?? '', ['type', 'subtype', 'student', 'department', 'course'], true) ? $basis : 'type';
 $printMode = !empty($printMode);
-$summary = $summary ?? ['count' => 0, 'students' => 0, 'amount' => 0, 'types' => [], 'subtypes' => [], 'departments' => []];
+$summary = $summary ?? ['count' => 0, 'students' => 0, 'amount' => 0, 'types' => [], 'subtypes' => [], 'departments' => [], 'courses' => []];
 $groups = $groups ?? [];
 $paymentTypes = $paymentTypes ?? [];
 $paymentSubtypes = $paymentSubtypes ?? [];
@@ -43,10 +43,14 @@ foreach ($departments as $departmentOption) {
 $basisTitles = [
     'type' => 'By payment type',
     'subtype' => 'By sub type',
+    'course' => 'By course (sub types)',
     'student' => 'By student',
     'department' => 'By department',
 ];
 $headingTitle = $basisTitles[$basis] ?? 'Payments Report';
+if ($basis === 'course') {
+    $headingTitle = 'Course-wise summary (sub type categories)';
+}
 
 $metaBits = [];
 if (($filters['payment_subtype'] ?? '') !== '') {
@@ -448,6 +452,65 @@ $lineTotal = static function ($payment) {
                         </tbody>
                     </table>
                 </div>
+            <?php elseif ($basis === 'course' && !empty($summary['courses'])): ?>
+                <div class="pay-table-wrap mb-3">
+                    <table class="table table-sm table-bordered pay-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Course</th>
+                                <th>Department</th>
+                                <th>Type</th>
+                                <th>Sub type</th>
+                                <th class="text-end">Payments</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($summary['courses'] as $courseRow): ?>
+                                <?php
+                                $courseSubtypes = $courseRow['subtypes'] ?? [];
+                                $subtypeCount = max(1, count($courseSubtypes));
+                                $firstSubtype = true;
+                                if ($courseSubtypes === []) {
+                                    $courseSubtypes = [['type' => '—', 'subtype' => '—', 'count' => 0, 'amount' => 0.0]];
+                                }
+                                foreach ($courseSubtypes as $subtypeRow):
+                                ?>
+                                    <tr>
+                                        <?php if ($firstSubtype): ?>
+                                            <td rowspan="<?php echo (int) $subtypeCount; ?>" class="align-middle fw-semibold">
+                                                <?php echo htmlspecialchars($courseRow['name'] ?? 'Unspecified course'); ?>
+                                                <div class="small text-muted fw-normal"><?php echo (int) ($courseRow['students'] ?? 0); ?> student(s)</div>
+                                            </td>
+                                            <td rowspan="<?php echo (int) $subtypeCount; ?>" class="align-middle">
+                                                <?php echo htmlspecialchars($courseRow['department'] ?? '—'); ?>
+                                            </td>
+                                        <?php
+                                            $firstSubtype = false;
+                                        endif;
+                                        ?>
+                                        <td><?php echo htmlspecialchars($subtypeRow['type'] ?? '—'); ?></td>
+                                        <td><?php echo htmlspecialchars($subtypeRow['subtype'] ?? '—'); ?></td>
+                                        <td class="text-end num"><?php echo (int) ($subtypeRow['count'] ?? 0); ?></td>
+                                        <td class="text-end num">Rs. <?php echo number_format((float) ($subtypeRow['amount'] ?? 0), 2); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                <tr class="table-light">
+                                    <td colspan="4" class="text-end fw-bold"><?php echo htmlspecialchars(($courseRow['name'] ?? 'Course') . ' total'); ?></td>
+                                    <td class="text-end fw-bold num"><?php echo (int) ($courseRow['count'] ?? 0); ?></td>
+                                    <td class="text-end fw-bold num">Rs. <?php echo number_format((float) ($courseRow['amount'] ?? 0), 2); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th colspan="4" class="text-end">Grand total</th>
+                                <th class="text-end"><?php echo (int) $summary['count']; ?></th>
+                                <th class="text-end">Rs. <?php echo number_format((float) $summary['amount'], 2); ?></th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
             <?php endif; ?>
 
             <?php if (empty($groups)): ?>
@@ -535,11 +598,38 @@ $lineTotal = static function ($payment) {
                                 <?php if ($basis === 'subtype' && !empty($group['type'])): ?>
                                     <div class="small text-muted"><?php echo htmlspecialchars($group['type']); ?></div>
                                 <?php endif; ?>
+                                <?php if ($basis === 'course' && !empty($group['department'])): ?>
+                                    <div class="small text-muted"><?php echo htmlspecialchars($group['department']); ?></div>
+                                <?php endif; ?>
                             </div>
                             <div class="small fw-semibold text-success">
                                 <?php echo count($group['payments']); ?> · Rs. <?php echo number_format((float) $group['total'], 2); ?>
                             </div>
                         </div>
+                        <?php if ($basis === 'course' && !empty($group['subtypes'])): ?>
+                            <div class="pay-table-wrap mb-2">
+                                <table class="table table-sm table-bordered pay-table mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Sub type</th>
+                                            <th class="text-end">Payments</th>
+                                            <th class="text-end">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($group['subtypes'] as $courseSubtype): ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($courseSubtype['type']); ?></td>
+                                                <td><?php echo htmlspecialchars($courseSubtype['subtype']); ?></td>
+                                                <td class="text-end num"><?php echo (int) $courseSubtype['count']; ?></td>
+                                                <td class="text-end num">Rs. <?php echo number_format((float) $courseSubtype['amount'], 2); ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
                         <?php include BASE_PATH . '/views/payments/_report_lines.php'; ?>
                     </section>
                 <?php endforeach; ?>
