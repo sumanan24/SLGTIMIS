@@ -187,6 +187,8 @@ class StudentModel extends Model {
             $conditions[] = "LOWER(TRIM(IFNULL(s.`student_nationality`, ''))) = ?";
             $params[] = $language;
             $types .= 's';
+        } elseif (in_array($language, ['empty', 'blank', 'none'], true)) {
+            $conditions[] = "TRIM(IFNULL(s.`student_nationality`, '')) = ''";
         } elseif ($language === 'other' || $language === 'others') {
             $conditions[] = "(TRIM(IFNULL(s.`student_nationality`, '')) = '' OR LOWER(TRIM(s.`student_nationality`)) NOT IN ('sinhala', 'tamil', 'english'))";
         }
@@ -472,6 +474,8 @@ class StudentModel extends Model {
             $conditions[] = "LOWER(TRIM(IFNULL(s.`student_nationality`, ''))) = ?";
             $params[] = $language;
             $types .= 's';
+        } elseif (in_array($language, ['empty', 'blank', 'none'], true)) {
+            $conditions[] = "TRIM(IFNULL(s.`student_nationality`, '')) = ''";
         } elseif ($language === 'other' || $language === 'others') {
             $conditions[] = "(TRIM(IFNULL(s.`student_nationality`, '')) = '' OR LOWER(TRIM(s.`student_nationality`)) NOT IN ('sinhala', 'tamil', 'english'))";
         }

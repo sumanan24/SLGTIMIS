@@ -696,7 +696,7 @@ class StudentController extends Controller {
             $conductAccepted = '';
         }
         $language = strtolower(trim((string) $this->get('language', '')));
-        if (!in_array($language, ['sinhala', 'tamil', 'english'], true)) {
+        if (!in_array($language, ['sinhala', 'tamil', 'english', 'empty'], true)) {
             $language = '';
         }
         $registrationFee = strtolower(trim((string) $this->get('registration_fee', '')));

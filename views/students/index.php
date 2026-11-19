@@ -273,6 +273,7 @@ $smsQuery = http_build_query(array_filter([
                             <option value="tamil" <?php echo (($filters['language'] ?? '') === 'tamil') ? 'selected' : ''; ?>>Tamil</option>
                             <option value="sinhala" <?php echo (($filters['language'] ?? '') === 'sinhala') ? 'selected' : ''; ?>>Sinhala</option>
                             <option value="english" <?php echo (($filters['language'] ?? '') === 'english') ? 'selected' : ''; ?>>English</option>
+                            <option value="empty" <?php echo (($filters['language'] ?? '') === 'empty') ? 'selected' : ''; ?>>Not entered</option>
                         </select>
                     </div>
                     <div class="col-md-6 col-lg-3 stu-field">
@@ -721,6 +722,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <option value="tamil" <?php echo (($filters['language'] ?? '') === 'tamil') ? 'selected' : ''; ?>>Tamil</option>
                                     <option value="sinhala" <?php echo (($filters['language'] ?? '') === 'sinhala') ? 'selected' : ''; ?>>Sinhala</option>
                                     <option value="english" <?php echo (($filters['language'] ?? '') === 'english') ? 'selected' : ''; ?>>English</option>
+                                    <option value="empty" <?php echo (($filters['language'] ?? '') === 'empty') ? 'selected' : ''; ?>>Not entered</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
