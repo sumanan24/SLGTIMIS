@@ -695,6 +695,14 @@ class StudentController extends Controller {
         if (!in_array($conductAccepted, ['accepted', 'pending'], true)) {
             $conductAccepted = '';
         }
+        $language = strtolower(trim((string) $this->get('language', '')));
+        if (!in_array($language, ['sinhala', 'tamil', 'english'], true)) {
+            $language = '';
+        }
+        $registrationFee = strtolower(trim((string) $this->get('registration_fee', '')));
+        if (!in_array($registrationFee, ['paid', 'unpaid'], true)) {
+            $registrationFee = '';
+        }
 
         // HOD, IN1, IN2, IN3: locked to own department + Active; allow search and enrollment filters (year, course, mode, group); ignore district/gender
         if ($isDepartmentRestricted) {
@@ -711,6 +719,8 @@ class StudentController extends Controller {
                 'group_id' => $this->get('group_id', ''),
                 'provinces' => $provinceRaw,
                 'conduct_accepted' => $conductAccepted,
+                'language' => $language,
+                'registration_fee' => $registrationFee,
                 'current_enrollment' => true
             ];
         } else {
@@ -726,6 +736,8 @@ class StudentController extends Controller {
                 'group_id' => $this->get('group_id', ''),
                 'provinces' => $provinceRaw,
                 'conduct_accepted' => $conductAccepted,
+                'language' => $language,
+                'registration_fee' => $registrationFee,
                 'current_enrollment' => true
             ];
         }
@@ -4978,6 +4990,8 @@ class StudentController extends Controller {
             'course_id' => $this->get('course_id', $this->post('course_id', '')),
             'academic_year' => $this->get('academic_year', $this->post('academic_year', '')),
             'group_id' => $this->get('group_id', $this->post('group_id', '')),
+            'language' => $this->get('language', $this->post('language', '')),
+            'registration_fee' => $this->get('registration_fee', $this->post('registration_fee', '')),
             'current_enrollment' => true
         ];
         

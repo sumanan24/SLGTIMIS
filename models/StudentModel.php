@@ -58,6 +58,32 @@ class StudentModel extends Model {
         }
     }
 
+    /**
+     * A student has paid the registration fee when a receipt exists for that charge.
+     * The payment type is stored as "Regstration" and also matches a correctly spelled name.
+     */
+    private function registrationFeePaidSql(): string {
+        return "EXISTS (
+            SELECT 1 FROM `pays` regpay
+            WHERE regpay.`student_id` = s.`student_id`
+              AND IFNULL(regpay.`pays_amount`, 0) > 0
+              AND IFNULL(regpay.`approved`, 1) <> 0
+              AND (
+                LOWER(TRIM(regpay.`payment_reason`)) IN ('regstration', 'registration', 'registration fee', 'regstration fee')
+                OR LOWER(TRIM(regpay.`payment_reason`)) LIKE '%regist%'
+              )
+        )";
+    }
+
+    private function appendRegistrationFeeFilter(array $filters, array &$conditions): void {
+        $fee = strtolower(trim((string) ($filters['registration_fee'] ?? '')));
+        if ($fee === 'paid') {
+            $conditions[] = $this->registrationFeePaidSql();
+        } elseif (in_array($fee, ['unpaid', 'not_paid', 'pending'], true)) {
+            $conditions[] = 'NOT ' . $this->registrationFeePaidSql();
+        }
+    }
+
     public function getStudents($page = 1, $perPage = 20, $filters = []) {
         // Ensure student_profile_img column exists
         $this->addStudentProfileImgColumnIfNotExists();
@@ -153,7 +179,11 @@ class StudentModel extends Model {
 
         // Language filter (stored in student_nationality: Sinhala / Tamil / English / other)
         $language = strtolower(trim((string) ($filters['language'] ?? ($filters['student_nationality'] ?? ''))));
-        if (in_array($language, ['sinhala', 'tamil', 'english'], true)) {
+        if ($language === 'tamil') {
+            $conditions[] = "LOWER(TRIM(IFNULL(s.`student_nationality`, ''))) LIKE '%tamil%'";
+        } elseif ($language === 'sinhala') {
+            $conditions[] = "(LOWER(TRIM(IFNULL(s.`student_nationality`, ''))) LIKE '%sinhala%' OR LOWER(TRIM(IFNULL(s.`student_nationality`, ''))) = 'sinhalese')";
+        } elseif ($language === 'english') {
             $conditions[] = "LOWER(TRIM(IFNULL(s.`student_nationality`, ''))) = ?";
             $params[] = $language;
             $types .= 's';
@@ -231,6 +261,7 @@ class StudentModel extends Model {
         }
 
         $this->appendConductAcceptedFilter($filters, $conditions);
+        $this->appendRegistrationFeeFilter($filters, $conditions);
         
         if (!empty($conditions)) {
             $sql .= " WHERE " . implode(' AND ', $conditions);
@@ -433,7 +464,11 @@ class StudentModel extends Model {
 
         // Language filter (stored in student_nationality: Sinhala / Tamil / English / other)
         $language = strtolower(trim((string) ($filters['language'] ?? ($filters['student_nationality'] ?? ''))));
-        if (in_array($language, ['sinhala', 'tamil', 'english'], true)) {
+        if ($language === 'tamil') {
+            $conditions[] = "LOWER(TRIM(IFNULL(s.`student_nationality`, ''))) LIKE '%tamil%'";
+        } elseif ($language === 'sinhala') {
+            $conditions[] = "(LOWER(TRIM(IFNULL(s.`student_nationality`, ''))) LIKE '%sinhala%' OR LOWER(TRIM(IFNULL(s.`student_nationality`, ''))) = 'sinhalese')";
+        } elseif ($language === 'english') {
             $conditions[] = "LOWER(TRIM(IFNULL(s.`student_nationality`, ''))) = ?";
             $params[] = $language;
             $types .= 's';
@@ -508,6 +543,7 @@ class StudentModel extends Model {
         }
 
         $this->appendConductAcceptedFilter($filters, $conditions);
+        $this->appendRegistrationFeeFilter($filters, $conditions);
         
         // Add WHERE clause with all conditions
         if (!empty($conditions)) {

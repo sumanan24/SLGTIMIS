@@ -11,7 +11,8 @@ foreach ($selectedProvinces as $sp) {
 $hasActiveFilters = !empty($filters['search']) || !empty($filters['status']) || !empty($filters['district'])
     || !empty($filters['gender']) || !empty($filters['department_id']) || !empty($filters['course_id'])
     || !empty($filters['academic_year']) || !empty($filters['course_mode']) || !empty($filters['group_id'])
-    || !empty($filters['provinces']) || !empty($filters['conduct_accepted']);
+    || !empty($filters['provinces']) || !empty($filters['conduct_accepted'])
+    || !empty($filters['language']) || !empty($filters['registration_fee']);
 $smsQuery = http_build_query(array_filter([
     'academic_year' => $filters['academic_year'] ?? '',
     'department_id' => $filters['department_id'] ?? '',
@@ -265,6 +266,23 @@ $smsQuery = http_build_query(array_filter([
                             <option value="pending" <?php echo (($filters['conduct_accepted'] ?? '') === 'pending') ? 'selected' : ''; ?>>Not accepted</option>
                         </select>
                     </div>
+                    <div class="col-md-6 col-lg-3 stu-field">
+                        <label for="language" class="stu-label">Language</label>
+                        <select class="form-select" id="language" name="language">
+                            <option value="">All</option>
+                            <option value="tamil" <?php echo (($filters['language'] ?? '') === 'tamil') ? 'selected' : ''; ?>>Tamil</option>
+                            <option value="sinhala" <?php echo (($filters['language'] ?? '') === 'sinhala') ? 'selected' : ''; ?>>Sinhala</option>
+                            <option value="english" <?php echo (($filters['language'] ?? '') === 'english') ? 'selected' : ''; ?>>English</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 col-lg-3 stu-field">
+                        <label for="registration_fee" class="stu-label">Registration fee</label>
+                        <select class="form-select" id="registration_fee" name="registration_fee">
+                            <option value="">All</option>
+                            <option value="paid" <?php echo (($filters['registration_fee'] ?? '') === 'paid') ? 'selected' : ''; ?>>Paid</option>
+                            <option value="unpaid" <?php echo (($filters['registration_fee'] ?? '') === 'unpaid') ? 'selected' : ''; ?>>Not paid</option>
+                        </select>
+                    </div>
                     <div class="col-12">
                         <div class="stu-prov-bar">
                             <label class="stu-label mb-0">Provinces</label>
@@ -438,6 +456,8 @@ $smsQuery = http_build_query(array_filter([
                         if (!empty($filters['course_mode'])) $params['course_mode'] = $filters['course_mode'];
                         if (!empty($filters['group_id'])) $params['group_id'] = $filters['group_id'];
                         if (!empty($filters['conduct_accepted'])) $params['conduct_accepted'] = $filters['conduct_accepted'];
+                        if (!empty($filters['language'])) $params['language'] = $filters['language'];
+                        if (!empty($filters['registration_fee'])) $params['registration_fee'] = $filters['registration_fee'];
                         if (!empty($filters['provinces']) && is_array($filters['provinces'])) {
                             $params['provinces'] = array_values($filters['provinces']);
                         }
@@ -692,6 +712,23 @@ document.addEventListener('DOMContentLoaded', function() {
                                             <?php echo htmlspecialchars($year); ?>
                                         </option>
                                     <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="export_language" class="form-label small fw-bold">Language</label>
+                                <select class="form-select form-select-sm" id="export_language" name="language">
+                                    <option value="">All</option>
+                                    <option value="tamil" <?php echo (($filters['language'] ?? '') === 'tamil') ? 'selected' : ''; ?>>Tamil</option>
+                                    <option value="sinhala" <?php echo (($filters['language'] ?? '') === 'sinhala') ? 'selected' : ''; ?>>Sinhala</option>
+                                    <option value="english" <?php echo (($filters['language'] ?? '') === 'english') ? 'selected' : ''; ?>>English</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="export_registration_fee" class="form-label small fw-bold">Registration fee</label>
+                                <select class="form-select form-select-sm" id="export_registration_fee" name="registration_fee">
+                                    <option value="">All</option>
+                                    <option value="paid" <?php echo (($filters['registration_fee'] ?? '') === 'paid') ? 'selected' : ''; ?>>Paid</option>
+                                    <option value="unpaid" <?php echo (($filters['registration_fee'] ?? '') === 'unpaid') ? 'selected' : ''; ?>>Not paid</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
