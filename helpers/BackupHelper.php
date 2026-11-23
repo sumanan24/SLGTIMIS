@@ -41,6 +41,65 @@ class BackupHelper {
         "-- Import compatibility: allow foreign keys on non-unique columns (MySQL 8.4+ rejects them by default).\n"
         . "/*!80400 SET @OLD_RESTRICT_FK_ON_NON_STANDARD_KEY=@@SESSION.restrict_fk_on_non_standard_key, SESSION restrict_fk_on_non_standard_key=0 */;\n";
 
+    /** Shared mysqldump flags for portable, importable .sql files. */
+    private const MYSQLDUMP_FLAGS =
+        ' --routines --triggers --events --single-transaction --hex-blob'
+        . ' --default-character-set=utf8mb4 --set-gtid-purged=OFF --column-statistics=0'
+        // Avoid SET TIME_ZONE='+00:00' which fails (#1298) when timezone tables are missing (WAMP).
+        . ' --skip-tz-utc';
+
+    /**
+     * Standard session settings written at the top of every dump.
+     */
+    private static function dumpSessionPrelude(string $dbName, string $serverInfo = ''): string {
+        $sql = "-- SLGTI MIS Database Backup\n";
+        $sql .= '-- Generated: ' . date('Y-m-d H:i:s') . "\n";
+        $sql .= '-- Database: ' . $dbName . "\n";
+        if ($serverInfo !== '') {
+            $sql .= '-- MySQL Version: ' . $serverInfo . "\n";
+        }
+        $sql .= "-- Compatible with phpMyAdmin / mysql client import on WAMP and MySQL 8.x\n\n";
+        $sql .= "SET NAMES utf8mb4;\n";
+        $sql .= "SET CHARACTER_SET_CLIENT=utf8mb4;\n";
+        $sql .= self::IMPORT_COMPAT_PRELUDE;
+        $sql .= "SET FOREIGN_KEY_CHECKS=0;\n";
+        // ALLOW_INVALID_DATES keeps legacy 0000-00-00 values importable under strict MySQL modes.
+        $sql .= "SET SQL_MODE='NO_AUTO_VALUE_ON_ZERO,ALLOW_INVALID_DATES';\n";
+        // SYSTEM avoids #1298 on servers without timezone tables (common on WAMP).
+        $sql .= "SET time_zone='SYSTEM';\n\n";
+        return $sql;
+    }
+
+    /**
+     * Strip known-bad foreign keys that break import (non-unique referenced columns).
+     * Example: assessments_type.module_id -> module.module_id (module PK is composite).
+     */
+    public static function normalizeCreateTableSql(string $createSql): string {
+        $createSql = preg_replace(
+            '/,\s*CONSTRAINT\s+`assessments_type_ibfk_2`\s+FOREIGN\s+KEY\s+\(`module_id`\)\s+REFERENCES\s+`module`\s+\(`module_id`\)\s+ON\s+UPDATE\s+CASCADE/i',
+            '',
+            $createSql
+        ) ?? $createSql;
+        $createSql = preg_replace(
+            '/,\s*CONSTRAINT\s+`payment_reason_foreingkey`\s+FOREIGN\s+KEY\s+\(`payment_reason`\)\s+REFERENCES\s+`payment`\s+\(`payment_reason`\)\s+ON\s+UPDATE\s+CASCADE/i',
+            '',
+            $createSql
+        ) ?? $createSql;
+        $createSql = preg_replace(
+            '/,\s*CONSTRAINT\s+`[^`]+`\s+FOREIGN\s+KEY\s+\(`module_id`\)\s+REFERENCES\s+`module`\s+\(`module_id`\)[^,\)]*/i',
+            '',
+            $createSql
+        ) ?? $createSql;
+        $createSql = preg_replace(
+            '/,\s*CONSTRAINT\s+`[^`]+`\s+FOREIGN\s+KEY\s+\(`payment_reason`\)\s+REFERENCES\s+`payment`\s+\(`payment_reason`\)[^,\)]*/i',
+            '',
+            $createSql
+        ) ?? $createSql;
+        $createSql = preg_replace('/,\s*,/', ',', $createSql) ?? $createSql;
+        $createSql = preg_replace('/,\s*\)/', ')', $createSql) ?? $createSql;
+        return $createSql;
+    }
+
     /**
      * Build a full SQL dump (tables, data, views, triggers, routines, events).
      */
@@ -61,17 +120,7 @@ class BackupHelper {
             }
         }
 
-        $sql = "-- SLGTI MIS Database Backup\n";
-        $sql .= '-- Generated: ' . date('Y-m-d H:i:s') . "\n";
-        $sql .= '-- Database: ' . $dbName . "\n";
-        $sql .= '-- MySQL Version: ' . $conn->server_info . "\n\n";
-        $sql .= "SET NAMES utf8mb4;\n";
-        $sql .= self::IMPORT_COMPAT_PRELUDE;
-        $sql .= "SET FOREIGN_KEY_CHECKS=0;\n";
-        // ALLOW_INVALID_DATES keeps legacy 0000-00-00 values importable under strict MySQL modes.
-        $sql .= "SET SQL_MODE = \"NO_AUTO_VALUE_ON_ZERO,ALLOW_INVALID_DATES\";\n";
-        // SYSTEM avoids #1298 on servers without timezone tables (common on WAMP).
-        $sql .= "SET time_zone = \"SYSTEM\";\n\n";
+        $sql = self::dumpSessionPrelude($dbName, (string) $conn->server_info);
 
         foreach ($tables as $table) {
             $sql .= self::exportTable($conn, $table);
@@ -82,8 +131,10 @@ class BackupHelper {
             foreach ($views as $view) {
                 $create = $conn->query("SHOW CREATE VIEW `$view`");
                 if ($create && ($row = $create->fetch_row())) {
+                    $viewSql = (string) $row[1];
+                    $viewSql = preg_replace('/CREATE\s+DEFINER\s*=\s*`[^`]+`@`[^`]+`\s+/i', 'CREATE ', $viewSql) ?? $viewSql;
                     $sql .= "\nDROP VIEW IF EXISTS `$view`;\n";
-                    $sql .= $row[1] . ";\n\n";
+                    $sql .= $viewSql . ";\n\n";
                 }
             }
         }
@@ -92,6 +143,8 @@ class BackupHelper {
         $sql .= self::exportRoutines($conn, $dbName);
         $sql .= self::exportEvents($conn, $dbName);
         $sql .= "\nSET FOREIGN_KEY_CHECKS=1;\n";
+        $sql .= "SET SQL_MODE=DEFAULT;\n";
+        $sql .= "-- Dump completed: " . date('Y-m-d H:i:s') . "\n";
 
         return $sql;
     }
@@ -113,8 +166,7 @@ class BackupHelper {
         try {
             $cmd = escapeshellarg($mysqldump)
                 . ' --defaults-extra-file=' . escapeshellarg($cnfPath)
-                . ' --routines --triggers --events --single-transaction --hex-blob'
-                . ' --default-character-set=utf8mb4 --set-gtid-purged=OFF --column-statistics=0'
+                . self::MYSQLDUMP_FLAGS
                 . ' ' . escapeshellarg($dbName);
 
             $descriptors = [
@@ -180,8 +232,7 @@ class BackupHelper {
         try {
             $cmd = escapeshellarg($mysqldump)
                 . ' --defaults-extra-file=' . escapeshellarg($cnfPath)
-                . ' --routines --triggers --events --single-transaction --hex-blob'
-                . ' --default-character-set=utf8mb4 --set-gtid-purged=OFF --column-statistics=0'
+                . self::MYSQLDUMP_FLAGS
                 . ' --result-file=' . escapeshellarg($rawPath)
                 . ' ' . escapeshellarg($dbName);
 
@@ -235,11 +286,24 @@ class BackupHelper {
 
         $started = false;          // skip any mysqldump warnings printed before the real header
         $preludeDone = false;
+        $sqlModeFixed = false;
         $hasCreateTable = false;
+        $createBuffer = '';
+        $inCreateTable = false;
+
+        // Portable session header before the rest of the dump body.
+        fwrite($out, "-- SLGTI MIS sanitized dump\n");
+        fwrite($out, "-- Generated: " . date('Y-m-d H:i:s') . "\n\n");
+        fwrite($out, "SET NAMES utf8mb4;\n");
+        fwrite($out, "SET CHARACTER_SET_CLIENT=utf8mb4;\n");
+        fwrite($out, self::IMPORT_COMPAT_PRELUDE);
+        fwrite($out, "SET FOREIGN_KEY_CHECKS=0;\n");
+        fwrite($out, "SET SQL_MODE='NO_AUTO_VALUE_ON_ZERO,ALLOW_INVALID_DATES';\n");
+        fwrite($out, "SET time_zone='SYSTEM';\n\n");
 
         while (($line = fgets($in)) !== false) {
             if (!$started) {
-                if (!preg_match('/^(--\s*MySQL dump|\/\*!40101 SET @OLD_CHARACTER_SET)/i', $line)) {
+                if (!preg_match('/^(--\s*MySQL dump|\/\*!40101 SET @OLD_CHARACTER_SET|--\s*SLGTI MIS)/i', $line)) {
                     continue;
                 }
                 $started = true;
@@ -250,33 +314,69 @@ class BackupHelper {
                 continue;
             }
 
-            // Avoid #1298 Unknown or incorrect time zone: '+00:00' when tz tables are missing.
+            // Skip raw timezone / SQL_MODE lines — we already wrote safe session settings.
+            if (preg_match('/^(?:\/\*!40103\s+)?SET\s+(?:@@SESSION\.)?(?:TIME_ZONE|time_zone)\s*=/i', $line)
+                || preg_match('/^(?:\/\*!40101\s+)?SET\s+(?:@@SESSION\.)?SQL_MODE\s*=/i', $line)
+                || preg_match('/^SET\s+FOREIGN_KEY_CHECKS\s*=/i', $line)
+                || preg_match('/^SET\s+NAMES\s+/i', $line)) {
+                continue;
+            }
+
+            // Avoid leftover +00:00 in any other form.
             if (preg_match('/TIME_ZONE\s*=\s*[\'"]\+00:00[\'"]/i', $line)
                 || preg_match('/time_zone\s*=\s*[\'"]\+00:00[\'"]/i', $line)) {
                 $line = preg_replace(
                     '/(TIME_ZONE|time_zone)\s*=\s*[\'"]\+00:00[\'"]/i',
                     '$1=\'SYSTEM\'',
                     $line
-                );
+                ) ?? $line;
             }
 
             // DEFINER often missing on a new PC / new MySQL user
             if (stripos($line, 'DEFINER') !== false) {
-                $line = preg_replace('/CREATE\s+DEFINER\s*=\s*`[^`]+`@`[^`]+`\s+/i', 'CREATE ', $line);
+                $line = preg_replace('/CREATE\s+DEFINER\s*=\s*`[^`]+`@`[^`]+`\s+/i', 'CREATE ', $line) ?? $line;
             }
 
-            if (!$hasCreateTable && strncmp($line, 'CREATE TABLE', 12) === 0) {
+            // Buffer CREATE TABLE ... ; so we can strip bad FKs (assessments_type → module, etc.).
+            if (!$inCreateTable && preg_match('/^\s*CREATE\s+TABLE\b/i', $line)) {
+                $inCreateTable = true;
+                $createBuffer = $line;
                 $hasCreateTable = true;
+                if (preg_match('/;\s*$/', rtrim($line))) {
+                    fwrite($out, self::normalizeCreateTableSql($createBuffer));
+                    $createBuffer = '';
+                    $inCreateTable = false;
+                }
+                continue;
+            }
+            if ($inCreateTable) {
+                $createBuffer .= $line;
+                if (preg_match('/;\s*$/', rtrim($line))) {
+                    fwrite($out, self::normalizeCreateTableSql($createBuffer));
+                    $createBuffer = '';
+                    $inCreateTable = false;
+                }
+                continue;
             }
 
             fwrite($out, $line);
 
-            // Let the dump import on MySQL 8.4+ (see IMPORT_COMPAT_PRELUDE).
+            // Keep a second copy of the 8.4 prelude near FOREIGN_KEY_CHECKS if mysqldump still emits it.
             if (!$preludeDone && strpos($line, '/*!40014 SET @OLD_FOREIGN_KEY_CHECKS') === 0) {
                 fwrite($out, self::IMPORT_COMPAT_PRELUDE);
                 $preludeDone = true;
             }
+            if (!$sqlModeFixed && stripos($line, 'SQL_MODE') !== false) {
+                $sqlModeFixed = true;
+            }
         }
+
+        if ($inCreateTable && $createBuffer !== '') {
+            fwrite($out, self::normalizeCreateTableSql($createBuffer));
+        }
+
+        fwrite($out, "\nSET FOREIGN_KEY_CHECKS=1;\n");
+        fwrite($out, "-- Dump completed: " . date('Y-m-d H:i:s') . "\n");
 
         fclose($in);
         fclose($out);
@@ -331,14 +431,30 @@ class BackupHelper {
             '/(TIME_ZONE|time_zone)\s*=\s*[\'"]\+00:00[\'"]/i',
             '$1=\'SYSTEM\'',
             $sql
-        );
+        ) ?? $sql;
+
+        // Prefer SYSTEM / ALLOW_INVALID_DATES for WAMP and legacy zero dates.
+        $sql = preg_replace(
+            '/^SET\s+SQL_MODE\s*=\s*[\'"][^\'"]*[\'"]\s*;/im',
+            "SET SQL_MODE='NO_AUTO_VALUE_ON_ZERO,ALLOW_INVALID_DATES';",
+            $sql
+        ) ?? $sql;
 
         // DEFINER often missing on a new PC / new MySQL user
         $sql = preg_replace(
             '/CREATE\s+DEFINER\s*=\s*`[^`]+`@`[^`]+`\s+/i',
             'CREATE ',
             $sql
-        );
+        ) ?? $sql;
+
+        // Strip bad FKs from CREATE TABLE blocks (assessments_type → module, payment_reason, etc.).
+        $sql = preg_replace_callback(
+            '/CREATE\s+TABLE[\s\S]*?;/i',
+            static function (array $m): string {
+                return BackupHelper::normalizeCreateTableSql($m[0]);
+            },
+            $sql
+        ) ?? $sql;
 
         // Let the dump import on MySQL 8.4+ (see IMPORT_COMPAT_PRELUDE); skip if already present.
         if (strpos($sql, 'restrict_fk_on_non_standard_key') === false) {
@@ -352,6 +468,15 @@ class BackupHelper {
             if (!$inserted) {
                 $sql = self::IMPORT_COMPAT_PRELUDE . "\n" . $sql;
             }
+        }
+
+        // Ensure a safe session prelude when the dump did not already include one.
+        if (stripos($sql, "SET time_zone='SYSTEM'") === false && stripos($sql, 'SET time_zone = "SYSTEM"') === false) {
+            $sql = "SET NAMES utf8mb4;\n"
+                . "SET FOREIGN_KEY_CHECKS=0;\n"
+                . "SET SQL_MODE='NO_AUTO_VALUE_ON_ZERO,ALLOW_INVALID_DATES';\n"
+                . "SET time_zone='SYSTEM';\n\n"
+                . $sql;
         }
 
         return ltrim($sql);
@@ -449,29 +574,78 @@ class BackupHelper {
     }
 
     private static function exportTable(mysqli $conn, string $table): string {
-        $sql = "\n\n-- Table: `$table` --\n";
+        $sql = "\n\n--\n-- Table structure for table `$table`\n--\n\n";
         $sql .= "DROP TABLE IF EXISTS `$table`;\n";
+        $sql .= "/*!40101 SET @saved_cs_client     = @@character_set_client */;\n";
+        $sql .= "/*!40101 SET character_set_client = utf8mb4 */;\n";
 
         $create = $conn->query("SHOW CREATE TABLE `$table`");
         if (!$create || !($row = $create->fetch_row())) {
             return $sql;
         }
-        $sql .= $row[1] . ";\n\n";
+        $createSql = self::normalizeCreateTableSql((string) $row[1]);
+        if (substr(rtrim($createSql), -1) !== ';') {
+            $createSql .= ';';
+        }
+        $sql .= $createSql . "\n";
+        $sql .= "/*!40101 SET character_set_client = @saved_cs_client */;\n\n";
 
-        $data = $conn->query("SELECT * FROM `$table`");
-        if (!$data || $data->num_rows === 0) {
+        $data = $conn->query("SELECT * FROM `$table`", MYSQLI_USE_RESULT);
+        if (!$data) {
             return $sql;
         }
 
         $fields = $data->fetch_fields();
-        $numFields = $data->field_count;
+        $numFields = count($fields);
+        $columnNames = [];
+        foreach ($fields as $field) {
+            $columnNames[] = '`' . str_replace('`', '``', $field->name) . '`';
+        }
+        $columnList = '(' . implode(',', $columnNames) . ')';
+
+        $batch = [];
+        $batchBytes = 0;
+        $maxBatchBytes = 900000; // keep INSERT statements under ~1MB
+        $wroteHeader = false;
 
         while ($row = $data->fetch_row()) {
             $values = [];
             for ($i = 0; $i < $numFields; $i++) {
                 $values[] = self::sqlValue($conn, $row[$i], $fields[$i]->type ?? null);
             }
-            $sql .= "INSERT INTO `$table` VALUES(" . implode(',', $values) . ");\n";
+            $tuple = '(' . implode(',', $values) . ')';
+            $tupleBytes = strlen($tuple);
+
+            if ($batch !== [] && ($batchBytes + $tupleBytes + 2) > $maxBatchBytes) {
+                if (!$wroteHeader) {
+                    $sql .= "--\n-- Dumping data for table `$table`\n--\n\n";
+                    $sql .= "LOCK TABLES `$table` WRITE;\n";
+                    $sql .= "/*!40000 ALTER TABLE `$table` DISABLE KEYS */;\n";
+                    $wroteHeader = true;
+                }
+                $sql .= "INSERT INTO `$table` $columnList VALUES\n" . implode(",\n", $batch) . ";\n";
+                $batch = [];
+                $batchBytes = 0;
+            }
+
+            $batch[] = $tuple;
+            $batchBytes += $tupleBytes + 2;
+        }
+        $data->free();
+
+        if ($batch !== []) {
+            if (!$wroteHeader) {
+                $sql .= "--\n-- Dumping data for table `$table`\n--\n\n";
+                $sql .= "LOCK TABLES `$table` WRITE;\n";
+                $sql .= "/*!40000 ALTER TABLE `$table` DISABLE KEYS */;\n";
+                $wroteHeader = true;
+            }
+            $sql .= "INSERT INTO `$table` $columnList VALUES\n" . implode(",\n", $batch) . ";\n";
+        }
+
+        if ($wroteHeader) {
+            $sql .= "/*!40000 ALTER TABLE `$table` ENABLE KEYS */;\n";
+            $sql .= "UNLOCK TABLES;\n";
         }
 
         return $sql;
@@ -480,6 +654,16 @@ class BackupHelper {
     private static function sqlValue(mysqli $conn, $value, $fieldType): string {
         if ($value === null) {
             return 'NULL';
+        }
+
+        $blobTypes = [
+            MYSQLI_TYPE_TINY_BLOB, MYSQLI_TYPE_MEDIUM_BLOB, MYSQLI_TYPE_LONG_BLOB, MYSQLI_TYPE_BLOB,
+        ];
+        if ($fieldType !== null && in_array((int) $fieldType, $blobTypes, true)) {
+            if ($value === '') {
+                return "''";
+            }
+            return '0x' . bin2hex((string) $value);
         }
 
         $numericTypes = [

@@ -282,7 +282,9 @@ $config = [
                 
                 // Disable foreign key checks and set SQL mode
                 $conn->query("SET FOREIGN_KEY_CHECKS=0");
-                $conn->query("SET SQL_MODE='NO_AUTO_VALUE_ON_ZERO'");
+                $conn->query("SET SQL_MODE='NO_AUTO_VALUE_ON_ZERO,ALLOW_INVALID_DATES'");
+                $conn->query("SET time_zone='SYSTEM'");
+                $conn->query("SET NAMES utf8mb4");
                 $conn->query("SET AUTOCOMMIT=0");
                 $conn->query("START TRANSACTION");
                 
