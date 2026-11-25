@@ -71,11 +71,37 @@
     justify-content: space-between;
     gap: 0.75rem 1rem;
     margin-bottom: 0.35rem;
+    position: sticky;
+    top: 68px;
+    z-index: 5;
+    background: #fff;
+    padding-bottom: 0.45rem;
 }
 .smu-find {
-    flex: 1 1 16rem;
-    max-width: 28rem;
+    flex: 1 1 18rem;
+    max-width: 32rem;
     margin-left: auto;
+}
+.smu-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.45rem;
+}
+.smu-filters button {
+    border: 1px solid #d5deea;
+    background: #fff;
+    color: #16324f;
+    border-radius: 999px;
+    min-height: 34px;
+    padding: 0.15rem 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+.smu-filters button.is-on {
+    background: #16324f;
+    border-color: #16324f;
+    color: #fff;
 }
 .smu-count {
     margin: 0.15rem 0 0;

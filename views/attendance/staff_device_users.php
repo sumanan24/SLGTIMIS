@@ -118,8 +118,14 @@ $action = (string) ($urls['users'] ?? '#');
                         <p class="smu-count"><span id="smuShown"><?php echo count($cards); ?></span> of <?php echo (int) $machineCount; ?></p>
                     </div>
                     <div class="smu-find">
-                        <label for="smuFind">Find number or name</label>
-                        <input id="smuFind" type="search" class="form-control" value="<?php echo $e($q); ?>" placeholder="53" autocomplete="off">
+                        <label for="smuFind">Search person</label>
+                        <input id="smuFind" type="search" class="form-control" value="<?php echo $e($q); ?>" placeholder="Number or name" autocomplete="off">
+                        <div class="smu-filters" role="group" aria-label="Filter people">
+                            <button type="button" class="is-on" data-smu-filter="all">All</button>
+                            <button type="button" data-smu-filter="face">Face</button>
+                            <button type="button" data-smu-filter="noface">No face</button>
+                            <button type="button" data-smu-filter="finger">Finger</button>
+                        </div>
                     </div>
                 </div>
                 <?php if ($loadError !== ''): ?>
@@ -136,9 +142,9 @@ $action = (string) ($urls['users'] ?? '#');
                             $fingers = (int) $card['finger_count'];
                             $faces = (int) $card['face_count'];
                             $photoUrl = (string) ($card['photo_url'] ?? '');
-                            $hay = strtolower($eno . ' ' . $name . ' ' . ($card['staff_name'] ?? ''));
+                            $hay = strtolower($eno . ' ' . $name . ' ' . ($card['staff_name'] ?? '') . ' ' . ($card['staff_id'] ?? ''));
                             ?>
-                            <article class="smu-row" data-smu="<?php echo $e($hay); ?>">
+                            <article class="smu-row" data-smu="<?php echo $e($hay); ?>" data-no="<?php echo $e(strtolower($eno)); ?>" data-face="<?php echo $faces > 0 ? '1' : '0'; ?>" data-finger="<?php echo $fingers > 0 ? '1' : '0'; ?>">
                                 <div class="smu-id"><?php echo $e($eno); ?></div>
                                 <div class="smu-top">
                                     <?php if ($photoUrl !== ''): ?>
@@ -223,12 +229,27 @@ $action = (string) ($urls['users'] ?? '#');
     var shown = document.getElementById('smuShown');
     var none = document.getElementById('smuNone');
     var rows = document.querySelectorAll('.smu-row[data-smu]');
+    var filter = 'all';
     if (!find) return;
+    function personMatches(el, q) {
+        if (q === '') return true;
+        var no = el.getAttribute('data-no') || '';
+        var text = el.getAttribute('data-smu') || '';
+        if (/^\d+$/.test(q)) {
+            return no === q || no.indexOf(q) === 0;
+        }
+        return text.indexOf(q) !== -1;
+    }
     function apply() {
         var q = find.value.trim().toLowerCase();
         var n = 0;
         rows.forEach(function (el) {
-            var ok = q === '' || (el.getAttribute('data-smu') || '').indexOf(q) !== -1;
+            var face = el.getAttribute('data-face') === '1';
+            var finger = el.getAttribute('data-finger') === '1';
+            var ok = personMatches(el, q);
+            if (filter === 'face' && !face) ok = false;
+            if (filter === 'noface' && face) ok = false;
+            if (filter === 'finger' && !finger) ok = false;
             el.classList.toggle('is-hide', !ok);
             if (ok) n++;
         });
@@ -237,6 +258,8 @@ $action = (string) ($urls['users'] ?? '#');
         var url = new URL(window.location.href);
         if (q === '') url.searchParams.delete('q');
         else url.searchParams.set('q', find.value.trim());
+        if (filter === 'all') url.searchParams.delete('f');
+        else url.searchParams.set('f', filter);
         window.history.replaceState({}, '', url.pathname + url.search);
         document.querySelectorAll('.smu-page form').forEach(function (form) {
             var action = new URL(form.getAttribute('action') || window.location.pathname, window.location.origin);
@@ -245,8 +268,24 @@ $action = (string) ($urls['users'] ?? '#');
             form.setAttribute('action', action.pathname + action.search);
         });
     }
+    document.querySelectorAll('[data-smu-filter]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            filter = btn.getAttribute('data-smu-filter') || 'all';
+            document.querySelectorAll('[data-smu-filter]').forEach(function (other) {
+                other.classList.toggle('is-on', other === btn);
+            });
+            apply();
+        });
+    });
+    var startFilter = new URL(window.location.href).searchParams.get('f') || '';
+    if (startFilter === 'face' || startFilter === 'noface' || startFilter === 'finger') {
+        filter = startFilter;
+        document.querySelectorAll('[data-smu-filter]').forEach(function (btn) {
+            btn.classList.toggle('is-on', btn.getAttribute('data-smu-filter') === filter);
+        });
+    }
     find.addEventListener('input', apply);
-    if (find.value) apply();
+    if (find.value || filter !== 'all') apply();
 })();
 (function () {
     var box = document.getElementById('smuCamBox');
