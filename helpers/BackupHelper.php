@@ -7,6 +7,9 @@ class BackupHelper {
     /** @var list<string> */
     private static $deferredForeignKeys = [];
 
+    /** @var array<string, array<string, array{base:string,len:?int}>> */
+    private static $columnTypes = [];
+
     /**
      * Prepare response headers so the browser saves the file to the user's PC (Downloads folder).
      */
@@ -114,6 +117,8 @@ class BackupHelper {
             ) ?? $createSql;
         }
 
+        $createSql = self::unifyStringCharset($createSql);
+
         // Keep the CREATE free of foreign keys. They are added after every table exists,
         // so a table such as module does not fail when course is not created yet (error 1824).
         if (preg_match('/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`([^`]+)`/i', $createSql, $tableMatch)) {
@@ -129,21 +134,98 @@ class BackupHelper {
             ) ?? $createSql;
             $createSql = preg_replace('/,\s*,/', ',', $createSql) ?? $createSql;
             $createSql = preg_replace('/,\s*\)/', ')', $createSql) ?? $createSql;
+            self::rememberColumnTypes($tableMatch[1], $createSql);
         }
 
         return $createSql;
     }
 
+    /**
+     * One charset for every string column so a foreign key is not rejected (error 3780).
+     * module.course_id was latin1 while course.course_id is utf8mb4_unicode_ci.
+     */
+    private static function unifyStringCharset(string $sql): string {
+        $sql = preg_replace('/\bCHARSET=latin1\b/i', 'CHARSET=utf8mb4', $sql) ?? $sql;
+        $sql = preg_replace('/\bCHARSET=utf8mb3\b/i', 'CHARSET=utf8mb4', $sql) ?? $sql;
+        $sql = preg_replace('/\bCHARSET=utf8(?!mb4)\b/i', 'CHARSET=utf8mb4', $sql) ?? $sql;
+        $sql = preg_replace('/\bCHARACTER\s+SET\s+latin1\b/i', 'CHARACTER SET utf8mb4', $sql) ?? $sql;
+        $sql = preg_replace('/\bCHARACTER\s+SET\s+utf8mb3\b/i', 'CHARACTER SET utf8mb4', $sql) ?? $sql;
+        $sql = preg_replace('/\bCHARACTER\s+SET\s+utf8(?!mb4)\b/i', 'CHARACTER SET utf8mb4', $sql) ?? $sql;
+        $sql = preg_replace('/\bCOLLATE(?:\s+|=)latin1_\w+/i', 'COLLATE utf8mb4_unicode_ci', $sql) ?? $sql;
+        $sql = preg_replace('/\bCOLLATE(?:\s+|=)utf8mb3_\w+/i', 'COLLATE utf8mb4_unicode_ci', $sql) ?? $sql;
+        $sql = preg_replace('/\bCOLLATE(?:\s+|=)utf8_(?!mb4)\w+/i', 'COLLATE utf8mb4_unicode_ci', $sql) ?? $sql;
+        $sql = preg_replace('/\bCOLLATE(?:\s+|=)utf8mb4_(?!unicode_ci\b)\w+/i', 'COLLATE utf8mb4_unicode_ci', $sql) ?? $sql;
+        $sql = preg_replace(
+            '/\bCHARSET=utf8mb4\b(?!\s+COLLATE)/i',
+            'CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci',
+            $sql
+        ) ?? $sql;
+        return $sql;
+    }
+
+    private static function rememberColumnTypes(string $table, string $createSql): void {
+        self::$columnTypes[$table] = [];
+        if (!preg_match_all('/^\s*`([^`]+)`\s+([A-Za-z]+)(?:\((\d+)\))?/m', $createSql, $matches, PREG_SET_ORDER)) {
+            return;
+        }
+        foreach ($matches as $match) {
+            self::$columnTypes[$table][$match[1]] = [
+                'base' => strtolower($match[2]),
+                'len' => isset($match[3]) && $match[3] !== '' ? (int) $match[3] : null,
+            ];
+        }
+    }
+
+    private static function foreignKeyLineIsCompatible(string $line): bool {
+        if (!preg_match('/ALTER\s+TABLE\s+`([^`]+)`/i', $line, $tableMatch)) {
+            return true;
+        }
+        if (!preg_match('/FOREIGN\s+KEY\s*\(([^)]+)\)\s+REFERENCES\s+`([^`]+)`\s*\(([^)]+)\)/i', $line, $refMatch)) {
+            return true;
+        }
+        $child = $tableMatch[1];
+        $parent = $refMatch[2];
+        $cols = array_map(static function (string $name): string {
+            return trim($name, " `\t");
+        }, explode(',', $refMatch[1]));
+        $refs = array_map(static function (string $name): string {
+            return trim($name, " `\t");
+        }, explode(',', $refMatch[3]));
+        foreach ($cols as $index => $col) {
+            $ref = $refs[$index] ?? '';
+            $left = self::$columnTypes[$child][$col] ?? null;
+            $right = self::$columnTypes[$parent][$ref] ?? null;
+            if ($left === null || $right === null) {
+                continue;
+            }
+            if ($left['base'] !== $right['base']) {
+                return false;
+            }
+            if (in_array($left['base'], ['varchar', 'char'], true) && $left['len'] !== $right['len']) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public static function beginImportRewrite(): void {
         self::$deferredForeignKeys = [];
+        self::$columnTypes = [];
     }
 
     public static function deferredForeignKeySql(): string {
-        if (self::$deferredForeignKeys === []) {
+        $statements = [];
+        foreach (self::$deferredForeignKeys as $statement) {
+            if (!self::foreignKeyLineIsCompatible($statement)) {
+                continue;
+            }
+            $statements[] = $statement;
+        }
+        if ($statements === []) {
             return '';
         }
         $sql = "\n-- Foreign keys added after every table exists (avoids error 1824).\n";
-        foreach (self::$deferredForeignKeys as $statement) {
+        foreach ($statements as $statement) {
             $sql .= $statement . "\n";
         }
         return $sql;
@@ -483,6 +565,12 @@ class BackupHelper {
             // DEFINER often missing on a new PC / new MySQL user
             if (stripos($line, 'DEFINER') !== false) {
                 $line = preg_replace('/CREATE\s+DEFINER\s*=\s*`[^`]+`@`[^`]+`\s+/i', 'CREATE ', $line) ?? $line;
+            }
+
+            // Foreign keys are rewritten at the end, after every table and charset is known.
+            if (preg_match('/^ALTER\s+TABLE\s+`[^`]+`\s+ADD\s+(?:CONSTRAINT\s+`[^`]+`\s+)?FOREIGN\s+KEY\b/i', $line)) {
+                self::$deferredForeignKeys[] = rtrim($line, "\r\n");
+                continue;
             }
 
             // Buffer CREATE TABLE ... ; so we can strip bad FKs (assessments_type → module, etc.).
