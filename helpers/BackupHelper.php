@@ -97,7 +97,113 @@ class BackupHelper {
         ) ?? $createSql;
         $createSql = preg_replace('/,\s*,/', ',', $createSql) ?? $createSql;
         $createSql = preg_replace('/,\s*\)/', ')', $createSql) ?? $createSql;
+
+        // timestamp defaults fail on WAMP when the time-zone tables are empty (#1298).
+        $createSql = preg_replace('/\btimestamp(\(\d+\))?\b/i', 'datetime$1', $createSql) ?? $createSql;
+
+        // assessments.course_id must match course.course_id or the foreign key is rejected.
+        if (preg_match('/CREATE\s+TABLE\s+`assessments`/i', $createSql)) {
+            $createSql = preg_replace(
+                '/(`course_id`\s+)varchar\(20\)/i',
+                '$1varchar(11)',
+                $createSql,
+                1
+            ) ?? $createSql;
+        }
+
         return $createSql;
+    }
+
+    /**
+     * Dump tables after the tables they reference, so assessments is created after
+     * assessments_type, course, academic, and module.
+     *
+     * @param list<string> $tables
+     * @return list<string>
+     */
+    private static function orderTablesByForeignKeys(mysqli $conn, array $tables): array {
+        $known = array_fill_keys($tables, true);
+        $deps = [];
+        foreach ($tables as $table) {
+            $deps[$table] = [];
+            $safe = str_replace('`', '``', $table);
+            $result = $conn->query("SHOW CREATE TABLE `$safe`");
+            if (!$result || !($row = $result->fetch_row())) {
+                continue;
+            }
+            if (preg_match_all('/REFERENCES\s+`([^`]+)`/i', (string) $row[1], $matches)) {
+                foreach ($matches[1] as $ref) {
+                    if ($ref !== $table && isset($known[$ref])) {
+                        $deps[$table][$ref] = $ref;
+                    }
+                }
+            }
+        }
+
+        $ordered = [];
+        $visiting = [];
+        $visit = static function (string $table) use (&$visit, &$ordered, &$deps, &$visiting): void {
+            if (isset($ordered[$table]) || isset($visiting[$table])) {
+                return;
+            }
+            $visiting[$table] = true;
+            foreach ($deps[$table] ?? [] as $dep) {
+                $visit($dep);
+            }
+            unset($visiting[$table]);
+            $ordered[$table] = $table;
+        };
+        foreach ($tables as $table) {
+            $visit($table);
+        }
+
+        return array_values($ordered);
+    }
+
+    /**
+     * Ask mysqldump to write tables in foreign-key order.
+     * An empty result keeps the default dump (every table and view).
+     */
+    private static function mysqldumpTableList(string $dbName): string {
+        if (!defined('DB_HOST') || !defined('DB_USER') || !defined('DB_PASS')) {
+            return '';
+        }
+
+        $conn = @new mysqli(DB_HOST, DB_USER, DB_PASS, $dbName);
+        if ($conn->connect_error) {
+            return '';
+        }
+        $conn->set_charset('utf8mb4');
+
+        $tables = [];
+        $views = [];
+        $result = $conn->query('SHOW FULL TABLES');
+        if ($result) {
+            while ($row = $result->fetch_row()) {
+                if (strcasecmp((string) ($row[1] ?? ''), 'VIEW') === 0) {
+                    $views[] = (string) $row[0];
+                } else {
+                    $tables[] = (string) $row[0];
+                }
+            }
+        }
+
+        $names = array_merge(self::orderTablesByForeignKeys($conn, $tables), $views);
+        $conn->close();
+        if ($names === []) {
+            return '';
+        }
+
+        $arg = '';
+        foreach ($names as $name) {
+            $piece = ' ' . escapeshellarg($name);
+            if (strlen($arg) + strlen($piece) > 6000) {
+                return '';
+            }
+            $arg .= $piece;
+        }
+
+        return $arg;
     }
 
     /**
@@ -119,6 +225,8 @@ class BackupHelper {
                 }
             }
         }
+
+        $tables = self::orderTablesByForeignKeys($conn, $tables);
 
         $sql = self::dumpSessionPrelude($dbName, (string) $conn->server_info);
 
@@ -167,7 +275,8 @@ class BackupHelper {
             $cmd = escapeshellarg($mysqldump)
                 . ' --defaults-extra-file=' . escapeshellarg($cnfPath)
                 . self::MYSQLDUMP_FLAGS
-                . ' ' . escapeshellarg($dbName);
+                . ' ' . escapeshellarg($dbName)
+                . self::mysqldumpTableList($dbName);
 
             $descriptors = [
                 0 => ['pipe', 'r'],
@@ -234,7 +343,8 @@ class BackupHelper {
                 . ' --defaults-extra-file=' . escapeshellarg($cnfPath)
                 . self::MYSQLDUMP_FLAGS
                 . ' --result-file=' . escapeshellarg($rawPath)
-                . ' ' . escapeshellarg($dbName);
+                . ' ' . escapeshellarg($dbName)
+                . self::mysqldumpTableList($dbName);
 
             $proc = @proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
             if (!is_resource($proc)) {
