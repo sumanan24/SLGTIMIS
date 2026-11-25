@@ -1,6 +1,8 @@
 -- Backup of the `module` table structure (schema only, no data).
 -- Uses IF NOT EXISTS, so running this on a database that already has `module` changes nothing.
--- Requires the `course` table to exist first (foreign key `module_ibfk_1`).
+-- Foreign key checks are off so this still creates when `course` is imported later (error 1824).
+
+SET FOREIGN_KEY_CHECKS=0;
 
 CREATE TABLE IF NOT EXISTS `module` (
   `module_id` varchar(11) NOT NULL,
@@ -23,3 +25,5 @@ CREATE TABLE IF NOT EXISTS `module` (
   KEY `course_id` (`course_id`),
   CONSTRAINT `module_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `course` (`course_id`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+SET FOREIGN_KEY_CHECKS=1;

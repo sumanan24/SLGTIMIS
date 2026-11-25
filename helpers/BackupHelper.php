@@ -4,6 +4,9 @@
  */
 
 class BackupHelper {
+    /** @var list<string> */
+    private static $deferredForeignKeys = [];
+
     /**
      * Prepare response headers so the browser saves the file to the user's PC (Downloads folder).
      */
@@ -111,7 +114,39 @@ class BackupHelper {
             ) ?? $createSql;
         }
 
+        // Keep the CREATE free of foreign keys. They are added after every table exists,
+        // so a table such as module does not fail when course is not created yet (error 1824).
+        if (preg_match('/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`([^`]+)`/i', $createSql, $tableMatch)) {
+            $table = $tableMatch[1];
+            $createSql = preg_replace_callback(
+                '/,(\s*(?:CONSTRAINT\s+`[^`]+`\s+)?FOREIGN\s+KEY\s*\([^)]*\)\s+REFERENCES\s+`[^`]+`\s*\([^)]*\)(?:\s+ON\s+(?:DELETE|UPDATE)\s+(?:CASCADE|RESTRICT|SET\s+NULL|NO\s+ACTION|SET\s+DEFAULT))*)/i',
+                static function (array $match) use ($table): string {
+                    $clause = trim($match[1]);
+                    self::$deferredForeignKeys[] = 'ALTER TABLE `' . str_replace('`', '``', $table) . '` ADD ' . $clause . ';';
+                    return '';
+                },
+                $createSql
+            ) ?? $createSql;
+            $createSql = preg_replace('/,\s*,/', ',', $createSql) ?? $createSql;
+            $createSql = preg_replace('/,\s*\)/', ')', $createSql) ?? $createSql;
+        }
+
         return $createSql;
+    }
+
+    public static function beginImportRewrite(): void {
+        self::$deferredForeignKeys = [];
+    }
+
+    public static function deferredForeignKeySql(): string {
+        if (self::$deferredForeignKeys === []) {
+            return '';
+        }
+        $sql = "\n-- Foreign keys added after every table exists (avoids error 1824).\n";
+        foreach (self::$deferredForeignKeys as $statement) {
+            $sql .= $statement . "\n";
+        }
+        return $sql;
     }
 
     /**
@@ -228,6 +263,7 @@ class BackupHelper {
 
         $tables = self::orderTablesByForeignKeys($conn, $tables);
 
+        self::beginImportRewrite();
         $sql = self::dumpSessionPrelude($dbName, (string) $conn->server_info);
 
         foreach ($tables as $table) {
@@ -250,6 +286,7 @@ class BackupHelper {
         $sql .= self::exportTriggers($conn, $dbName);
         $sql .= self::exportRoutines($conn, $dbName);
         $sql .= self::exportEvents($conn, $dbName);
+        $sql .= self::deferredForeignKeySql();
         $sql .= "\nSET FOREIGN_KEY_CHECKS=1;\n";
         $sql .= "SET SQL_MODE=DEFAULT;\n";
         $sql .= "-- Dump completed: " . date('Y-m-d H:i:s') . "\n";
@@ -394,6 +431,7 @@ class BackupHelper {
             return false;
         }
 
+        self::beginImportRewrite();
         $started = false;          // skip any mysqldump warnings printed before the real header
         $preludeDone = false;
         $sqlModeFixed = false;
@@ -413,7 +451,7 @@ class BackupHelper {
 
         while (($line = fgets($in)) !== false) {
             if (!$started) {
-                if (!preg_match('/^(--\s*MySQL dump|\/\*!40101 SET @OLD_CHARACTER_SET|--\s*SLGTI MIS)/i', $line)) {
+                if (!preg_match('/^(--\s*MySQL dump|\/\*!40101 SET @OLD_CHARACTER_SET|--\s*SLGTI )/i', $line)) {
                     continue;
                 }
                 $started = true;
@@ -485,6 +523,7 @@ class BackupHelper {
             fwrite($out, self::normalizeCreateTableSql($createBuffer));
         }
 
+        fwrite($out, self::deferredForeignKeySql());
         fwrite($out, "\nSET FOREIGN_KEY_CHECKS=1;\n");
         fwrite($out, "-- Dump completed: " . date('Y-m-d H:i:s') . "\n");
 
@@ -558,6 +597,7 @@ class BackupHelper {
         ) ?? $sql;
 
         // Strip bad FKs from CREATE TABLE blocks (assessments_type → module, payment_reason, etc.).
+        self::beginImportRewrite();
         $sql = preg_replace_callback(
             '/CREATE\s+TABLE[\s\S]*?;/i',
             static function (array $m): string {
@@ -581,6 +621,8 @@ class BackupHelper {
         }
 
         // Ensure a safe session prelude when the dump did not already include one.
+        $sql .= self::deferredForeignKeySql();
+
         if (stripos($sql, "SET time_zone='SYSTEM'") === false && stripos($sql, 'SET time_zone = "SYSTEM"') === false) {
             $sql = "SET NAMES utf8mb4;\n"
                 . "SET FOREIGN_KEY_CHECKS=0;\n"
