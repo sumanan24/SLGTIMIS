@@ -1295,15 +1295,22 @@ class HikvisionIntegration {
      */
     public function searchUsers(int $maxResults = 100, string $employeeNo = ''): array {
         $employeeNo = trim($employeeNo);
-        $pageSize = max(1, min(200, $maxResults));
+        // This terminal returns at most 30 people per search even when a larger page is requested.
+        $pageSize = 30;
+        $cap = $employeeNo !== '' ? $pageSize : max($pageSize, min(2000, $maxResults));
         $users = [];
+        $seen = [];
         $position = 0;
+        $searchId = 'sis' . time();
 
         try {
-            for ($page = 0; $page < 50; $page++) {
+            for ($page = 0; $page < 80; $page++) {
+                if (count($users) >= $cap) {
+                    break;
+                }
                 $search = [
                     'UserInfoSearchCond' => [
-                        'searchID' => (string) (time() + $page),
+                        'searchID' => $searchId,
                         'searchResultPosition' => $position,
                         'maxResults' => $pageSize,
                     ],
@@ -1316,7 +1323,8 @@ class HikvisionIntegration {
 
                 $url = $this->baseUrl . '/AccessControl/UserInfo/Search?format=json';
                 $response = $this->makeRequest($url, 'POST', json_encode($search), 'application/json');
-                $list = $response['UserInfoSearch']['UserInfo'] ?? null;
+                $info = is_array($response) ? ($response['UserInfoSearch'] ?? null) : null;
+                $list = is_array($info) ? ($info['UserInfo'] ?? null) : null;
                 if ($list === null) {
                     break;
                 }
@@ -1324,20 +1332,31 @@ class HikvisionIntegration {
                     $list = [$list];
                 }
                 $batch = 0;
+                $added = 0;
                 foreach ($list as $user) {
                     if (!is_array($user)) {
                         continue;
                     }
                     $batch++;
+                    $eno = (string) ($user['employeeNo'] ?? '');
+                    if ($eno === '' || isset($seen[$eno])) {
+                        continue;
+                    }
+                    $seen[$eno] = true;
+                    $added++;
                     $users[] = [
-                        'employee_no' => (string) ($user['employeeNo'] ?? ''),
+                        'employee_no' => $eno,
                         'name' => (string) ($user['name'] ?? ''),
                         'user_type' => (string) ($user['userType'] ?? 'normal'),
                         'finger_count' => (int) ($user['numOfFP'] ?? $user['numOfFingerPrint'] ?? $user['fingerPrintNum'] ?? 0),
                         'face_count' => (int) ($user['numOfFace'] ?? $user['faceNum'] ?? 0),
                     ];
+                    if (count($users) >= $cap) {
+                        break;
+                    }
                 }
-                if ($employeeNo !== '' || $batch < $pageSize) {
+                $status = strtoupper((string) (is_array($info) ? ($info['responseStatusStrg'] ?? '') : ''));
+                if ($employeeNo !== '' || $added === 0 || $batch === 0 || $status !== 'MORE') {
                     break;
                 }
                 $position += $batch;
@@ -1992,7 +2011,7 @@ class HikvisionIntegration {
                 }
                 return [
                     'ok' => false,
-                    'message' => $slotLabel . ' capture failed. Ask the student to place a finger on the scanner, then try again. (' . $detail . ')',
+                    'message' => $slotLabel . ' capture failed. Place a finger on the scanner, then try again. (' . $detail . ')',
                     'response' => $captured['raw'] ?? null,
                 ];
             }
@@ -2025,40 +2044,60 @@ class HikvisionIntegration {
     private function captureFingerPrintData(int $fingerNo, array &$errors): array {
         // Auth already verified by enrollFingerPrint(); do not warm again (extra 401s re-lock admin)
 
-        $payloads = [
-            [
-                'path' => '/AccessControl/CaptureFingerPrint?format=json',
-                'body' => json_encode(['CaptureFingerPrintCond' => ['fingerNo' => $fingerNo]]),
-                'ct' => 'application/json',
-            ],
-            [
-                'path' => '/AccessControl/CaptureFingerPrint',
-                'body' => '<?xml version="1.0" encoding="UTF-8"?>'
-                    . '<CaptureFingerPrintCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">'
-                    . '<fingerNo>' . $fingerNo . '</fingerNo>'
-                    . '</CaptureFingerPrintCond>',
-                'ct' => 'application/xml; charset=UTF-8',
-            ],
-        ];
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'
+            . '<CaptureFingerPrintCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">'
+            . '<fingerNo>' . $fingerNo . '</fingerNo>'
+            . '</CaptureFingerPrintCond>';
+        $url = $this->baseUrl . '/AccessControl/CaptureFingerPrint';
+        $contentType = 'application/xml; charset=UTF-8';
+        $res = null;
+        $decoded = null;
+        $bodyText = '';
 
-        $attemptNo = 0;
-        foreach ($payloads as $att) {
-            // Prefer POST only — PUT retries on 401 were re-locking the admin account
-            $attemptNo++;
-            $url = $this->baseUrl . $att['path'];
-            $res = $this->makeRequestDetailed($url, 'POST', $att['body'], $att['ct'], 70);
+        // This terminal listens for about 12 seconds, then returns HTTP 400 Device Error
+        // if it did not read a finger. Repeat the read so one click stays on the scanner.
+        for ($try = 1; $try <= 4; $try++) {
+            $started = microtime(true);
+            $res = $this->makeRequestDetailed($url, 'POST', $xml, $contentType, 20);
             $decoded = $res['decoded'];
-            if ($res['http_code'] === 401) {
-                $errors[] = 'Capture#' . $attemptNo . ' HTTP 401 '
-                    . ($res['error'] !== '' ? $res['error'] : 'Unauthorized');
-                // Stop immediately — more attempts extend the lockout
-                return ['fingerData' => null, 'quality' => null, 'raw' => $decoded ?? $res['body']];
-            }
-            if ($res['http_code'] >= 400) {
-                $errors[] = 'Capture#' . $attemptNo . ' HTTP ' . $res['http_code'] . ' '
-                    . $this->hikvisionErrorMessage(is_array($decoded) ? $decoded : null, substr($res['body'], 0, 120));
+            $bodyText = (string) ($res['body'] ?? '');
+            if (stripos((string) ($res['error'] ?? ''), 'timed out') !== false) {
                 continue;
             }
+            if ($res['http_code'] === 401) {
+                $errors[] = 'Capture HTTP 401 ' . ($res['error'] !== '' ? $res['error'] : 'Unauthorized');
+                return ['fingerData' => null, 'quality' => null, 'raw' => $decoded ?? $res['body']];
+            }
+            if ($res['http_code'] > 0 && $res['http_code'] < 400) {
+                break;
+            }
+
+            $fastReject = (microtime(true) - $started) < 2
+                && (stripos($bodyText, 'badXml') !== false || stripos($bodyText, 'badParameters') !== false || stripos($bodyText, 'badJson') !== false);
+            if ($fastReject) {
+                $json = $this->makeRequestDetailed(
+                    $this->baseUrl . '/AccessControl/CaptureFingerPrint?format=json',
+                    'POST',
+                    json_encode(['CaptureFingerPrintCond' => ['fingerNo' => $fingerNo]]),
+                    'application/json',
+                    20
+                );
+                if ($json['http_code'] > 0 && $json['http_code'] < 400 && stripos((string) ($json['error'] ?? ''), 'timed out') === false) {
+                    $res = $json;
+                    $decoded = $json['decoded'];
+                    $bodyText = (string) ($json['body'] ?? '');
+                    break;
+                }
+                $errors[] = 'Capture HTTP ' . (int) ($json['http_code'] ?? 0) . ' '
+                    . $this->hikvisionErrorMessage(is_array($json['decoded']) ? $json['decoded'] : null, 'rejected');
+                return ['fingerData' => null, 'quality' => null, 'raw' => $json['decoded'] ?? $json['body']];
+            }
+
+            if ($try === 4) {
+                $errors[] = 'the scanner did not read a finger';
+                return ['fingerData' => null, 'quality' => null, 'raw' => $decoded ?? $res['body']];
+            }
+        }
             $fpBlock = is_array($decoded) ? ($decoded['CaptureFingerPrint'] ?? $decoded) : null;
             $printData = is_array($fpBlock)
                 ? ($fpBlock['fingerData'] ?? $fpBlock['fingerprintData'] ?? null)
@@ -2108,8 +2147,7 @@ class HikvisionIntegration {
                     ];
                 }
             }
-            $errors[] = 'Capture#' . $attemptNo . ' POST — no fingerData (place finger on scanner)';
-        }
+            $errors[] = 'the scanner did not return a fingerprint';
 
         return ['fingerData' => null, 'quality' => null, 'raw' => null];
     }
@@ -2372,6 +2410,103 @@ class HikvisionIntegration {
     }
 
     /**
+     * JPEG from a CaptureFaceData body, including a faceDataUrl the terminal returns after the camera shot.
+     */
+    private function jpegFromCaptureResponse(string $body, string $contentType, $decoded): ?string {
+        $jpeg = $this->extractFaceJpeg($body, $contentType, $decoded);
+        if (is_string($jpeg) && strncmp($jpeg, "\xFF\xD8\xFF", 3) === 0) {
+            return $jpeg;
+        }
+
+        $url = '';
+        if (is_array($decoded)) {
+            $block = $decoded['CaptureFaceData'] ?? $decoded;
+            if (is_array($block)) {
+                foreach (['faceDataUrl', 'faceURL', 'faceUrl', 'infraredFaceDataUrl'] as $key) {
+                    $candidate = trim((string) ($block[$key] ?? ''));
+                    if ($candidate !== '') {
+                        $url = $candidate;
+                        break;
+                    }
+                }
+            }
+        }
+        if ($url === '' && preg_match('/<(?:faceDataUrl|faceURL|infraredFaceDataUrl)[^>]*>\s*([^<]+)\s*</i', $body, $match)) {
+            $url = trim(html_entity_decode($match[1], ENT_QUOTES, 'UTF-8'));
+        }
+        if ($url === '') {
+            return null;
+        }
+
+        return $this->downloadJpegByUrl($url);
+    }
+
+    private function downloadJpegByUrl(string $url): ?string {
+        $hostBase = rtrim((string) preg_replace('#/ISAPI/?$#', '', $this->baseUrl), '/');
+        $urls = [$url];
+        if (stripos($url, 'http') !== 0) {
+            $urls[] = $hostBase . '/' . ltrim($url, '/');
+        } elseif (preg_match('#https?://[^/]+(/.*)$#i', $url, $match)) {
+            $urls[] = $hostBase . $match[1];
+            $plain = preg_replace('/@.*$/', '', $match[1]);
+            if (is_string($plain) && $plain !== '' && $plain !== $match[1]) {
+                $urls[] = $hostBase . $plain;
+            }
+        }
+        foreach (array_unique($urls) as $one) {
+            $bytes = $this->fetchUrlBody($one);
+            if ($bytes === null || $bytes === '') {
+                continue;
+            }
+            $start = strpos($bytes, "\xFF\xD8\xFF");
+            if ($start === false) {
+                continue;
+            }
+            $jpeg = substr($bytes, $start);
+            $end = strpos($jpeg, "\xFF\xD9");
+            if ($end !== false) {
+                $jpeg = substr($jpeg, 0, $end + 2);
+            }
+            if (strlen($jpeg) > 100) {
+                return $jpeg;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * GET a device URL. A face address contains @ in the path; curl would treat that as the host, so the path is sent with CURLOPT_REQUEST_TARGET.
+     */
+    private function fetchUrlBody(string $url): ?string {
+        $url = trim($url);
+        if ($url === '') {
+            return null;
+        }
+        if (strpos($url, '@') !== false && preg_match('#^(https?://[^/]+)(/.*)$#i', $url, $match) && defined('CURLOPT_REQUEST_TARGET')) {
+            try {
+                $ch = $this->createDigestCurl($match[1] . '/', 20);
+            } catch (Throwable $e) {
+                return null;
+            }
+            curl_setopt($ch, CURLOPT_HTTPGET, true);
+            curl_setopt($ch, CURLOPT_REQUEST_TARGET, $match[2]);
+            $response = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            if ($httpCode >= 200 && $httpCode < 300 && is_string($response) && $response !== '') {
+                return $response;
+            }
+            return null;
+        }
+        $img = $this->makeRequestDetailed($url, 'GET', null, null, 20);
+        if (empty($img['ok'])) {
+            return null;
+        }
+        $body = (string) ($img['body'] ?? '');
+        return $body !== '' ? $body : null;
+    }
+
+    /**
      * Resolve face library FDID (default "1").
      */
     private function resolveFaceLibraryId(): string {
@@ -2474,45 +2609,15 @@ class HikvisionIntegration {
             return ['ok' => false, 'message' => $lastMsg];
         }
 
-        // Download JPEG from device LOCALS faceURL (Digest auth)
-        $urls = [$faceUrl];
-        if (preg_match('#https?://[^/]+(/.*)$#i', $faceUrl, $m)) {
-            $hostBase = preg_replace('#/ISAPI/?$#', '', $this->baseUrl);
-            $urls[] = rtrim((string) $hostBase, '/') . $m[1];
-        }
-        foreach (array_unique($urls) as $url) {
-            $img = $this->makeRequestDetailed($url, 'GET', null, null, 30);
-            if (!$img['ok']) {
-                continue;
-            }
-            $bytes = $img['body'];
-            if (strncmp($bytes, "\xFF\xD8\xFF", 3) === 0) {
-                return [
-                    'ok' => true,
-                    'message' => 'OK',
-                    'jpeg' => $bytes,
-                    'face_url' => $faceUrl,
-                    'fpid' => $fpid,
-                ];
-            }
-            // Multipart or JSON-wrapped base64
-            if (preg_match('/\xFF\xD8\xFF.{20,}/s', $bytes, $mm)) {
-                $start = strpos($bytes, "\xFF\xD8\xFF");
-                if ($start !== false) {
-                    $jpeg = substr($bytes, $start);
-                    $end = strpos($jpeg, "\xFF\xD9");
-                    if ($end !== false) {
-                        $jpeg = substr($jpeg, 0, $end + 2);
-                    }
-                    return [
-                        'ok' => true,
-                        'message' => 'OK',
-                        'jpeg' => $jpeg,
-                        'face_url' => $faceUrl,
-                        'fpid' => $fpid,
-                    ];
-                }
-            }
+        $jpeg = $this->downloadJpegByUrl($faceUrl);
+        if ($jpeg !== null) {
+            return [
+                'ok' => true,
+                'message' => 'OK',
+                'jpeg' => $jpeg,
+                'face_url' => $faceUrl,
+                'fpid' => $fpid,
+            ];
         }
 
         return ['ok' => false, 'message' => 'Face record found but photo download failed.', 'face_url' => $faceUrl, 'fpid' => $fpid];
@@ -2674,6 +2779,16 @@ class HikvisionIntegration {
             return ['ok' => true, 'message' => 'Face enrolled for ' . $employeeNo . '.', 'response' => $res['decoded']];
         }
 
+        $decoded = is_array($res['decoded']) ? $res['decoded'] : null;
+        $sub = is_array($decoded) ? (string) ($decoded['subStatusCode'] ?? '') : '';
+        if ($sub === 'SubpicAnalysisModelingError' || (is_string($res['body'] ?? null) && stripos((string) $res['body'], 'saveFacePic') !== false)) {
+            return [
+                'ok' => false,
+                'message' => 'The machine did not see a clear face for ' . $employeeNo . '. Stand close to the terminal, look straight at it, and press Take photo again.',
+                'response' => $decoded,
+            ];
+        }
+
         $modUrl = $this->baseUrl . '/Intelligent/FDLib/FDSetUp?format=json';
         $res2 = $this->makeRequestDetailed($modUrl, 'PUT', $body, 'multipart/form-data; boundary=' . $boundary, 45);
         if ($res2['ok'] && $this->isHikvisionOk($res2['decoded'] ?? ['statusCode' => 1])) {
@@ -2714,6 +2829,30 @@ class HikvisionIntegration {
     }
 
     /**
+     * One still from the terminal’s own camera (not the browser webcam).
+     *
+     * @return array{ok: bool, message: string, jpeg?: string}
+     */
+    public function captureDeviceCameraJpeg(): array {
+        $last = 'The machine camera did not return a photo.';
+        foreach (['101', '102'] as $channel) {
+            $res = $this->makeRequestDetailed(
+                $this->baseUrl . '/Streaming/channels/' . $channel . '/picture',
+                'GET',
+                null,
+                null,
+                12
+            );
+            $body = (string) ($res['body'] ?? '');
+            if (!empty($res['ok']) && strncmp($body, "\xFF\xD8\xFF", 3) === 0 && strlen($body) > 800) {
+                return ['ok' => true, 'message' => 'OK', 'jpeg' => $body];
+            }
+            $last = 'Machine camera HTTP ' . (int) ($res['http_code'] ?? 0);
+        }
+        return ['ok' => false, 'message' => $last];
+    }
+
+    /**
      * On-device face enrollment for DS-K1T320MFWX (ISAPI).
      * Uses CaptureFaceData/capabilities when available, then CaptureFaceData (no invalid dataType),
      * Progress polling, and UserInfoDetail Setup for terminal UI enrollment.
@@ -2748,98 +2887,61 @@ class HikvisionIntegration {
         $capOk = $cap['ok'];
         $this->logFaceDebug('capabilities HTTP ' . $cap['http_code'] . ' ' . substr($cap['body'], 0, 200));
 
-        $xmlBodies = [];
-        // Minimal body used by Hikvision person-AC examples (captureInfrared only)
-        $xmlBodies[] = '<?xml version="1.0" encoding="UTF-8"?>'
-            . '<CaptureFaceDataCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">'
-            . '<captureInfrared>false</captureInfrared>'
-            . '</CaptureFaceDataCond>';
-
-        if ($capOk && is_string($cap['body']) && stripos($cap['body'], 'dataType') !== false) {
-            foreach (['binary', 'url', 'binaryAndModelData', 'modelData'] as $dt) {
-                if (stripos($cap['body'], $dt) === false) {
+        $supportsBinary = $capOk && is_string($cap['body']) && stripos($cap['body'], 'binary') !== false;
+        $jpeg = null;
+        $cameraRan = false;
+        if ($supportsBinary) {
+            $jpeg = $this->captureFaceByCamera($errors, $cameraRan);
+        }
+        if ($jpeg === null && !$cameraRan) {
+            $jsonBodies = [
+                json_encode(['CaptureFaceDataCond' => ['dataType' => 'binary', 'captureInfrared' => false]]),
+                json_encode(['CaptureFaceDataCond' => ['captureInfrared' => false]]),
+            ];
+            foreach ($jsonBodies as $jsonBody) {
+                $res = $this->makeRequestDetailed(
+                    $this->baseUrl . '/AccessControl/CaptureFaceData?format=json',
+                    'POST',
+                    $jsonBody,
+                    'application/json',
+                    20
+                );
+                if ($res['http_code'] >= 400) {
+                    $errors[] = 'CaptureFaceData JSON ' . $this->hikvisionErrorMessage(
+                        is_array($res['decoded']) ? $res['decoded'] : null,
+                        'HTTP ' . $res['http_code']
+                    );
                     continue;
                 }
-                $xmlBodies[] = '<?xml version="1.0" encoding="UTF-8"?>'
-                    . '<CaptureFaceDataCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">'
-                    . '<captureInfrared>false</captureInfrared>'
-                    . '<dataType>' . $dt . '</dataType>'
-                    . '</CaptureFaceDataCond>';
-            }
-        }
-
-        $jpeg = null;
-        // Prefer JSON CaptureFaceData on modern terminals (DS-K1T343)
-        $jsonBodies = [
-            json_encode(['CaptureFaceDataCond' => ['captureInfrared' => false]]),
-            json_encode(['CaptureFaceDataCond' => ['dataType' => 'binary', 'captureInfrared' => false]]),
-        ];
-        foreach ($jsonBodies as $jsonBody) {
-            $res = $this->makeRequestDetailed(
-                $this->baseUrl . '/AccessControl/CaptureFaceData?format=json',
-                'POST',
-                $jsonBody,
-                'application/json',
-                45
-            );
-            if ($res['http_code'] >= 400) {
-                $errors[] = 'CaptureFaceData JSON HTTP ' . $res['http_code'];
-                continue;
-            }
-            $jpeg = $this->extractFaceJpeg($res['body'], $res['content_type'], $res['decoded']);
-            if ($jpeg !== null) {
+                $cameraRan = true;
+                $jpeg = $this->jpegFromCaptureResponse((string) $res['body'], (string) $res['content_type'], $res['decoded']);
                 break;
             }
         }
-
-        if ($jpeg === null) {
-        foreach ($xmlBodies as $xmlBody) {
-            $res = $this->makeRequestDetailed(
-                $this->baseUrl . '/AccessControl/CaptureFaceData',
-                'POST',
-                $xmlBody,
-                'application/xml; charset="UTF-8"',
-                20
-            );
-            if ($res['http_code'] >= 400) {
-                $errors[] = 'CaptureFaceData HTTP ' . $res['http_code'];
-                // Do not keep trying dataType variants if device rejects parameters entirely without capabilities
-                if (!$capOk && stripos($res['body'], 'badParameters') !== false) {
-                    break;
-                }
-                continue;
-            }
-            $jpeg = $this->extractFaceJpeg($res['body'], $res['content_type'], $res['decoded']);
-            if ($jpeg !== null) {
-                break;
-            }
-            for ($i = 0; $i < 30; $i++) {
-                usleep(500000);
-                $prog = $this->makeRequestDetailed(
-                    $this->baseUrl . '/AccessControl/CaptureFaceData/Progress',
-                    'GET',
-                    null,
-                    'application/xml',
-                    15
-                );
-                if ($prog['http_code'] >= 400) {
-                    break;
-                }
-                $jpeg = $this->extractFaceJpeg($prog['body'], $prog['content_type'], $prog['decoded']);
-                if ($jpeg !== null) {
-                    break 2;
-                }
-            }
-        }
-        } // end if jpeg === null XML fallback
 
         if ($jpeg !== null) {
             // Transient JPEG in memory only — push to machine FaceDataRecord, never save to DB
             $uploaded = $this->uploadFaceImage($employeeNo, $jpeg, $this->resolveFaceLibraryId());
             if (!empty($uploaded['ok'])) {
-                return $uploaded;
+                return [
+                    'ok' => true,
+                    'message' => 'Machine camera took the photo and saved the face for ' . $employeeNo . '.',
+                    'jpeg' => $jpeg,
+                    'response' => $uploaded['response'] ?? null,
+                ];
             }
-            $errors[] = $uploaded['message'] ?? 'FaceDataRecord upload failed';
+            return [
+                'ok' => false,
+                'message' => 'The camera took a photo, but it was not saved for ' . $employeeNo . '. '
+                    . ($uploaded['message'] ?? 'Face upload failed.'),
+            ];
+        }
+        if ($cameraRan) {
+            return [
+                'ok' => false,
+                'message' => 'Look at the machine screen and keep your face in the camera for ' . $employeeNo
+                    . '. The page waits about a minute. Press Take photo again while you are already in front of the lens.',
+            ];
         }
 
         // Terminal UI enrollment: ask device to open person face collection for this employeeNo
@@ -2906,6 +3008,69 @@ class HikvisionIntegration {
             'message' => 'On-device face enrollment failed (' . $detail
                 . '). Stand at the terminal while enrolling, or use a student profile JPEG photo. Existing face was not removed.',
         ];
+    }
+
+    /**
+     * DS-K1T320 face capture. Each request watches the camera for a short time.
+     * A live stream snapshot is not used: the terminal rejects it with saveFacePic.
+     *
+     * @param list<string> $errors
+     */
+    private function captureFaceByCamera(array &$errors, bool &$cameraRan): ?string {
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'
+            . '<CaptureFaceDataCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">'
+            . '<captureInfrared>false</captureInfrared>'
+            . '<dataType>binary</dataType>'
+            . '</CaptureFaceDataCond>';
+        $url = $this->baseUrl . '/AccessControl/CaptureFaceData';
+        $deadline = time() + 55;
+        $attempts = 0;
+
+        while (time() < $deadline && $attempts < 4) {
+            $attempts++;
+            $res = $this->makeRequestDetailed($url, 'POST', $xml, 'application/xml; charset="UTF-8"', 22);
+            $body = (string) ($res['body'] ?? '');
+            $code = (int) ($res['http_code'] ?? 0);
+            if (stripos($body, 'deviceBusy') !== false) {
+                sleep(1);
+                continue;
+            }
+            if ($code >= 400 || $code === 0) {
+                $decoded = is_array($res) ? ($res['decoded'] ?? null) : null;
+                $errors[] = 'CaptureFaceData ' . $this->hikvisionErrorMessage(
+                    is_array($decoded) ? $decoded : null,
+                    'HTTP ' . $code
+                );
+                return null;
+            }
+
+            $cameraRan = true;
+            $jpeg = $this->jpegFromCaptureResponse($body, (string) ($res['content_type'] ?? ''), $res['decoded'] ?? null);
+            if ($jpeg !== null) {
+                return $jpeg;
+            }
+
+            for ($i = 0; $i < 3; $i++) {
+                usleep(400000);
+                $prog = $this->makeRequestDetailed(
+                    $this->baseUrl . '/AccessControl/CaptureFaceData/Progress',
+                    'GET',
+                    null,
+                    'application/xml',
+                    8
+                );
+                $jpeg = $this->jpegFromCaptureResponse(
+                    (string) ($prog['body'] ?? ''),
+                    (string) ($prog['content_type'] ?? ''),
+                    $prog['decoded'] ?? null
+                );
+                if ($jpeg !== null) {
+                    return $jpeg;
+                }
+            }
+        }
+
+        return null;
     }
 
     private function logFaceDebug(string $msg): void {

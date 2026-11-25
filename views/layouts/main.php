@@ -527,7 +527,7 @@ $educationPages = ['departments', 'courses', 'modules', 'staff', 'academic-years
                             </li>
 
                             <?php
-                            $staffDevicePages = ['staff-attendance-device', 'staff-attendance-device-daily', 'staff-attendance-device-month', 'staff-attendance-device-sync'];
+                            $staffDevicePages = ['staff-attendance-device', 'staff-attendance-device-daily', 'staff-attendance-device-month', 'staff-attendance-device-sync', 'staff-attendance-device-users'];
                             $studentAttendancePages = [];
                             if ($hasAttendanceAccess) {
                                 $studentAttendancePages[] = 'attendance';

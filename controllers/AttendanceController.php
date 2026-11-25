@@ -2025,6 +2025,386 @@ class AttendanceController extends Controller {
     }
 
     /**
+     * People already stored on the staff terminal: add a user, or change finger and face.
+     */
+    public function staffDeviceUsers() {
+        if (!$this->staffDeviceAccessOk()) {
+            return;
+        }
+        @set_time_limit(180);
+
+        require_once BASE_PATH . '/core/HikvisionIntegration.php';
+        $urls = $this->staffDeviceNavUrls();
+        $hik = $this->staffMachineClient();
+        $host = $hik->getHost();
+        $q = trim((string) ($_GET['q'] ?? $this->post('q', '')));
+        if (strlen($q) > 80) {
+            $q = substr($q, 0, 80);
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $this->staffMachineHandlePost($hik);
+            $back = 'attendance/staff-device/users';
+            if ($q !== '') {
+                $back .= '?q=' . rawurlencode($q);
+            }
+            $this->redirect($back);
+            return;
+        }
+
+        $connection = $hik->testConnection();
+        $users = [];
+        $loadError = '';
+        if (!empty($connection['success'])) {
+            $found = $hik->searchUsers(2000, '');
+            if (empty($found['ok'])) {
+                $loadError = (string) ($found['message'] ?? 'Could not read users from the machine.');
+            } else {
+                $users = $found['users'] ?? [];
+                usort($users, static function (array $a, array $b): int {
+                    $na = (string) ($a['employee_no'] ?? '');
+                    $nb = (string) ($b['employee_no'] ?? '');
+                    if (ctype_digit($na) && ctype_digit($nb)) {
+                        return (int) $na <=> (int) $nb;
+                    }
+                    return strnatcasecmp($na, $nb);
+                });
+            }
+        } else {
+            $loadError = (string) ($connection['message'] ?? 'Machine is not reachable.');
+        }
+
+        $staffRows = $this->staffMachineDirectory();
+        $byNo = [];
+        foreach ($staffRows as $row) {
+            $no = trim((string) ($row['finger_machine_no'] ?? ''));
+            if ($no !== '') {
+                $byNo[$no] = $row;
+            }
+        }
+
+        $cards = [];
+        foreach ($users as $user) {
+            $eno = trim((string) ($user['employee_no'] ?? ''));
+            $name = trim((string) ($user['name'] ?? ''));
+            $linked = $byNo[$eno] ?? null;
+            $faceCount = (int) ($user['face_count'] ?? 0);
+            $faceFile = $this->staffFaceCacheFile($eno);
+            if ($faceCount < 1 && is_file($faceFile)) {
+                $faceCount = 1;
+            }
+            $photoUrl = '';
+            if ($faceCount > 0 && preg_match('/^[A-Za-z0-9_\\-]{1,32}$/', $eno)) {
+                $version = is_file($faceFile) ? (string) filemtime($faceFile) : '1';
+                $photoUrl = rtrim(APP_URL, '/') . '/attendance/staff-device/face?no=' . rawurlencode($eno) . '&v=' . rawurlencode($version);
+            }
+            $cards[] = [
+                'employee_no' => $eno,
+                'name' => $name,
+                'user_type' => (string) ($user['user_type'] ?? 'normal'),
+                'finger_count' => (int) ($user['finger_count'] ?? 0),
+                'face_count' => $faceCount,
+                'photo_url' => $photoUrl,
+                'staff_id' => $linked['staff_id'] ?? '',
+                'staff_name' => $linked['staff_name'] ?? '',
+            ];
+        }
+
+        $deviceName = '';
+        if (!empty($connection['device_info']['deviceName'])) {
+            $deviceName = (string) $connection['device_info']['deviceName'];
+        } elseif (!empty($connection['device_info']['model'])) {
+            $deviceName = (string) $connection['device_info']['model'];
+        }
+        $statusLine = !empty($connection['success'])
+            ? 'Ready'
+            : (string) ($connection['message'] ?? '');
+
+        return $this->view('attendance/staff_device_users', [
+            'title' => 'Staff machine users',
+            'page' => 'staff-attendance-device-users',
+            'staffDeviceSection' => 'users',
+            'urls' => $urls,
+            'host' => $host,
+            'connected' => !empty($connection['success']),
+            'connectionMessage' => $statusLine,
+            'deviceName' => $deviceName,
+            'loadError' => $loadError,
+            'q' => $q,
+            'cards' => $cards,
+            'staffRows' => $staffRows,
+            'machineCount' => count($users),
+        ]);
+    }
+
+    /**
+     * Live still from the staff terminal camera for the users-page camera box.
+     */
+    public function staffDeviceCamera() {
+        if (!$this->staffDeviceAccessOk()) {
+            return;
+        }
+        require_once BASE_PATH . '/core/HikvisionIntegration.php';
+        try {
+            $shot = $this->staffMachineClient()->captureDeviceCameraJpeg();
+        } catch (Throwable $e) {
+            $shot = ['ok' => false];
+        }
+        if (empty($shot['ok']) || empty($shot['jpeg'])) {
+            http_response_code(404);
+            exit;
+        }
+        header('Content-Type: image/jpeg');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        header('Pragma: no-cache');
+        echo $shot['jpeg'];
+        exit;
+    }
+
+    /**
+     * Face photo stored on the staff terminal, shown on the users page.
+     */
+    public function staffDeviceFace() {
+        if (!$this->staffDeviceAccessOk()) {
+            return;
+        }
+        $employeeNo = trim((string) $this->get('no', ''));
+        if ($employeeNo === '' || !preg_match('/^[A-Za-z0-9_\\-]{1,32}$/', $employeeNo)) {
+            http_response_code(404);
+            exit;
+        }
+
+        $cacheFile = $this->staffFaceCacheFile($employeeNo);
+        if (is_file($cacheFile) && (time() - (int) filemtime($cacheFile)) < 600) {
+            header('Content-Type: image/jpeg');
+            header('Cache-Control: private, max-age=120');
+            readfile($cacheFile);
+            exit;
+        }
+
+        require_once BASE_PATH . '/core/HikvisionIntegration.php';
+        try {
+            $photo = $this->staffMachineClient()->getFacePhoto($employeeNo);
+            if (empty($photo['ok']) || empty($photo['jpeg'])) {
+                if (is_file($cacheFile)) {
+                    header('Content-Type: image/jpeg');
+                    header('Cache-Control: private, max-age=60');
+                    readfile($cacheFile);
+                    exit;
+                }
+                http_response_code(404);
+                exit;
+            }
+            $this->staffFaceCacheWrite($employeeNo, (string) $photo['jpeg']);
+            header('Content-Type: image/jpeg');
+            header('Cache-Control: private, max-age=120');
+            echo $photo['jpeg'];
+            exit;
+        } catch (Throwable $e) {
+            http_response_code(404);
+            exit;
+        }
+    }
+
+    private function staffFaceCacheFile(string $employeeNo): string {
+        $safe = preg_replace('/[^A-Za-z0-9_-]/', '_', $employeeNo);
+        $dir = BASE_PATH . '/cache/staff-faces';
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+            $deny = $dir . '/.htaccess';
+            if (!is_file($deny)) {
+                file_put_contents($deny, "Require all denied\n");
+            }
+        }
+        return $dir . '/' . $safe . '.jpg';
+    }
+
+    private function staffFaceCacheWrite(string $employeeNo, string $jpeg): void {
+        if ($jpeg === '' || strncmp($jpeg, "\xFF\xD8\xFF", 3) !== 0) {
+            return;
+        }
+        file_put_contents($this->staffFaceCacheFile($employeeNo), $jpeg);
+    }
+
+    private function staffFaceCacheDelete(string $employeeNo): void {
+        $file = $this->staffFaceCacheFile($employeeNo);
+        if (is_file($file)) {
+            unlink($file);
+        }
+    }
+
+    private function staffMachineClient(): HikvisionIntegration {
+        if (!defined('HIKVISION_IP')) {
+            require_once BASE_PATH . '/staff_attendance/config.php';
+        }
+        return HikvisionIntegration::fromAttendanceSyncConfig();
+    }
+
+    /**
+     * @return list<array{staff_id:string,staff_name:string,finger_machine_no:string,department_id:string}>
+     */
+    private function staffMachineDirectory(): array {
+        try {
+            $db = Database::getInstance()->getConnection();
+            $res = $db->query(
+                "SELECT staff_id, staff_name, IFNULL(finger_machine_no, '') AS finger_machine_no, IFNULL(department_id, '') AS department_id
+                 FROM staff
+                 ORDER BY staff_name
+                 LIMIT 800"
+            );
+            if (!$res) {
+                return [];
+            }
+            $rows = [];
+            while ($row = $res->fetch_assoc()) {
+                $rows[] = [
+                    'staff_id' => (string) ($row['staff_id'] ?? ''),
+                    'staff_name' => (string) ($row['staff_name'] ?? ''),
+                    'finger_machine_no' => (string) ($row['finger_machine_no'] ?? ''),
+                    'department_id' => (string) ($row['department_id'] ?? ''),
+                ];
+            }
+            return $rows;
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
+    private function staffMachineHandlePost(HikvisionIntegration $hik): void {
+        $action = trim((string) $this->post('action', ''));
+        $employeeNo = trim((string) $this->post('employee_no', ''));
+        $name = trim((string) $this->post('name', ''));
+        $staffId = trim((string) $this->post('staff_id', ''));
+        $fingerNo = (int) $this->post('finger_no', 1);
+        if (strlen($employeeNo) > 32) {
+            $employeeNo = substr($employeeNo, 0, 32);
+        }
+        if (strlen($name) > 64) {
+            $name = substr($name, 0, 64);
+        }
+
+        if ($action === 'add_user') {
+            if ($employeeNo === '' || $name === '') {
+                $_SESSION['flash_error'] = 'Employee number and name are required.';
+                return;
+            }
+            $created = $hik->createUser($employeeNo, $name, 'normal');
+            if (empty($created['ok'])) {
+                $_SESSION['flash_error'] = (string) ($created['message'] ?? 'Could not add the user on the machine.');
+                return;
+            }
+            $link = $this->staffMachineLinkNumber($staffId, $employeeNo);
+            $_SESSION['flash_success'] = (string) ($created['message'] ?? 'User saved on the machine.')
+                . ($link !== '' ? ' ' . $link : '');
+            return;
+        }
+
+        if ($employeeNo === '') {
+            $_SESSION['flash_error'] = 'Choose a person already on the machine.';
+            return;
+        }
+        if ($name === '') {
+            $name = $employeeNo;
+        }
+
+        if ($action === 'save_name') {
+            $updated = $hik->modifyUser($employeeNo, $name, 'normal');
+            $_SESSION[$updated['ok'] ? 'flash_success' : 'flash_error'] = (string) ($updated['message'] ?? 'Name was not updated.');
+            return;
+        }
+
+        if ($action === 'finger') {
+            $slot = max(1, min(2, $fingerNo > 0 ? $fingerNo : 1));
+            $enroll = $hik->enrollFingerPrint($employeeNo, $slot);
+            $_SESSION[!empty($enroll['ok']) ? 'flash_success' : 'flash_error'] = (string) ($enroll['message'] ?? 'Fingerprint was not saved.');
+            return;
+        }
+
+        if ($action === 'remove_finger') {
+            $slot = max(0, min(2, $fingerNo));
+            $del = $hik->deleteFingerPrint($employeeNo, $slot);
+            $_SESSION[!empty($del['ok']) ? 'flash_success' : 'flash_error'] = (string) ($del['message'] ?? 'Fingerprint was not removed.');
+            return;
+        }
+
+        if ($action === 'face_device') {
+            @set_time_limit(180);
+            $enroll = $hik->enrollFaceOnDevice($employeeNo);
+            if (!empty($enroll['ok']) && !empty($enroll['jpeg']) && is_string($enroll['jpeg'])) {
+                $this->staffFaceCacheWrite($employeeNo, $enroll['jpeg']);
+            }
+            $_SESSION[!empty($enroll['ok']) ? 'flash_success' : 'flash_error'] = (string) ($enroll['message'] ?? 'Face photo was not saved.');
+            return;
+        }
+
+        if ($action === 'face_photo') {
+            @set_time_limit(120);
+            $raw = (string) $this->post('photo', '');
+            if (preg_match('#^data:image/[^;]+;base64,#i', $raw)) {
+                $raw = substr($raw, (int) strpos($raw, ',') + 1);
+            }
+            $raw = preg_replace('/\s+/', '', $raw) ?? '';
+            $bytes = base64_decode($raw, true);
+            if (!is_string($bytes) || strlen($bytes) < 800) {
+                $_SESSION['flash_error'] = 'Take a photo in the camera box first.';
+                return;
+            }
+            if (strlen($bytes) > 4000000) {
+                $_SESSION['flash_error'] = 'That photo is too large. Move closer and take it again.';
+                return;
+            }
+            $enroll = $hik->enrollFaceFromJpeg($employeeNo, $bytes);
+            if (!empty($enroll['ok'])) {
+                $this->staffFaceCacheWrite($employeeNo, $bytes);
+            }
+            $_SESSION[!empty($enroll['ok']) ? 'flash_success' : 'flash_error'] = (string) ($enroll['message'] ?? 'Face photo was not saved.');
+            return;
+        }
+
+        if ($action === 'face') {
+            @set_time_limit(240);
+            $enroll = $hik->enrollFaceOnDevice($employeeNo);
+            $_SESSION[!empty($enroll['ok']) ? 'flash_success' : 'flash_error'] = (string) ($enroll['message'] ?? 'Face was not saved.');
+            return;
+        }
+
+        if ($action === 'remove_face') {
+            $del = $hik->deleteFace($employeeNo);
+            if (!empty($del['ok'])) {
+                $this->staffFaceCacheDelete($employeeNo);
+            }
+            $_SESSION[!empty($del['ok']) ? 'flash_success' : 'flash_error'] = (string) ($del['message'] ?? 'Face was not removed.');
+            return;
+        }
+
+        $_SESSION['flash_error'] = 'Unknown machine action.';
+    }
+
+    private function staffMachineLinkNumber(string $staffId, string $employeeNo): string {
+        $staffId = trim($staffId);
+        if ($staffId === '' || $employeeNo === '') {
+            return '';
+        }
+        try {
+            $db = Database::getInstance()->getConnection();
+            $stmt = $db->prepare('UPDATE staff SET finger_machine_no = ? WHERE staff_id = ?');
+            if (!$stmt) {
+                return '';
+            }
+            $stmt->bind_param('ss', $employeeNo, $staffId);
+            $ok = $stmt->execute();
+            $err = $stmt->error;
+            $stmt->close();
+            if ($ok) {
+                return 'Linked to staff record ' . $staffId . '.';
+            }
+            return 'Staff link was not saved' . ($err !== '' ? ': ' . $err : '.');
+        } catch (Throwable $e) {
+            return 'Staff link was not saved.';
+        }
+    }
+
+    /**
      * View machine attendance records directly from device
      */
     public function machineAttendance() {

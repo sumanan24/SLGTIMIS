@@ -14,7 +14,7 @@ class PaymentModel extends Model {
      * Get all payments with student and related information
      */
     public function getAll($filters = []) {
-        $sql = "SELECT p.*, s.student_fullname, s.student_id as student_reg_no, 
+        $sql = "SELECT p.*, s.student_fullname, s.student_nic, s.student_id as student_reg_no, 
                 se.course_id, c.course_name, c.department_id AS course_department_id,
                 d.department_name, pd.department_name AS pays_department_name, se.academic_year
                 FROM `{$this->table}` p
@@ -72,13 +72,16 @@ class PaymentModel extends Model {
         }
         
         if (!empty($filters['search'])) {
-            $sql .= " AND (s.student_fullname LIKE ? OR s.student_id LIKE ? OR p.payment_reason LIKE ? OR p.pays_note LIKE ?)";
+            $sql .= " AND (s.student_fullname LIKE ? OR s.student_id LIKE ? OR s.student_nic LIKE ? OR REPLACE(REPLACE(REPLACE(s.student_nic, ' ', ''), '-', ''), '/', '') LIKE ? OR p.payment_reason LIKE ? OR p.pays_note LIKE ?)";
             $searchTerm = '%' . $filters['search'] . '%';
+            $nicTerm = '%' . preg_replace('/[\s\-\/]/', '', (string) $filters['search']) . '%';
             $params[] = $searchTerm;
             $params[] = $searchTerm;
             $params[] = $searchTerm;
+            $params[] = $nicTerm;
             $params[] = $searchTerm;
-            $types .= 'ssss';
+            $params[] = $searchTerm;
+            $types .= 'ssssss';
         }
         
         if (!empty($filters['academic_year'])) {
@@ -197,13 +200,16 @@ class PaymentModel extends Model {
         }
         
         if (!empty($filters['search'])) {
-            $sql .= " AND (s.student_fullname LIKE ? OR s.student_id LIKE ? OR p.payment_reason LIKE ? OR p.pays_note LIKE ?)";
+            $sql .= " AND (s.student_fullname LIKE ? OR s.student_id LIKE ? OR s.student_nic LIKE ? OR REPLACE(REPLACE(REPLACE(s.student_nic, ' ', ''), '-', ''), '/', '') LIKE ? OR p.payment_reason LIKE ? OR p.pays_note LIKE ?)";
             $searchTerm = '%' . $filters['search'] . '%';
+            $nicTerm = '%' . preg_replace('/[\s\-\/]/', '', (string) $filters['search']) . '%';
             $params[] = $searchTerm;
             $params[] = $searchTerm;
             $params[] = $searchTerm;
+            $params[] = $nicTerm;
             $params[] = $searchTerm;
-            $types .= 'ssss';
+            $params[] = $searchTerm;
+            $types .= 'ssssss';
         }
         
         if (!empty($filters['academic_year'])) {

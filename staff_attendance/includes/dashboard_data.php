@@ -206,5 +206,6 @@ function staff_attendance_embed_nav_urls(): array
         'daily' => $root . '/daily',
         'month' => $root . '/month',
         'sync' => $root . '/sync',
+        'users' => $root . '/users',
     ];
 }

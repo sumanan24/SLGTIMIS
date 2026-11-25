@@ -43,7 +43,7 @@
                         <label for="search" class="form-label fw-semibold">Search</label>
                         <input type="text" class="form-control" id="search" name="search" 
                                value="<?php echo htmlspecialchars($filters['search'] ?? ''); ?>" 
-                               placeholder="Student name, ID, or reason">
+                               placeholder="Name, ID, NIC, or reason">
                     </div>
                     <div class="col-md-2">
                         <label for="student_id" class="form-label fw-semibold">Student</label>
@@ -53,7 +53,14 @@
                                 <?php foreach ($students as $student): ?>
                                     <option value="<?php echo htmlspecialchars($student['student_id']); ?>" 
                                             <?php echo ($filters['student_id'] ?? '') == $student['student_id'] ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($student['student_id'] . ' - ' . $student['student_fullname']); ?>
+                                        <?php
+                                        $studentLabel = $student['student_id'] . ' - ' . $student['student_fullname'];
+                                        $studentNic = trim((string) ($student['student_nic'] ?? ''));
+                                        if ($studentNic !== '') {
+                                            $studentLabel .= ' (' . $studentNic . ')';
+                                        }
+                                        echo htmlspecialchars($studentLabel);
+                                        ?>
                                     </option>
                                 <?php endforeach; ?>
                             <?php endif; ?>
@@ -105,6 +112,9 @@
                                     <td>
                                         <div><?php echo htmlspecialchars($payment['student_reg_no'] ?? $payment['student_id']); ?></div>
                                         <small class="text-muted"><?php echo htmlspecialchars($payment['student_fullname'] ?? '-'); ?></small>
+                                        <?php if (trim((string) ($payment['student_nic'] ?? '')) !== ''): ?>
+                                            <div><small class="text-muted">NIC <?php echo htmlspecialchars($payment['student_nic']); ?></small></div>
+                                        <?php endif; ?>
                                     </td>
                                     <td><?php echo date('M d, Y', strtotime($payment['pays_date'])); ?></td>
                                     <?php

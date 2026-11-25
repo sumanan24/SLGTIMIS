@@ -26,6 +26,12 @@ $navLimited = !empty($staffDeviceNavLimited);
        href="<?php echo htmlspecialchars($urls['sync'], ENT_QUOTES, 'UTF-8'); ?>">
         <i class="fas fa-sync fa-fw text-secondary"></i><span>Device sync</span>
     </a>
+    <?php if (!empty($urls['users'])): ?>
+    <a class="list-group-item list-group-item-action d-flex align-items-center gap-2 <?php echo $sec === 'users' ? 'active' : ''; ?>"
+       href="<?php echo htmlspecialchars($urls['users'], ENT_QUOTES, 'UTF-8'); ?>">
+        <i class="fas fa-users-cog fa-fw text-secondary"></i><span>Machine users</span>
+    </a>
+    <?php endif; ?>
     <?php endif; ?>
 </nav>
 <style>
