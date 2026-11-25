@@ -39,7 +39,7 @@ DROP TABLE IF EXISTS `assessments`;
 CREATE TABLE `assessments` (
   `assessment_id` int NOT NULL AUTO_INCREMENT,
   `assessment_type_id` int NOT NULL,
-  `course_id` varchar(20) NOT NULL,
+  `course_id` varchar(11) NOT NULL,
   `module_id` varchar(11) NOT NULL,
   `academic_year` varchar(11) NOT NULL,
   `assessment_date` date NOT NULL,
