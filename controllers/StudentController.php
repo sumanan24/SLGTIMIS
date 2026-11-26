@@ -23,6 +23,53 @@ class StudentController extends Controller {
         return true;
     }
 
+    /**
+     * ADM / Admin / SAO may see Inactive & Graduated students and change Student Status.
+     */
+    private function isAdmOrSao(): bool
+    {
+        if (!isset($_SESSION['user_id'])) {
+            return false;
+        }
+        require_once BASE_PATH . '/models/UserModel.php';
+        $userModel = new UserModel();
+        $uid = (int) $_SESSION['user_id'];
+        return $userModel->isAdminOrADM($uid) || $userModel->isSAO($uid);
+    }
+
+    private function isStudentActiveStatus($student): bool
+    {
+        if (!is_array($student)) {
+            return false;
+        }
+        return strcasecmp(trim((string) ($student['student_status'] ?? '')), 'Active') === 0;
+    }
+
+    /**
+     * Non-ADM/SAO users only work with Active students.
+     */
+    private function canViewStudentByStatus($student): bool
+    {
+        if ($this->isAdmOrSao()) {
+            return true;
+        }
+        return $this->isStudentActiveStatus($student);
+    }
+
+    /**
+     * Only Active students can be updated by regular staff; ADM/SAO can update any.
+     */
+    private function canUpdateStudentByStatus($student): bool
+    {
+        return $this->canViewStudentByStatus($student);
+    }
+
+    private function denyNonActiveStudentAccess(string $redirect = 'students'): void
+    {
+        $_SESSION['error'] = 'Only ADM and SAO can access inactive students.';
+        $this->redirect($redirect);
+    }
+
     private function containsNonEnglishChars($value) {
         if ($value === null) return false;
         $value = (string)$value;
@@ -704,6 +751,15 @@ class StudentController extends Controller {
             $registrationFee = '';
         }
 
+        // Only ADM/SAO may browse Inactive / Graduated students.
+        $canViewInactive = $this->isAdmOrSao();
+        $requestedStatus = trim((string) $this->get('status', ''));
+        if (!$canViewInactive) {
+            $requestedStatus = 'Active';
+        } elseif ($requestedStatus !== '' && !in_array($requestedStatus, ['Active', 'Inactive', 'Graduated'], true)) {
+            $requestedStatus = '';
+        }
+
         // HOD, IN1, IN2, IN3: locked to own department + Active; allow search and enrollment filters (year, course, mode, group); ignore district/gender
         if ($isDepartmentRestricted) {
             $filters = [
@@ -726,7 +782,7 @@ class StudentController extends Controller {
         } else {
             $filters = [
                 'search' => $this->get('search', ''),
-                'status' => $this->get('status', ''),
+                'status' => $requestedStatus !== '' ? $requestedStatus : ($canViewInactive ? '' : 'Active'),
                 'district' => $this->get('district', ''),
                 'gender' => $this->get('gender', ''),
                 'department_id' => $userDepartmentId ? $userDepartmentId : $this->get('department_id', ''),
@@ -740,6 +796,10 @@ class StudentController extends Controller {
                 'registration_fee' => $registrationFee,
                 'current_enrollment' => true
             ];
+            // Safety: non-ADM/SAO always Active-only even if filter was tampered.
+            if (!$canViewInactive) {
+                $filters['status'] = 'Active';
+            }
         }
         
         // Newest academic year first (kept out of $filters so it never leaks into links)
@@ -799,11 +859,13 @@ class StudentController extends Controller {
             'courses' => $courses,
             'academicYears' => $academicYears,
             'provinces' => $provinces,
-            'statuses' => ['Active', 'Inactive', 'Graduated'],
+            'statuses' => $canViewInactive ? ['Active', 'Inactive', 'Graduated'] : ['Active'],
             'genders' => ['Male', 'Female'],
             'isHOD' => $isDepartmentRestricted,
             'canExport' => $canExport,
             'isADM' => $isADM,
+            'isSAO' => $isSAO,
+            'canViewInactive' => $canViewInactive,
             'canEdit' => $canEdit,
             'staff_whatsapp_header' => $this->staffWhatsAppShortcutFromConfig(),
             'message' => $_SESSION['message'] ?? null,
@@ -845,6 +907,12 @@ class StudentController extends Controller {
         if (!$this->canAccessStudentRecord($id)) {
             $_SESSION['error'] = 'Access denied. You can only view students of your own department.';
             $this->redirect('students');
+            return;
+        }
+
+        // Inactive / Graduated students: ADM and SAO only
+        if (!$this->canViewStudentByStatus($student)) {
+            $this->denyNonActiveStudentAccess();
             return;
         }
         
@@ -895,7 +963,9 @@ class StudentController extends Controller {
         require_once BASE_PATH . '/core/AccessControl.php';
         $userModel = new UserModel();
         $isADM = $userModel->isAdminOrADM((int) $_SESSION['user_id']);
-        $canEdit = AccessControl::can((int) $_SESSION['user_id'], 'students', 'edit');
+        $canEditModule = AccessControl::can((int) $_SESSION['user_id'], 'students', 'edit');
+        // Non-ADM/SAO may only edit Active students
+        $canEdit = $canEditModule && $this->canUpdateStudentByStatus($student);
         
         $data = [
             'title' => 'Student Details',
@@ -915,6 +985,7 @@ class StudentController extends Controller {
             ],
             'canEdit' => $canEdit,
             'isADM' => $isADM,
+            'canManageStudentStatus' => $this->isAdmOrSao(),
             'admissionDocuments' => $this->admissionDocumentsForStudent((string) $id),
             'qualifications' => $this->qualificationsForStudent((string) $id),
         ];
@@ -1625,11 +1696,32 @@ class StudentController extends Controller {
             return;
         }
 
+        // HOD / IN1-3 may only edit students of their own department
+        if (!$this->canAccessStudentRecord($id)) {
+            $_SESSION['error'] = 'Access denied. You can only edit students of your own department.';
+            $this->redirect('students');
+            return;
+        }
+
+        // Inactive / Graduated: view & update restricted to ADM and SAO
+        if (!$this->canViewStudentByStatus($student)) {
+            $this->denyNonActiveStudentAccess();
+            return;
+        }
+
         require_once BASE_PATH . '/models/UserModel.php';
         $profileUserModel = new UserModel();
-        $canUpdateProfileImage = $profileUserModel->isSAO($_SESSION['user_id']) || $profileUserModel->isAdminOrADM($_SESSION['user_id']);
+        $canUpdateProfileImage = $profileUserModel->canTakeStudentProfilePhoto((int) $_SESSION['user_id']);
+        $canManageStudentStatus = $this->isAdmOrSao();
         
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            // Non-ADM/SAO cannot update inactive / graduated students
+            if (!$this->canUpdateStudentByStatus($student)) {
+                $_SESSION['error'] = 'Access denied. Only ADM and SAO can update inactive students.';
+                $this->redirect('students/edit?id=' . urlencode($id));
+                return;
+            }
+
             $updateSection = $this->post('update_section', '');
             $data = [];
             $validationRequired = false;
@@ -1657,7 +1749,6 @@ class StudentController extends Controller {
                     'student_em_address' => trim($this->post('student_em_address', '')),
                     'student_em_phone' => trim($this->post('student_em_phone', '')),
                     'student_em_relation' => trim($this->post('student_em_relation', '')),
-                    'student_status' => trim($this->post('student_status', 'Active')),
                     'student_nationality' => trim($this->post('student_nationality', '')),
                     'student_whatsapp' => trim($this->post('student_whatsapp', '')),
                     'student_religion' => trim($this->post('student_religion', ''))
@@ -1740,6 +1831,69 @@ class StudentController extends Controller {
                     'allowance_eligible_date' => $eligibleDate
                 ];
                 $successMessage = 'Allowance eligibility updated successfully.';
+            } elseif ($updateSection === 'add_enrollment') {
+                // Second (or further) course — only after a prior enrollment is Completed
+                $enrollmentModel = $this->model('StudentEnrollmentModel');
+                $_SESSION['active_tab'] = 'enrollment';
+
+                if (!$enrollmentModel->canAddAdditionalEnrollment($id)) {
+                    if ($enrollmentModel->hasActiveEnrollment($id)) {
+                        $_SESSION['error'] = 'Complete the current course before adding another enrollment.';
+                    } elseif (!$enrollmentModel->hasCompletedEnrollment($id)) {
+                        $_SESSION['error'] = 'First course must be Completed before adding a second enrollment.';
+                    } else {
+                        $_SESSION['error'] = 'Cannot add another enrollment.';
+                    }
+                } else {
+                    $courseId = trim($this->post('course_id', ''));
+                    $academicYear = trim($this->post('academic_year', ''));
+                    $courseMode = trim($this->post('course_mode', 'Full'));
+                    if ($courseMode === 'Full Time') $courseMode = 'Full';
+                    if ($courseMode === 'Part Time') $courseMode = 'Part';
+                    if (!in_array($courseMode, ['Full', 'Part'], true)) {
+                        $courseMode = 'Full';
+                    }
+
+                    if ($courseId === '' || $academicYear === '') {
+                        $_SESSION['error'] = 'Course and Academic Year are required.';
+                    } else {
+                        $courseModel = $this->model('CourseModel');
+                        if (!$courseModel->exists($courseId)) {
+                            $_SESSION['error'] = 'Invalid course selected.';
+                        } elseif ($enrollmentModel->findEnrollment($id, $courseId, $academicYear)) {
+                            $_SESSION['error'] = 'Enrollment already exists for that course and year.';
+                        } else {
+                            $enrollmentData = [
+                                'student_id' => $id,
+                                'course_id' => $courseId,
+                                'academic_year' => $academicYear,
+                                'course_mode' => $courseMode,
+                                'student_enroll_status' => 'Following',
+                                'student_enroll_date' => date('Y-m-d'),
+                                'student_enroll_exit_date' => date('Y-m-d', strtotime('+1 year'))
+                            ];
+                            if ($enrollmentModel->createEnrollment($enrollmentData)) {
+                                $this->logActivity(
+                                    'CREATE',
+                                    'student_enrollment',
+                                    $id,
+                                    "Additional enrollment created for student {$id}: {$courseId} ({$academicYear})",
+                                    null,
+                                    $enrollmentData
+                                );
+                                $studentModel->syncUserActiveWithStudentStatus($id);
+                                $_SESSION['message'] = 'Second enrollment added.';
+                            } else {
+                                $sqlErr = $enrollmentModel->getLastSqlError();
+                                $_SESSION['error'] = 'Failed to create enrollment.' . ($sqlErr ? ' SQL error: ' . $sqlErr : '');
+                            }
+                        }
+                    }
+                }
+
+                $student = $studentModel->find($id);
+                $updateSection = null;
+
             } elseif ($updateSection === 'enrollment') {
                 // Enrollment update - handled separately
                 $enrollmentModel = $this->model('StudentEnrollmentModel');
@@ -1753,6 +1907,19 @@ class StudentController extends Controller {
                 if ($courseMode === 'Full Time') $courseMode = 'Full';
                 if ($courseMode === 'Part Time') $courseMode = 'Part';
                 $enrollStatus = trim($this->post('student_enroll_status', 'Following'));
+                // Student Status: ADM/SAO only (one privileged update path; others cannot change it)
+                $studentStatus = '';
+                if ($canManageStudentStatus) {
+                    $studentStatus = trim($this->post('student_status', ''));
+                    $allowedStudentStatuses = ['Active', 'Inactive', 'Graduated'];
+                    if ($studentStatus !== '' && !in_array($studentStatus, $allowedStudentStatuses, true)) {
+                        $studentStatus = '';
+                    }
+                } elseif (trim($this->post('student_status', '')) !== ''
+                    && strcasecmp(trim($this->post('student_status', '')), (string) ($student['student_status'] ?? '')) !== 0) {
+                    $_SESSION['error'] = 'Only ADM and SAO can update Student Status.';
+                    $_SESSION['active_tab'] = 'enrollment';
+                }
 
                 // Validate course_id early to avoid FK constraint failures on student_enroll.course_id
                 if (!empty($courseId)) {
@@ -1760,6 +1927,24 @@ class StudentController extends Controller {
                     if (!$courseModel->exists($courseId)) {
                         $_SESSION['error'] = 'Invalid course selected. Please choose a valid course.';
                         $_SESSION['active_tab'] = 'enrollment';
+                    }
+                }
+
+                // Student status belongs on the Enrollment tab (controls portal login). ADM/SAO only.
+                if (empty($_SESSION['error']) && $canManageStudentStatus && $studentStatus !== '') {
+                    $oldStudentStatus = trim((string) ($student['student_status'] ?? ''));
+                    if (strcasecmp($oldStudentStatus, $studentStatus) !== 0) {
+                        if ($studentModel->updateStudent($id, ['student_status' => $studentStatus])) {
+                            $studentModel->syncUserActiveWithStudentStatus($id);
+                            $statusReason = trim((string) $this->post('status_change_reason', ''));
+                            $changedBy = (string) ($_SESSION['user_name'] ?? $_SESSION['user_id'] ?? 'staff');
+                            $studentModel->logStatusChange($id, $oldStudentStatus !== '' ? $oldStudentStatus : '—', $studentStatus, $statusReason, $changedBy);
+                            $_SESSION['message'] = ($_SESSION['message'] ?? '') . ' Student status changed to ' . $studentStatus . '.';
+                            $student = $studentModel->find($id) ?: $student;
+                        } else {
+                            $sqlErr = $studentModel->getLastSqlError();
+                            $_SESSION['error'] = 'Failed to update student status.' . ($sqlErr ? ' SQL error: ' . $sqlErr : '');
+                        }
                     }
                 }
                 
@@ -1783,35 +1968,71 @@ class StudentController extends Controller {
                 
                 // Update enrollment if we have an enrollment record to update
                 if (empty($_SESSION['error']) && !empty($editableEnrollment) && !empty($courseId) && !empty($academicYear)) {
-                    $enrollmentData = [
-                        'course_id' => $courseId,
-                        'academic_year' => $academicYear,
-                        'course_mode' => $courseMode,
-                        'student_enroll_status' => $enrollStatus
-                    ];
-                    
-                    // Use updateEnrollment for Following; updateEnrollmentByRecord for Dropout/Long Absent
-                    if ($editableEnrollment['student_enroll_status'] === 'Following') {
-                        $enrollResult = $enrollmentModel->updateEnrollment($id, $enrollmentData);
-                    } else {
-                        $enrollResult = $enrollmentModel->updateEnrollmentByRecord(
-                            $id,
-                            $editableEnrollment['course_id'],
-                            $editableEnrollment['academic_year'],
-                            $enrollmentData
-                        );
+                    $priorStatus = trim((string) ($editableEnrollment['student_enroll_status'] ?? ''));
+
+                    // Completed / Graduated-path rows: keep course + year fixed (add second enrollment instead)
+                    if ($priorStatus === 'Completed') {
+                        $courseId = (string) ($editableEnrollment['course_id'] ?? $courseId);
+                        $academicYear = (string) ($editableEnrollment['academic_year'] ?? $academicYear);
+                        $courseMode = (string) ($editableEnrollment['course_mode'] ?? $courseMode);
+                        if ($courseMode === 'Full Time') $courseMode = 'Full';
+                        if ($courseMode === 'Part Time') $courseMode = 'Part';
+                        // Only status may change on a completed record (e.g. correction); do not turn it into Following here for a new course
+                        if ($enrollStatus === 'Following' && (
+                            $courseId !== (string) ($editableEnrollment['course_id'] ?? '')
+                            || $academicYear !== (string) ($editableEnrollment['academic_year'] ?? '')
+                        )) {
+                            $_SESSION['error'] = 'Use Add Second Enrollment for a new course.';
+                            $_SESSION['active_tab'] = 'enrollment';
+                        }
                     }
-                    if ($enrollResult) {
-                        // Sync user_active with student_status (e.g. re-register: Active -> user_active=1)
-                        $studentModel->syncUserActiveWithStudentStatus($id);
-                        $_SESSION['message'] = ($_SESSION['message'] ?? '') . ' Enrollment updated successfully.' . 
-                            ($enrollStatus === 'Following' && $editableEnrollment['student_enroll_status'] !== 'Following' ? ' Student re-registered.' : '');
-                    } else {
-                        $sqlErr = $enrollmentModel->getLastSqlError();
-                        $_SESSION['error'] = ($_SESSION['error'] ?? '') . ' Failed to update enrollment.' . ($sqlErr ? ' SQL error: ' . $sqlErr : '');
+
+                    if (empty($_SESSION['error'])) {
+                        $enrollmentData = [
+                            'course_id' => $courseId,
+                            'academic_year' => $academicYear,
+                            'course_mode' => $courseMode,
+                            'student_enroll_status' => $enrollStatus
+                        ];
+                        
+                        // Use updateEnrollment for Following; updateEnrollmentByRecord for Dropout/Long Absent/Completed
+                        if ($priorStatus === 'Following') {
+                            $enrollResult = $enrollmentModel->updateEnrollment($id, $enrollmentData);
+                        } else {
+                            $enrollResult = $enrollmentModel->updateEnrollmentByRecord(
+                                $id,
+                                $editableEnrollment['course_id'],
+                                $editableEnrollment['academic_year'],
+                                $enrollmentData
+                            );
+                        }
+                        if ($enrollResult) {
+                            // Sync user_active with student_status (e.g. re-register: Active -> user_active=1)
+                            $studentModel->syncUserActiveWithStudentStatus($id);
+                            $oldEnrollStatus = $priorStatus;
+                            if ($oldEnrollStatus !== '' && strcasecmp($oldEnrollStatus, $enrollStatus) !== 0) {
+                                $statusReason = trim((string) $this->post('enrollment_status_change_reason', ''));
+                                $changedBy = (string) ($_SESSION['user_name'] ?? $_SESSION['user_id'] ?? 'staff');
+                                $studentModel->logStatusChange(
+                                    $id,
+                                    'Enrollment: ' . $oldEnrollStatus,
+                                    'Enrollment: ' . $enrollStatus,
+                                    $statusReason,
+                                    $changedBy
+                                );
+                            }
+                            $_SESSION['message'] = ($_SESSION['message'] ?? '') . ' Enrollment updated successfully.' . 
+                                ($enrollStatus === 'Following' && $priorStatus !== 'Following' ? ' Student re-registered.' : '');
+                        } else {
+                            $sqlErr = $enrollmentModel->getLastSqlError();
+                            $_SESSION['error'] = ($_SESSION['error'] ?? '') . ' Failed to update enrollment.' . ($sqlErr ? ' SQL error: ' . $sqlErr : '');
+                        }
                     }
                 } elseif (empty($_SESSION['error']) && empty($editableEnrollment)) {
-                    $_SESSION['error'] = 'No enrollment found to update.';
+                    // Student status can still be updated above without an enrollment record.
+                    if (empty($_SESSION['message'])) {
+                        $_SESSION['error'] = 'No enrollment found to update.';
+                    }
                 }
                 
                 // Refresh student data after update
@@ -1871,10 +2092,6 @@ class StudentController extends Controller {
                     $result = $studentModel->updateStudent($id, $data);
                     
                     if ($result) {
-                        // Sync user_active when student_status changes (e.g. Active -> user_active=1)
-                        if (isset($data['student_status'])) {
-                            $studentModel->syncUserActiveWithStudentStatus($id);
-                        }
                         // Log activity
                         $studentName = isset($data['student_fullname']) ? $data['student_fullname'] : ($oldStudent['student_fullname'] ?? 'Unknown');
                         $this->logActivity(
@@ -1974,6 +2191,7 @@ class StudentController extends Controller {
         if (empty($currentEnrollment)) {
             $currentEnrollment = $enrollmentModel->getLatestEnrollment($id);
         }
+        $canAddSecondEnrollment = $enrollmentModel->canAddAdditionalEnrollment($id);
         
         // Get hostel information
         $hostelAllocation = null;
@@ -1996,6 +2214,7 @@ class StudentController extends Controller {
         
         $studentModel->addAllowanceEligibleDateColumnIfNotExists();
         $student = $studentModel->find($id);
+        $statusHistory = $studentModel->getStatusHistory($id, 15);
         
         $data = [
             'title' => 'Edit Student',
@@ -2003,11 +2222,15 @@ class StudentController extends Controller {
             'student' => $student,
             'enrollments' => $enrollments,
             'currentEnrollment' => $currentEnrollment,
+            'canAddSecondEnrollment' => $canAddSecondEnrollment,
             'hostelAllocation' => $hostelAllocation,
             'courses' => $courses,
             'departments' => $departments,
             'academicYears' => $academicYears,
+            'statusHistory' => $statusHistory,
             'canUpdateProfileImage' => $canUpdateProfileImage,
+            'canManageStudentStatus' => $canManageStudentStatus,
+            'canViewInactive' => $canManageStudentStatus,
             'error' => $_SESSION['error'] ?? null,
             'message' => $_SESSION['message'] ?? null
         ];
@@ -2221,6 +2444,11 @@ class StudentController extends Controller {
         if (!$student) {
             $_SESSION['error'] = 'Student not found.';
             $this->redirect('students');
+            return;
+        }
+
+        if (!$this->canUpdateStudentByStatus($student)) {
+            $this->denyNonActiveStudentAccess();
             return;
         }
         
@@ -2755,6 +2983,11 @@ class StudentController extends Controller {
         if (!$student) {
             $_SESSION['error'] = 'Student not found.';
             $this->redirect('students');
+            return;
+        }
+
+        if (!$this->canUpdateStudentByStatus($student)) {
+            $this->denyNonActiveStudentAccess();
             return;
         }
         
@@ -4980,10 +5213,14 @@ class StudentController extends Controller {
             return;
         }
         
-        // Get filters from GET or POST
+        // Get filters from GET or POST — Inactive/Graduated export only for ADM/SAO
+        $exportCanViewInactive = $isADM || $isSAO;
+        $exportStatus = $exportCanViewInactive
+            ? $this->get('status', $this->post('status', ''))
+            : 'Active';
         $filters = [
             'search' => $this->get('search', $this->post('search', '')),
-            'status' => $isHOD ? 'Active' : $this->get('status', $this->post('status', '')),
+            'status' => $exportStatus,
             'district' => $this->get('district', $this->post('district', '')),
             'gender' => $this->get('gender', $this->post('gender', '')),
             'department_id' => $hodDepartmentId ? $hodDepartmentId : $this->get('department_id', $this->post('department_id', '')),
@@ -4994,6 +5231,9 @@ class StudentController extends Controller {
             'registration_fee' => $this->get('registration_fee', $this->post('registration_fee', '')),
             'current_enrollment' => true
         ];
+        if (!$exportCanViewInactive) {
+            $filters['status'] = 'Active';
+        }
         
         // Get selected columns from POST
         $selectedColumns = $this->post('columns', []);

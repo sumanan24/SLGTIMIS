@@ -16,6 +16,61 @@
             min-width: 0;
             word-break: break-word;
         }
+
+        /* Consistent form alignment across tabs */
+        .student-edit-page .form-label {
+            display: block;
+            margin-bottom: 0.35rem;
+            line-height: 1.25;
+        }
+        .student-edit-page .form-text {
+            margin-top: 0.3rem;
+            line-height: 1.35;
+        }
+        .student-edit-page .form-control,
+        .student-edit-page .form-select {
+            min-height: 38px;
+        }
+        .student-edit-page .row.g-3 > [class*="col-"] {
+            display: flex;
+            flex-direction: column;
+        }
+        .student-edit-page .edit-actions {
+            align-items: center;
+        }
+        .student-edit-page .stu-status-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            align-items: center;
+        }
+        .student-edit-page .stu-enroll-card .card-body {
+            padding: 1rem 1.1rem;
+        }
+        .student-edit-page .stu-enroll-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.9rem 1rem;
+            align-items: start;
+        }
+        .student-edit-page .stu-enroll-grid .stu-field-full {
+            grid-column: 1 / -1;
+        }
+        .student-edit-page .stu-enroll-grid .input-group {
+            flex-wrap: nowrap;
+        }
+        .student-edit-page .stu-history-table {
+            margin-bottom: 0;
+        }
+        .student-edit-page .stu-history-table th,
+        .student-edit-page .stu-history-table td {
+            vertical-align: middle;
+            padding: 0.45rem 0.6rem;
+        }
+        .student-edit-page .nav-tabs .nav-link {
+            white-space: nowrap;
+        }
+
         @media (max-width: 768px) {
             .student-edit-page {
                 padding-left: 0.5rem !important;
@@ -61,6 +116,20 @@
             }
             .student-edit-page .edit-actions .btn {
                 width: 100%;
+            }
+            .student-edit-page .stu-enroll-grid {
+                grid-template-columns: 1fr;
+            }
+            .student-edit-page .stu-enroll-grid .input-group {
+                flex-wrap: wrap;
+            }
+            .student-edit-page .stu-enroll-grid .input-group > .form-control {
+                flex: 1 1 100%;
+                width: 100%;
+            }
+            .student-edit-page .stu-enroll-grid .input-group > .btn {
+                width: 100%;
+                margin-top: 0.4rem;
             }
         }
 
@@ -313,14 +382,14 @@
                                                         <?php endif; ?>
                                                     </div>
                                                     <?php if ($profileImageUrl && !empty($canUpdateProfileImage)): ?>
-                                                        <button type="button" class="btn btn-sm btn-danger position-absolute" 
+                                                        <button type="button" class="btn btn-sm btn-danger position-absolute"
                                                                 style="top: 0; right: 0; border-radius: 50%; width: 30px; height: 30px; padding: 0;"
-                                                                onclick="confirmRemoveImage()" title="Remove Image">
+                                                                onclick="confirmRemoveImage()" title="Remove photo">
                                                             <i class="fas fa-times"></i>
                                                         </button>
                                                     <?php endif; ?>
                                                 </div>
-                                                <div class="mt-2">
+                                                <div class="mt-2" id="profileImageCaption">
                                                     <?php if ($profileImageUrl): ?>
                                                         <small class="text-muted">Current Image</small>
                                                     <?php else: ?>
@@ -334,15 +403,21 @@
                                                     <label for="profile_image" class="form-label fw-semibold">Upload New Profile Image</label>
                                                     <input type="file" class="form-control" id="profile_image" name="profile_image" 
                                                            accept="image/jpeg,image/jpg,image/png,image/gif" onchange="previewImage(this)">
-                                                    <div class="form-text">Accepted formats: JPG, PNG, GIF (Max 5MB). ID size 35×45 mm. SAO and ADM only.</div>
+                                                    <div class="form-text">JPG, PNG, GIF · max 5MB · 35×45 mm</div>
                                                 </div>
-                                                <div class="mb-3 profile-cam-open">
+                                                <div class="mb-3 d-flex flex-wrap gap-2 align-items-center profile-cam-open">
                                                     <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenWebcam" data-facing="user">
                                                         <i class="fas fa-user me-1"></i>Front camera
                                                     </button>
                                                     <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenBackCamera" data-facing="environment">
                                                         <i class="fas fa-camera me-1"></i>Back camera
                                                     </button>
+                                                    <?php if ($profileImageUrl): ?>
+                                                    <button type="button" class="btn btn-outline-danger btn-sm" id="btnRemoveProfileImage"
+                                                            onclick="confirmRemoveImage()">
+                                                        <i class="fas fa-trash-alt me-1"></i>Remove photo
+                                                    </button>
+                                                    <?php endif; ?>
                                                 </div>
                                                 <div id="webcamPanel" class="mb-3" style="display: none;">
                                                     <div class="profile-cam-wrap">
@@ -382,7 +457,7 @@
                                                 </div>
                                                 <input type="hidden" name="remove_profile_image" id="remove_profile_image" value="0">
                                                 <?php else: ?>
-                                                <p class="text-muted mb-0">Profile image can be updated by SAO or ADM only.</p>
+                                                <p class="text-muted mb-0 small">SAO / ADM only</p>
                                                 <?php endif; ?>
                                             </div>
                                         </div>
@@ -395,7 +470,6 @@
                                         <input type="text" class="form-control" id="student_id" 
                                                value="<?php echo htmlspecialchars($student['student_id']); ?>" 
                                                disabled>
-                                        <div class="form-text">Student ID cannot be changed</div>
                                     </div>
                                     
                                     <div class="col-12 col-md-3 mb-3">
@@ -569,15 +643,6 @@
                                                        value="<?php echo htmlspecialchars($student['student_whatsapp'] ?? ''); ?>" 
                                                        maxlength="20">
                                             </div>
-                                            
-                                            <div class="col-md-6 mb-3">
-                                                <label for="student_status" class="form-label fw-semibold">Status</label>
-                                                <select class="form-select" id="student_status" name="student_status">
-                                                    <option value="Active" <?php echo ($student['student_status'] ?? '') === 'Active' ? 'selected' : ''; ?>>Active</option>
-                                                    <option value="Inactive" <?php echo ($student['student_status'] ?? '') === 'Inactive' ? 'selected' : ''; ?>>Inactive</option>
-                                                    <option value="Graduated" <?php echo ($student['student_status'] ?? '') === 'Graduated' ? 'selected' : ''; ?>>Graduated</option>
-                                                </select>
-                                            </div>
                                         </div>
                                         
                                         <hr class="my-4">
@@ -615,7 +680,7 @@
                                 
                                 <div class="d-flex gap-2 mt-4 edit-actions">
                                     <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-1"></i>Update Personal Information
+                                        <i class="fas fa-save me-1"></i>Save
                                     </button>
                                     <a href="<?php echo APP_URL; ?>/students/view?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-secondary">
                                         <i class="fas fa-times me-1"></i>Cancel
@@ -626,149 +691,306 @@
 
                         <!-- Enrollment Information Tab -->
                         <div class="tab-pane fade <?php echo $activeTab === 'enrollment' ? 'show active' : ''; ?>" id="enrollment" role="tabpanel">
+                            <?php
+                            $statusHistory = $statusHistory ?? [];
+                            $studentStatusNow = trim((string) ($student['student_status'] ?? '—'));
+                            $enrollStatusNow = trim((string) ($currentEnrollment['student_enroll_status'] ?? '—'));
+                            $statusBadgeClass = static function (string $status): string {
+                                $s = strtolower($status);
+                                if (in_array($s, ['active', 'following'], true)) {
+                                    return 'success';
+                                }
+                                if (in_array($s, ['graduated', 'completed', 'internship'], true)) {
+                                    return 'primary';
+                                }
+                                if (in_array($s, ['inactive', 'dropout', 'long absent'], true)) {
+                                    return 'warning';
+                                }
+                                return 'secondary';
+                            };
+                            ?>
                             <form method="POST" action="<?php echo APP_URL; ?>/students/edit?id=<?php echo urlencode($student['student_id']); ?>">
                                 <input type="hidden" name="update_section" value="enrollment">
-                                
-                                <?php if (!empty($currentEnrollment)): ?>
-                                    <?php $isDropoutReregister = in_array($currentEnrollment['student_enroll_status'] ?? '', ['Dropout', 'Long Absent']); ?>
-                                    <div class="alert alert-<?php echo $isDropoutReregister ? 'warning' : 'info'; ?> mb-4">
-                                        <i class="fas fa-<?php echo $isDropoutReregister ? 'exclamation-triangle' : 'info-circle'; ?> me-2"></i>
-                                        <strong><?php echo $isDropoutReregister ? 'Previous Enrollment (Re-register):' : 'Current Enrollment:'; ?></strong>
-                                        <?php echo htmlspecialchars($currentEnrollment['course_name'] ?? 'N/A'); ?> - 
-                                        <?php echo htmlspecialchars($currentEnrollment['academic_year'] ?? 'N/A'); ?> 
-                                        (<?php echo htmlspecialchars($currentEnrollment['student_enroll_status'] ?? 'N/A'); ?>)
-                                        <?php if ($isDropoutReregister): ?>
-                                            <br><small>Change status to <strong>Following</strong> to re-register this student.</small>
-                                        <?php endif; ?>
+
+                                <div class="stu-status-badges mb-3">
+                                    <span class="badge bg-<?php echo $statusBadgeClass($studentStatusNow); ?>">
+                                        Student: <?php echo htmlspecialchars($studentStatusNow !== '' ? $studentStatusNow : '—'); ?>
+                                    </span>
+                                    <span class="badge bg-<?php echo $statusBadgeClass($enrollStatusNow); ?>">
+                                        Enrollment: <?php echo htmlspecialchars($enrollStatusNow !== '' ? $enrollStatusNow : '—'); ?>
+                                    </span>
+                                </div>
+
+                                <?php $canManageStudentStatus = !empty($canManageStudentStatus); ?>
+                                <div class="card mb-3 border stu-enroll-card">
+                                    <div class="card-header bg-light py-2">
+                                        <h6 class="mb-0 fw-bold"><i class="fas fa-user-check me-2"></i>Student Status</h6>
                                     </div>
-                                    
-                                    <h6 class="fw-bold mb-3 mt-0">Update Course & Enrollment</h6>
-                                    <div class="row g-3">
-                                        <div class="col-md-6">
-                                            <label for="course_id" class="form-label fw-semibold">Course <span class="text-danger">*</span></label>
-                                            <select class="form-select" id="course_id" name="course_id" required>
-                                                <option value="">Select Course</option>
-                                                <?php foreach ($courses as $course): ?>
-                                                    <option value="<?php echo htmlspecialchars($course['course_id']); ?>" 
-                                                            data-department="<?php echo htmlspecialchars($course['department_id'] ?? ''); ?>"
-                                                            <?php echo ($currentEnrollment['course_id'] ?? '') == $course['course_id'] ? 'selected' : ''; ?>>
-                                                        <?php echo htmlspecialchars($course['course_name']); ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                        
-                                        <div class="col-md-6">
-                                            <label for="academic_year" class="form-label fw-semibold">Academic Year <span class="text-danger">*</span></label>
-                                            <select class="form-select" id="academic_year" name="academic_year" required>
-                                                <option value="">Select Academic Year</option>
-                                                <?php foreach ($academicYears as $year): ?>
-                                                    <option value="<?php echo htmlspecialchars($year); ?>" 
-                                                            <?php echo ($currentEnrollment['academic_year'] ?? '') == $year ? 'selected' : ''; ?>>
-                                                        <?php echo htmlspecialchars($year); ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="row g-3 mb-2">
-                                        <div class="col-md-6">
-                                            <label for="student_id_new" class="form-label fw-semibold">
-                                                Registration Number (Student ID) <span class="text-danger">*</span>
-                                            </label>
-                                            <div class="input-group">
-                                                <input type="text" class="form-control" id="student_id_new" name="student_id_new" 
-                                                       value="<?php echo htmlspecialchars($student['student_id']); ?>" 
-                                                       maxlength="50" required>
-                                                <button type="button" class="btn btn-outline-secondary" id="btnSuggestRegNumber" title="Get next available number for selected course">
-                                                    <i class="fas fa-magic"></i> Suggest
-                                                </button>
+                                    <div class="card-body">
+                                        <div class="stu-enroll-grid">
+                                            <div>
+                                                <label for="student_status" class="form-label fw-semibold">Student Status</label>
+                                                <?php if ($canManageStudentStatus): ?>
+                                                <select class="form-select" id="student_status" name="student_status">
+                                                    <option value="Active" <?php echo ($student['student_status'] ?? '') === 'Active' ? 'selected' : ''; ?>>Active</option>
+                                                    <option value="Inactive" <?php echo ($student['student_status'] ?? '') === 'Inactive' ? 'selected' : ''; ?>>Inactive</option>
+                                                    <option value="Graduated" <?php echo ($student['student_status'] ?? '') === 'Graduated' ? 'selected' : ''; ?>>Graduated</option>
+                                                </select>
+                                                <?php else: ?>
+                                                <input type="text" class="form-control" id="student_status_display"
+                                                       value="<?php echo htmlspecialchars($student['student_status'] ?? 'Active'); ?>" readonly disabled>
+                                                <input type="hidden" name="student_status" value="<?php echo htmlspecialchars($student['student_status'] ?? 'Active'); ?>">
+                                                <?php endif; ?>
                                             </div>
-                                            <div class="form-text">Changing course? Registration number auto-updates when you select course & year.</div>
+                                            <?php if ($canManageStudentStatus): ?>
+                                            <div id="statusChangeReasonRow" style="display: none;">
+                                                <label for="status_change_reason" class="form-label fw-semibold">Reason</label>
+                                                <input type="text" class="form-control" id="status_change_reason" name="status_change_reason"
+                                                       maxlength="255" placeholder="Optional">
+                                            </div>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
-                                    
-                                    <div class="row g-3">
-                                        <div class="col-md-6">
-                                            <label for="course_mode" class="form-label fw-semibold">Course Mode</label>
-                                            <select class="form-select" id="course_mode" name="course_mode">
-                                                <?php $mode = $currentEnrollment['course_mode'] ?? ''; ?>
-                                                <option value="Full" <?php echo in_array($mode, ['Full', 'Full Time']) ? 'selected' : ''; ?>>Full Time</option>
-                                                <option value="Part" <?php echo in_array($mode, ['Part', 'Part Time']) ? 'selected' : ''; ?>>Part Time</option>
-                                            </select>
+                                </div>
+                                
+                                <?php
+                                $canAddSecondEnrollment = !empty($canAddSecondEnrollment);
+                                $enrollStatusNowRaw = (string) ($currentEnrollment['student_enroll_status'] ?? '');
+                                $isCompletedEnrollment = ($enrollStatusNowRaw === 'Completed');
+                                $lockCompletedCourseFields = $isCompletedEnrollment;
+                                ?>
+                                <?php if (!empty($currentEnrollment)): ?>
+                                    <div class="card mb-3 border stu-enroll-card">
+                                        <div class="card-header bg-light py-2">
+                                            <h6 class="mb-0 fw-bold"><i class="fas fa-graduation-cap me-2"></i>Course &amp; Enrollment</h6>
                                         </div>
-                                        
-                                        <div class="col-md-6">
-                                            <label for="student_enroll_status" class="form-label fw-semibold">Enrollment Status</label>
-                                            <select class="form-select" id="student_enroll_status" name="student_enroll_status">
-                                                <option value="Following" <?php echo ($currentEnrollment['student_enroll_status'] ?? '') === 'Following' ? 'selected' : ''; ?>>Following</option>
-                                                <option value="Dropout" <?php echo ($currentEnrollment['student_enroll_status'] ?? '') === 'Dropout' ? 'selected' : ''; ?>>Dropout</option>
-                                                <option value="Completed" <?php echo ($currentEnrollment['student_enroll_status'] ?? '') === 'Completed' ? 'selected' : ''; ?>>Completed</option>
-                                                <option value="Long Absent" <?php echo ($currentEnrollment['student_enroll_status'] ?? '') === 'Long Absent' ? 'selected' : ''; ?>>Long Absent</option>
-                                                <option value="Internship" <?php echo ($currentEnrollment['student_enroll_status'] ?? '') === 'Internship' ? 'selected' : ''; ?>>Internship</option>
-                                            </select>
+                                        <div class="card-body">
+                                            <div class="stu-enroll-grid">
+                                                <div>
+                                                    <label for="course_id" class="form-label fw-semibold">Course <span class="text-danger">*</span></label>
+                                                    <select class="form-select" id="course_id" name="course_id" required
+                                                            <?php echo $lockCompletedCourseFields ? 'disabled' : ''; ?>>
+                                                        <option value="">Select Course</option>
+                                                        <?php foreach ($courses as $course): ?>
+                                                            <option value="<?php echo htmlspecialchars($course['course_id']); ?>"
+                                                                    data-department="<?php echo htmlspecialchars($course['department_id'] ?? ''); ?>"
+                                                                    <?php echo ($currentEnrollment['course_id'] ?? '') == $course['course_id'] ? 'selected' : ''; ?>>
+                                                                <?php echo htmlspecialchars($course['course_name']); ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                    <?php if ($lockCompletedCourseFields): ?>
+                                                        <input type="hidden" name="course_id" value="<?php echo htmlspecialchars($currentEnrollment['course_id'] ?? ''); ?>">
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div>
+                                                    <label for="academic_year" class="form-label fw-semibold">Academic Year <span class="text-danger">*</span></label>
+                                                    <select class="form-select" id="academic_year" name="academic_year" required
+                                                            <?php echo $lockCompletedCourseFields ? 'disabled' : ''; ?>>
+                                                        <option value="">Select Academic Year</option>
+                                                        <?php foreach ($academicYears as $year): ?>
+                                                            <option value="<?php echo htmlspecialchars($year); ?>"
+                                                                    <?php echo ($currentEnrollment['academic_year'] ?? '') == $year ? 'selected' : ''; ?>>
+                                                                <?php echo htmlspecialchars($year); ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                    <?php if ($lockCompletedCourseFields): ?>
+                                                        <input type="hidden" name="academic_year" value="<?php echo htmlspecialchars($currentEnrollment['academic_year'] ?? ''); ?>">
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div class="stu-field-full">
+                                                    <label for="student_id_new" class="form-label fw-semibold">
+                                                        Registration Number <span class="text-danger">*</span>
+                                                    </label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control" id="student_id_new" name="student_id_new"
+                                                               value="<?php echo htmlspecialchars($student['student_id']); ?>"
+                                                               maxlength="50" required
+                                                               <?php echo $lockCompletedCourseFields ? 'readonly' : ''; ?>>
+                                                        <?php if (!$lockCompletedCourseFields): ?>
+                                                        <button type="button" class="btn btn-outline-secondary" id="btnSuggestRegNumber" title="Suggest next number">
+                                                            <i class="fas fa-magic"></i> Suggest
+                                                        </button>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label for="course_mode" class="form-label fw-semibold">Course Mode</label>
+                                                    <select class="form-select" id="course_mode" name="course_mode"
+                                                            <?php echo $lockCompletedCourseFields ? 'disabled' : ''; ?>>
+                                                        <?php $mode = $currentEnrollment['course_mode'] ?? ''; ?>
+                                                        <option value="Full" <?php echo in_array($mode, ['Full', 'Full Time']) ? 'selected' : ''; ?>>Full Time</option>
+                                                        <option value="Part" <?php echo in_array($mode, ['Part', 'Part Time']) ? 'selected' : ''; ?>>Part Time</option>
+                                                    </select>
+                                                    <?php if ($lockCompletedCourseFields): ?>
+                                                        <input type="hidden" name="course_mode" value="<?php echo htmlspecialchars(in_array($mode, ['Part', 'Part Time'], true) ? 'Part' : 'Full'); ?>">
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div>
+                                                    <label for="student_enroll_status" class="form-label fw-semibold">Enrollment Status</label>
+                                                    <select class="form-select" id="student_enroll_status" name="student_enroll_status">
+                                                        <option value="Following" <?php echo $enrollStatusNowRaw === 'Following' ? 'selected' : ''; ?>>Following</option>
+                                                        <option value="Dropout" <?php echo $enrollStatusNowRaw === 'Dropout' ? 'selected' : ''; ?>>Dropout</option>
+                                                        <option value="Completed" <?php echo $enrollStatusNowRaw === 'Completed' ? 'selected' : ''; ?>>Completed</option>
+                                                        <option value="Long Absent" <?php echo $enrollStatusNowRaw === 'Long Absent' ? 'selected' : ''; ?>>Long Absent</option>
+                                                        <option value="Internship" <?php echo $enrollStatusNowRaw === 'Internship' ? 'selected' : ''; ?>>Internship</option>
+                                                    </select>
+                                                </div>
+                                                <div class="stu-field-full" id="enrollmentStatusReasonRow" style="display: none;">
+                                                    <label for="enrollment_status_change_reason" class="form-label fw-semibold">Reason</label>
+                                                    <input type="text" class="form-control" id="enrollment_status_change_reason" name="enrollment_status_change_reason"
+                                                           maxlength="255" placeholder="Optional">
+                                                </div>
+                                            </div>
+                                            <input type="hidden" name="enrollment_id" value="<?php echo htmlspecialchars($currentEnrollment['student_id'] ?? ''); ?>">
                                         </div>
                                     </div>
-                                    
-                                    <input type="hidden" name="enrollment_id" value="<?php echo htmlspecialchars($currentEnrollment['student_id'] ?? ''); ?>">
                                 <?php else: ?>
-                                    <div class="alert alert-warning">
-                                        <i class="fas fa-exclamation-triangle me-2"></i>No active enrollment found. Please create an enrollment first.
+                                    <div class="alert alert-warning mb-3 py-2">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>No enrollment found.
                                     </div>
                                 <?php endif; ?>
                                 
+                                <?php if (!empty($statusHistory)): ?>
+                                    <div class="card mb-3 border stu-enroll-card">
+                                        <div class="card-header bg-light py-2">
+                                            <h6 class="mb-0 fw-bold"><i class="fas fa-history me-2"></i>Status History</h6>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-bordered stu-history-table mb-0">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>When</th>
+                                                            <th>From</th>
+                                                            <th>To</th>
+                                                            <th>Reason</th>
+                                                            <th>By</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php foreach ($statusHistory as $hist): ?>
+                                                            <tr>
+                                                                <td class="text-nowrap"><?php echo !empty($hist['created_at']) ? htmlspecialchars(date('d M Y, H:i', strtotime($hist['created_at']))) : '—'; ?></td>
+                                                                <td><?php echo htmlspecialchars($hist['old_status'] ?? '—'); ?></td>
+                                                                <td><?php echo htmlspecialchars($hist['new_status'] ?? '—'); ?></td>
+                                                                <td><?php echo htmlspecialchars(($hist['reason'] ?? '') !== '' ? $hist['reason'] : '—'); ?></td>
+                                                                <td><?php echo htmlspecialchars(($hist['changed_by'] ?? '') !== '' ? $hist['changed_by'] : '—'); ?></td>
+                                                            </tr>
+                                                        <?php endforeach; ?>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+
                                 <?php if (!empty($enrollments)): ?>
-                                    <hr class="my-4">
-                                    <h6 class="fw-bold mb-3">Enrollment History</h6>
-                                    <div class="table-responsive">
-                                        <table class="table table-hover">
-                                            <thead class="table-light">
-                                                <tr>
-                                                    <th>Academic Year</th>
-                                                    <th>Course</th>
-                                                    <th>Department</th>
-                                                    <th>Mode</th>
-                                                    <th>Enroll Date</th>
-                                                    <th>Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($enrollments as $enroll): ?>
-                                                    <tr>
-                                                        <td><?php echo htmlspecialchars($enroll['academic_year']); ?></td>
-                                                        <td><?php echo htmlspecialchars($enroll['course_name'] ?? 'N/A'); ?></td>
-                                                        <td><?php echo htmlspecialchars($enroll['department_name'] ?? 'N/A'); ?></td>
-                                                        <td><?php echo htmlspecialchars($enroll['course_mode']); ?></td>
-                                                        <td><?php echo htmlspecialchars($enroll['student_enroll_date']); ?></td>
-                                                        <td>
-                                                            <span class="badge bg-<?php echo $enroll['student_enroll_status'] === 'Following' ? 'success' : 'warning'; ?> rounded-pill">
-                                                                <?php echo htmlspecialchars($enroll['student_enroll_status']); ?>
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
+                                    <div class="card mb-3 border stu-enroll-card">
+                                        <div class="card-header bg-light py-2">
+                                            <h6 class="mb-0 fw-bold"><i class="fas fa-list me-2"></i>Enrollment History</h6>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover stu-history-table mb-0">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>Academic Year</th>
+                                                            <th>Course</th>
+                                                            <th>Department</th>
+                                                            <th>Mode</th>
+                                                            <th>Enroll Date</th>
+                                                            <th>Status</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php foreach ($enrollments as $enroll): ?>
+                                                            <tr>
+                                                                <td><?php echo htmlspecialchars($enroll['academic_year']); ?></td>
+                                                                <td><?php echo htmlspecialchars($enroll['course_name'] ?? 'N/A'); ?></td>
+                                                                <td><?php echo htmlspecialchars($enroll['department_name'] ?? 'N/A'); ?></td>
+                                                                <td><?php echo htmlspecialchars($enroll['course_mode']); ?></td>
+                                                                <td><?php echo htmlspecialchars($enroll['student_enroll_date']); ?></td>
+                                                                <td>
+                                                                    <span class="badge bg-<?php echo $enroll['student_enroll_status'] === 'Following' ? 'success' : 'warning'; ?> rounded-pill">
+                                                                        <?php echo htmlspecialchars($enroll['student_enroll_status']); ?>
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        <?php endforeach; ?>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
                                     </div>
                                 <?php endif; ?>
                                 
-                                <div class="d-flex gap-2 mt-4 edit-actions">
+                                <div class="d-flex flex-wrap gap-2 mt-3 edit-actions">
                                     <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-1"></i>Update Enrollment Information
+                                        <i class="fas fa-save me-1"></i>Save
                                     </button>
                                     <a href="<?php echo APP_URL; ?>/students/view?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-secondary">
-                                        <i class="fas fa-times me-1"></i>Cancel
+                                        Cancel
                                     </a>
                                 </div>
                             </form>
+
+                            <?php if ($canAddSecondEnrollment): ?>
+                            <form method="POST" action="<?php echo APP_URL; ?>/students/edit?id=<?php echo urlencode($student['student_id']); ?>" class="mt-3">
+                                <input type="hidden" name="update_section" value="add_enrollment">
+                                <div class="card mb-3 border stu-enroll-card">
+                                    <div class="card-header bg-light py-2">
+                                        <h6 class="mb-0 fw-bold"><i class="fas fa-plus-circle me-2"></i>Add Second Enrollment</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="stu-enroll-grid">
+                                            <div>
+                                                <label for="add_course_id" class="form-label fw-semibold">Course <span class="text-danger">*</span></label>
+                                                <select class="form-select" id="add_course_id" name="course_id" required>
+                                                    <option value="">Select Course</option>
+                                                    <?php foreach ($courses as $course): ?>
+                                                        <option value="<?php echo htmlspecialchars($course['course_id']); ?>">
+                                                            <?php echo htmlspecialchars($course['course_name']); ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label for="add_academic_year" class="form-label fw-semibold">Academic Year <span class="text-danger">*</span></label>
+                                                <select class="form-select" id="add_academic_year" name="academic_year" required>
+                                                    <option value="">Select Academic Year</option>
+                                                    <?php foreach ($academicYears as $year): ?>
+                                                        <option value="<?php echo htmlspecialchars($year); ?>">
+                                                            <?php echo htmlspecialchars($year); ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label for="add_course_mode" class="form-label fw-semibold">Course Mode</label>
+                                                <select class="form-select" id="add_course_mode" name="course_mode">
+                                                    <option value="Full" selected>Full Time</option>
+                                                    <option value="Part">Part Time</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-2 mt-3">
+                                            <button type="submit" class="btn btn-primary"
+                                                    onclick="return confirm('Add second enrollment?');">
+                                                <i class="fas fa-plus me-1"></i>Add Enrollment
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                            <?php endif; ?>
                         </div>
                         
                         <!-- Bank Details Tab -->
                         <div class="tab-pane fade <?php echo $activeTab === 'bank' ? 'show active' : ''; ?>" id="bank" role="tabpanel">
                             <form method="POST" action="<?php echo APP_URL; ?>/students/edit?id=<?php echo urlencode($student['student_id']); ?>">
                                 <input type="hidden" name="update_section" value="bank">
-                                <p class="text-muted small mb-3">Bank details must be entered in English (letters, numbers, and basic punctuation).</p>
                                 <div class="row g-3">
                                     <div class="col-12 col-md-6">
                                         <label for="bank_name" class="form-label fw-semibold">Bank Name</label>
@@ -791,10 +1013,10 @@
                                 </div>
                                 <div class="d-flex gap-2 mt-4 edit-actions">
                                     <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-1"></i>Update Bank Details
+                                        <i class="fas fa-save me-1"></i>Save
                                     </button>
                                     <a href="<?php echo APP_URL; ?>/students/view?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-secondary">
-                                        <i class="fas fa-times me-1"></i>Cancel
+                                        Cancel
                                     </a>
                                 </div>
                             </form>
@@ -813,21 +1035,19 @@
                                                 Allowance eligible
                                             </label>
                                         </div>
-                                        <div class="form-text">When checked, this student is included in allowance-related reports and FIN attendance views (where filtered).</div>
                                     </div>
                                     <div class="col-12 col-md-6 col-lg-4">
-                                        <label for="allowance_eligible_date" class="form-label fw-semibold">Eligible from (optional)</label>
+                                        <label for="allowance_eligible_date" class="form-label fw-semibold">Eligible from</label>
                                         <input type="date" class="form-control" id="allowance_eligible_date" name="allowance_eligible_date" 
                                                value="<?php echo htmlspecialchars($student['allowance_eligible_date'] ?? ''); ?>">
-                                        <div class="form-text">Date from which allowance eligibility applies (used by attendance logic when set).</div>
                                     </div>
                                 </div>
                                 <div class="d-flex gap-2 mt-4 edit-actions">
                                     <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-1"></i>Update Allowance Eligibility
+                                        <i class="fas fa-save me-1"></i>Save
                                     </button>
                                     <a href="<?php echo APP_URL; ?>/students/view?id=<?php echo urlencode($student['student_id']); ?>" class="btn btn-outline-secondary">
-                                        <i class="fas fa-times me-1"></i>Cancel
+                                        Cancel
                                     </a>
                                 </div>
                             </form>
@@ -858,28 +1078,47 @@ function previewImage(input) {
 }
 
 function confirmRemoveImage() {
-    if (confirm('Are you sure you want to remove the current profile image? This action cannot be undone.')) {
-        document.getElementById('remove_profile_image').value = '1';
-        const currentImage = document.getElementById('currentProfileImage');
-        const currentIcon = document.getElementById('currentProfileImageIcon');
-        const imagePreview = document.getElementById('imagePreview');
-        const profileImageInput = document.getElementById('profile_image');
-        
-        if (currentImage) {
-            currentImage.style.display = 'none';
-        }
-        if (currentIcon) {
-            currentIcon.style.display = 'flex';
-        }
-        if (imagePreview) {
-            imagePreview.style.display = 'none';
-        }
-        if (profileImageInput) {
-            profileImageInput.value = '';
-        }
-        
-        // Show message
-        alert('Profile image will be removed when you save the form.');
+    if (!confirm('Remove this profile photo? Save to apply.')) {
+        return;
+    }
+    const removeFlag = document.getElementById('remove_profile_image');
+    if (removeFlag) {
+        removeFlag.value = '1';
+    }
+    const currentImage = document.getElementById('currentProfileImage');
+    const circle = document.querySelector('.profile-photo-circle');
+    let currentIcon = document.getElementById('currentProfileImageIcon');
+    const imagePreview = document.getElementById('imagePreview');
+    const profileImageInput = document.getElementById('profile_image');
+    const removeBtn = document.getElementById('btnRemoveProfileImage');
+    const caption = document.getElementById('profileImageCaption');
+
+    if (currentImage) {
+        currentImage.remove();
+    }
+    if (!currentIcon && circle) {
+        currentIcon = document.createElement('i');
+        currentIcon.className = 'fas fa-user fa-4x text-muted';
+        currentIcon.id = 'currentProfileImageIcon';
+        circle.appendChild(currentIcon);
+    } else if (currentIcon) {
+        currentIcon.style.display = 'flex';
+    }
+    if (imagePreview) {
+        imagePreview.style.display = 'none';
+    }
+    if (profileImageInput) {
+        profileImageInput.value = '';
+    }
+    if (removeBtn) {
+        removeBtn.style.display = 'none';
+    }
+    if (caption) {
+        caption.innerHTML = '<small class="text-warning">Photo marked for removal — click Save</small>';
+    }
+    const cornerRemove = circle ? circle.parentElement.querySelector('button.btn-danger') : null;
+    if (cornerRemove) {
+        cornerRemove.style.display = 'none';
     }
 }
 
@@ -894,6 +1133,30 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    function bindStatusReasonToggle(selectId, rowId, initialValue) {
+        const select = document.getElementById(selectId);
+        const row = document.getElementById(rowId);
+        if (!select || !row) {
+            return;
+        }
+        const original = initialValue || select.value;
+        const sync = function () {
+            row.style.display = select.value !== original ? '' : 'none';
+        };
+        select.addEventListener('change', sync);
+        sync();
+    }
+    bindStatusReasonToggle(
+        'student_status',
+        'statusChangeReasonRow',
+        <?php echo json_encode((string) ($student['student_status'] ?? 'Active')); ?>
+    );
+    bindStatusReasonToggle(
+        'student_enroll_status',
+        'enrollmentStatusReasonRow',
+        <?php echo json_encode((string) ($currentEnrollment['student_enroll_status'] ?? 'Following')); ?>
+    );
 
     const openWebcamBtn = document.getElementById('btnOpenWebcam');
     const openBackCameraBtn = document.getElementById('btnOpenBackCamera');

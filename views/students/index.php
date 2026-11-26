@@ -169,7 +169,11 @@ $smsQuery = http_build_query(array_filter([
                                    placeholder="Name, ID, email, or NIC">
                         </div>
                     </div>
-                    <?php if (!isset($isHOD) || !$isHOD): ?>
+                    <?php
+                    $canViewInactive = !empty($canViewInactive);
+                    // Status filter: ADM/SAO see Active/Inactive/Graduated; others are Active-only (no filter)
+                    if ($canViewInactive && (!isset($isHOD) || !$isHOD)):
+                    ?>
                     <div class="col-6 col-md-4 col-lg-2 stu-field">
                         <label for="status" class="stu-label">Status</label>
                         <select class="form-select" id="status" name="status">
@@ -182,6 +186,8 @@ $smsQuery = http_build_query(array_filter([
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <?php elseif (!$canViewInactive && (!isset($isHOD) || !$isHOD)): ?>
+                    <input type="hidden" name="status" value="Active">
                     <?php endif; ?>
                     <div class="col-6 col-md-4 col-lg-2 stu-field">
                         <label for="gender" class="stu-label">Gender</label>

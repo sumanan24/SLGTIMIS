@@ -1027,6 +1027,83 @@ class StudentModel extends Model {
         $stmt->close();
         return $result;
     }
+
+    /**
+     * Ensure student_status_history exists (lifecycle schema).
+     */
+    public function ensureStatusHistoryTable(): void {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+        $done = true;
+        $this->db->query(
+            "CREATE TABLE IF NOT EXISTS `student_status_history` (
+                `id` int unsigned NOT NULL AUTO_INCREMENT,
+                `student_id` varchar(20) NOT NULL,
+                `old_status` varchar(20) DEFAULT NULL,
+                `new_status` varchar(20) NOT NULL,
+                `reason` varchar(255) DEFAULT NULL,
+                `changed_by` varchar(50) DEFAULT NULL,
+                `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                KEY `idx_status_student` (`student_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+    }
+
+    /**
+     * Record a student / enrollment status change for the edit page history.
+     */
+    public function logStatusChange(string $studentId, string $oldStatus, string $newStatus, string $reason = '', string $changedBy = ''): bool {
+        $this->ensureStatusHistoryTable();
+        $oldStatus = trim($oldStatus);
+        $newStatus = trim($newStatus);
+        if ($newStatus === '' || strcasecmp($oldStatus, $newStatus) === 0) {
+            return false;
+        }
+        $sql = "INSERT INTO `student_status_history`
+                (`student_id`, `old_status`, `new_status`, `reason`, `changed_by`)
+                VALUES (?, ?, ?, ?, ?)";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return false;
+        }
+        $reason = mb_substr(trim($reason), 0, 255);
+        $changedBy = mb_substr(trim($changedBy), 0, 50);
+        $stmt->bind_param('sssss', $studentId, $oldStatus, $newStatus, $reason, $changedBy);
+        $ok = $stmt->execute();
+        $stmt->close();
+        return (bool) $ok;
+    }
+
+    /**
+     * Recent status-change rows for a student (newest first).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function getStatusHistory(string $studentId, int $limit = 20): array {
+        $this->ensureStatusHistoryTable();
+        $limit = max(1, min(100, $limit));
+        $sql = "SELECT `id`, `student_id`, `old_status`, `new_status`, `reason`, `changed_by`, `created_at`
+                FROM `student_status_history`
+                WHERE `student_id` = ?
+                ORDER BY `id` DESC
+                LIMIT {$limit}";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param('s', $studentId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $rows = [];
+        while ($result && ($row = $result->fetch_assoc())) {
+            $rows[] = $row;
+        }
+        $stmt->close();
+        return $rows;
+    }
     
     /**
      * Delete student

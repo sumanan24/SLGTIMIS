@@ -158,6 +158,50 @@ class StudentEnrollmentModel extends Model {
     }
 
     /**
+     * Still studying (Following / Internship) — blocks adding another course.
+     */
+    public function hasActiveEnrollment(string $studentId): bool {
+        $sql = "SELECT 1 FROM `{$this->table}`
+                WHERE `student_id` = ?
+                  AND `student_enroll_status` IN ('Following', 'Internship')
+                LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param('s', $studentId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        return $res && $res->num_rows > 0;
+    }
+
+    /**
+     * At least one course marked Completed.
+     */
+    public function hasCompletedEnrollment(string $studentId): bool {
+        $sql = "SELECT 1 FROM `{$this->table}`
+                WHERE `student_id` = ?
+                  AND `student_enroll_status` = 'Completed'
+                LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            return false;
+        }
+        $stmt->bind_param('s', $studentId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        return $res && $res->num_rows > 0;
+    }
+
+    /**
+     * Second (or further) enrollment is allowed only after a prior course is Completed
+     * and the student is not still Following / on Internship.
+     */
+    public function canAddAdditionalEnrollment(string $studentId): bool {
+        return !$this->hasActiveEnrollment($studentId) && $this->hasCompletedEnrollment($studentId);
+    }
+
+    /**
      * Create new enrollment
      */
     public function createEnrollment($data) {
