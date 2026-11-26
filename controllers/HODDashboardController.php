@@ -191,11 +191,17 @@ class HODDashboardController extends Controller {
 
             // Department student counts by enrolment status
             $studentStatusCounts = [];
+            $studentCountsByYear = [];
             if ($userDepartmentId) {
                 try {
                     $studentStatusCounts = $this->getDepartmentEnrollmentBreakdown($userDepartmentId, $selectedAcademicYear);
                 } catch (Throwable $ex) {
                     error_log('HODDashboard status counts: ' . $ex->getMessage());
+                }
+                try {
+                    $studentCountsByYear = $this->getDepartmentStudentCountsByAcademicYear($userDepartmentId);
+                } catch (Throwable $ex) {
+                    error_log('HODDashboard year counts: ' . $ex->getMessage());
                 }
             }
 
@@ -256,6 +262,7 @@ class HODDashboardController extends Controller {
 
             $data = [
                 'studentStatusCounts' => $studentStatusCounts,
+                'studentCountsByYear' => $studentCountsByYear,
                 'my' => $my,
                 'error' => $flashError,
                 'assignments' => $assignments,
@@ -298,6 +305,57 @@ class HODDashboardController extends Controller {
         }
     }
     
+    /**
+     * Student counts per academic year for a department.
+     * total = Following + Internship; completed counted separately.
+     *
+     * @return list<array{academic_year:string,total:int,following:int,internship:int,completed:int,full:int,part:int}>
+     */
+    private function getDepartmentStudentCountsByAcademicYear($departmentId): array {
+        $departmentId = trim((string) $departmentId);
+        if ($departmentId === '') {
+            return [];
+        }
+        $full = "LOWER(TRIM(se.`course_mode`)) LIKE 'full%'";
+        $part = "LOWER(TRIM(se.`course_mode`)) LIKE 'part%'";
+        $current = "se.`student_enroll_status` IN ('Following', 'Internship')";
+        $sql = "SELECT se.`academic_year`,
+                       COUNT(DISTINCT CASE WHEN {$current} THEN se.`student_id` END) AS total,
+                       COUNT(DISTINCT CASE WHEN se.`student_enroll_status` = 'Following' THEN se.`student_id` END) AS following,
+                       COUNT(DISTINCT CASE WHEN se.`student_enroll_status` = 'Internship' THEN se.`student_id` END) AS internship,
+                       COUNT(DISTINCT CASE WHEN se.`student_enroll_status` = 'Completed' THEN se.`student_id` END) AS completed,
+                       COUNT(DISTINCT CASE WHEN {$current} AND {$full} THEN se.`student_id` END) AS full_time,
+                       COUNT(DISTINCT CASE WHEN {$current} AND {$part} THEN se.`student_id` END) AS part_time
+                FROM `student_enroll` se
+                INNER JOIN `course` c ON c.`course_id` = se.`course_id`
+                WHERE c.`department_id` = ?
+                  AND se.`academic_year` IS NOT NULL
+                  AND se.`academic_year` != ''
+                GROUP BY se.`academic_year`
+                ORDER BY se.`academic_year` DESC";
+        $stmt = Database::getInstance()->prepare($sql);
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param('s', $departmentId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $rows = [];
+        while ($row = $result->fetch_assoc()) {
+            $rows[] = [
+                'academic_year' => (string) ($row['academic_year'] ?? ''),
+                'total' => (int) ($row['total'] ?? 0),
+                'following' => (int) ($row['following'] ?? 0),
+                'internship' => (int) ($row['internship'] ?? 0),
+                'completed' => (int) ($row['completed'] ?? 0),
+                'full' => (int) ($row['full_time'] ?? 0),
+                'part' => (int) ($row['part_time'] ?? 0),
+            ];
+        }
+        $stmt->close();
+        return $rows;
+    }
+
     /**
      * Distinct students of a department for an academic year, each split into full time and part time.
      * "total" = current students (Following + Internship, same rule as StudentModel::getTotalStudents);

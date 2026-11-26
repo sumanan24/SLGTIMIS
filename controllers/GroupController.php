@@ -100,10 +100,15 @@ class GroupController extends Controller {
             $status = trim($this->post('status', 'active'));
             $courseVersion = (int) $this->post('course_version', 0);
             
+            $createReturnQs = '';
+            if ($courseId !== '') {
+                $createReturnQs = '?course_id=' . urlencode($courseId) . '&course_version=' . urlencode((string) $courseVersion);
+            }
+
             // Validation
             if (empty($name)) {
                 $_SESSION['error'] = 'Group name is required.';
-                $this->redirect('groups/create');
+                $this->redirect('groups/create' . $createReturnQs);
                 return;
             }
             
@@ -115,14 +120,14 @@ class GroupController extends Controller {
             
             if (empty($academicYear)) {
                 $_SESSION['error'] = 'Academic year is required.';
-                $this->redirect('groups/create');
+                $this->redirect('groups/create' . $createReturnQs);
                 return;
             }
 
             $allowedVersions = $this->versionNumbersForCourse($courseModel, $courseId);
             if (!in_array($courseVersion, $allowedVersions, true)) {
                 $_SESSION['error'] = 'Select a valid course version.';
-                $this->redirect('groups/create');
+                $this->redirect('groups/create' . $createReturnQs);
                 return;
             }
             
@@ -139,7 +144,7 @@ class GroupController extends Controller {
             $extra = $this->readGroupExtraFields($groupModel, $courseId, $academicYear, 0);
             if ($extra['error'] !== null) {
                 $_SESSION['error'] = $extra['error'];
-                $this->redirect('groups/create');
+                $this->redirect('groups/create' . $createReturnQs);
                 return;
             }
 
@@ -164,9 +169,32 @@ class GroupController extends Controller {
                 $this->redirect('groups/show?id=' . $groupId);
             } else {
                 $_SESSION['error'] = 'Failed to create group.';
-                $this->redirect('groups/create');
+                $this->redirect('groups/create' . $createReturnQs);
             }
         } else {
+            $preCourseId = trim((string) $this->get('course_id', ''));
+            $preVersionRaw = $this->get('course_version', '');
+            $preVersion = $preVersionRaw === '' ? null : (int) $preVersionRaw;
+            $preDepartmentId = '';
+            $preCourseName = '';
+            if ($preCourseId !== '') {
+                $preCourse = $courseModel->getById($preCourseId);
+                if ($preCourse) {
+                    $preDepartmentId = (string) ($preCourse['department_id'] ?? '');
+                    $preCourseName = (string) ($preCourse['course_name'] ?? $preCourseId);
+                    // Department-scoped users may only prefill their own department courses
+                    if ($departmentId && $preDepartmentId !== (string) $departmentId) {
+                        $preCourseId = '';
+                        $preVersion = null;
+                        $preDepartmentId = '';
+                        $preCourseName = '';
+                    }
+                } else {
+                    $preCourseId = '';
+                    $preVersion = null;
+                }
+            }
+
             $data = [
                 'title' => 'Create Group',
                 'page' => 'groups',
@@ -174,8 +202,10 @@ class GroupController extends Controller {
                 'academicYears' => $academicYears,
                 'courses' => [],
                 'instructors' => $this->model('GroupTimetableModel')->listStaff($departmentId ?: ''),
-                'preCourseId' => trim((string) $this->get('course_id', '')),
-                'preVersion' => $this->get('course_version', '') === '' ? null : (int) $this->get('course_version'),
+                'preCourseId' => $preCourseId,
+                'preCourseName' => $preCourseName,
+                'preDepartmentId' => $preDepartmentId,
+                'preVersion' => $preVersion,
                 'error' => $_SESSION['error'] ?? null
             ];
             unset($_SESSION['error']);
