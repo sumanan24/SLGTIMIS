@@ -4285,14 +4285,21 @@ class StudentController extends Controller {
     private function bulkSmsFilters(array $src): array {
         $userDepartmentId = $this->getUserDepartment();
         $restricted = $this->isDepartmentRestricted();
+        $canViewInactive = $this->isAdmOrSao();
         $language = strtolower(trim((string) ($src['language'] ?? '')));
         if (!in_array($language, ['sinhala', 'tamil', 'english', 'other', 'others'], true)) {
             $language = '';
         } elseif ($language === 'others') {
             $language = 'other';
         }
+        $status = trim((string) ($src['status'] ?? ''));
+        if ($restricted || !$canViewInactive) {
+            $status = 'Active';
+        } elseif ($status !== '' && !in_array($status, ['Active', 'Inactive', 'Graduated'], true)) {
+            $status = 'Active';
+        }
         return [
-            'status' => $restricted ? 'Active' : '',
+            'status' => $status,
             'department_id' => $restricted
                 ? ($userDepartmentId ?: '__none__')
                 : ($userDepartmentId ?: trim((string) ($src['department_id'] ?? ''))),
@@ -4397,6 +4404,7 @@ class StudentController extends Controller {
                 $rows[] = [
                     'student_id' => (string) ($s['student_id'] ?? ''),
                     'name' => trim((string) ($s['student_fullname'] ?? '')),
+                    'status' => trim((string) ($s['student_status'] ?? '')),
                     'phone' => trim((string) ($s['student_phone'] ?? '')) !== ''
                         ? trim((string) $s['student_phone'])
                         : trim((string) ($s['student_whatsapp'] ?? '')),
@@ -4433,6 +4441,8 @@ class StudentController extends Controller {
             'courses' => $courses,
             'academicYears' => $studentModel->getAcademicYears(),
             'isHOD' => $restricted,
+            'canViewInactive' => $this->isAdmOrSao(),
+            'statuses' => $this->isAdmOrSao() ? ['Active', 'Inactive', 'Graduated'] : ['Active'],
             'csrfToken' => (string) $_SESSION['bulk_sms_csrf'],
             'smsMissing' => $sms->missingSettings(),
             'result' => $result,
@@ -4464,6 +4474,7 @@ class StudentController extends Controller {
             'department_id' => $_POST['department_id'] ?? '',
             'course_id' => $filters['course_id'],
             'language' => $filters['language'] ?? '',
+            'status' => $filters['status'] ?? '',
         ], 'strlen'));
 
         $sent = (string) $this->post('csrf_token', '');
@@ -4586,6 +4597,7 @@ class StudentController extends Controller {
             'department_id' => $_POST['department_id'] ?? '',
             'course_id' => $filters['course_id'],
             'language' => $filters['language'] ?? '',
+            'status' => $filters['status'] ?? '',
         ], 'strlen'));
 
         $sent = (string) $this->post('csrf_token', '');

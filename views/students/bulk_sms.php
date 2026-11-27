@@ -203,6 +203,25 @@ $withoutNumber = max(0, count($rows) - $withNumber);
                         <option value="other" <?php echo ($filters['language'] ?? '') === 'other' ? 'selected' : ''; ?>>Others</option>
                     </select>
                 </div>
+                <?php $canViewInactive = !empty($canViewInactive); ?>
+                <div class="stu-field stu-span-3">
+                    <label for="status" class="stu-label">Student status</label>
+                    <?php if ($canViewInactive): ?>
+                    <select class="form-select" id="status" name="status">
+                        <option value="">All statuses</option>
+                        <?php foreach (($statuses ?? ['Active', 'Inactive', 'Graduated']) as $st): ?>
+                            <option value="<?php echo $e($st); ?>" <?php echo ($filters['status'] ?? '') === $st ? 'selected' : ''; ?>>
+                                <?php echo $e($st); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php else: ?>
+                    <input type="hidden" name="status" value="Active">
+                    <select class="form-select" id="status" disabled>
+                        <option selected>Active</option>
+                    </select>
+                    <?php endif; ?>
+                </div>
                 <div class="stu-field stu-span-auto">
                     <button type="submit" class="stu-btn stu-btn-primary w-100 justify-content-center">
                         <i class="fas fa-users"></i>Show students
@@ -218,6 +237,7 @@ $withoutNumber = max(0, count($rows) - $withNumber);
         <input type="hidden" name="department_id" value="<?php echo $e($deptForForm); ?>">
         <input type="hidden" name="course_id" value="<?php echo $e($filters['course_id'] ?? ''); ?>">
         <input type="hidden" name="language" value="<?php echo $e($filters['language'] ?? ''); ?>">
+        <input type="hidden" name="status" value="<?php echo $e($filters['status'] ?? ''); ?>">
 
         <div class="stu-layout">
             <div>
@@ -275,6 +295,7 @@ $withoutNumber = max(0, count($rows) - $withNumber);
                                     <th style="width:48px;">No</th>
                                     <th>Student ID</th>
                                     <th>Name</th>
+                                    <th style="width:100px;">Status</th>
                                     <th style="width:120px;">Language</th>
                                     <th>Phone</th>
                                 </tr>
@@ -282,6 +303,9 @@ $withoutNumber = max(0, count($rows) - $withNumber);
                             <tbody>
                                 <?php foreach ($rows as $i => $r):
                                     $lv = (string) ($r['language_value'] ?? '');
+                                    $st = (string) ($r['status'] ?? '');
+                                    $stClass = strcasecmp($st, 'Active') === 0 ? 'ok'
+                                        : (strcasecmp($st, 'Graduated') === 0 ? 'info' : 'muted');
                                 ?>
                                     <tr class="sms-row<?php echo $r['valid'] ? '' : ' sms-warn'; ?>">
                                         <td>
@@ -293,6 +317,13 @@ $withoutNumber = max(0, count($rows) - $withNumber);
                                         <td class="text-muted"><?php echo $i + 1; ?></td>
                                         <td><span class="stu-id"><?php echo $e($r['student_id']); ?></span></td>
                                         <td><?php echo $e($r['name']); ?></td>
+                                        <td>
+                                            <?php if ($st !== ''): ?>
+                                                <span class="stu-chip <?php echo $stClass; ?>"><?php echo $e($st); ?></span>
+                                            <?php else: ?>
+                                                <span class="stu-tag muted">—</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td>
                                             <select class="form-select stu-lang-select js-lang-edit"
                                                     data-student-id="<?php echo $e($r['student_id']); ?>"
