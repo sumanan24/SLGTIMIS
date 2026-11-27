@@ -14,7 +14,7 @@ class PaymentModel extends Model {
      * Get all payments with student and related information
      */
     public function getAll($filters = []) {
-        $sql = "SELECT p.*, s.student_fullname, s.student_nic, s.student_id as student_reg_no, 
+        $sql = "SELECT p.*, s.student_fullname, s.student_nic, s.student_gender, s.student_id as student_reg_no, 
                 se.course_id, c.course_name, c.department_id AS course_department_id,
                 d.department_name, pd.department_name AS pays_department_name, se.academic_year
                 FROM `{$this->table}` p
@@ -32,6 +32,12 @@ class PaymentModel extends Model {
         if (!empty($filters['student_id'])) {
             $sql .= " AND p.student_id = ?";
             $params[] = $filters['student_id'];
+            $types .= 's';
+        }
+
+        if (!empty($filters['gender'])) {
+            $sql .= " AND s.student_gender = ?";
+            $params[] = $filters['gender'];
             $types .= 's';
         }
         
@@ -166,6 +172,12 @@ class PaymentModel extends Model {
         if (!empty($filters['student_id'])) {
             $sql .= " AND p.student_id = ?";
             $params[] = $filters['student_id'];
+            $types .= 's';
+        }
+
+        if (!empty($filters['gender'])) {
+            $sql .= " AND s.student_gender = ?";
+            $params[] = $filters['gender'];
             $types .= 's';
         }
         

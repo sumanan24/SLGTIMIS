@@ -1,8 +1,8 @@
 <?php
 $filters = $filters ?? [];
-$basis = in_array($basis ?? '', ['type', 'subtype', 'student', 'department', 'course'], true) ? $basis : 'type';
+$basis = in_array($basis ?? '', ['type', 'subtype', 'student', 'department', 'course', 'gender'], true) ? $basis : 'type';
 $printMode = !empty($printMode);
-$summary = $summary ?? ['count' => 0, 'students' => 0, 'amount' => 0, 'types' => [], 'subtypes' => [], 'departments' => [], 'courses' => []];
+$summary = $summary ?? ['count' => 0, 'students' => 0, 'amount' => 0, 'types' => [], 'subtypes' => [], 'departments' => [], 'courses' => [], 'genders' => []];
 $groups = $groups ?? [];
 $paymentTypes = $paymentTypes ?? [];
 $paymentSubtypes = $paymentSubtypes ?? [];
@@ -46,6 +46,7 @@ $basisTitles = [
     'course' => 'By course (sub types)',
     'student' => 'By student',
     'department' => 'By department',
+    'gender' => 'By gender',
 ];
 $headingTitle = $basisTitles[$basis] ?? 'Payments Report';
 if ($basis === 'course') {
@@ -63,6 +64,9 @@ if (($filters['academic_year'] ?? '') !== '') {
 }
 if ($departmentLabel !== '') {
     $metaBits[] = $departmentLabel;
+}
+if (($filters['gender'] ?? '') !== '') {
+    $metaBits[] = $filters['gender'];
 }
 if (($filters['student_id'] ?? '') !== '') {
     $metaBits[] = $filters['student_id'];
@@ -308,6 +312,14 @@ $lineTotal = static function ($payment) {
                         </select>
                     </div>
                     <div class="pay-field">
+                        <label class="form-label small fw-semibold" for="gender">Gender</label>
+                        <select class="form-select form-select-sm" id="gender" name="gender">
+                            <option value="">All</option>
+                            <option value="Male" <?php echo ($filters['gender'] ?? '') === 'Male' ? 'selected' : ''; ?>>Male</option>
+                            <option value="Female" <?php echo ($filters['gender'] ?? '') === 'Female' ? 'selected' : ''; ?>>Female</option>
+                        </select>
+                    </div>
+                    <div class="pay-field">
                         <label class="form-label small fw-semibold" for="officer">Officer</label>
                         <select class="form-select form-select-sm" id="officer" name="officer">
                             <option value="">All</option>
@@ -447,6 +459,29 @@ $lineTotal = static function ($payment) {
                                     <td class="text-end num"><?php echo (int) $departmentRow['count']; ?></td>
                                     <td class="text-end num"><?php echo (int) $departmentRow['students']; ?></td>
                                     <td class="text-end num">Rs. <?php echo number_format((float) $departmentRow['amount'], 2); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php elseif ($basis === 'gender' && !empty($summary['genders'])): ?>
+                <div class="pay-table-wrap mb-3">
+                    <table class="table table-sm table-bordered pay-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Gender</th>
+                                <th class="text-end">Payments</th>
+                                <th class="text-end">Students</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($summary['genders'] as $genderName => $genderRow): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($genderName); ?></td>
+                                    <td class="text-end num"><?php echo (int) $genderRow['count']; ?></td>
+                                    <td class="text-end num"><?php echo (int) $genderRow['students']; ?></td>
+                                    <td class="text-end num">Rs. <?php echo number_format((float) $genderRow['amount'], 2); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>

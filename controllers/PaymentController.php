@@ -595,7 +595,7 @@ class PaymentController extends Controller {
         }
 
         $basis = $this->get('basis', 'type');
-        if (!in_array($basis, ['type', 'subtype', 'student', 'department', 'course'], true)) {
+        if (!in_array($basis, ['type', 'subtype', 'student', 'department', 'course', 'gender'], true)) {
             $basis = 'type';
         }
 
@@ -607,6 +607,10 @@ class PaymentController extends Controller {
         }
         $studentId = trim((string) $this->get('student_id', ''));
         $paysDepartment = trim((string) $this->get('department', ''));
+        $gender = trim((string) $this->get('gender', ''));
+        if (!in_array($gender, ['Male', 'Female'], true)) {
+            $gender = '';
+        }
         $officer = trim((string) $this->get('officer', ''));
         if (strlen($officer) > 100) {
             $officer = '';
@@ -650,6 +654,9 @@ class PaymentController extends Controller {
         if ($paysDepartment !== '') {
             $filters['pays_department'] = $paysDepartment;
         }
+        if ($gender !== '') {
+            $filters['gender'] = $gender;
+        }
         if ($officer !== '') {
             $filters['officer'] = $officer;
         }
@@ -667,6 +674,8 @@ class PaymentController extends Controller {
             $groups = $this->groupPaymentsByDepartment($payments);
         } elseif ($basis === 'course') {
             $groups = $this->groupPaymentsByCourse($payments);
+        } elseif ($basis === 'gender') {
+            $groups = $this->groupPaymentsByGender($payments);
         } else {
             $groups = $this->groupPaymentsByType($payments);
         }
@@ -725,6 +734,7 @@ class PaymentController extends Controller {
             'academic_year' => $academicYear,
             'student_id' => $studentId,
             'department' => $paysDepartment,
+            'gender' => $gender,
             'officer' => $officer,
         ];
 
@@ -878,11 +888,23 @@ class PaymentController extends Controller {
         $subtypes = [];
         $departments = [];
         $courses = [];
+        $genders = [];
         $total = 0.0;
         foreach ($payments as $payment) {
             $line = $this->paymentLineTotal($payment);
             $total += $line;
             $students[(string) ($payment['student_id'] ?? '')] = true;
+            $gender = trim((string) ($payment['student_gender'] ?? ''));
+            if ($gender === '') {
+                $gender = 'Unspecified';
+            }
+            if (!isset($genders[$gender])) {
+                $genders[$gender] = ['count' => 0, 'students' => [], 'amount' => 0.0];
+            }
+            $genders[$gender]['count']++;
+            $genders[$gender]['students'][(string) ($payment['student_id'] ?? '')] = true;
+            $genders[$gender]['amount'] += $line;
+
             $type = trim((string) ($payment['payment_type'] ?? ''));
             if ($type === '') {
                 $type = 'Unspecified';
@@ -980,6 +1002,18 @@ class PaymentController extends Controller {
                 return strcasecmp($a['subtype'], $b['subtype']);
             });
         }
+        foreach ($genders as $key => $row) {
+            $genders[$key]['students'] = count($row['students']);
+        }
+        uksort($genders, static function ($a, $b) {
+            $order = ['Male' => 0, 'Female' => 1];
+            $oa = $order[$a] ?? 50;
+            $ob = $order[$b] ?? 50;
+            if ($oa !== $ob) {
+                return $oa <=> $ob;
+            }
+            return strcasecmp((string) $a, (string) $b);
+        });
 
         return [
             'count' => count($payments),
@@ -989,6 +1023,7 @@ class PaymentController extends Controller {
             'subtypes' => $subtypes,
             'departments' => $departments,
             'courses' => $courses,
+            'genders' => $genders,
         ];
     }
 
@@ -1096,6 +1131,35 @@ class PaymentController extends Controller {
             $groups[$type]['total'] += $this->paymentLineTotal($payment);
         }
         ksort($groups, SORT_NATURAL | SORT_FLAG_CASE);
+        return $groups;
+    }
+
+    private function groupPaymentsByGender($payments) {
+        $groups = [];
+        foreach ($payments as $payment) {
+            $gender = trim((string) ($payment['student_gender'] ?? ''));
+            if ($gender === '') {
+                $gender = 'Unspecified';
+            }
+            if (!isset($groups[$gender])) {
+                $groups[$gender] = [
+                    'title' => $gender,
+                    'payments' => [],
+                    'total' => 0.0,
+                ];
+            }
+            $groups[$gender]['payments'][] = $payment;
+            $groups[$gender]['total'] += $this->paymentLineTotal($payment);
+        }
+        uksort($groups, static function ($a, $b) {
+            $order = ['Male' => 0, 'Female' => 1];
+            $oa = $order[$a] ?? 50;
+            $ob = $order[$b] ?? 50;
+            if ($oa !== $ob) {
+                return $oa <=> $ob;
+            }
+            return strcasecmp((string) $a, (string) $b);
+        });
         return $groups;
     }
 
@@ -1253,6 +1317,8 @@ class PaymentController extends Controller {
             $basisSlug = 'by-department';
         } elseif ($basis === 'course') {
             $basisSlug = 'by-course';
+        } elseif ($basis === 'gender') {
+            $basisSlug = 'by-gender';
         }
         $filename = 'payments-report-' . $basisSlug;
         if ($dateFrom !== '' || $dateTo !== '') {
@@ -1290,6 +1356,7 @@ class PaymentController extends Controller {
             'Date',
             'Student ID',
             'Student Name',
+            'Gender',
             'Course',
             'Department',
             'Payment Type',
@@ -1338,6 +1405,28 @@ class PaymentController extends Controller {
                 }
                 return strcmp((string) ($b['pays_date'] ?? ''), (string) ($a['pays_date'] ?? ''));
             });
+        } elseif ($basis === 'gender') {
+            usort($rows, function ($a, $b) {
+                $order = ['Male' => 0, 'Female' => 1];
+                $ga = trim((string) ($a['student_gender'] ?? ''));
+                $gb = trim((string) ($b['student_gender'] ?? ''));
+                if ($ga === '') {
+                    $ga = 'Unspecified';
+                }
+                if ($gb === '') {
+                    $gb = 'Unspecified';
+                }
+                $oa = $order[$ga] ?? 50;
+                $ob = $order[$gb] ?? 50;
+                if ($oa !== $ob) {
+                    return $oa <=> $ob;
+                }
+                $name = strcasecmp($ga, $gb);
+                if ($name !== 0) {
+                    return $name;
+                }
+                return strcmp((string) ($b['pays_date'] ?? ''), (string) ($a['pays_date'] ?? ''));
+            });
         } else {
             usort($rows, function ($a, $b) {
                 $type = strcasecmp((string) ($a['payment_type'] ?? ''), (string) ($b['payment_type'] ?? ''));
@@ -1355,6 +1444,7 @@ class PaymentController extends Controller {
                 !empty($payment['pays_date']) ? date('Y-m-d', strtotime($payment['pays_date'])) : '',
                 $payment['student_reg_no'] ?? $payment['student_id'] ?? '',
                 $payment['student_fullname'] ?? '',
+                $payment['student_gender'] ?? '',
                 $payment['course_name'] ?? '',
                 $payment['pays_department_name'] ?? $payment['department_name'] ?? '',
                 $payment['payment_type'] ?? '',
