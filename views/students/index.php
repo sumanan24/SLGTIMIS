@@ -23,8 +23,13 @@ $smsQuery = http_build_query(array_filter([
 .stu-page { --stu-navy:#0b2545; --stu-ink:#1e293b; --stu-muted:#64748b; --stu-line:#dbe4f0; --stu-soft:#f5f8fd; --stu-accent:#1d4ed8; color:var(--stu-ink); }
 .stu-page .stu-head { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1.1rem; }
 .stu-page .stu-title { margin:0; font-size:1.35rem; font-weight:700; color:var(--stu-navy); letter-spacing:-.02em; }
+.stu-page .stu-title-row { display:flex; flex-wrap:wrap; align-items:center; gap:.55rem; }
+.stu-page .stu-total-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.28rem .65rem; border-radius:999px; background:#e8eef8; color:var(--stu-navy); font-size:.78rem; font-weight:700; line-height:1.2; }
+.stu-page .stu-total-badge strong { font-size:.92rem; font-variant-numeric:tabular-nums; }
 .stu-page .stu-sub { margin:.2rem 0 0; color:var(--stu-muted); font-size:.86rem; max-width:36rem; }
 .stu-page .stu-actions { display:flex; flex-wrap:wrap; gap:.45rem; align-items:center; }
+.stu-page .stu-btn-export { background:#15803d; color:#fff; border-color:#15803d; }
+.stu-page .stu-btn-export:hover { background:#166534; color:#fff; border-color:#166534; }
 .stu-page .stu-btn { display:inline-flex; align-items:center; gap:.4rem; border-radius:.45rem; font-size:.82rem; font-weight:600; padding:.42rem .8rem; border:1px solid transparent; text-decoration:none; line-height:1.2; }
 .stu-page .stu-btn-primary { background:var(--stu-navy); color:#fff; }
 .stu-page .stu-btn-primary:hover { background:#163a66; color:#fff; }
@@ -92,7 +97,14 @@ $smsQuery = http_build_query(array_filter([
 <div class="container-fluid px-4 py-3 stu-page">
     <div class="stu-head">
         <div>
-            <h1 class="stu-title">Students</h1>
+            <div class="stu-title-row">
+                <h1 class="stu-title">Students</h1>
+                <span class="stu-total-badge" title="Matching current filters">
+                    <i class="fas fa-user-graduate" aria-hidden="true"></i>
+                    <strong><?php echo number_format((int) $total); ?></strong>
+                    student<?php echo (int) $total === 1 ? '' : 's'; ?>
+                </span>
+            </div>
             <p class="stu-sub">Browse and manage current enrolments. Following and Internship only — Dropout, Completed, and Long Absent are excluded.</p>
         </div>
         <div class="stu-actions">
@@ -101,6 +113,11 @@ $smsQuery = http_build_query(array_filter([
                title="WhatsApp <?php echo htmlspecialchars($staff_whatsapp_header['display'], ENT_QUOTES, 'UTF-8'); ?>">
                 <i class="fab fa-whatsapp" aria-hidden="true"></i><?php echo htmlspecialchars($staff_whatsapp_header['display'], ENT_QUOTES, 'UTF-8'); ?>
             </a>
+            <?php endif; ?>
+            <?php if (isset($canExport) && $canExport): ?>
+            <button type="button" class="stu-btn stu-btn-export" data-bs-toggle="modal" data-bs-target="#exportModal">
+                <i class="fas fa-file-excel"></i>Export
+            </button>
             <?php endif; ?>
             <?php if (isset($canEdit) && $canEdit): ?>
             <a href="<?php echo APP_URL; ?>/students/create" class="stu-btn stu-btn-primary">
@@ -332,15 +349,25 @@ $smsQuery = http_build_query(array_filter([
     <div class="stu-meta">
         <div>
             <div class="stu-count">
-                Showing <strong><?php echo count($students); ?></strong> of <strong><?php echo number_format($total); ?></strong> students
+                Showing <strong><?php echo count($students); ?></strong> of <strong><?php echo number_format((int) $total); ?></strong> students
+                <?php if ($hasActiveFilters): ?>
+                    <span class="stu-note">(filtered)</span>
+                <?php endif; ?>
             </div>
             <div class="stu-note">Select rows to use with Envelopes / Name list from Tools.</div>
         </div>
-        <?php if ($hasActiveFilters): ?>
-        <a href="<?php echo APP_URL; ?>/students" class="stu-btn stu-btn-ghost" style="padding:.3rem .7rem; font-size:.78rem;">
-            <i class="fas fa-times-circle"></i>Clear filters
-        </a>
-        <?php endif; ?>
+        <div class="stu-actions">
+            <?php if (!empty($canExport)): ?>
+            <button type="button" class="stu-btn stu-btn-export" style="padding:.3rem .7rem; font-size:.78rem;" data-bs-toggle="modal" data-bs-target="#exportModal">
+                <i class="fas fa-file-excel"></i>Export <?php echo number_format((int) $total); ?>
+            </button>
+            <?php endif; ?>
+            <?php if ($hasActiveFilters): ?>
+            <a href="<?php echo APP_URL; ?>/students" class="stu-btn stu-btn-ghost" style="padding:.3rem .7rem; font-size:.78rem;">
+                <i class="fas fa-times-circle"></i>Clear filters
+            </a>
+            <?php endif; ?>
+        </div>
     </div>
 
     <div class="stu-panel" style="margin-bottom:0;">
@@ -815,6 +842,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <div class="me-auto small text-muted">
+                        Current list: <strong><?php echo number_format((int) $total); ?></strong> student<?php echo (int) $total === 1 ? '' : 's'; ?>
+                    </div>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                         <i class="fas fa-times me-1"></i>Cancel
                     </button>

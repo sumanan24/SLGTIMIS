@@ -58,7 +58,8 @@ class DashboardOverviewModel extends Model {
                 COUNT(DISTINCT CASE WHEN se.`course_mode` = 'Part' THEN se.`student_id` END) AS part_time
             FROM `student_enroll` se
             INNER JOIN `student` s ON s.`student_id` = se.`student_id`
-            WHERE se.`student_enroll_status` IN {$cur}");
+            WHERE s.`student_status` = 'Active'
+              AND se.`student_enroll_status` IN {$cur}");
         return [
             'full_time' => (int) ($rows[0]['full_time'] ?? 0),
             'part_time' => (int) ($rows[0]['part_time'] ?? 0),
@@ -106,7 +107,8 @@ class DashboardOverviewModel extends Model {
         foreach ($this->rows("SELECT se.`academic_year` AS academic_year, {$cols}
                 FROM `student_enroll` se
                 INNER JOIN `student` s ON s.`student_id` = se.`student_id`
-                WHERE se.`student_enroll_status` IN {$statuses}
+                WHERE s.`student_status` = 'Active'
+                  AND se.`student_enroll_status` IN {$statuses}
                 GROUP BY se.`academic_year`") as $r) {
             $key = (string) $r['academic_year'];
             // Left side wins on duplicate keys, so the fresh counts replace the zeros.
@@ -119,7 +121,8 @@ class DashboardOverviewModel extends Model {
                 INNER JOIN `student` s ON s.`student_id` = se.`student_id`
                 INNER JOIN `course` c ON c.`course_id` = se.`course_id`
                 INNER JOIN `department` d ON d.`department_id` = c.`department_id`
-                WHERE se.`student_enroll_status` IN {$statuses}
+                WHERE s.`student_status` = 'Active'
+                  AND se.`student_enroll_status` IN {$statuses}
                 GROUP BY se.`academic_year`, d.`department_id`, d.`department_name`
                 ORDER BY d.`department_name`") as $r) {
             $key = (string) $r['academic_year'];
@@ -139,7 +142,8 @@ class DashboardOverviewModel extends Model {
                 INNER JOIN `student` s ON s.`student_id` = se.`student_id`
                 INNER JOIN `course` c ON c.`course_id` = se.`course_id`
                 INNER JOIN `department` d ON d.`department_id` = c.`department_id`
-                WHERE se.`student_enroll_status` IN {$statuses}
+                WHERE s.`student_status` = 'Active'
+                  AND se.`student_enroll_status` IN {$statuses}
                 GROUP BY se.`academic_year`, d.`department_id`, c.`course_id`, c.`course_name`, c.`course_nvq_level`
                 ORDER BY c.`course_nvq_level`, c.`course_name`") as $r) {
             $key = (string) $r['academic_year'];

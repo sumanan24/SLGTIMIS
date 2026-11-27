@@ -5304,6 +5304,8 @@ class StudentController extends Controller {
             $studentsWithEnrollment[] = $student;
         }
         
+        $exportCount = count($studentsWithEnrollment);
+
         // Set headers for Excel download (CSV format for Excel compatibility)
         $filename = 'students_export_' . date('Y-m-d_His') . '.csv';
         header('Content-Type: text/csv; charset=utf-8');
@@ -5316,6 +5318,11 @@ class StudentController extends Controller {
         
         // Open output stream
         $output = fopen('php://output', 'w');
+
+        fputcsv($output, ['SLGTI Students Export']);
+        fputcsv($output, ['Student count', $exportCount]);
+        fputcsv($output, ['Exported at', date('Y-m-d H:i:s')]);
+        fputcsv($output, []);
         
         // Write header row
         $headers = [];
@@ -5345,6 +5352,9 @@ class StudentController extends Controller {
             }
             fputcsv($output, $row);
         }
+
+        fputcsv($output, []);
+        fputcsv($output, ['Total students', $exportCount]);
         
         fclose($output);
         exit;

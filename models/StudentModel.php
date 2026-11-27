@@ -576,7 +576,11 @@ class StudentModel extends Model {
         $sql = "SELECT se.`student_enroll_status` AS status, COUNT(DISTINCT s.`student_id`) AS total
                 FROM `{$this->table}` s
                 INNER JOIN `student_enroll` se ON s.`student_id` = se.`student_id`";
-        $where = ["se.`student_enroll_status` IS NOT NULL", "se.`student_enroll_status` <> ''"];
+        $where = [
+            "s.`student_status` = 'Active'",
+            "se.`student_enroll_status` IS NOT NULL",
+            "se.`student_enroll_status` <> ''",
+        ];
         $types = '';
         $params = [];
         if (!empty($departmentId)) {

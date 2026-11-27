@@ -46,8 +46,8 @@ class DashboardController extends Controller {
             $academicYears = [];
             $selectedAcademicYear = '';
             
-            // Same count as the Students page: Following + Internship across all years.
-            $totalStudents = $studentModel->getTotalStudents([]);
+            // Active students only (Following + Internship across all years).
+            $totalStudents = $studentModel->getTotalStudents(['status' => 'Active']);
             $totalStaff = $staffModel->count();
             $totalCourses = $courseModel->count();
             $recentStudents = $studentModel->getRecentStudents(5);
