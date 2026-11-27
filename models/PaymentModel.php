@@ -333,6 +333,26 @@ class PaymentModel extends Model {
     }
     
     /**
+     * Bank name and branch for a bank or online payment. Older pays tables do not have these columns.
+     */
+    public function ensureBankColumns() {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+        $ready = true;
+        $check = $this->db->query("SHOW COLUMNS FROM `{$this->table}` LIKE 'bank_name'");
+        if ($check && $check->num_rows > 0) {
+            return;
+        }
+        $this->db->query(
+            "ALTER TABLE `{$this->table}`
+             ADD COLUMN `bank_name` varchar(80) NULL DEFAULT NULL AFTER `payment_method`,
+             ADD COLUMN `bank_branch` varchar(80) NULL DEFAULT NULL AFTER `bank_name`"
+        );
+    }
+
+    /**
      * Cashier name is stored with the receipt. Older pays tables do not have this column.
      */
     public function ensureCollectedByColumn() {
@@ -428,6 +448,7 @@ class PaymentModel extends Model {
      * Update payment
      */
     public function updatePayment($id, $data) {
+        $this->ensureBankColumns();
         return $this->update($id, $data);
     }
     

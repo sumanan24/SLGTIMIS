@@ -117,26 +117,35 @@
                                value="<?php echo htmlspecialchars($payment['pays_qty'] ?? 1); ?>" min="1" required>
                     </div>
 
-                    <div class="col-12 col-md-6 col-lg-3">
-                        <label for="payment_method" class="form-label fw-semibold mb-1">Payment Method</label>
-                        <select class="form-select" id="payment_method" name="payment_method">
-                            <option value="">Select Method</option>
-                            <option value="CASH" <?php echo ($payment['payment_method'] ?? '') == 'CASH' ? 'selected' : ''; ?>>Cash</option>
-                            <option value="BANK" <?php echo ($payment['payment_method'] ?? '') == 'BANK' ? 'selected' : ''; ?>>Bank</option>
-                            <option value="ONLINE" <?php echo ($payment['payment_method'] ?? '') == 'ONLINE' ? 'selected' : ''; ?>>Online transfer</option>
-                            <?php
-                            $currentMethod = strtoupper(trim((string) ($payment['payment_method'] ?? '')));
-                            if ($currentMethod !== '' && !in_array($currentMethod, ['CASH', 'BANK', 'ONLINE'], true)):
-                            ?>
-                            <option value="<?php echo htmlspecialchars($currentMethod); ?>" selected><?php echo htmlspecialchars($currentMethod); ?></option>
-                            <?php endif; ?>
-                        </select>
-                    </div>
-
-                    <div class="col-12 col-md-6 col-lg-3">
-                        <label for="reference_no" class="form-label fw-semibold mb-1">Reference Number</label>
-                        <input type="text" class="form-control" id="reference_no" name="reference_no"
-                               value="<?php echo htmlspecialchars($payment['reference_no'] ?? ''); ?>" placeholder="Optional reference number">
+                    <?php $currentMethod = strtoupper(trim((string) ($payment['payment_method'] ?? 'CASH'))); ?>
+                    <div class="col-12">
+                        <div class="border rounded p-3 bg-light">
+                            <div class="fw-semibold mb-2">Cash or bank <span class="text-danger">*</span></div>
+                            <div class="d-flex flex-wrap gap-2" id="payMethodChoices">
+                                <button type="button" class="btn btn-outline-primary pay-method" data-method="CASH">Cash</button>
+                                <button type="button" class="btn btn-outline-primary pay-method" data-method="BANK">Bank</button>
+                                <button type="button" class="btn btn-outline-primary pay-method" data-method="ONLINE">Online transfer</button>
+                            </div>
+                            <input type="hidden" name="payment_method" id="payment_method" value="<?php echo htmlspecialchars($currentMethod); ?>">
+                            <div class="row g-3 mt-1">
+                                <div class="col-12 col-md-4 pay-bank-field">
+                                    <label for="bank_name" class="form-label fw-semibold mb-1">Bank name</label>
+                                    <input type="text" class="form-control" id="bank_name" name="bank_name" maxlength="80"
+                                           value="<?php echo htmlspecialchars($payment['bank_name'] ?? ''); ?>" placeholder="People's Bank">
+                                </div>
+                                <div class="col-12 col-md-4 pay-bank-field">
+                                    <label for="bank_branch" class="form-label fw-semibold mb-1">Branch</label>
+                                    <input type="text" class="form-control" id="bank_branch" name="bank_branch" maxlength="80"
+                                           value="<?php echo htmlspecialchars($payment['bank_branch'] ?? ''); ?>" placeholder="Kilinochchi">
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <label for="reference_no" class="form-label fw-semibold mb-1" id="referenceLabel">Receipt number</label>
+                                    <input type="text" class="form-control" id="reference_no" name="reference_no" maxlength="64"
+                                           value="<?php echo htmlspecialchars($payment['reference_no'] ?? ''); ?>">
+                                    <div class="form-text" id="referenceHelp">The cash receipt number already on this payment.</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-3">
@@ -197,5 +206,40 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Update when type changes
     paymentTypeSelect.addEventListener('change', updatePaymentReasons);
+
+    var methodInput = document.getElementById('payment_method');
+    var bankFields = document.querySelectorAll('.pay-bank-field');
+    var referenceLabel = document.getElementById('referenceLabel');
+    var referenceHelp = document.getElementById('referenceHelp');
+
+    function showMethod(method) {
+        methodInput.value = method;
+        document.querySelectorAll('.pay-method').forEach(function (btn) {
+            var on = btn.getAttribute('data-method') === method;
+            btn.classList.toggle('btn-primary', on);
+            btn.classList.toggle('btn-outline-primary', !on);
+        });
+        var isCash = method === 'CASH' || method === '';
+        bankFields.forEach(function (field) {
+            field.classList.toggle('d-none', isCash);
+        });
+        if (isCash) {
+            referenceLabel.textContent = 'Cash receipt number';
+            referenceHelp.textContent = 'Keep the daily number, or type a different cash receipt number.';
+        } else if (method === 'ONLINE') {
+            referenceLabel.textContent = 'Transfer reference';
+            referenceHelp.textContent = 'The online transfer or deposit reference.';
+        } else {
+            referenceLabel.textContent = 'Bank slip number';
+            referenceHelp.textContent = 'The slip or deposit number from the bank.';
+        }
+    }
+
+    document.querySelectorAll('.pay-method').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            showMethod(btn.getAttribute('data-method') || 'CASH');
+        });
+    });
+    showMethod(methodInput.value || 'CASH');
 });
 </script>

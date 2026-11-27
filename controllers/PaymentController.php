@@ -393,6 +393,7 @@ class PaymentController extends Controller {
         }
         
         $paymentModel = $this->model('PaymentModel');
+        $paymentModel->ensureBankColumns();
         $studentModel = $this->model('StudentModel');
         $payment = $paymentModel->getById($id);
         
@@ -408,11 +409,32 @@ class PaymentController extends Controller {
             $paysAmount = trim($this->post('payment_amount', ''));
             $paymentReason = trim($this->post('payment_reason', ''));
             $paymentType = trim($this->post('payment_type', ''));
-            $paymentMethod = trim($this->post('payment_method', ''));
+            $paymentMethod = strtoupper(trim($this->post('payment_method', '')));
             $paysNote = trim($this->post('payment_notes', ''));
             $paysQty = (int)$this->post('pays_qty', 1);
             $referenceNo = trim($this->post('reference_no', ''));
+            $bankName = trim($this->post('bank_name', ''));
+            $bankBranch = trim($this->post('bank_branch', ''));
             $approved = 1;
+
+            if (!isset($this->posPaymentMethods()[$paymentMethod])) {
+                $_SESSION['error'] = 'Choose how the money was received: Cash, Bank, or Online transfer.';
+                $this->redirect('payments/edit?id=' . urlencode($id));
+                return;
+            }
+            if ($paymentMethod === 'CASH') {
+                $bankName = '';
+                $bankBranch = '';
+            }
+            if (strlen($referenceNo) > 64) {
+                $referenceNo = function_exists('mb_substr') ? mb_substr($referenceNo, 0, 64) : substr($referenceNo, 0, 64);
+            }
+            if (strlen($bankName) > 80) {
+                $bankName = function_exists('mb_substr') ? mb_substr($bankName, 0, 80) : substr($bankName, 0, 80);
+            }
+            if (strlen($bankBranch) > 80) {
+                $bankBranch = function_exists('mb_substr') ? mb_substr($bankBranch, 0, 80) : substr($bankBranch, 0, 80);
+            }
             
             // Validation
             if (empty($studentId) || empty($paysDate) || empty($paysAmount) || empty($paymentReason) || empty($paymentType)) {
@@ -454,6 +476,8 @@ class PaymentController extends Controller {
                 'payment_reason' => $paymentReason,
                 'payment_type' => $paymentType,
                 'payment_method' => $paymentMethod,
+                'bank_name' => $bankName !== '' ? $bankName : null,
+                'bank_branch' => $bankBranch !== '' ? $bankBranch : null,
                 'pays_note' => $paysNote,
                 'pays_qty' => $paysQty,
                 'reference_no' => $referenceNo,

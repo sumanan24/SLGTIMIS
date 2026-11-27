@@ -13,6 +13,12 @@ $paymentReason = $p['payment_reason'] ?? '—';
 $paymentMethodCode = strtoupper(trim($p['payment_method'] ?? ''));
 $methodLabels = ['CASH' => 'Cash', 'BANK' => 'Bank', 'ONLINE' => 'Online transfer'];
 $paymentMethod = $methodLabels[$paymentMethodCode] ?? trim($p['payment_method'] ?? '');
+$bankName = trim((string) ($p['bank_name'] ?? ''));
+$bankBranch = trim((string) ($p['bank_branch'] ?? ''));
+$bankLine = $bankName;
+if ($bankBranch !== '') {
+    $bankLine = trim($bankLine . ($bankLine !== '' ? ', ' : '') . $bankBranch);
+}
 $notes = trim($p['pays_note'] ?? '');
 $cashierName = trim((string) ($cashierName ?? ''));
 if ($cashierName === '') {
@@ -378,6 +384,12 @@ $grandTotal = isset($lineTotal) ? (float) $lineTotal : ($unitAmount * $qty);
         <div class="pos-row">
             <span class="pos-label">Payment method</span>
             <span class="pos-val"><?php echo htmlspecialchars($paymentMethod); ?></span>
+        </div>
+        <?php endif; ?>
+        <?php if ($bankLine !== '' && $paymentMethodCode !== 'CASH'): ?>
+        <div class="pos-row">
+            <span class="pos-label">Bank</span>
+            <span class="pos-val"><?php echo htmlspecialchars($bankLine); ?></span>
         </div>
         <?php endif; ?>
         <?php if ($referenceNo !== ''): ?>
