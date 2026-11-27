@@ -47,20 +47,14 @@
             <form method="POST" action="<?php echo APP_URL; ?>/payments/edit?id=<?php echo urlencode($payment['pays_id']); ?>" class="payment-form">
                 <div class="row g-3">
                     <div class="col-12 col-md-6 col-lg-4">
-                        <label for="student_id" class="form-label fw-semibold mb-1">
-                            Student <span class="text-danger">*</span>
-                        </label>
-                        <select class="form-select" id="student_id" name="student_id" required>
-                            <option value="">Select Student</option>
-                            <?php if (isset($students) && !empty($students)): ?>
-                                <?php foreach ($students as $student): ?>
-                                    <option value="<?php echo htmlspecialchars($student['student_id']); ?>"
-                                            <?php echo ($payment['student_id'] ?? '') == $student['student_id'] ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($student['student_id'] . ' - ' . $student['student_fullname']); ?>
-                                    </option>
-                                <?php endforeach; ?>
+                        <label class="form-label fw-semibold mb-1">Student</label>
+                        <div class="form-control-plaintext border rounded px-3 py-2 bg-light">
+                            <strong><?php echo htmlspecialchars($payment['student_reg_no'] ?? $payment['student_id'] ?? '—'); ?></strong>
+                            <?php if (!empty($payment['student_fullname'])): ?>
+                                <span class="text-muted"> — <?php echo htmlspecialchars($payment['student_fullname']); ?></span>
                             <?php endif; ?>
-                        </select>
+                        </div>
+                        <input type="hidden" name="student_id" value="<?php echo htmlspecialchars($payment['student_id'] ?? ''); ?>">
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-4">

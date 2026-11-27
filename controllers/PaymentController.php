@@ -404,7 +404,8 @@ class PaymentController extends Controller {
         }
         
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $studentId = trim($this->post('student_id', ''));
+            // Student is fixed on edit — keep the original payment student
+            $studentId = trim((string) ($payment['student_id'] ?? ''));
             $paysDate = trim($this->post('payment_date', ''));
             $paysAmount = trim($this->post('payment_amount', ''));
             $paymentReason = trim($this->post('payment_reason', ''));
@@ -437,8 +438,8 @@ class PaymentController extends Controller {
             }
             
             // Validation
-            if (empty($studentId) || empty($paysDate) || empty($paysAmount) || empty($paymentReason) || empty($paymentType)) {
-                $_SESSION['error'] = 'Student, Payment Date, Amount, Reason, and Payment Type are required.';
+            if ($studentId === '' || empty($paysDate) || empty($paysAmount) || empty($paymentReason) || empty($paymentType)) {
+                $_SESSION['error'] = 'Payment Date, Amount, Reason, and Payment Type are required.';
                 $this->redirect('payments/edit?id=' . urlencode($id));
                 return;
             }
@@ -446,13 +447,6 @@ class PaymentController extends Controller {
             // Validate amount
             if (!is_numeric($paysAmount) || $paysAmount <= 0) {
                 $_SESSION['error'] = 'Payment amount must be a positive number.';
-                $this->redirect('payments/edit?id=' . urlencode($id));
-                return;
-            }
-            
-            // Check if student exists
-            if (!$studentModel->exists($studentId)) {
-                $_SESSION['error'] = 'Student not found.';
                 $this->redirect('payments/edit?id=' . urlencode($id));
                 return;
             }
@@ -499,17 +493,12 @@ class PaymentController extends Controller {
                 $this->redirect('payments/edit?id=' . urlencode($id));
             }
         } else {
-            // Get students for dropdown
-            $students = $studentModel->getStudents(1, 1000, ['status' => 'active']);
-            
-            // Get payment reasons and types
             $paymentReasons = $paymentModel->getPaymentReasons();
             
             $data = [
                 'title' => 'Edit Payment',
                 'page' => 'payments-edit',
                 'payment' => $payment,
-                'students' => $students,
                 'paymentReasons' => $paymentReasons,
                 'error' => $_SESSION['error'] ?? null
             ];
