@@ -34,6 +34,13 @@
 # Prevent directory listing
 Options -Indexes
 
+<Files ".env">
+    Require all denied
+</Files>
+<Files "ldap-queue.key">
+    Require all denied
+</Files>
+
 # Protect sensitive files (commented out for now to avoid blocking)
 # <FilesMatch "^(install\.php|config|\.htaccess|\.git)">
 #     Order allow,deny

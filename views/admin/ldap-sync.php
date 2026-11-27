@@ -20,8 +20,8 @@ $q = static function (array $extra) use ($filters): string {
     }));
 };
 $statusLabel = [
-    'match' => 'Password matches',
-    'waiting' => 'Waiting for SIS password change',
+    'match' => 'Directory password set',
+    'waiting' => 'No directory password',
     'missing' => 'Missing from LDAP',
     'unavailable' => 'LDAP unavailable',
 ];
@@ -29,12 +29,31 @@ $statusLabel = [
 <div class="container-fluid px-3 px-lg-4 py-3">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
         <div>
-            <h4 class="mb-1 fw-bold">EDUROAM LDAP sync</h4>
-            <p class="text-muted small mb-0">Active SIS logins in <code>ou=People</code>. The Wi-Fi username is the SIS username, including slashes. Sync adds missing accounts and does not change a password already stored in LDAP.</p>
+            <h4 class="mb-1 fw-bold">Central LDAP identity</h4>
+            <p class="text-muted small mb-0">When someone changes a password in SIS, that password is written to LDAP. Moodle and RADIUS authentication then use the directory. RADIUS accounting does not keep a separate password.</p>
         </div>
-        <form method="post" action="<?php echo APP_URL; ?>/admin/ldap-sync?<?php echo $e($q(['page' => $pageNo])); ?>">
-            <button type="submit" class="btn btn-primary btn-sm" name="sync" value="1">Sync now</button>
-        </form>
+        <div class="d-flex flex-wrap gap-2">
+            <form method="post" action="<?php echo APP_URL; ?>/admin/ldap-sync?<?php echo $e($q(['page' => $pageNo])); ?>">
+                <input type="hidden" name="action" value="missing">
+                <button type="submit" class="btn btn-primary btn-sm">Sync missing accounts</button>
+            </form>
+            <form method="post" action="<?php echo APP_URL; ?>/admin/ldap-sync?<?php echo $e($q(['page' => $pageNo])); ?>">
+                <input type="hidden" name="action" value="retry">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Retry queue</button>
+            </form>
+            <form method="post" action="<?php echo APP_URL; ?>/admin/ldap-sync?<?php echo $e($q(['page' => $pageNo])); ?>">
+                <input type="hidden" name="action" value="dry-run">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Dry-run report</button>
+            </form>
+            <form method="post" action="<?php echo APP_URL; ?>/admin/ldap-sync?<?php echo $e($q(['page' => $pageNo])); ?>">
+                <input type="hidden" name="action" value="states">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Sync account status</button>
+            </form>
+            <form method="post" action="<?php echo APP_URL; ?>/admin/ldap-sync?<?php echo $e($q(['page' => $pageNo])); ?>">
+                <input type="hidden" name="action" value="attributes">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Sync names</button>
+            </form>
+        </div>
     </div>
 
     <?php if (!empty($message)): ?>
@@ -43,16 +62,86 @@ $statusLabel = [
     <?php if (!empty($error)): ?>
         <div class="alert alert-danger py-2"><?php echo $e($error); ?></div>
     <?php endif; ?>
-    <?php if (!empty($ldapError)): ?>
+    <?php
+    $ldapConfig = is_array($ldapConfig ?? null) ? $ldapConfig : [];
+    $bindReady = !empty($ldapConfig['bind_ready']);
+    ?>
+    <?php if (!$bindReady): ?>
+        <div class="alert alert-warning py-2">
+            LDAP is not configured on this server yet. Add <code>LDAP_HOST</code>, <code>LDAP_BIND_DN</code> and <code>LDAP_BIND_PASSWORD</code> to <code>.env</code>.
+            Current target: <code><?php echo $e(($ldapConfig['host'] ?? '127.0.0.1') . ':' . (string) ($ldapConfig['port'] ?? 389)); ?></code>.
+            SIS accounts on this page were not changed.
+        </div>
+    <?php elseif (!empty($ldapError)): ?>
         <div class="alert alert-warning py-2">LDAP could not be read. <?php echo $e($ldapError); ?> SIS password changes still succeed and the LDAP error is written to the log.</div>
     <?php endif; ?>
 
-    <div class="row g-2 mb-3">
-        <div class="col-6 col-md-3"><div class="border rounded p-2"><div class="small text-muted">Active SIS</div><strong><?php echo (int) $counts['total']; ?></strong></div></div>
-        <div class="col-6 col-md-3"><div class="border rounded p-2"><div class="small text-muted">Password matches</div><strong><?php echo (int) $counts['match']; ?></strong></div></div>
-        <div class="col-6 col-md-3"><div class="border rounded p-2"><div class="small text-muted">Waiting for password change</div><strong><?php echo (int) $counts['waiting']; ?></strong></div></div>
-        <div class="col-6 col-md-3"><div class="border rounded p-2"><div class="small text-muted">Missing</div><strong><?php echo (int) $counts['missing']; ?></strong></div></div>
+    <?php $connectionTests = is_array($connectionTests ?? null) ? $connectionTests : []; ?>
+    <?php if ($connectionTests !== []): ?>
+        <div class="border rounded mb-3">
+            <div class="px-3 py-2 small fw-semibold border-bottom">Server connections</div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Service</th>
+                            <th>Target</th>
+                            <th>Result</th>
+                            <th>Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($connectionTests as $test): ?>
+                            <tr>
+                                <td><?php echo $e($test['name'] ?? ''); ?></td>
+                                <td><code><?php echo $e($test['target'] ?? ''); ?></code></td>
+                                <td><?php echo !empty($test['ok']) ? 'Connected' : 'Not connected'; ?></td>
+                                <td><?php echo $e($test['detail'] ?? ''); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <?php
+    $activeSis = (int) ($counts['total'] ?? 0);
+    $withPassword = (int) ($counts['match'] ?? 0);
+    $noPassword = (int) ($counts['waiting'] ?? 0);
+    $missingLdap = (int) ($counts['missing'] ?? 0);
+    $inLdap = max(0, $activeSis - $missingLdap);
+    ?>
+    <div class="row g-2 mb-2">
+        <div class="col-6 col-md-3"><div class="border rounded p-2"><div class="small text-muted">Active SIS</div><strong><?php echo $activeSis; ?></strong></div></div>
+        <div class="col-6 col-md-3"><div class="border rounded p-2"><div class="small text-muted">Same accounts in LDAP</div><strong><?php echo $inLdap; ?></strong></div></div>
+        <div class="col-6 col-md-3"><div class="border rounded p-2"><div class="small text-muted">Directory password set</div><strong><?php echo $withPassword; ?></strong></div></div>
+        <div class="col-6 col-md-3"><div class="border rounded p-2"><div class="small text-muted">No directory password</div><strong><?php echo $noPassword; ?></strong></div></div>
     </div>
+    <p class="small text-muted mb-3"><?php echo $withPassword; ?> + <?php echo $noPassword; ?> = <?php echo $activeSis; ?> active SIS accounts. <?php echo $missingLdap; ?> are missing from LDAP. SIS records were not changed. A password already stored only as a SIS hash cannot be copied into LDAP.</p>
+    <?php $queue = is_array($queue ?? null) ? $queue : ['pending' => 0, 'failed' => 0, 'done' => 0, 'recent' => []]; ?>
+    <div class="row g-2 mb-3">
+        <div class="col-4"><div class="border rounded p-2"><div class="small text-muted">Retry queue</div><strong><?php echo (int) ($queue['pending'] ?? 0); ?></strong></div></div>
+        <div class="col-4"><div class="border rounded p-2"><div class="small text-muted">Failed retries</div><strong><?php echo (int) ($queue['failed'] ?? 0); ?></strong></div></div>
+        <div class="col-4"><div class="border rounded p-2"><div class="small text-muted">Completed queue</div><strong><?php echo (int) ($queue['done'] ?? 0); ?></strong></div></div>
+    </div>
+    <?php if (!empty($queue['recent'])): ?>
+        <div class="border rounded mb-3">
+            <div class="px-2 py-1 small fw-semibold border-bottom">Recent sync log</div>
+            <ul class="list-unstyled mb-0 small">
+                <?php foreach ($queue['recent'] as $log): ?>
+                    <li class="px-2 py-1 border-bottom">
+                        <code><?php echo $e($log['username'] ?? ''); ?></code>
+                        <?php echo $e($log['action'] ?? ''); ?>
+                        · <?php echo $e($log['result'] ?? ''); ?>
+                        <?php if (($log['message'] ?? '') !== ''): ?>
+                            · <?php echo $e($log['message']); ?>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    <?php endif; ?>
 
     <form method="get" action="<?php echo APP_URL; ?>/admin/ldap-sync" class="row g-2 align-items-end mb-3">
         <div class="col-md-3">
@@ -80,8 +169,8 @@ $statusLabel = [
             <label class="form-label small fw-semibold" for="status">Sync status</label>
             <select class="form-select form-select-sm" id="status" name="status">
                 <option value="">All</option>
-                <option value="match" <?php echo ($filters['status'] ?? '') === 'match' ? 'selected' : ''; ?>>Password matches</option>
-                <option value="waiting" <?php echo ($filters['status'] ?? '') === 'waiting' ? 'selected' : ''; ?>>Waiting</option>
+                <option value="match" <?php echo ($filters['status'] ?? '') === 'match' ? 'selected' : ''; ?>>Directory password set</option>
+                <option value="waiting" <?php echo ($filters['status'] ?? '') === 'waiting' ? 'selected' : ''; ?>>No directory password</option>
                 <option value="missing" <?php echo ($filters['status'] ?? '') === 'missing' ? 'selected' : ''; ?>>Missing</option>
             </select>
         </div>

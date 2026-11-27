@@ -46,3 +46,16 @@ if (!defined('LDAP_PEOPLE_DN')) {
 if (!defined('LDAP_TLS_CA')) {
     define('LDAP_TLS_CA', slgti_ldap_env('LDAP_TLS_CA', ''));
 }
+if (!defined('LDAP_BASE_DN')) {
+    define('LDAP_BASE_DN', slgti_ldap_env('LDAP_BASE_DN', 'dc=slgti,dc=ac,dc=lk'));
+}
+if (!defined('LDAP_SIS_AUTH')) {
+    // local keeps the existing SIS password check.
+    // ldap_or_local also accepts a successful LDAP bind.
+    // ldap_primary rejects a password LDAP has already refused, and falls back to SIS only when LDAP is down or the user is not in the directory.
+    $mode = strtolower(slgti_ldap_env('LDAP_SIS_AUTH', 'local'));
+    if (!in_array($mode, ['local', 'ldap_or_local', 'ldap_primary'], true)) {
+        $mode = 'local';
+    }
+    define('LDAP_SIS_AUTH', $mode);
+}

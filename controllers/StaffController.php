@@ -865,12 +865,23 @@ class StaffController extends Controller {
                 return false;
             }
             if ($newStaffId !== $id) {
+                $previousStaffId = (string) $id;
                 if (!$staffModel->renameStaffId($id, $newStaffId)) {
                     $_SESSION['error'] = $staffModel->getLastError() ?: 'Failed to change Staff ID.';
                     return false;
                 }
                 if (isset($_SESSION['user_name']) && (string) $_SESSION['user_name'] === (string) $id) {
                     $_SESSION['user_name'] = $newStaffId;
+                }
+                try {
+                    require_once BASE_PATH . '/helpers/SisLdapSync.php';
+                    SisLdapSync::note(
+                        $previousStaffId,
+                        'rename-review',
+                        'Staff ID changed. The previous LDAP entry was kept and was not deleted.'
+                    );
+                } catch (Throwable $e) {
+                    error_log('Staff LDAP rename note failed: ' . $e->getMessage());
                 }
                 $id = $newStaffId;
             }
@@ -958,6 +969,19 @@ class StaffController extends Controller {
             return false;
         }
         $this->logActivity('UPDATE', 'staff-file', $id, 'Staff personal file updated (' . $section . ')', $oldValues, $data);
+        if ($section === 'personal' || $section === 'employment') {
+            try {
+                require_once BASE_PATH . '/helpers/SisLdap.php';
+                SisLdap::syncProfileAttributes((string) $id);
+                if ($section === 'employment') {
+                    $status = strtolower(trim((string) ($data['staff_status'] ?? '')));
+                    $working = in_array($status, ['working', 'active'], true);
+                    SisLdap::syncActiveState((string) $id, $working);
+                }
+            } catch (Throwable $e) {
+                error_log('Staff LDAP sync failed: ' . $e->getMessage());
+            }
+        }
         $_SESSION['message'] = 'Personal file updated.';
         return $id;
     }

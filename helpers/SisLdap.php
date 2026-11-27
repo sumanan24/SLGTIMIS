@@ -9,6 +9,8 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__ . '/SisLdapSync.php';
+
 class SisLdap
 {
     public const PAGE_SIZE = 40;
@@ -46,8 +48,10 @@ class SisLdap
                 ];
             }
             self::client()->upsert($profile, $plain, true);
+            SisLdapSync::recordSuccess($username, 'password');
+            self::linkMoodleAccount($username);
         } catch (Throwable $e) {
-            error_log('SisLdap password sync failed for ' . $username . ': ' . $e->getMessage());
+            self::fail($username, 'password', $e, $plain);
         }
     }
 
@@ -57,14 +61,18 @@ class SisLdap
         if ($userId <= 0 || $plain === '') {
             return;
         }
+        $profile = null;
         try {
             $profile = self::profileByUserId($userId);
             if ($profile === null) {
                 return;
             }
             self::client()->upsert($profile, $plain, true);
+            SisLdapSync::recordSuccess((string) $profile['username'], 'password');
+            self::linkMoodleAccount((string) $profile['username']);
         } catch (Throwable $e) {
-            error_log('SisLdap password sync failed for user ' . $userId . ': ' . $e->getMessage());
+            $name = $profile['username'] ?? (string) $userId;
+            self::fail($name, 'password', $e, $plain);
         }
     }
 
@@ -84,8 +92,73 @@ class SisLdap
                 return;
             }
             self::client()->upsert($profile, $plain, false);
+            SisLdapSync::recordSuccess($username, 'provision');
         } catch (Throwable $e) {
-            error_log('SisLdap add-if-missing failed for ' . $username . ': ' . $e->getMessage());
+            self::fail($username, 'provision', $e, $plain);
+        }
+    }
+
+    /**
+     * Lock or unlock the LDAP entry. The entry is not deleted and the password is not changed.
+     */
+    public static function syncActiveState(string $username, bool $active): void
+    {
+        $username = trim($username);
+        if ($username === '') {
+            return;
+        }
+        try {
+            self::client()->setAccountState($username, $active);
+            SisLdapSync::recordSuccess($username, $active ? 'enable' : 'disable');
+        } catch (Throwable $e) {
+            self::fail($username, $active ? 'enable' : 'disable', $e, null);
+        }
+    }
+
+    /**
+     * Copy name, department and type onto an existing LDAP entry. Password is not changed.
+     */
+    public static function syncProfileAttributes(string $username): void
+    {
+        $username = trim($username);
+        if ($username === '') {
+            return;
+        }
+        try {
+            $profile = self::profileByUsername($username);
+            if ($profile === null) {
+                return;
+            }
+            self::client()->syncIdentity($profile);
+            SisLdapSync::recordSuccess($username, 'attributes');
+        } catch (Throwable $e) {
+            self::fail($username, 'attributes', $e, null);
+        }
+    }
+
+    /**
+     * LDAP simple bind for SIS login.
+     * null means LDAP is unavailable or this user is not in the directory, so SIS keeps its local check.
+     */
+    public static function verifyBind(string $username, string $password): ?bool
+    {
+        $username = trim($username);
+        if ($username === '' || $password === '') {
+            return null;
+        }
+        try {
+            require_once BASE_PATH . '/config/ldap.php';
+            if (!LDAP_SYNC_ENABLED) {
+                return null;
+            }
+            $mode = defined('LDAP_SIS_AUTH') ? LDAP_SIS_AUTH : 'local';
+            if ($mode === 'local') {
+                return null;
+            }
+            return self::client()->passwordAccepted($username, $password);
+        } catch (Throwable $e) {
+            error_log('SisLdap login check skipped for ' . $username . ': ' . $e->getMessage());
+            return null;
         }
     }
 
@@ -116,6 +189,9 @@ class SisLdap
                 } catch (Throwable $e) {
                     $errors++;
                     error_log('SisLdap missing-account add failed for ' . $profile['username'] . ': ' . $e->getMessage());
+                    if (!SisLdapSync::isApplying()) {
+                        SisLdapSync::recordFailure($profile['username'], 'provision', $e->getMessage(), null);
+                    }
                 }
             }
             return [
@@ -199,6 +275,7 @@ class SisLdap
             'counts' => $counts,
             'departments' => $departments,
             'ldap_error' => $ldapError,
+            'ldap_config' => self::configStatus(),
             'enabled' => defined('LDAP_SYNC_ENABLED') ? LDAP_SYNC_ENABLED : true,
         ];
     }
@@ -337,10 +414,276 @@ class SisLdap
         return strtolower(trim($username));
     }
 
+    /**
+     * Point an existing Moodle account at LDAP after the directory password is saved.
+     * RADIUS authentication reads this same directory. Accounting does not keep a password.
+     */
+    private static function linkMoodleAccount(string $username): void
+    {
+        $username = trim($username);
+        $key = BASE_PATH . '/storage/lms-sync-key';
+        if ($username === '' || !is_file($key) || preg_match('/[\r\n\0]/', $username)) {
+            return;
+        }
+        $ssh = 'C:\\Windows\\System32\\OpenSSH\\ssh.exe';
+        if (!is_file($ssh)) {
+            $ssh = 'ssh';
+        }
+        $known = BASE_PATH . '/storage/lms-known-hosts';
+        $remote = 'sudo -n /usr/bin/php /usr/local/sbin/slgti-moodle-use-ldap.php ' . escapeshellarg($username);
+        $cmd = escapeshellarg($ssh)
+            . ' -i ' . escapeshellarg($key)
+            . ' -o BatchMode=yes -o StrictHostKeyChecking=accept-new'
+            . ' -o UserKnownHostsFile=' . escapeshellarg($known)
+            . ' ictadmin@172.16.1.230 ' . escapeshellarg($remote);
+        $output = [];
+        $code = 0;
+        exec($cmd . ' 2>&1', $output, $code);
+        $text = trim(implode(' ', $output));
+        if (strlen($text) > 400) {
+            $text = substr($text, 0, 400);
+        }
+        $linked = $code === 0 && (
+            str_contains($text, 'moodle-ldap')
+            || str_contains($text, 'moodle-already-ldap')
+            || str_contains($text, 'moodle-user-missing')
+            || str_contains($text, 'moodle-auth-kept')
+            || str_contains($text, 'moodle-duplicate')
+        );
+        if ($linked) {
+            SisLdapSync::recordSuccess($username, 'moodle', $text);
+            return;
+        }
+        SisLdapSync::note($username, 'moodle', $text !== '' ? $text : 'Moodle could not be updated');
+    }
+
+    /**
+     * Connection checks for the admin page. No passwords are read or returned.
+     *
+     * @return list<array{name:string,target:string,ok:bool,detail:string}>
+     */
+    public static function connectionTests(): array
+    {
+        require_once BASE_PATH . '/config/ldap.php';
+        $tests = [];
+
+        try {
+            $db = Database::getInstance();
+            $result = $db->query('SELECT 1 AS ok');
+            $tests[] = [
+                'name' => 'SIS database',
+                'target' => DB_HOST . ' / ' . DB_NAME,
+                'ok' => $result !== false,
+                'detail' => $result !== false ? 'Connected' : 'Query failed',
+            ];
+        } catch (Throwable $e) {
+            $tests[] = [
+                'name' => 'SIS database',
+                'target' => DB_HOST . ' / ' . DB_NAME,
+                'ok' => false,
+                'detail' => 'Database connection failed',
+            ];
+        }
+
+        $ldapTarget = LDAP_HOST . ':' . (int) LDAP_PORT;
+        try {
+            $client = self::client();
+            $found = $client->sampleAccount();
+            $tests[] = [
+                'name' => 'LDAP directory',
+                'target' => $ldapTarget . ' / ' . LDAP_PEOPLE_DN,
+                'ok' => true,
+                'detail' => $found
+                    ? 'Bind and search succeeded. Existing Wi-Fi and LMS passwords stay in LDAP and cannot be displayed.'
+                    : 'Bind succeeded. No people entries were returned.',
+            ];
+        } catch (Throwable $e) {
+            $tests[] = [
+                'name' => 'LDAP directory',
+                'target' => $ldapTarget,
+                'ok' => false,
+                'detail' => $e->getMessage(),
+            ];
+        }
+
+        $tests[] = self::httpTest(
+            'Moodle LMS',
+            'https://lms.slgti.ac.lk/login/index.php'
+        );
+        $tests[] = self::tcpTest('LMS server', '172.16.1.230', 443);
+        $tests[] = self::udpTest('RADIUS auth', '172.16.1.246', 1812);
+        $tests[] = self::udpTest('RADIUS accounting', '172.16.1.246', 1813);
+
+        return $tests;
+    }
+
+    /** @return array{name:string,target:string,ok:bool,detail:string} */
+    private static function tcpTest(string $name, string $host, int $port): array
+    {
+        $errno = 0;
+        $err = '';
+        $socket = @fsockopen($host, $port, $errno, $err, 3.0);
+        $ok = is_resource($socket);
+        if ($ok) {
+            fclose($socket);
+        }
+        $detail = $ok ? 'Port is accepting connections' : 'No TCP listener on this port';
+        if (!$ok && ($port === 1812 || $port === 1813)) {
+            $detail .= '. FreeRADIUS usually listens on UDP, so a closed TCP port does not by itself mean Wi-Fi is down.';
+        }
+        return [
+            'name' => $name,
+            'target' => $host . ':' . $port,
+            'ok' => $ok,
+            'detail' => $detail,
+        ];
+    }
+
+    /** @return array{name:string,target:string,ok:bool,detail:string} */
+    private static function httpTest(string $name, string $url): array
+    {
+        if (!function_exists('curl_init')) {
+            return [
+                'name' => $name,
+                'target' => $url,
+                'ok' => false,
+                'detail' => 'HTTP client is not available',
+            ];
+        }
+        $probe = self::httpStatus($url, true);
+        if ($probe['ok']) {
+            return [
+                'name' => $name,
+                'target' => $url,
+                'ok' => true,
+                'detail' => 'HTTP ' . $probe['code'],
+            ];
+        }
+        if ($probe['ssl']) {
+            $again = self::httpStatus($url, false);
+            if ($again['ok']) {
+                return [
+                    'name' => $name,
+                    'target' => $url,
+                    'ok' => true,
+                    'detail' => 'Login page returned HTTP ' . $again['code'] . '. This PC does not trust the LMS certificate.',
+                ];
+            }
+        }
+        return [
+            'name' => $name,
+            'target' => $url,
+            'ok' => false,
+            'detail' => $probe['error'] !== '' ? $probe['error'] : 'HTTP ' . $probe['code'],
+        ];
+    }
+
+    /** @return array{ok:bool,code:int,error:string,ssl:bool} */
+    private static function httpStatus(string $url, bool $verify): array
+    {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_NOBODY => true,
+            CURLOPT_TIMEOUT => 8,
+            CURLOPT_CONNECTTIMEOUT => 4,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 3,
+            CURLOPT_SSL_VERIFYPEER => $verify,
+            CURLOPT_SSL_VERIFYHOST => $verify ? 2 : 0,
+            CURLOPT_RETURNTRANSFER => true,
+        ]);
+        curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = (string) curl_error($ch);
+        curl_close($ch);
+        return [
+            'ok' => $code >= 200 && $code < 400,
+            'code' => $code,
+            'error' => $error,
+            'ssl' => stripos($error, 'SSL') !== false || stripos($error, 'certificate') !== false,
+        ];
+    }
+
+    /** @return array{name:string,target:string,ok:bool,detail:string} */
+    private static function udpTest(string $name, string $host, int $port): array
+    {
+        $target = $host . ':' . $port . ' UDP';
+        if (!function_exists('socket_create')) {
+            return [
+                'name' => $name,
+                'target' => $target,
+                'ok' => false,
+                'detail' => 'UDP client is not available',
+            ];
+        }
+        $socket = @socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+        if ($socket === false) {
+            return [
+                'name' => $name,
+                'target' => $target,
+                'ok' => false,
+                'detail' => 'UDP socket could not be opened',
+            ];
+        }
+        socket_set_option($socket, SOL_SOCKET, SO_RCVTIMEO, ['sec' => 2, 'usec' => 0]);
+        $sent = @socket_sendto($socket, "\x00", 1, 0, $host, $port);
+        $buffer = '';
+        $from = '';
+        $fromPort = 0;
+        $received = @socket_recvfrom($socket, $buffer, 64, 0, $from, $fromPort);
+        $error = socket_last_error($socket);
+        socket_close($socket);
+        if ($sent === false) {
+            return [
+                'name' => $name,
+                'target' => $target,
+                'ok' => false,
+                'detail' => 'UDP packet could not be sent',
+            ];
+        }
+        if ($received === false && in_array($error, [10054, 111, 10061], true)) {
+            return [
+                'name' => $name,
+                'target' => $target,
+                'ok' => false,
+                'detail' => 'The server refused the UDP port',
+            ];
+        }
+        return [
+            'name' => $name,
+            'target' => $target,
+            'ok' => true,
+            'detail' => $received !== false
+                ? 'The RADIUS port answered'
+                : 'The port did not refuse the packet. Wi-Fi auth still uses the password stored in LDAP.',
+        ];
+    }
+
+    /** @return array{host:string,port:int,bind_ready:bool,env_file:bool} */
+    public static function configStatus(): array
+    {
+        require_once BASE_PATH . '/config/ldap.php';
+        return [
+            'host' => (string) LDAP_HOST,
+            'port' => (int) LDAP_PORT,
+            'bind_ready' => LDAP_BIND_DN !== '' && LDAP_BIND_PASSWORD !== '',
+            'env_file' => is_file(BASE_PATH . '/.env'),
+        ];
+    }
+
     private static function client(): SisLdapClient
     {
         require_once BASE_PATH . '/config/ldap.php';
         return new SisLdapClient();
+    }
+
+    private static function fail(string $username, string $action, Throwable $e, ?string $secret): void
+    {
+        error_log('SisLdap ' . $action . ' failed for ' . $username . ': ' . $e->getMessage());
+        if (SisLdapSync::isApplying()) {
+            throw $e;
+        }
+        SisLdapSync::recordFailure($username, $action, $e->getMessage(), $secret);
     }
 }
 
@@ -364,7 +707,14 @@ class SisLdapClient
         if (LDAP_BIND_DN === '' || LDAP_BIND_PASSWORD === '') {
             throw new RuntimeException('LDAP bind account is not configured.');
         }
+        $this->link = $this->open(LDAP_BIND_DN, LDAP_BIND_PASSWORD);
+    }
 
+    /**
+     * @return resource|\LDAP\Connection
+     */
+    private function open(string $dn, string $password)
+    {
         $uri = 'ldap://' . LDAP_HOST . ':' . (int) LDAP_PORT;
         if (defined('LDAP_OPT_X_TLS_REQUIRE_CERT')) {
             $requireCert = LDAP_OPT_X_TLS_DEMAND;
@@ -392,11 +742,11 @@ class SisLdapClient
             $detail = function_exists('ldap_error') ? ldap_error($link) : 'StartTLS failed';
             throw new RuntimeException('LDAP StartTLS failed for ' . LDAP_HOST . ': ' . $detail);
         }
-        if (!@ldap_bind($link, LDAP_BIND_DN, LDAP_BIND_PASSWORD)) {
+        if (!@ldap_bind($link, $dn, $password)) {
             $detail = function_exists('ldap_error') ? ldap_error($link) : 'bind failed';
             throw new RuntimeException('LDAP bind failed: ' . $detail);
         }
-        $this->link = $link;
+        return $link;
     }
 
     /**
@@ -421,6 +771,7 @@ class SisLdapClient
                 'cn' => $name,
                 'sn' => $sn,
                 'employeeType' => $profile['type'] === 'student' ? 'student' : 'staff',
+                'businessCategory' => 'active',
             ];
             if (trim($profile['department']) !== '') {
                 $entry['ou'] = trim($profile['department']);
@@ -439,6 +790,117 @@ class SisLdapClient
                 throw new RuntimeException('LDAP password update failed: ' . ldap_error($this->link));
             }
         }
+    }
+
+    /**
+     * Mark an existing entry active or disabled. Does not delete the entry or the password.
+     */
+    public function setAccountState(string $username, bool $active): void
+    {
+        $username = trim($username);
+        if ($username === '' || !$this->entryExists($username)) {
+            return;
+        }
+        $dn = 'uid=' . self::escapeDn($username) . ',' . LDAP_PEOPLE_DN;
+        $desired = $active ? 'active' : 'disabled';
+        if (!$this->replaceAttribute($dn, 'businessCategory', $desired)) {
+            throw new RuntimeException('LDAP account state update failed: ' . ldap_error($this->link));
+        }
+        if ($active) {
+            $this->clearPolicyLock($dn);
+            return;
+        }
+        $locked = @ldap_mod_add($this->link, $dn, ['pwdAccountLockedTime' => '000001010000Z']);
+        if (!$locked) {
+            $detail = ldap_error($this->link);
+            $already = is_string($detail) && (
+                stripos($detail, 'Already exists') !== false
+                || stripos($detail, 'Type or value exists') !== false
+            );
+            if (!$already) {
+                error_log('SisLdap policy lock was not applied for ' . $username . ': ' . $detail);
+            }
+        }
+    }
+
+    /**
+     * @param array{username:string,name:string,department:string,type:string} $profile
+     */
+    public function syncIdentity(array $profile): bool
+    {
+        $username = trim($profile['username']);
+        if ($username === '' || !$this->entryExists($username)) {
+            return false;
+        }
+        $name = trim($profile['name']) !== '' ? trim($profile['name']) : $username;
+        $dn = 'uid=' . self::escapeDn($username) . ',' . LDAP_PEOPLE_DN;
+        $entry = [
+            'cn' => $name,
+            'sn' => self::surname($name),
+            'employeeType' => $profile['type'] === 'student' ? 'student' : 'staff',
+        ];
+        if (trim($profile['department']) !== '') {
+            $entry['ou'] = trim($profile['department']);
+        }
+        if (!@ldap_mod_replace($this->link, $dn, $entry)) {
+            throw new RuntimeException('LDAP profile update failed: ' . ldap_error($this->link));
+        }
+        return true;
+    }
+
+    public function passwordAccepted(string $username, string $plain): ?bool
+    {
+        $username = trim($username);
+        if ($username === '' || $plain === '' || !$this->entryExists($username)) {
+            return null;
+        }
+        if ($this->accountMarker($username) === 'disabled') {
+            return false;
+        }
+        $dn = 'uid=' . self::escapeDn($username) . ',' . LDAP_PEOPLE_DN;
+        try {
+            $link = $this->open($dn, $plain);
+        } catch (RuntimeException $e) {
+            if (str_contains($e->getMessage(), 'LDAP bind failed')) {
+                return false;
+            }
+            throw $e;
+        }
+        @ldap_unbind($link);
+        return true;
+    }
+
+    private function replaceAttribute(string $dn, string $attribute, string $value): bool
+    {
+        if (@ldap_mod_replace($this->link, $dn, [$attribute => $value])) {
+            return true;
+        }
+        return @ldap_mod_add($this->link, $dn, [$attribute => $value]);
+    }
+
+    private function clearPolicyLock(string $dn): void
+    {
+        $search = @ldap_read($this->link, $dn, '(objectClass=*)', ['pwdAccountLockedTime']);
+        if ($search === false) {
+            return;
+        }
+        $entries = ldap_get_entries($this->link, $search);
+        $value = (string) ($entries[0]['pwdaccountlockedtime'][0] ?? '');
+        if ($value === '') {
+            return;
+        }
+        @ldap_mod_del($this->link, $dn, ['pwdAccountLockedTime' => $value]);
+    }
+
+    private function accountMarker(string $username): string
+    {
+        $filter = '(uid=' . self::escapeFilter($username) . ')';
+        $search = @ldap_search($this->link, LDAP_PEOPLE_DN, $filter, ['businessCategory'], 0, 1);
+        if ($search === false) {
+            return 'unknown';
+        }
+        $entries = ldap_get_entries($this->link, $search);
+        return strtolower((string) ($entries[0]['businesscategory'][0] ?? 'unknown'));
     }
 
     /**
@@ -466,7 +928,7 @@ class SisLdapClient
                 $this->link,
                 LDAP_PEOPLE_DN,
                 '(uid=*)',
-                ['uid', 'userPassword'],
+                ['uid', 'userPassword', 'businessCategory'],
                 0,
                 0,
                 0,
@@ -484,7 +946,9 @@ class SisLdapClient
                     continue;
                 }
                 $hasPassword = !empty($entries[$i]['userpassword'][0]);
-                $index[SisLdap::uidKey($uid)] = ['has_password' => $hasPassword];
+                $marker = strtolower((string) ($entries[$i]['businesscategory'][0] ?? ''));
+                $account = $marker === 'disabled' ? 'disabled' : ($marker === 'active' ? 'active' : 'unknown');
+                $index[SisLdap::uidKey($uid)] = ['has_password' => $hasPassword, 'account' => $account];
             }
             $cookie = '';
             if (defined('LDAP_CONTROL_PAGEDRESULTS') && function_exists('ldap_parse_result')) {
@@ -509,6 +973,16 @@ class SisLdapClient
         $search = @ldap_search($this->link, LDAP_PEOPLE_DN, $filter, ['uid'], 0, 1);
         if ($search === false) {
             return false;
+        }
+        $entries = ldap_get_entries($this->link, $search);
+        return (int) ($entries['count'] ?? 0) > 0;
+    }
+
+    public function sampleAccount(): bool
+    {
+        $search = @ldap_search($this->link, LDAP_PEOPLE_DN, '(uid=*)', ['uid'], 0, 1);
+        if ($search === false) {
+            throw new RuntimeException('LDAP search failed: ' . ldap_error($this->link));
         }
         $entries = ldap_get_entries($this->link, $search);
         return (int) ($entries['count'] ?? 0) > 0;

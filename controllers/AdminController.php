@@ -590,11 +590,38 @@ class AdminController extends Controller {
         unset($_SESSION['message'], $_SESSION['error']);
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $result = SisLdap::addMissingAccounts();
-            if (($result['errors'] ?? 0) > 0 && ($result['added'] ?? 0) === 0 && ($result['present'] ?? 0) === 0) {
-                $_SESSION['error'] = (string) ($result['message'] ?? 'LDAP sync failed.');
+            $action = (string) $this->post('action', 'missing');
+            if ($action === 'retry') {
+                $result = SisLdapSync::processQueue();
+                $_SESSION['message'] = $result['done'] . ' queued LDAP change(s) completed. ' . $result['failed'] . ' still waiting.';
+            } elseif ($action === 'dry-run') {
+                $report = SisLdapSync::dryRun();
+                $_SESSION['message'] = 'Dry-run only. SIS accounts: ' . (int) $report['sis_accounts']
+                    . '. Matched: ' . ($report['matched'] === null ? 'LDAP unavailable' : (string) $report['matched'])
+                    . '. Missing from LDAP: ' . ($report['missing_ldap'] === null ? 'LDAP unavailable' : (string) $report['missing_ldap'])
+                    . '. Duplicate usernames: ' . count($report['duplicate_usernames'])
+                    . '. No LDAP passwords or entries were changed.';
+            } elseif ($action === 'attributes') {
+                $result = SisLdapSync::syncAttributes();
+                if (($result['errors'] ?? 0) > 0 && ($result['updated'] ?? 0) === 0) {
+                    $_SESSION['error'] = (string) $result['message'];
+                } else {
+                    $_SESSION['message'] = (string) $result['message'];
+                }
+            } elseif ($action === 'states') {
+                $result = SisLdapSync::reconcileStates();
+                if (($result['errors'] ?? 0) > 0 && ($result['changed'] ?? 0) === 0) {
+                    $_SESSION['error'] = (string) $result['message'];
+                } else {
+                    $_SESSION['message'] = (string) $result['message'];
+                }
             } else {
-                $_SESSION['message'] = (string) ($result['message'] ?? 'Sync finished.');
+                $result = SisLdap::addMissingAccounts();
+                if (($result['errors'] ?? 0) > 0 && ($result['added'] ?? 0) === 0 && ($result['present'] ?? 0) === 0) {
+                    $_SESSION['error'] = (string) ($result['message'] ?? 'LDAP sync failed.');
+                } else {
+                    $_SESSION['message'] = (string) ($result['message'] ?? 'Sync finished.');
+                }
             }
             $keep = array_filter([
                 'q' => (string) $this->get('q', ''),
@@ -629,6 +656,9 @@ class AdminController extends Controller {
             'pages' => $monitor['pages'],
             'filtered' => $monitor['filtered'],
             'ldapError' => $monitor['ldap_error'],
+            'ldapConfig' => $monitor['ldap_config'] ?? SisLdap::configStatus(),
+            'queue' => SisLdapSync::dashboard(),
+            'connectionTests' => SisLdap::connectionTests(),
             'message' => $message,
             'error' => $error,
         ]);

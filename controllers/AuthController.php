@@ -111,6 +111,21 @@ class AuthController extends Controller {
                     // Try PHP password_verify (for newer password_hash format if any)
                     $passwordVerified = password_verify($password, $user['user_password_hash']);
                 }
+
+                // LDAP is optional. The default mode keeps this local check unchanged.
+                $ldapDecision = null;
+                try {
+                    require_once BASE_PATH . '/helpers/SisLdap.php';
+                    $ldapDecision = SisLdap::verifyBind($username, $password);
+                } catch (Throwable $e) {
+                    $ldapDecision = null;
+                }
+                $ldapMode = defined('LDAP_SIS_AUTH') ? LDAP_SIS_AUTH : 'local';
+                if ($ldapMode === 'ldap_primary' && $ldapDecision === false) {
+                    $passwordVerified = false;
+                } elseif (!$passwordVerified && $ldapDecision === true) {
+                    $passwordVerified = true;
+                }
                 
                 if ($passwordVerified) {
                     // Set session variables

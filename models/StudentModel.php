@@ -1029,6 +1029,32 @@ class StudentModel extends Model {
         $stmt->bind_param("iss", $userActive, $studentId, $nic);
         $result = $stmt->execute();
         $stmt->close();
+        if ($result) {
+            try {
+                require_once BASE_PATH . '/helpers/SisLdap.php';
+                $names = [];
+                $lookup = $this->db->prepare("SELECT `user_name` FROM `user` WHERE `user_table` = 'student' AND (`user_name` = ? OR `user_name` = ?)");
+                if ($lookup) {
+                    $lookup->bind_param('ss', $studentId, $nic);
+                    $lookup->execute();
+                    $found = $lookup->get_result();
+                    if ($found) {
+                        while ($nameRow = $found->fetch_assoc()) {
+                            $name = trim((string) ($nameRow['user_name'] ?? ''));
+                            if ($name !== '') {
+                                $names[$name] = true;
+                            }
+                        }
+                    }
+                    $lookup->close();
+                }
+                foreach (array_keys($names) as $name) {
+                    SisLdap::syncActiveState($name, $userActive === 1);
+                }
+            } catch (Throwable $e) {
+                error_log('Student LDAP status sync failed: ' . $e->getMessage());
+            }
+        }
         return $result;
     }
 

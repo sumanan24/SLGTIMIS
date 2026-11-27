@@ -1,5 +1,9 @@
-# Local logs
-error.log
+storage/backups/
+storage/ldap-reports/
+storage/ldap-queue.key
+storage/lms-sync-key
+storage/lms-sync-key.pub
+storage/lms-known-hosts
 
 # Secrets (machine credentials, local overrides)
 .env

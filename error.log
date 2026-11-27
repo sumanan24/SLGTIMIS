@@ -1,0 +1,142 @@
+[27-Nov-2026 08:37:51 UTC] Database::connect - Exception: Unknown database 'sisslgti'
+[27-Nov-2026 08:37:51 UTC] Error initializing security tables: Database Error: Unknown database 'sisslgti'
+[27-Nov-2026 08:37:51 UTC] Database::connect - Exception: Unknown database 'sisslgti'
+[27-Nov-2026 08:37:51 UTC] DepartmentModel::ensureCategoryColumn: Database Error: Unknown database 'sisslgti'
+[27-Nov-2026 08:37:51 UTC] Database::connect - Exception: Unknown database 'sisslgti'
+[27-Nov-2026 08:37:51 UTC] DepartmentModel::ensureHeadColumns: Database Error: Unknown database 'sisslgti'
+[27-Nov-2026 08:37:51 UTC] Database::connect - Exception: Unknown database 'sisslgti'
+[27-Nov-2026 08:37:51 UTC] DepartmentModel::ensureHeadHistoryTable: Database Error: Unknown database 'sisslgti'
+[27-Nov-2026 08:37:51 UTC] Database::connect - Exception: Unknown database 'sisslgti'
+[27-Nov-2026 08:40:06 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 08:40:09 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 08:40:15 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 08:40:17 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 08:40:40 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 08:40:42 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 08:40:44 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 08:40:44 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:12:34 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:14:29 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:14:31 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:14:32 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:14:49 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:14:50 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:15:00 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:15:29 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:15:31 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:15:32 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:15:38 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:15:44 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:15:44 UTC] SisLdap addMissingAccounts: LDAP bind account is not configured.
+[27-Nov-2026 09:15:44 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:17:00 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:17:06 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:17:09 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:18:54 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:18:56 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:18:58 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:19:04 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:19:17 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:19:17 UTC] SisLdap addMissingAccounts: LDAP bind account is not configured.
+[27-Nov-2026 09:19:17 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:26:59 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:27:05 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:31:58 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:33:12 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:37:29 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:38:50 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:38:56 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:38:57 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:38:57 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:39:02 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:39:02 UTC] SisLdap policy lock was not applied for 200130900160: Undefined attribute type
+[27-Nov-2026 09:39:02 UTC] SisLdap policy lock was not applied for 200203900129: Undefined attribute type
+[27-Nov-2026 09:39:02 UTC] SisLdap policy lock was not applied for 200214800245: Undefined attribute type
+[27-Nov-2026 09:39:02 UTC] SisLdap policy lock was not applied for 200236600542: Undefined attribute type
+[27-Nov-2026 09:39:02 UTC] SisLdap policy lock was not applied for 200307112933: Undefined attribute type
+[27-Nov-2026 09:39:02 UTC] SisLdap policy lock was not applied for 200329410267: Undefined attribute type
+[27-Nov-2026 09:39:02 UTC] SisLdap policy lock was not applied for 200333411960: Undefined attribute type
+[27-Nov-2026 09:39:02 UTC] SisLdap policy lock was not applied for 200415000943: Undefined attribute type
+[27-Nov-2026 09:39:02 UTC] SisLdap policy lock was not applied for 200416602455: Undefined attribute type
+[27-Nov-2026 09:39:02 UTC] SisLdap policy lock was not applied for 200421202225: Undefined attribute type
+[27-Nov-2026 09:39:02 UTC] SisLdap policy lock was not applied for 200422603090: Undefined attribute type
+[27-Nov-2026 09:39:02 UTC] SisLdap policy lock was not applied for 200431301368: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200432704533: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200433700478: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200434502903: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200435501162: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200456701041: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200475600611: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200508401346: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200514703014: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200516200327: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200516402843: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200517404794: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200517500956: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200519600322: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200520501210: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200524503580: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200528600712: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200528703083: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200529604356: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200530400298: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200550103573: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200560900148: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200563900540: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200565502125: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200576303722: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200579401141: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200600603104: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200603801343: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200604500370: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200604503506: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200607500748: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200608003817: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200608903433: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200609200627: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200610602349: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200612603875: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200613002544: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200614202086: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200614900715: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200615000915: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200615301276: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200617103749: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200619703600: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200619803363: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200620502282: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200621703330: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200622203877: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200624901642: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200630603555: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200635300595: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200652900559: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200656603665: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200659803554: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200660302014: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200663801477: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200669901313: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200701902620: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200718400030: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200723201427: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200752000132: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200785601012: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200801201224: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200806701879: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200809501111: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200833703950: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200902901438: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200911503826: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200912805148: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200930700203: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 200934403212: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 2026/ICT/4IT043: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] SisLdap policy lock was not applied for 991270833V: Undefined attribute type
+[27-Nov-2026 09:39:03 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:42:58 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 09:53:29 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 10:06:49 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 10:07:11 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 10:07:11 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 10:07:12 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 10:07:24 UTC] Database::connect - Connection successful to sisslgti
