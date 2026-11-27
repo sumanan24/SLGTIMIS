@@ -7,8 +7,8 @@ define('CLI_SCRIPT', true);
 require '/var/www/moodle/config.php';
 
 $mode = $argv[1] ?? 'report';
-if (!in_array($mode, ['report', 'apply', 'diag'], true)) {
-    fwrite(STDERR, "use report, apply, or diag\n");
+if (!in_array($mode, ['report', 'apply', 'diag', 'sis-report', 'sis-apply'], true)) {
+    fwrite(STDERR, "use report, apply, diag, sis-report, or sis-apply\n");
     exit(2);
 }
 
@@ -44,6 +44,110 @@ if ($mode === 'diag') {
             echo 'user=' . $row->id . ' username=' . $row->username . ' auth=' . $row->auth . ' suspended=' . $row->suspended . PHP_EOL;
         }
     }
+    exit(0);
+}
+
+if ($mode === 'sis-report' || $mode === 'sis-apply') {
+    $cfgpath = '/usr/local/etc/slgti-sis-auth.php';
+    if (!is_file($cfgpath)) {
+        fwrite(STDERR, "sis auth settings are missing\n");
+        exit(1);
+    }
+    $sicfg = require $cfgpath;
+    $extended = !empty($CFG->extendedusernamechars) ? '1' : '0';
+    $ch = curl_init((string) $sicfg['url']);
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query(['action' => 'map', 'extended' => $extended]),
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/x-www-form-urlencoded',
+            'X-SLGTI-Auth: ' . $sicfg['token'],
+        ],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 20,
+    ]);
+    $raw = curl_exec($ch);
+    $errno = curl_errno($ch);
+    $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    $decoded = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($decoded) || empty($decoded['ok']) || !isset($decoded['users'])) {
+        $bytes = is_string($raw) ? strlen($raw) : 0;
+        fwrite(STDERR, "sis map request failed errno={$errno} http={$http} bytes={$bytes}\n");
+        exit(1);
+    }
+    $byEmail = [];
+    foreach ($decoded['users'] as $row) {
+        $email = strtolower(trim((string) ($row['email'] ?? '')));
+        $username = strtolower(trim((string) ($row['username'] ?? '')));
+        if ($email === '' || $username === '' || (int) ($row['active'] ?? 0) !== 1) {
+            continue;
+        }
+        $byEmail[$email] = $username;
+    }
+    $protected = ['admin' => true, 'guest' => true];
+    $siteadmins = array_filter(array_map('intval', explode(',', (string) get_config('core', 'siteadmins'))));
+    $users = $DB->get_records_select('user', 'deleted = 0', null, 'id ASC', 'id, username, auth, email, suspended');
+    $switch = 0;
+    $same = 0;
+    $skipped = 0;
+    $sampleOld = '';
+    $sampleNew = '';
+    foreach ($users as $user) {
+        $name = strtolower(trim((string) $user->username));
+        $email = strtolower(trim((string) $user->email));
+        if ($name === '' || isset($protected[$name]) || in_array((int) $user->id, $siteadmins, true)) {
+            continue;
+        }
+        if ($email === '' || !isset($byEmail[$email])) {
+            $skipped++;
+            continue;
+        }
+        $target = $byEmail[$email];
+        if ($target === $name && $user->auth === 'sis') {
+            $same++;
+            continue;
+        }
+        $taken = $DB->get_records_select('user', 'deleted = 0 AND id <> :id AND LOWER(username) = :username', [
+            'id' => $user->id,
+            'username' => $target,
+        ], '', 'id');
+        if ($taken) {
+            $skipped++;
+            continue;
+        }
+        $switch++;
+        if ($sampleOld === '') {
+            $sampleOld = $name;
+            $sampleNew = $target;
+        }
+        if ($name === 'keerththeejan' || $target === '2022ict5te100' || $target === '2022/ict/5te100') {
+            echo 'known_old=' . $name . PHP_EOL;
+            echo 'known_new=' . $target . PHP_EOL;
+        }
+        if ($mode === 'sis-apply') {
+            $user->username = $target;
+            $user->auth = 'sis';
+            $user->password = 'not cached';
+            $DB->update_record('user', $user);
+        }
+    }
+    $auths = array_filter(array_map('trim', explode(',', (string) ($CFG->auth ?? ''))));
+    if (!in_array('sis', $auths, true)) {
+        $auths[] = 'sis';
+    }
+    if ($mode === 'sis-apply') {
+        set_config('auth', implode(',', $auths));
+        purge_all_caches();
+    }
+    echo 'mode=' . $mode . PHP_EOL;
+    echo 'extended_usernames=' . $extended . PHP_EOL;
+    echo 'sis_accounts=' . count($byEmail) . PHP_EOL;
+    echo 'moodle_to_sis=' . $switch . PHP_EOL;
+    echo 'already_sis=' . $same . PHP_EOL;
+    echo 'left_unchanged=' . $skipped . PHP_EOL;
+    echo 'sample_old=' . $sampleOld . PHP_EOL;
+    echo 'sample_new=' . $sampleNew . PHP_EOL;
     exit(0);
 }
 
