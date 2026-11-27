@@ -140,3 +140,18 @@
 [27-Nov-2026 10:07:11 UTC] Database::connect - Connection successful to sisslgti
 [27-Nov-2026 10:07:12 UTC] Database::connect - Connection successful to sisslgti
 [27-Nov-2026 10:07:24 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 13:16:33 UTC] Database::connect - Exception: No connection could be made because the target machine actively refused it
+[27-Nov-2026 13:16:33 UTC] Error initializing security tables: Database Error: No connection could be made because the target machine actively refused it
+[27-Nov-2026 13:16:36 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 13:16:40 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 13:16:42 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 13:16:42 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 13:16:45 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 13:16:48 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 13:16:51 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 13:16:51 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 13:16:52 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 13:17:01 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 13:17:01 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 13:17:09 UTC] Database::connect - Connection successful to sisslgti
+[27-Nov-2026 13:17:20 UTC] Database::connect - Connection successful to sisslgti
