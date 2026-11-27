@@ -20,7 +20,7 @@ class auth_plugin_sis extends auth_plugin_base {
         if ($cfg === null) {
             return false;
         }
-        $payload = http_build_query([
+        $payload = json_encode([
             'action' => 'lookup',
             'username' => $username,
             'extended' => !empty($GLOBALS['CFG']->extendedusernamechars) ? '1' : '0',
@@ -76,7 +76,7 @@ class auth_plugin_sis extends auth_plugin_base {
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => $payload,
             CURLOPT_HTTPHEADER => [
-                'Content-Type: application/x-www-form-urlencoded',
+                'Content-Type: application/json',
                 'X-SLGTI-Auth: ' . $cfg['token'],
             ],
             CURLOPT_RETURNTRANSFER => true,

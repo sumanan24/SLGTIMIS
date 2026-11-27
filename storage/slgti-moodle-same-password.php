@@ -58,9 +58,9 @@ if ($mode === 'sis-report' || $mode === 'sis-apply') {
     $ch = curl_init((string) $sicfg['url']);
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => http_build_query(['action' => 'map', 'extended' => $extended]),
+        CURLOPT_POSTFIELDS => json_encode(['action' => 'map', 'extended' => $extended]),
         CURLOPT_HTTPHEADER => [
-            'Content-Type: application/x-www-form-urlencoded',
+            'Content-Type: application/json',
             'X-SLGTI-Auth: ' . $sicfg['token'],
         ],
         CURLOPT_RETURNTRANSFER => true,

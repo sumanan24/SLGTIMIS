@@ -28,21 +28,22 @@ if ($expected === '' || $given === '' || !hash_equals($expected, $given)) {
     exit;
 }
 
+$raw = file_get_contents('php://input');
+$contentType = (string) ($_SERVER['CONTENT_TYPE'] ?? '');
+if (is_string($raw) && $raw !== '' && str_contains($contentType, 'application/json')) {
+    $parsed = json_decode($raw, true);
+    if (is_array($parsed)) {
+        $_POST = $parsed;
+    }
+} elseif ((!is_array($_POST) || $_POST === []) && is_string($raw) && $raw !== '') {
+    $parsed = [];
+    parse_str(str_replace('&amp;', '&', $raw), $parsed);
+    if (is_array($parsed)) {
+        $_POST = $parsed;
+    }
+}
 $extended = (($_POST['extended'] ?? '0') === '1');
 $action = (string) ($_POST['action'] ?? 'lookup');
-if (($_POST['username'] ?? '') === '' && ($_POST['action'] ?? '') === '') {
-    $raw = file_get_contents('php://input');
-    error_log('lms-auth raw-bytes=' . (is_string($raw) ? strlen($raw) : 0));
-    if (is_string($raw) && $raw !== '') {
-        $parsed = [];
-        parse_str($raw, $parsed);
-        if (is_array($parsed)) {
-            $_POST = $parsed + $_POST;
-        }
-    }
-    $extended = (($_POST['extended'] ?? '0') === '1');
-    $action = (string) ($_POST['action'] ?? 'lookup');
-}
 
 function slgti_lms_username(string $name, bool $extended): string
 {
@@ -110,7 +111,6 @@ foreach ($rows as $row) {
     }
 }
 if (count($matches) !== 1) {
-    error_log('lms-auth lookup miss ulen=' . strlen($wanted) . ' extended=' . ($extended ? '1' : '0') . ' matches=' . count($matches));
     echo '{"ok":true,"found":0}';
     exit;
 }
