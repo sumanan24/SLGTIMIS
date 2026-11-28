@@ -225,6 +225,9 @@ $totalAvail = max(0, $totalCap - $totalOcc);
     word-wrap: break-word;
 }
 .rooms-page .empty-room { color: #94a3b8; font-size: .8125rem; }
+.rooms-page .bed-line { display: block; margin-top: .15rem; font-size: .72rem; color: #64748b; font-weight: 600; }
+.rooms-page .head-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.rooms-page .head-actions form { margin: 0; }
 .rooms-page .actions .btn {
     width: 30px;
     height: 30px;
@@ -249,11 +252,27 @@ $totalAvail = max(0, $totalCap - $totalOcc);
     <div class="rooms-shell">
         <div class="rooms-head">
             <h1><i class="fas fa-door-open me-2"></i>Room Management</h1>
-            <?php if ($isAdminOrADM): ?>
-                <a href="<?php echo APP_URL; ?>/rooms/create" class="btn btn-light btn-sm">
-                    <i class="fas fa-plus me-1"></i>Add Room
-                </a>
-            <?php endif; ?>
+            <div class="head-actions">
+                <?php if ($isAdminOrADM && (string) ($hostel_id ?? '') !== ''): ?>
+                    <form method="POST" action="<?php echo APP_URL; ?>/rooms/create-beds">
+                        <input type="hidden" name="hostel_id" value="<?php echo $e($hostel_id); ?>">
+                        <button type="submit" class="btn btn-light btn-sm">
+                            <i class="fas fa-bed me-1"></i>Create beds
+                        </button>
+                    </form>
+                    <a href="<?php echo APP_URL; ?>/rooms/bed-stickers?hostel_id=<?php echo urlencode((string) $hostel_id); ?>" class="btn btn-light btn-sm" target="_blank">
+                        <i class="fas fa-barcode me-1"></i>Print bed stickers
+                    </a>
+                    <a href="<?php echo APP_URL; ?>/rooms/bed-stickers?hostel_id=<?php echo urlencode((string) $hostel_id); ?>&amp;download=1" class="btn btn-light btn-sm">
+                        <i class="fas fa-download me-1"></i>Download stickers
+                    </a>
+                <?php endif; ?>
+                <?php if ($isAdminOrADM): ?>
+                    <a href="<?php echo APP_URL; ?>/rooms/create" class="btn btn-light btn-sm">
+                        <i class="fas fa-plus me-1"></i>Add Room
+                    </a>
+                <?php endif; ?>
+            </div>
         </div>
 
         <div class="rooms-body">
@@ -302,6 +321,9 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                     <?php endif; ?>
                 </div>
             </form>
+            <?php if ((string) ($hostel_id ?? '') === ''): ?>
+                <p class="small text-muted mb-3">Each hostel has a Download stickers button. That file is for the whole hostel.</p>
+            <?php endif; ?>
 
             <div class="stats-row">
                 <div class="stat-card"><span class="lbl">Rooms</span><span class="val"><?php echo number_format((int) $total); ?></span></div>
@@ -335,6 +357,12 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                 <span>Occupied <strong><?php echo number_format($gOcc); ?></strong></span>
                                 <span>Available <strong class="<?php echo $gAvail > 0 ? 'text-success' : 'text-danger'; ?>"><?php echo number_format($gAvail); ?></strong></span>
                                 <span>Students <strong><?php echo number_format($gStu); ?></strong></span>
+                                <?php if ((string) ($group['id'] ?? '') !== '' && (string) ($group['id'] ?? '') !== '0'): ?>
+                                    <a class="btn btn-sm btn-dark"
+                                       href="<?php echo APP_URL; ?>/rooms/bed-stickers?hostel_id=<?php echo urlencode((string) $group['id']); ?>&amp;download=1">
+                                        <i class="fas fa-download me-1"></i>Download stickers
+                                    </a>
+                                <?php endif; ?>
                             </div>
                         </div>
 
@@ -413,7 +441,23 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                                     <?php endif; ?>
                                                 </td>
                                                 <td class="col-num"><?php echo $i + 1; ?></td>
-                                                <td class="col-room"><span class="room-no"><?php echo $e($room['room_no'] ?? '—'); ?></span></td>
+                                                <td class="col-room">
+                                                    <span class="room-no"><?php echo $e($room['room_no'] ?? '—'); ?></span>
+                                                    <?php
+                                                    $bedInfo = $bedMap[(string) ($room['id'] ?? '')] ?? null;
+                                                    $bedCount = (int) ($bedInfo['count'] ?? 0);
+                                                    $bedBunks = (int) ($bedInfo['bunks'] ?? 0);
+                                                    ?>
+                                                    <span class="bed-line">
+                                                        <?php if ($bedBunks >= 8): ?>
+                                                            T1–T4 · B1–B4
+                                                        <?php elseif ($bedCount < 1): ?>
+                                                            Beds not created
+                                                        <?php else: ?>
+                                                            <?php echo number_format($bedCount); ?> beds
+                                                        <?php endif; ?>
+                                                    </span>
+                                                </td>
                                                 <td class="col-stu">
                                                     <?php if ($studentCount === 0): ?>
                                                         <span class="empty-room">Vacant</span>

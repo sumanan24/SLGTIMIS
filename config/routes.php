@@ -205,6 +205,8 @@ return [
     'hostels/edit' => 'HostelController@edit',
     'hostels/delete' => 'HostelController@delete',
     'rooms' => 'RoomController@index',
+    'rooms/create-beds' => 'RoomController@createBeds',
+    'rooms/bed-stickers' => 'RoomController@bedStickers',
     'rooms/create' => 'RoomController@create',
     'rooms/edit' => 'RoomController@edit',
     'rooms/delete' => 'RoomController@delete',

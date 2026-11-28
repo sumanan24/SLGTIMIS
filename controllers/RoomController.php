@@ -49,6 +49,7 @@ class RoomController extends Controller {
         $allocationModel = $this->model('RoomAllocationModel');
         $roomIds = array_column($rooms, 'id');
         $studentsByRoom = $allocationModel->getActiveStudentsByRoomIds($roomIds);
+        $bedMap = $roomModel->getBedSummaries($roomIds);
 
         $hostelGroups = [];
         foreach ($rooms as $room) {
@@ -120,7 +121,8 @@ class RoomController extends Controller {
             'blocks' => $blocks,
             'message' => $_SESSION['message'] ?? null,
             'error' => $_SESSION['error'] ?? null,
-            'isAdminOrADM' => $isAdminOrADM
+            'isAdminOrADM' => $isAdminOrADM,
+            'bedMap' => $bedMap,
         ];
         
         unset($_SESSION['message'], $_SESSION['error']);
@@ -178,7 +180,8 @@ class RoomController extends Controller {
             $result = $roomModel->createRoom($data);
             
             if ($result) {
-                $_SESSION['message'] = 'Room created successfully.';
+                $roomModel->ensureBedsForRoom($result);
+                $_SESSION['message'] = 'Room created successfully. Beds T1–T4 and B1–B4 were created.';
                 $this->redirect('rooms');
             } else {
                 $_SESSION['error'] = 'Failed to create room.';
@@ -270,7 +273,10 @@ class RoomController extends Controller {
             $result = $roomModel->updateRoom($id, $data);
             
             if ($result) {
-                $_SESSION['message'] = 'Room updated successfully.';
+                $added = $roomModel->ensureBedsForRoom($id);
+                $_SESSION['message'] = $added > 0
+                    ? 'Room updated. ' . $added . ' new bed number(s) were added.'
+                    : 'Room updated successfully.';
                 $this->redirect('rooms');
             } else {
                 $_SESSION['error'] = 'Failed to update room.';
@@ -385,6 +391,105 @@ class RoomController extends Controller {
         $hostelId = $this->get('hostel_id', '');
         $blocks = $this->getBlocksByHostel($hostelId);
         $this->json($blocks);
+    }
+
+    public function createBeds() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        if (!$this->checkAdminOrADM()) {
+            return;
+        }
+        $hostelId = (int) $this->post('hostel_id', 0);
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || $hostelId < 1) {
+            $_SESSION['error'] = 'Select a hostel, then create the beds.';
+            $this->redirect('rooms');
+            return;
+        }
+        $roomModel = $this->model('RoomModel');
+        $hostelModel = $this->model('HostelModel');
+        $hostel = $hostelModel->getById($hostelId);
+        $name = trim((string) ($hostel['name'] ?? ''));
+        if ($name === '') {
+            $_SESSION['error'] = 'That hostel was not found.';
+            $this->redirect('rooms');
+            return;
+        }
+        $result = $roomModel->createMissingBedsForHostel($hostelId);
+        if ((int) $result['rooms'] === 0) {
+            $_SESSION['error'] = $name . ' has no rooms yet.';
+        } elseif ((int) $result['created'] === 0) {
+            $_SESSION['message'] = $name . ' already has ' . (int) $result['total'] . ' bed number(s).';
+        } else {
+            $_SESSION['message'] = 'Created beds T1–T4 and B1–B4 for ' . $name . '. ' . (int) $result['created'] . ' new sticker code(s).';
+        }
+        $this->redirect('rooms?hostel_id=' . $hostelId);
+    }
+
+    public function bedStickers() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        if (!$this->checkAdminOrADM()) {
+            return;
+        }
+        $hostelId = (int) $this->get('hostel_id', 0);
+        $roomId = (int) $this->get('room_id', 0);
+        $roomModel = $this->model('RoomModel');
+        $hostelModel = $this->model('HostelModel');
+        $fileLabel = '';
+        $room = null;
+        if ($roomId > 0) {
+            $room = $roomModel->getById($roomId);
+            if (!$room) {
+                $_SESSION['error'] = 'That room was not found.';
+                $this->redirect('rooms');
+                return;
+            }
+            $hostelId = (int) ($room['hostel_id'] ?? 0);
+            $beds = $roomModel->getBedsForRoom($roomId);
+            $name = trim((string) ($room['hostel_name'] ?? ''));
+            $fileLabel = $name . '-flat-' . trim((string) ($room['block_name'] ?? '')) . '-room-' . trim((string) ($room['room_no'] ?? ''));
+            $hostel = ['id' => $hostelId, 'name' => $name];
+        } else {
+            if ($hostelId < 1) {
+                $_SESSION['error'] = 'Select a hostel, then print the bed stickers.';
+                $this->redirect('rooms');
+                return;
+            }
+            $hostel = $hostelModel->getById($hostelId);
+            $name = trim((string) ($hostel['name'] ?? ''));
+            if ($name === '') {
+                $_SESSION['error'] = 'That hostel was not found.';
+                $this->redirect('rooms');
+                return;
+            }
+            $beds = $roomModel->getBedsForStickers($hostelId);
+        }
+        if ((string) $this->get('download', '') === '1') {
+            if (!$beds) {
+                $_SESSION['error'] = 'Create the beds first, then download the stickers.';
+                $this->redirect('rooms' . ($hostelId > 0 ? '?hostel_id=' . $hostelId : ''));
+                return;
+            }
+            require_once BASE_PATH . '/helpers/BedStickerPdf.php';
+            BedStickerPdf::download($beds, $name !== '' ? $name : 'Hostel', 'D', $fileLabel);
+            return;
+        }
+        if ($name === '') {
+            $_SESSION['error'] = 'That hostel was not found.';
+            $this->redirect('rooms');
+            return;
+        }
+        return $this->view('rooms/bed_stickers', [
+            'title' => 'Bed stickers — ' . $name,
+            'page' => 'rooms',
+            'hostel' => $hostel,
+            'hostel_id' => $hostelId,
+            'beds' => $beds,
+        ]);
     }
 }
 
