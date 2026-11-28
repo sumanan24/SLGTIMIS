@@ -1,0 +1,236 @@
+{{!
+    @template theme_slgti/drawers
+    SLGTI page shell. Moodle regions, menus and blocks are unchanged.
+}}
+{{> theme_boost/head }}
+
+<body {{{ bodyattributes }}}>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+{{> core/local/toast/wrapper}}
+<div id="page-wrapper" class="d-print-block">
+
+    {{{ output.standard_top_of_body_html }}}
+
+    <aside class="slgti-sidebar" id="slgti-sidebar" aria-label="{{#str}}sitemenubar, admin{{/str}}">
+        <a class="slgti-brand" href="{{{ homeurl }}}">
+            <span class="slgti-brand-title">{{sitename}}</span>
+        </a>
+        <nav class="slgti-nav">
+            {{#navitems}}
+                <a class="slgti-nav-link{{#active}} is-active{{/active}}" href="{{{url}}}" title="{{label}}">
+                    {{{icon}}}
+                    <span>{{label}}</span>
+                </a>
+            {{/navitems}}
+        </nav>
+        <button type="button" class="slgti-collapse" id="slgti-collapse" aria-label="{{#str}}collapsesidebar, theme_slgti{{/str}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 7l-5 5 5 5"/></svg>
+            <span>{{#str}}collapsesidebar, theme_slgti{{/str}}</span>
+        </button>
+    </aside>
+    <button type="button" class="slgti-backdrop" id="slgti-backdrop" aria-label="{{#str}}closebuttontitle{{/str}}"></button>
+
+    {{> theme_boost/primary-drawer-mobile }}
+
+    {{#courseindex}}
+        {{< theme_boost/drawer }}
+            {{$id}}theme_boost-drawers-courseindex{{/id}}
+            {{$drawerheadercontent}}
+                {{> theme_boost/courseindexdrawercontrols}}
+            {{/drawerheadercontent}}
+            {{$drawerclasses}}drawer drawer-left {{#courseindexopen}}show{{/courseindexopen}}{{/drawerclasses}}
+            {{$drawercontent}}
+                {{{courseindex}}}
+            {{/drawercontent}}
+            {{$drawerpreferencename}}drawer-open-index{{/drawerpreferencename}}
+            {{$drawerstate}}show-drawer-left{{/drawerstate}}
+            {{$tooltipplacement}}right{{/tooltipplacement}}
+            {{$closebuttontext}}{{#str}}closecourseindex, core{{/str}}{{/closebuttontext}}
+        {{/ theme_boost/drawer}}
+    {{/courseindex}}
+    {{#hasblocks}}
+        {{< theme_boost/drawer }}
+            {{$id}}theme_boost-drawers-blocks{{/id}}
+            {{$drawerclasses}}drawer drawer-right{{#blockdraweropen}} show{{/blockdraweropen}}{{/drawerclasses}}
+            {{$drawercontent}}
+                <section class="d-print-none" aria-label="{{#str}}blocks{{/str}}">
+                    {{{ addblockbutton }}}
+                    {{{ sidepreblocks }}}
+                </section>
+            {{/drawercontent}}
+            {{$drawerpreferencename}}drawer-open-block{{/drawerpreferencename}}
+            {{$forceopen}}{{#forceblockdraweropen}}1{{/forceblockdraweropen}}{{/forceopen}}
+            {{$drawerstate}}show-drawer-right{{/drawerstate}}
+            {{$tooltipplacement}}left{{/tooltipplacement}}
+            {{$drawercloseonresize}}1{{/drawercloseonresize}}
+            {{$closebuttontext}}{{#str}}closeblockdrawer, core{{/str}}{{/closebuttontext}}
+        {{/ theme_boost/drawer}}
+    {{/hasblocks}}
+
+    <div id="page" data-region="mainpage" data-usertour="scroller" class="drawers {{#courseindexopen}}show-drawer-left{{/courseindexopen}} {{#blockdraweropen}}show-drawer-right{{/blockdraweropen}} drag-container">
+        <div id="topofscroll" class="main-inner">
+            <header class="slgti-topbar">
+                <button type="button" class="slgti-menu" id="slgti-menu" aria-label="{{#str}}opensidebar, theme_slgti{{/str}}">
+                    {{{menuicon}}}
+                </button>
+                <div class="slgti-search">
+                    {{{ output.search_box }}}
+                </div>
+                <div class="slgti-topbar-tools">
+                    {{#langmenu}}
+                        {{> theme_boost/language_menu }}
+                    {{/langmenu}}
+                    {{{ output.navbar_plugin_output }}}
+                    <div class="d-flex align-items-stretch usermenu-container" data-region="usermenu">
+                        {{#usermenu}}
+                            {{> core/user_menu }}
+                        {{/usermenu}}
+                    </div>
+                    {{{ output.edit_switch }}}
+                </div>
+            </header>
+
+            <div class="drawer-toggles d-flex">
+                {{#courseindex}}
+                    <div class="drawer-toggler drawer-left-toggle open-nav d-print-none">
+                        <button class="btn icon-no-margin" data-toggler="drawers" data-action="toggle" data-target="theme_boost-drawers-courseindex" data-toggle="tooltip" data-placement="right" title="{{#str}}opendrawerindex, core{{/str}}">
+                            <span class="sr-only">{{#str}}opendrawerindex, core{{/str}}</span>
+                            {{#pix}} t/index_drawer, moodle {{/pix}}
+                        </button>
+                    </div>
+                {{/courseindex}}
+                {{#hasblocks}}
+                    <div class="drawer-toggler drawer-right-toggle ms-auto d-print-none">
+                        <button class="btn icon-no-margin" data-toggler="drawers" data-action="toggle" data-target="theme_boost-drawers-blocks" data-toggle="tooltip" data-placement="left" title="{{#str}}opendrawerblocks, core{{/str}}">
+                            <span class="sr-only">{{#str}}opendrawerblocks, core{{/str}}</span>
+                            <span class="dir-rtl-hide">{{#pix}}t/blocks_drawer, core{{/pix}}</span>
+                            <span class="dir-ltr-hide">{{#pix}}t/blocks_drawer_rtl, core{{/pix}}</span>
+                        </button>
+                    </div>
+                {{/hasblocks}}
+            </div>
+
+            {{^isdashboard}}
+                {{{ output.full_header }}}
+            {{/isdashboard}}
+            {{#secondarymoremenu}}
+                <div class="secondary-navigation d-print-none">
+                    {{> core/moremenu}}
+                </div>
+            {{/secondarymoremenu}}
+            <div id="page-content" class="pb-3 d-print-block">
+                <div id="region-main-box">
+                    {{#hasregionmainsettingsmenu}}
+                    <div id="region-main-settings-menu" class="d-print-none">
+                        <div> {{{ regionmainsettingsmenu }}} </div>
+                    </div>
+                    {{/hasregionmainsettingsmenu}}
+                    <section id="region-main" aria-label="{{#str}}content{{/str}}">
+                        {{#hasregionmainsettingsmenu}}
+                            <div class="region_main_settings_menu_proxy"></div>
+                        {{/hasregionmainsettingsmenu}}
+                        {{{ output.course_content_header }}}
+                        {{#headercontent}}
+                            {{> core/activity_header }}
+                        {{/headercontent}}
+                        {{#overflow}}
+                            <div class="container-fluid tertiary-navigation">
+                                <div class="navitem">
+                                    {{> core/url_select}}
+                                </div>
+                            </div>
+                        {{/overflow}}
+                        {{#isdashboard}}
+                            {{{academichtml}}}
+                            <section class="slgti-welcome">
+                                <div>
+                                    <p class="slgti-date">{{welcome.today}}</p>
+                                    <h1>{{welcome.greeting}}{{#welcome.fullname}}, {{welcome.fullname}}{{/welcome.fullname}}</h1>
+                                    <p class="slgti-lead">{{welcome.message}}</p>
+                                    <div class="slgti-actions">
+                                        {{#welcome.actions}}
+                                            <a class="slgti-action" href="{{{url}}}">{{label}}</a>
+                                        {{/welcome.actions}}
+                                    </div>
+                                </div>
+                                {{#welcome.avatar}}
+                                    <div class="slgti-welcome-user">{{{welcome.avatar}}}</div>
+                                {{/welcome.avatar}}
+                            </section>
+                            <section class="slgti-stats" aria-label="{{#str}}dashboard, theme_slgti{{/str}}">
+                                <article class="slgti-stat">
+                                    <span class="slgti-stat-icon">{{{staticons.enrolled}}}</span>
+                                    <div>
+                                        <strong>{{stats.enrolled}}</strong>
+                                        <span>{{#str}}enrolledcourses, theme_slgti{{/str}}</span>
+                                    </div>
+                                </article>
+                                <article class="slgti-stat">
+                                    <span class="slgti-stat-icon is-done">{{{staticons.completed}}}</span>
+                                    <div>
+                                        <strong>{{stats.completed}}</strong>
+                                        <span>{{#str}}completedcourses, theme_slgti{{/str}}</span>
+                                    </div>
+                                </article>
+                                <article class="slgti-stat">
+                                    <span class="slgti-stat-icon is-progress">{{{staticons.progress}}}</span>
+                                    <div>
+                                        <strong>{{stats.inprogress}}</strong>
+                                        <span>{{#str}}inprogress, theme_slgti{{/str}}</span>
+                                    </div>
+                                </article>
+                                <article class="slgti-stat">
+                                    <span class="slgti-stat-icon is-due">{{{staticons.pending}}}</span>
+                                    <div>
+                                        <strong>{{stats.pending}}</strong>
+                                        <span>{{#str}}pendingassignments, theme_slgti{{/str}}</span>
+                                    </div>
+                                </article>
+                            </section>
+                        {{/isdashboard}}
+                        {{{ output.main_content }}}
+                        {{{ output.activity_navigation }}}
+                        {{{ output.course_content_footer }}}
+                    </section>
+                </div>
+            </div>
+        </div>
+        {{> theme_boost/footer }}
+    </div>
+    {{{ output.standard_after_main_region_html }}}
+</div>
+</body>
+</html>
+{{#js}}
+M.util.js_pending('theme_boost/loader');
+require(['theme_boost/loader', 'theme_boost/drawer'], function(Loader, Drawer) {
+    Drawer.init();
+    var body = document.body;
+    var key = 'slgti-sidebar';
+    if (window.localStorage && localStorage.getItem(key) === 'collapsed') {
+        body.classList.add('slgti-sidebar-collapsed');
+    }
+    var collapse = document.getElementById('slgti-collapse');
+    if (collapse) {
+        collapse.addEventListener('click', function() {
+            body.classList.toggle('slgti-sidebar-collapsed');
+            if (window.localStorage) {
+                localStorage.setItem(key, body.classList.contains('slgti-sidebar-collapsed') ? 'collapsed' : 'open');
+            }
+        });
+    }
+    var menu = document.getElementById('slgti-menu');
+    var backdrop = document.getElementById('slgti-backdrop');
+    var closeMobile = function() { body.classList.remove('slgti-sidebar-open'); };
+    if (menu) {
+        menu.addEventListener('click', function() { body.classList.toggle('slgti-sidebar-open'); });
+    }
+    if (backdrop) {
+        backdrop.addEventListener('click', closeMobile);
+    }
+    document.querySelectorAll('.slgti-nav-link').forEach(function(link) {
+        link.addEventListener('click', closeMobile);
+    });
+    M.util.js_complete('theme_boost/loader');
+});
+{{/js}}

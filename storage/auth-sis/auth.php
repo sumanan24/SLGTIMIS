@@ -1,6 +1,8 @@
 <?php
 defined('MOODLE_INTERNAL') || die();
 
+require_once($CFG->libdir . '/authlib.php');
+
 /**
  * Check the SIS password hash. The hash is not stored in Moodle.
  */

@@ -1,0 +1,50 @@
+{{!
+    @template theme_slgti/login
+    Login page. The form itself is still Moodle's login form.
+}}
+{{> theme_boost/head }}
+
+<body {{{ bodyattributes }}}>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+{{> core/local/toast/wrapper}}
+
+<div id="page-wrapper" class="slgti-login-wrap">
+    {{{ output.standard_top_of_body_html }}}
+
+    <section class="slgti-login-hero" {{#loginbackgroundurl}}style="--slgti-campus: url('{{loginbackgroundurl}}')"{{/loginbackgroundurl}}>
+        <div class="slgti-login-hero-brand">
+            {{#logourl}}
+                <img src="{{logourl}}" alt="" class="slgti-login-logo">
+            {{/logourl}}
+            <p class="slgti-kicker">Sri Lanka German Training Institute</p>
+            <h1>Virtual Learning @ SLGTI</h1>
+            <p class="slgti-hero-sub">Learning Management System</p>
+        </div>
+        <p class="slgti-login-foot">Learn • Develop • Build Your Future</p>
+    </section>
+
+    <section id="region-main" class="slgti-login-panel" aria-label="{{#str}}content{{/str}}">
+        <div class="slgti-login-card">
+            {{#logourl}}
+                <img src="{{logourl}}" alt="{{sitename}}" class="slgti-login-card-logo">
+            {{/logourl}}
+            <h2>Welcome Back!</h2>
+            <p class="slgti-login-lead">Sign in to access your learning portal.</p>
+            {{{ output.main_content }}}
+        </div>
+    </section>
+
+    {{{ output.standard_end_of_body_html }}}
+</div>
+</body>
+</html>
+{{#js}}
+M.util.js_pending('theme_boost/loader');
+require(['theme_boost/loader'], function() {
+  var username = document.getElementById('username');
+  if (username) {
+    username.setAttribute('placeholder', 'Enter your username');
+  }
+  M.util.js_complete('theme_boost/loader');
+});
+{{/js}}
