@@ -202,6 +202,28 @@ if (!function_exists('allocationDateLabel')) {
                 </div>
             </div>
 
+            <?php if (!empty($canManage) && ($status ?? '') !== 'left'): ?>
+                <form id="bulkLeftForm" method="POST" action="<?php echo APP_URL; ?>/room-allocations/bulk-left" class="card shadow-sm border-0 mb-3">
+                    <div class="card-body py-2 d-flex flex-wrap align-items-center gap-2">
+                        <?php foreach ($allocationFilters as $filterKey => $filterValue): ?>
+                            <?php if ($filterValue !== '' && $filterValue !== null): ?>
+                                <input type="hidden" name="<?php echo htmlspecialchars($filterKey); ?>" value="<?php echo htmlspecialchars($filterValue); ?>">
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                        <div class="form-check mb-0 me-1">
+                            <input class="form-check-input" type="checkbox" id="allocSelectAll">
+                            <label class="form-check-label small" for="allocSelectAll">Select all</label>
+                        </div>
+                        <label class="small text-muted mb-0" for="bulk_leaving_at">Leaving date</label>
+                        <input type="date" class="form-control form-control-sm" style="width: auto;" id="bulk_leaving_at" name="leaving_at" value="<?php echo date('Y-m-d'); ?>" required>
+                        <button type="submit" class="btn btn-warning btn-sm" id="bulkLeftBtn">
+                            <i class="fas fa-sign-out-alt me-1"></i>Mark selected as left
+                        </button>
+                        <span class="small text-muted" id="allocPickCount">0 selected</span>
+                    </div>
+                </form>
+            <?php endif; ?>
+
             <?php if (isset($roomWiseView) && $roomWiseView): ?>
                 <!-- Room-wise Card View -->
                 <div class="d-flex align-items-center justify-content-between mb-3">
@@ -280,6 +302,11 @@ if (!function_exists('allocationDateLabel')) {
                                                     ?>
                                                         <div class="list-group-item px-0 py-2 border-bottom">
                                                             <div class="d-flex justify-content-between align-items-center">
+                                                                <?php if (!empty($canManage) && ($alloc['status'] ?? '') === 'active'): ?>
+                                                                <div class="form-check mb-0 me-2">
+                                                                    <input class="form-check-input alloc-pick" type="checkbox" name="ids[]" value="<?php echo htmlspecialchars((string) ($alloc['id'] ?? '')); ?>" form="bulkLeftForm" title="Select for bulk left">
+                                                                </div>
+                                                                <?php endif; ?>
                                                                 <div class="flex-grow-1">
                                                                     <div class="mb-1">
                                                                         <label class="form-label small text-muted mb-0">Student Name</label>
@@ -482,6 +509,9 @@ if (!function_exists('allocationDateLabel')) {
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
+                                <?php if (!empty($canManage) && ($status ?? '') !== 'left'): ?>
+                                <th style="width:36px;"></th>
+                                <?php endif; ?>
                                 <th class="fw-bold">Student</th>
                                 <th class="fw-bold">Student ID</th>
                                 <th class="fw-bold">Hostel</th>
@@ -496,6 +526,13 @@ if (!function_exists('allocationDateLabel')) {
                         <tbody>
                             <?php foreach ($allocations as $allocation): ?>
                                 <tr>
+                                    <?php if (!empty($canManage) && ($status ?? '') !== 'left'): ?>
+                                    <td>
+                                        <?php if (($allocation['status'] ?? '') === 'active'): ?>
+                                        <input class="form-check-input alloc-pick" type="checkbox" name="ids[]" value="<?php echo htmlspecialchars((string) ($allocation['id'] ?? '')); ?>" form="bulkLeftForm" title="Select for bulk left">
+                                        <?php endif; ?>
+                                    </td>
+                                    <?php endif; ?>
                                     <td><?php echo htmlspecialchars($allocation['student_fullname'] ?? 'N/A'); ?></td>
                                     <td><span class="fw-semibold text-primary"><?php echo htmlspecialchars($allocation['student_id'] ?? 'N/A'); ?></span></td>
                                     <td><?php echo htmlspecialchars($allocation['hostel_name'] ?? 'N/A'); ?></td>
@@ -619,6 +656,48 @@ function loadRoomsForFilter(hostelId) {
             roomSelect.innerHTML = '<option value="">Error loading rooms</option>';
         });
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    var picks = document.querySelectorAll('.alloc-pick');
+    var selectAll = document.getElementById('allocSelectAll');
+    var countLabel = document.getElementById('allocPickCount');
+    var bulkForm = document.getElementById('bulkLeftForm');
+    function selectedCount() {
+        var n = 0;
+        picks.forEach(function (box) { if (box.checked) n++; });
+        return n;
+    }
+    function refreshCount() {
+        var n = selectedCount();
+        if (countLabel) countLabel.textContent = n + ' selected';
+        if (selectAll) {
+            selectAll.checked = picks.length > 0 && n === picks.length;
+            selectAll.indeterminate = n > 0 && n < picks.length;
+        }
+    }
+    picks.forEach(function (box) {
+        box.addEventListener('change', refreshCount);
+    });
+    if (selectAll) {
+        selectAll.addEventListener('change', function () {
+            picks.forEach(function (box) { box.checked = selectAll.checked; });
+            refreshCount();
+        });
+    }
+    if (bulkForm) {
+        bulkForm.addEventListener('submit', function (event) {
+            if (selectedCount() < 1) {
+                event.preventDefault();
+                alert('Select at least one student.');
+                return;
+            }
+            if (!confirm('Mark the selected students as left? Their beds will become available.')) {
+                event.preventDefault();
+            }
+        });
+    }
+    refreshCount();
+});
 
 // Load rooms on page load if hostel is selected
 document.addEventListener('DOMContentLoaded', function() {

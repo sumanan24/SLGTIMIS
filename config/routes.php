@@ -216,6 +216,7 @@ return [
     'room-allocations/edit' => 'RoomAllocationController@edit',
     'room-allocations/delete' => 'RoomAllocationController@delete',
     'room-allocations/deallocate' => 'RoomAllocationController@deallocate',
+    'room-allocations/bulk-left' => 'RoomAllocationController@bulkLeft',
     'room-allocations/get-available-rooms' => 'RoomAllocationController@getAvailableRooms',
     'room-allocations/export-excel' => 'RoomAllocationController@exportExcel',
     'hostel-report' => 'RoomAllocationController@hostelReport',
