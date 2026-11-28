@@ -172,7 +172,7 @@ class RoomAllocationModel extends Model {
         $sql = "SELECT ha.*, 
                 s.student_id, s.student_fullname, s.student_email, s.student_nic, s.student_gender,
                 r.room_no, r.capacity,
-                b.name as block_name,
+                b.name as block_name, b.hostel_id,
                 h.name as hostel_name, h.gender as hostel_gender,
                 d.department_name
                 FROM `{$this->table}` ha
@@ -215,7 +215,7 @@ class RoomAllocationModel extends Model {
         $sql = "SELECT ha.*, 
                 s.student_id, s.student_fullname, s.student_email, s.student_nic, s.student_gender,
                 r.room_no, r.capacity,
-                b.name as block_name,
+                b.name as block_name, b.hostel_id,
                 h.name as hostel_name, h.gender as hostel_gender,
                 d.department_name
                 FROM `{$this->table}` ha
@@ -283,7 +283,7 @@ class RoomAllocationModel extends Model {
         $sql = "SELECT ha.*, 
                 s.student_id, s.student_fullname, s.student_email, s.student_nic, s.student_gender,
                 r.room_no, r.capacity, r.block_id,
-                b.name as block_name,
+                b.name as block_name, b.hostel_id,
                 h.name as hostel_name, h.gender as hostel_gender, h.id as hostel_id
                 FROM `{$this->table}` ha
                 LEFT JOIN `student` s ON ha.student_id COLLATE utf8mb4_unicode_ci = s.student_id
@@ -300,9 +300,11 @@ class RoomAllocationModel extends Model {
      * Get active allocation for a student
      */
     public function getActiveByStudentId($studentId) {
-        $sql = "SELECT ha.*, 
+        $this->ensureAllocationBedColumn();
+        $sql = "SELECT ha.*,
                 r.room_no,
                 b.name as block_name,
+                b.hostel_id,
                 h.name as hostel_name
                 FROM `{$this->table}` ha
                 LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
@@ -313,7 +315,35 @@ class RoomAllocationModel extends Model {
                 LIMIT 1";
 
         $result = $this->runFilteredQuery($sql, 's', [$studentId]);
-        return $result ? $result->fetch_assoc() : null;
+        $row = $result ? $result->fetch_assoc() : null;
+        if (!$row) {
+            return null;
+        }
+        $roomId = trim((string) ($row['room_id'] ?? ''));
+        if ($roomId !== '' && trim((string) ($row['bed_no'] ?? '')) === '') {
+            $this->fillMissingBeds([$roomId]);
+            $allocationId = (string) ($row['id'] ?? '');
+            if ($allocationId !== '') {
+                $fresh = $this->db->prepare("SELECT `bed_no` FROM `hostel_allocations` WHERE `id` = ?");
+                if ($fresh) {
+                    $fresh->bind_param('s', $allocationId);
+                    $fresh->execute();
+                    $bedRow = $fresh->get_result()->fetch_assoc();
+                    if ($bedRow) {
+                        $row['bed_no'] = $bedRow['bed_no'];
+                    }
+                }
+            }
+        }
+        $bedNo = trim((string) ($row['bed_no'] ?? ''));
+        $row['bed_code'] = $bedNo === '' ? '' : $this->roomModel()->studentBedCode($row, $bedNo);
+        return $row;
+    }
+
+    private function roomModel()
+    {
+        require_once BASE_PATH . '/models/RoomModel.php';
+        return new RoomModel();
     }
     
     /**
@@ -404,8 +434,10 @@ class RoomAllocationModel extends Model {
         }
 
         $placeholders = implode(',', array_fill(0, count($roomIds), '?'));
-        $sql = "SELECT ha.room_id, ha.allocated_at, ha.status,
+        $this->fillMissingBeds($roomIds);
+        $sql = "SELECT ha.id AS allocation_id, ha.room_id, ha.bed_no, ha.allocated_at, ha.status,
                 s.student_id, s.student_fullname, s.student_phone, s.student_nic, s.student_gender,
+                s.student_profile_img, s.student_provice, s.student_district,
                 d.department_name, c.course_name
                 FROM `{$this->table}` ha
                 LEFT JOIN `student` s ON ha.student_id COLLATE utf8mb4_unicode_ci = s.student_id"
@@ -446,7 +478,7 @@ class RoomAllocationModel extends Model {
      * Check if room has available beds
      */
     public function hasAvailableBeds($roomId) {
-        $roomModel = new RoomModel();
+        $roomModel = $this->roomModel();
         $room = $roomModel->getById($roomId);
         
         if (!$room) {
@@ -487,8 +519,132 @@ class RoomAllocationModel extends Model {
         if (empty($data['status'])) {
             $data['status'] = 'active';
         }
+
+        $this->fillMissingBeds([(string) $data['room_id']]);
+        $bed = $this->nextFreeBed((string) $data['room_id']);
+        if ($bed !== null && $bed !== '') {
+            $data['bed_no'] = $bed;
+        }
         
         return $this->create($data);
+    }
+
+    public function ensureAllocationBedColumn(): void
+    {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+        $done = true;
+        $result = $this->db->query("SHOW COLUMNS FROM `hostel_allocations` LIKE 'bed_no'");
+        if ($result && $result->num_rows > 0) {
+            return;
+        }
+        $this->db->query("ALTER TABLE `hostel_allocations` ADD COLUMN `bed_no` VARCHAR(10) NULL DEFAULT NULL AFTER `room_id`");
+    }
+
+    /**
+     * Give each active student without a bed the next free bunk: T1, B1, T2, B2.
+     *
+     * @param list<int|string> $roomIds
+     */
+    public function fillMissingBeds(array $roomIds): void
+    {
+        $this->ensureAllocationBedColumn();
+        $roomIds = array_values(array_unique(array_filter(array_map('strval', $roomIds), static function ($id) {
+            return $id !== '';
+        })));
+        if ($roomIds === []) {
+            return;
+        }
+        $placeholders = implode(',', array_fill(0, count($roomIds), '?'));
+        $types = str_repeat('s', count($roomIds));
+        $capStmt = $this->db->prepare("SELECT id, capacity FROM `hostel_rooms` WHERE id IN ($placeholders)");
+        $capStmt->bind_param($types, ...$roomIds);
+        $capStmt->execute();
+        $capResult = $capStmt->get_result();
+        $capacity = [];
+        while ($row = $capResult->fetch_assoc()) {
+            $capacity[(string) $row['id']] = (int) ($row['capacity'] ?? 0);
+        }
+        $stmt = $this->db->prepare(
+            "SELECT id, room_id, bed_no FROM `hostel_allocations`
+             WHERE status = 'active' AND room_id IN ($placeholders)
+             ORDER BY room_id ASC, allocated_at ASC, id ASC"
+        );
+        $stmt->bind_param($types, ...$roomIds);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $byRoom = [];
+        while ($row = $result->fetch_assoc()) {
+            $byRoom[(string) $row['room_id']][] = $row;
+        }
+        $roomModel = $this->roomModel();
+        $update = $this->db->prepare("UPDATE `hostel_allocations` SET `bed_no` = ? WHERE `id` = ? AND (`bed_no` IS NULL OR `bed_no` = '')");
+        foreach ($byRoom as $roomId => $rows) {
+            $order = $roomModel->bunkPairOrder($capacity[$roomId] ?? 0);
+            if (!$order) {
+                continue;
+            }
+            $used = [];
+            $need = [];
+            foreach ($rows as $row) {
+                $bed = strtoupper(trim((string) ($row['bed_no'] ?? '')));
+                if ($bed !== '' && in_array($bed, $order, true) && empty($used[$bed])) {
+                    $used[$bed] = true;
+                    continue;
+                }
+                $need[] = (string) $row['id'];
+            }
+            foreach ($need as $id) {
+                $next = '';
+                foreach ($order as $label) {
+                    if (empty($used[$label])) {
+                        $next = $label;
+                        break;
+                    }
+                }
+                if ($next === '') {
+                    continue;
+                }
+                $used[$next] = true;
+                $update->bind_param('ss', $next, $id);
+                $update->execute();
+            }
+        }
+    }
+
+    public function nextFreeBed(string $roomId): ?string
+    {
+        $roomId = trim($roomId);
+        if ($roomId === '') {
+            return null;
+        }
+        $this->ensureAllocationBedColumn();
+        $capStmt = $this->db->prepare("SELECT capacity FROM `hostel_rooms` WHERE id = ? LIMIT 1");
+        $capStmt->bind_param('s', $roomId);
+        $capStmt->execute();
+        $cap = $capStmt->get_result()->fetch_assoc();
+        $order = $this->roomModel()->bunkPairOrder((int) ($cap['capacity'] ?? 0));
+        if (!$order) {
+            return null;
+        }
+        $stmt = $this->db->prepare(
+            "SELECT bed_no FROM `hostel_allocations` WHERE room_id = ? AND status = 'active' AND bed_no IS NOT NULL AND bed_no <> ''"
+        );
+        $stmt->bind_param('s', $roomId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $used = [];
+        while ($row = $result->fetch_assoc()) {
+            $used[strtoupper(trim((string) $row['bed_no']))] = true;
+        }
+        foreach ($order as $label) {
+            if (empty($used[$label])) {
+                return $label;
+            }
+        }
+        return null;
     }
     
     /**
@@ -514,6 +670,97 @@ class RoomAllocationModel extends Model {
      */
     public function deleteAllocation($id) {
         return $this->delete($id);
+    }
+
+    /**
+     * NVQ levels already living in a room: '4' and/or '5'.
+     *
+     * @return list<string>
+     */
+    public function roomAssignedNvq($roomId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT DISTINCT TRIM(LEADING '0' FROM TRIM(CAST(c.course_nvq_level AS CHAR))) AS nvq
+             FROM `hostel_allocations` a
+             INNER JOIN `student_enroll` se ON se.student_id = a.student_id
+                AND se.student_enroll_status IN ('Following', 'Internship')
+             INNER JOIN `course` c ON c.course_id = se.course_id
+             WHERE a.room_id = ? AND a.status = 'active'
+               AND TRIM(LEADING '0' FROM TRIM(CAST(c.course_nvq_level AS CHAR))) IN ('4', '5')"
+        );
+        $stmt->bind_param('s', $roomId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $levels = [];
+        while ($row = $result->fetch_assoc()) {
+            $nvq = (string) ((int) ($row['nvq'] ?? 0));
+            if ($nvq === '4' || $nvq === '5') {
+                $levels[$nvq] = $nvq;
+            }
+        }
+        return array_values($levels);
+    }
+
+    /**
+     * Following students of one NVQ level who have no active room.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listUnassignedStudents(string $nvq, string $hostelGender = '', string $academicYear = ''): array
+    {
+        $nvq = (string) ((int) $nvq);
+        if ($nvq !== '4' && $nvq !== '5') {
+            return [];
+        }
+        $gender = ($hostelGender === 'male' || $hostelGender === 'female') ? $hostelGender : '';
+        $academicYear = trim($academicYear);
+        $province = "LOWER(TRIM(REPLACE(REPLACE(IFNULL(s.`student_provice`, ''), ' Province', ''), ' province', '')))";
+        $sql = "SELECT DISTINCT s.student_id, s.student_fullname, s.student_gender, c.course_name, se.academic_year,
+                       IFNULL(d.department_id, '') AS department_id, IFNULL(d.department_name, '') AS department_name
+                FROM `student` s
+                INNER JOIN `student_enroll` se ON se.student_id = s.student_id
+                    AND se.student_enroll_status IN ('Following', 'Internship')
+                INNER JOIN `course` c ON c.course_id = se.course_id
+                LEFT JOIN `department` d ON d.department_id = c.department_id
+                WHERE TRIM(LEADING '0' FROM TRIM(CAST(c.course_nvq_level AS CHAR))) = ?
+                  AND {$province} <> 'northern'
+                  AND TRIM(IFNULL(s.student_provice, '')) <> ''
+                  AND NOT EXISTS (
+                      SELECT 1 FROM `hostel_allocations` a
+                      WHERE a.student_id = s.student_id AND a.status = 'active'
+                  )
+                  AND EXISTS (
+                      SELECT 1 FROM `pays` p
+                      WHERE BINARY p.student_id = BINARY s.student_id
+                        AND LOWER(TRIM(p.payment_reason)) = 'hostel charges'
+                        AND p.approved = 1
+                  )";
+        $types = 's';
+        $params = [$nvq];
+        if ($academicYear !== '') {
+            $sql .= " AND se.academic_year = ?";
+            $types .= 's';
+            $params[] = $academicYear;
+        }
+        if ($gender !== '') {
+            $sql .= " AND LOWER(TRIM(s.student_gender)) = ?";
+            $types .= 's';
+            $params[] = $gender;
+        }
+        $sql .= " ORDER BY s.student_fullname ASC, s.student_id ASC";
+        $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            error_log('listUnassignedStudents prepare: ' . ($this->db->getConnection()->error ?? 'prepare failed'));
+            return [];
+        }
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $rows = [];
+        while ($row = $result->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        return $rows;
     }
 }
 

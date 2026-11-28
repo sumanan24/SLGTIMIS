@@ -159,7 +159,7 @@ $totalAvail = max(0, $totalCap - $totalOcc);
 .rooms-page .col-stu { width: 10%; text-align: center; }
 .rooms-page .col-metric { width: 9%; text-align: center; }
 .rooms-page .col-occ { width: 16%; }
-.rooms-page .col-act { width: 96px; text-align: right; }
+.rooms-page .col-act { width: 132px; text-align: right; }
 .rooms-page .room-no { font-weight: 700; color: #0f172a; }
 .rooms-page .occ-wrap {
     display: flex;
@@ -225,6 +225,9 @@ $totalAvail = max(0, $totalCap - $totalOcc);
     word-wrap: break-word;
 }
 .rooms-page .empty-room { color: #94a3b8; font-size: .8125rem; }
+.rooms-page .bed-line { display: block; margin-top: .15rem; font-size: .72rem; color: #64748b; font-weight: 600; }
+.rooms-page .head-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.rooms-page .head-actions form { margin: 0; }
 .rooms-page .actions .btn {
     width: 30px;
     height: 30px;
@@ -249,11 +252,30 @@ $totalAvail = max(0, $totalCap - $totalOcc);
     <div class="rooms-shell">
         <div class="rooms-head">
             <h1><i class="fas fa-door-open me-2"></i>Room Management</h1>
-            <?php if ($isAdminOrADM): ?>
-                <a href="<?php echo APP_URL; ?>/rooms/create" class="btn btn-light btn-sm">
-                    <i class="fas fa-plus me-1"></i>Add Room
-                </a>
-            <?php endif; ?>
+            <div class="head-actions">
+                <?php if ($isAdminOrADM && (string) ($hostel_id ?? '') !== ''): ?>
+                    <form method="POST" action="<?php echo APP_URL; ?>/rooms/create-beds">
+                        <input type="hidden" name="hostel_id" value="<?php echo $e($hostel_id); ?>">
+                        <button type="submit" class="btn btn-light btn-sm">
+                            <i class="fas fa-bed me-1"></i>Create beds
+                        </button>
+                    </form>
+                    <a href="<?php echo APP_URL; ?>/rooms/bed-stickers?hostel_id=<?php echo urlencode((string) $hostel_id); ?>" class="btn btn-light btn-sm" target="_blank">
+                        <i class="fas fa-barcode me-1"></i>Print bed stickers
+                    </a>
+                    <a href="<?php echo APP_URL; ?>/rooms/bed-stickers?hostel_id=<?php echo urlencode((string) $hostel_id); ?>&amp;download=1" class="btn btn-light btn-sm">
+                        <i class="fas fa-download me-1"></i>Download stickers
+                    </a>
+                    <a href="<?php echo APP_URL; ?>/rooms/student-list?hostel_id=<?php echo urlencode((string) $hostel_id); ?>" class="btn btn-light btn-sm">
+                        <i class="fas fa-file-alt me-1"></i>Download student list
+                    </a>
+                <?php endif; ?>
+                <?php if ($isAdminOrADM): ?>
+                    <a href="<?php echo APP_URL; ?>/rooms/create" class="btn btn-light btn-sm">
+                        <i class="fas fa-plus me-1"></i>Add Room
+                    </a>
+                <?php endif; ?>
+            </div>
         </div>
 
         <div class="rooms-body">
@@ -302,6 +324,9 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                     <?php endif; ?>
                 </div>
             </form>
+            <?php if ((string) ($hostel_id ?? '') === ''): ?>
+                <p class="small text-muted mb-3">Each hostel has a Download stickers button. That file is for the whole hostel.</p>
+            <?php endif; ?>
 
             <div class="stats-row">
                 <div class="stat-card"><span class="lbl">Rooms</span><span class="val"><?php echo number_format((int) $total); ?></span></div>
@@ -335,6 +360,16 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                 <span>Occupied <strong><?php echo number_format($gOcc); ?></strong></span>
                                 <span>Available <strong class="<?php echo $gAvail > 0 ? 'text-success' : 'text-danger'; ?>"><?php echo number_format($gAvail); ?></strong></span>
                                 <span>Students <strong><?php echo number_format($gStu); ?></strong></span>
+                                <?php if ((string) ($group['id'] ?? '') !== '' && (string) ($group['id'] ?? '') !== '0'): ?>
+                                    <a class="btn btn-sm btn-dark"
+                                       href="<?php echo APP_URL; ?>/rooms/bed-stickers?hostel_id=<?php echo urlencode((string) $group['id']); ?>&amp;download=1">
+                                        <i class="fas fa-download me-1"></i>Download stickers
+                                    </a>
+                                    <a class="btn btn-sm btn-outline-dark"
+                                       href="<?php echo APP_URL; ?>/rooms/student-list?hostel_id=<?php echo urlencode((string) $group['id']); ?>">
+                                        <i class="fas fa-file-alt me-1"></i>Student list
+                                    </a>
+                                <?php endif; ?>
                             </div>
                         </div>
 
@@ -413,7 +448,25 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                                     <?php endif; ?>
                                                 </td>
                                                 <td class="col-num"><?php echo $i + 1; ?></td>
-                                                <td class="col-room"><span class="room-no"><?php echo $e($room['room_no'] ?? '—'); ?></span></td>
+                                                <td class="col-room">
+                                                    <span class="room-no"><?php echo $e($room['room_no'] ?? '—'); ?></span>
+                                                    <?php
+                                                    $bedInfo = $bedMap[(string) ($room['id'] ?? '')] ?? null;
+                                                    $bedCount = (int) ($bedInfo['count'] ?? 0);
+                                                    ?>
+                                                    <span class="bed-line">
+                                                        <?php
+                                                        $bedHalf = intdiv($bedCount, 2);
+                                                        if ($bedHalf >= 1 && $bedCount === $bedHalf * 2):
+                                                        ?>
+                                                            T1–T<?php echo $bedHalf; ?> · B1–B<?php echo $bedHalf; ?>
+                                                        <?php elseif ($bedCount < 1): ?>
+                                                            Beds not created
+                                                        <?php else: ?>
+                                                            <?php echo number_format($bedCount); ?> beds
+                                                        <?php endif; ?>
+                                                    </span>
+                                                </td>
                                                 <td class="col-stu">
                                                     <?php if ($studentCount === 0): ?>
                                                         <span class="empty-room">Vacant</span>
@@ -438,6 +491,12 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                                 </td>
                                                 <?php if ($isAdminOrADM): ?>
                                                     <td class="col-act actions text-nowrap">
+                                                        <?php if ($available > 0): ?>
+                                                        <a href="<?php echo APP_URL; ?>/rooms/assign?room_id=<?php echo urlencode((string) ($room['id'] ?? '')); ?>&amp;nvq=4"
+                                                           class="btn btn-sm btn-outline-success" title="Assign students">
+                                                            <i class="fas fa-user-plus"></i>
+                                                        </a>
+                                                        <?php endif; ?>
                                                         <a href="<?php echo APP_URL; ?>/rooms/edit?id=<?php echo urlencode((string) ($room['id'] ?? '')); ?>"
                                                            class="btn btn-sm btn-outline-primary" title="Edit">
                                                             <i class="fas fa-edit"></i>
@@ -464,22 +523,30 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                                                 <div class="table-wrap border rounded">
                                                                     <table class="table table-sm stu-table mb-0">
                                                                         <colgroup>
-                                                                            <col style="width:4%">
-                                                                            <col style="width:14%">
-                                                                            <col style="width:22%">
-                                                                            <col style="width:8%">
-                                                                            <col style="width:16%">
-                                                                            <col style="width:16%">
+                                                                            <col style="width:3%">
                                                                             <col style="width:12%">
-                                                                            <col style="width:8%">
+                                                                            <col style="width:5%">
+                                                                            <col style="width:11%">
+                                                                            <col style="width:13%">
+                                                                            <col style="width:7%">
+                                                                            <col style="width:12%">
+                                                                            <col style="width:12%">
+                                                                            <col style="width:12%">
+                                                                            <col style="width:10%">
+                                                                            <col style="width:10%">
+                                                                            <col style="width:6%">
                                                                         </colgroup>
                                                                         <thead>
                                                                             <tr>
                                                                                 <th>#</th>
+                                                                                <th>Bed</th>
+                                                                                <th>Photo</th>
                                                                                 <th>Student ID</th>
                                                                                 <th>Name</th>
                                                                                 <th>Gender</th>
                                                                                 <th>Department</th>
+                                                                                <th>Province</th>
+                                                                                <th>District</th>
                                                                                 <th>Course</th>
                                                                                 <th>Phone</th>
                                                                                 <th>Allocated</th>
@@ -489,10 +556,20 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                                                             <?php foreach ($students as $si => $st): ?>
                                                                                 <tr>
                                                                                     <td class="text-muted"><?php echo $si + 1; ?></td>
+                                                                                    <td class="fw-semibold"><?php echo $e($st['bed_code'] ?? '—'); ?></td>
+                                                                                    <td>
+                                                                                        <?php if (!empty($st['photo_url'])): ?>
+                                                                                            <img src="<?php echo $e($st['photo_url']); ?>" alt="" width="32" height="40" style="width:32px;height:40px;object-fit:cover;border-radius:2px;display:block;">
+                                                                                        <?php else: ?>
+                                                                                            —
+                                                                                        <?php endif; ?>
+                                                                                    </td>
                                                                                     <td class="fw-semibold"><?php echo $e($st['student_id'] ?? ''); ?></td>
                                                                                     <td><?php echo $e($st['student_fullname'] ?? ''); ?></td>
                                                                                     <td><?php echo $e($st['student_gender'] ?? '—'); ?></td>
                                                                                     <td><?php echo $e($st['department_name'] ?? '—'); ?></td>
+                                                                                    <td><?php echo $e(trim((string) ($st['student_provice'] ?? '')) !== '' ? $st['student_provice'] : '—'); ?></td>
+                                                                                    <td><?php echo $e(trim((string) ($st['student_district'] ?? '')) !== '' ? $st['student_district'] : '—'); ?></td>
                                                                                     <td><?php echo $e($st['course_name'] ?? '—'); ?></td>
                                                                                     <td><?php echo $e($st['student_phone'] ?? '—'); ?></td>
                                                                                     <td class="text-muted">

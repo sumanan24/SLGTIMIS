@@ -812,6 +812,17 @@
                                     </div>
                                 </div>
                                 <div class="cv-info-item">
+                                    <div class="cv-info-icon"><i class="fas fa-bed"></i></div>
+                                    <div class="cv-info-content">
+                                        <div class="cv-info-label">Bed</div>
+                                        <div class="cv-info-value">
+                                            <span class="cv-badge cv-badge-info">
+                                                <?php echo htmlspecialchars(trim((string) ($hostelAllocation['bed_code'] ?? '')) !== '' ? $hostelAllocation['bed_code'] : 'N/A'); ?>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cv-info-item">
                                     <div class="cv-info-icon"><i class="fas fa-calendar-check"></i></div>
                                     <div class="cv-info-content">
                                         <div class="cv-info-label">Allocated Date</div>
@@ -844,6 +855,7 @@
                                         <tr>
                                             <th>Hostel</th>
                                             <th>Room</th>
+                                            <th>Bed</th>
                                             <th>Allocated</th>
                                             <th>Status</th>
                                         </tr>
@@ -853,6 +865,7 @@
                                         <tr>
                                             <td><?php echo htmlspecialchars($history['hostel_name'] ?? 'N/A'); ?></td>
                                             <td><?php echo htmlspecialchars($history['room_no'] ?? 'N/A'); ?></td>
+                                            <td><?php echo htmlspecialchars(trim((string) ($history['bed_code'] ?? '')) !== '' ? $history['bed_code'] : '—'); ?></td>
                                             <td><?php echo htmlspecialchars($history['allocated_at'] ?? 'N/A'); ?></td>
                                             <td>
                                                 <span class="badge bg-<?php echo ($history['status'] ?? '') === 'active' ? 'success' : 'secondary'; ?>">

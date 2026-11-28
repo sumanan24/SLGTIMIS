@@ -565,6 +565,74 @@ class RoomAllocationController extends Controller {
     }
 
     /**
+     * Mark the selected active allocations as left.
+     */
+    public function bulkLeft() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        if (!$this->checkRoomAllocationAccess()) {
+            return;
+        }
+        $returnQuery = $this->allocationListQuery();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->redirect('room-allocations' . $returnQuery);
+            return;
+        }
+
+        $raw = $this->post('ids', []);
+        if (!is_array($raw)) {
+            $raw = [$raw];
+        }
+        $ids = [];
+        foreach ($raw as $id) {
+            $n = (int) $id;
+            if ($n > 0) {
+                $ids[$n] = $n;
+            }
+        }
+        $ids = array_slice(array_values($ids), 0, 500);
+        if (!$ids) {
+            $_SESSION['error'] = 'Select at least one student to mark as left.';
+            $this->redirect('room-allocations' . $returnQuery);
+            return;
+        }
+
+        $leavingAt = trim((string) $this->post('leaving_at', ''));
+        if ($leavingAt === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $leavingAt)) {
+            $leavingAt = date('Y-m-d');
+        }
+
+        $allocationModel = $this->model('RoomAllocationModel');
+        $marked = 0;
+        foreach ($ids as $id) {
+            $allocation = $allocationModel->getById($id);
+            if (!$allocation || ($allocation['status'] ?? '') !== 'active') {
+                continue;
+            }
+            if ($allocationModel->deallocate($id, $leavingAt)) {
+                $marked++;
+            }
+        }
+
+        if ($marked > 0) {
+            $this->logActivity(
+                'UPDATE',
+                'room_allocation',
+                '',
+                'Marked ' . $marked . ' student(s) as left the hostel.',
+                null,
+                ['status' => 'left', 'leaving_at' => $leavingAt, 'count' => $marked]
+            );
+            $_SESSION['message'] = $marked . ' student(s) marked as left. Those beds are now available.';
+        } else {
+            $_SESSION['error'] = 'None of the selected students could be marked as left.';
+        }
+        $this->redirect('room-allocations' . $returnQuery);
+    }
+
+    /**
      * Keep the current allocation filters after an action.
      */
     private function allocationListQuery() {

@@ -5,6 +5,9 @@
 
 class RoomModel extends Model {
     protected $table = 'hostel_rooms';
+
+    /** @var array<int,bool> */
+    private $floorHostelCache = [];
     
     protected function getPrimaryKey() {
         return 'id';
@@ -268,6 +271,10 @@ class RoomModel extends Model {
         $conn = $this->db->getConnection();
         $conn->begin_transaction();
         try {
+            $this->ensureBedTable();
+            $bedStmt = $this->db->prepare("DELETE FROM `hostel_beds` WHERE `room_id` = ?");
+            $bedStmt->bind_param('s', $id);
+            $bedStmt->execute();
             $stmt = $this->db->prepare("DELETE FROM `hostel_allocations` WHERE `room_id` = ? AND `status` <> 'active'");
             $stmt->bind_param('s', $id);
             $stmt->execute();
@@ -344,6 +351,337 @@ class RoomModel extends Model {
         }
 
         return $data;
+    }
+
+    public function ensureBedTable(): void
+    {
+        $this->db->query(
+            "CREATE TABLE IF NOT EXISTS `hostel_beds` (
+                `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `room_id` INT NOT NULL,
+                `bed_no` VARCHAR(10) NOT NULL,
+                `barcode` VARCHAR(40) NOT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `uniq_room_bed` (`room_id`, `bed_no`),
+                UNIQUE KEY `uniq_barcode` (`barcode`),
+                KEY `idx_room` (`room_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+        $chk = $this->db->query(
+            "SELECT CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'hostel_beds' AND CONSTRAINT_NAME = 'fk_hostel_beds_room'"
+        );
+        if ($chk && $chk->num_rows === 0) {
+            $this->db->query(
+                "ALTER TABLE `hostel_beds`
+                 ADD CONSTRAINT `fk_hostel_beds_room`
+                 FOREIGN KEY (`room_id`) REFERENCES `hostel_rooms` (`id`) ON DELETE CASCADE"
+            );
+        }
+    }
+
+    /**
+     * Capacity 8 is T1–T4 and B1–B4. Half the beds are top, half are bottom.
+     *
+     * @return list<string>
+     */
+    public function bunkLabelsForCapacity(int $capacity): array
+    {
+        $half = intdiv(max(0, $capacity), 2);
+        $labels = [];
+        for ($i = 1; $i <= $half; $i++) {
+            $labels[] = 'T' . $i;
+        }
+        for ($i = 1; $i <= $half; $i++) {
+            $labels[] = 'B' . $i;
+        }
+        return $labels;
+    }
+
+    /**
+     * Bed order for a room: T1, B1, T2, B2, ...
+     *
+     * @return list<string>
+     */
+    public function bunkPairOrder(int $capacity): array
+    {
+        $half = intdiv(max(0, $capacity), 2);
+        $labels = [];
+        for ($i = 1; $i <= $half; $i++) {
+            $labels[] = 'T' . $i;
+            $labels[] = 'B' . $i;
+        }
+        return $labels;
+    }
+
+    public function bedPairRank(string $bedNo): int
+    {
+        if (!preg_match('/^([TB])(\d+)$/i', trim($bedNo), $m)) {
+            return 1000;
+        }
+        $n = (int) $m[2];
+        $side = strtoupper($m[1]) === 'T' ? 0 : 1;
+        return max(0, $n - 1) * 2 + $side;
+    }
+
+    /**
+     * Full bed label, for example B18/101/T1.
+     *
+     * @param array<string,mixed> $room
+     */
+    public function studentBedCode(array $room, string $bedNo): string
+    {
+        $code = $this->roomListCode(
+            (string) ($room['hostel_name'] ?? ''),
+            (string) ($room['block_name'] ?? ''),
+            (string) ($room['room_no'] ?? ''),
+            $this->hostelUsesFloors((int) ($room['hostel_id'] ?? 0))
+        );
+        $bedNo = strtoupper(trim($bedNo));
+        if ($bedNo === '') {
+            return $code;
+        }
+        return $code === '' ? $bedNo : $code . '/' . $bedNo;
+    }
+
+    /**
+     * Give every room in a hostel beds T1–T4 and B1–B4.
+     *
+     * @return array{created:int,rooms:int,total:int}
+     */
+    public function createMissingBedsForHostel(int $hostelId): array
+    {
+        $this->ensureBedTable();
+        $this->removeNonBunkBedsForHostel($hostelId);
+        $stmt = $this->db->prepare(
+            "SELECT r.id, r.room_no, r.capacity, b.name AS block_name, h.name AS hostel_name
+             FROM `hostel_rooms` r
+             JOIN `hostel_blocks` b ON b.id = r.block_id
+             JOIN `hostels` h ON h.id = b.hostel_id
+             WHERE b.hostel_id = ?"
+        );
+        $stmt->bind_param('i', $hostelId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $rooms = [];
+        while ($row = $result->fetch_assoc()) {
+            $rooms[] = $row;
+        }
+        $includeFloor = $this->hostelUsesFloors($hostelId);
+        $created = 0;
+        foreach ($rooms as $room) {
+            $created += $this->insertBunkBeds(
+                (int) $room['id'],
+                (string) $room['hostel_name'],
+                (string) $room['block_name'],
+                (string) $room['room_no'],
+                $includeFloor,
+                (int) ($room['capacity'] ?? 0)
+            );
+        }
+        $countStmt = $this->db->prepare(
+            "SELECT COUNT(*) AS c FROM `hostel_beds` bd
+             JOIN `hostel_rooms` r ON r.id = bd.room_id
+             JOIN `hostel_blocks` b ON b.id = r.block_id
+             WHERE b.hostel_id = ?"
+        );
+        $countStmt->bind_param('i', $hostelId);
+        $countStmt->execute();
+        $row = $countStmt->get_result()->fetch_assoc();
+        return ['created' => $created, 'rooms' => count($rooms), 'total' => (int) ($row['c'] ?? 0)];
+    }
+
+    public function ensureBedsForRoom($roomId): int
+    {
+        $room = $this->getById($roomId);
+        if (!$room) {
+            return 0;
+        }
+        $this->ensureBedTable();
+        return $this->insertBunkBeds(
+            (int) $room['id'],
+            (string) ($room['hostel_name'] ?? ''),
+            (string) ($room['block_name'] ?? ''),
+            (string) ($room['room_no'] ?? ''),
+            $this->hostelUsesFloors((int) ($room['hostel_id'] ?? 0)),
+            (int) ($room['capacity'] ?? 0)
+        );
+    }
+
+    private function removeNonBunkBedsForHostel(int $hostelId): void
+    {
+        $del = $this->db->prepare(
+            "DELETE bd FROM `hostel_beds` bd
+             JOIN `hostel_rooms` r ON r.id = bd.room_id
+             JOIN `hostel_blocks` b ON b.id = r.block_id
+             WHERE b.hostel_id = ? AND bd.bed_no NOT IN ('T1','T2','T3','T4','B1','B2','B3','B4')"
+        );
+        $del->bind_param('i', $hostelId);
+        $del->execute();
+    }
+
+    private function hostelUsesFloors(int $hostelId): bool
+    {
+        if ($hostelId < 1) {
+            return false;
+        }
+        if (isset($this->floorHostelCache[$hostelId])) {
+            return $this->floorHostelCache[$hostelId];
+        }
+        $stmt = $this->db->prepare("SELECT COUNT(*) AS c FROM `hostel_blocks` WHERE `hostel_id` = ?");
+        $stmt->bind_param('i', $hostelId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $uses = (int) ($row['c'] ?? 0) > 1;
+        $this->floorHostelCache[$hostelId] = $uses;
+        return $uses;
+    }
+
+    private function insertBunkBeds(int $roomId, string $hostel, string $block, string $roomNo, bool $includeFloor, int $capacity): int
+    {
+        $labels = $this->bunkLabelsForCapacity($capacity);
+        if (!$labels) {
+            return 0;
+        }
+        $keep = "'" . implode("','", $labels) . "'";
+        $del = $this->db->prepare("DELETE FROM `hostel_beds` WHERE `room_id` = ? AND `bed_no` NOT IN ($keep)");
+        $del->bind_param('i', $roomId);
+        $del->execute();
+        $stmt = $this->db->prepare(
+            "INSERT INTO `hostel_beds` (`room_id`, `bed_no`, `barcode`) VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE `barcode` = VALUES(`barcode`)"
+        );
+        $created = 0;
+        foreach ($labels as $bedNo) {
+            $code = $this->bedBarcode($hostel, $block, $roomNo, $bedNo, $includeFloor);
+            $stmt->bind_param('iss', $roomId, $bedNo, $code);
+            $stmt->execute();
+            if ($stmt->affected_rows === 1) {
+                $created++;
+            }
+        }
+        return $created;
+    }
+
+    public function roomListCode(string $hostel, string $block, string $roomNo, bool $includeFloor): string
+    {
+        $hostelPart = $this->barcodePart($hostel);
+        $roomPart = $this->numberedRoom($block, $roomNo, $includeFloor);
+        if ($hostelPart === '') {
+            return $roomPart;
+        }
+        if ($roomPart === '') {
+            return $hostelPart;
+        }
+        return $hostelPart . '/' . $roomPart;
+    }
+
+    private function bedBarcode(string $hostel, string $block, string $roomNo, string $bedNo, bool $includeFloor): string
+    {
+        $hostelPart = $this->barcodePart($hostel);
+        $bedPart = $this->barcodePart($bedNo);
+        $roomPart = $this->numberedRoom($block, $roomNo, $includeFloor);
+        $parts = array_values(array_filter([$hostelPart, $roomPart, $bedPart], static function ($part) {
+            return $part !== '';
+        }));
+        $code = implode('/', $parts);
+        if ($code === '') {
+            $code = $bedPart;
+        }
+        return substr($code, 0, 40);
+    }
+
+    /**
+     * Floor 1 room 1 is 101. Floor 2 room 1 is 201.
+     */
+    private function numberedRoom(string $block, string $roomNo, bool $includeFloor): string
+    {
+        $roomDigits = preg_replace('/\D+/', '', $roomNo) ?? '';
+        $roomNum = (int) $roomDigits;
+        $floorDigits = preg_replace('/\D+/', '', $block) ?? '';
+        $floorNum = (int) $floorDigits;
+        if ($includeFloor && $floorNum > 0 && $roomNum > 0 && $roomNum < 100) {
+            return (string) (($floorNum * 100) + $roomNum);
+        }
+        $plain = $this->barcodePart($roomNo);
+        return $plain !== '' ? $plain : (string) $roomNum;
+    }
+
+    private function barcodePart(string $value): string
+    {
+        $token = strtoupper(trim($value));
+        $token = preg_replace('/[^0-9A-Z]+/', '', $token) ?? '';
+        return $token;
+    }
+
+    /**
+     * @param array<int|string> $roomIds
+     * @return array<string, array{count:int,bunks:int}>
+     */
+    public function getBedSummaries(array $roomIds): array
+    {
+        $ids = [];
+        foreach ($roomIds as $id) {
+            $n = (int) $id;
+            if ($n > 0) {
+                $ids[$n] = $n;
+            }
+        }
+        if (!$ids) {
+            return [];
+        }
+        $this->ensureBedTable();
+        $in = implode(',', $ids);
+        $result = $this->db->query(
+            "SELECT room_id, COUNT(*) AS c,
+                    SUM(bed_no IN ('T1','T2','T3','T4','B1','B2','B3','B4')) AS bunks
+             FROM `hostel_beds` WHERE room_id IN ($in) GROUP BY room_id"
+        );
+        $map = [];
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $map[(string) $row['room_id']] = [
+                    'count' => (int) $row['c'],
+                    'bunks' => (int) $row['bunks'],
+                ];
+            }
+        }
+        return $map;
+    }
+
+    public function getBedsForRoom(int $roomId): array
+    {
+        return $this->fetchStickerBeds('r.id = ?', $roomId);
+    }
+
+    public function getBedsForStickers(int $hostelId): array
+    {
+        return $this->fetchStickerBeds('h.id = ?', $hostelId);
+    }
+
+    private function fetchStickerBeds(string $where, int $id): array
+    {
+        $this->ensureBedTable();
+        $stmt = $this->db->prepare(
+            "SELECT bd.bed_no, bd.barcode, r.room_no, r.id AS room_id,
+                    b.name AS block_name, h.name AS hostel_name
+             FROM `hostel_beds` bd
+             JOIN `hostel_rooms` r ON r.id = bd.room_id
+             JOIN `hostel_blocks` b ON b.id = r.block_id
+             JOIN `hostels` h ON h.id = b.hostel_id
+             WHERE $where
+             ORDER BY b.name ASC, CAST(r.room_no AS UNSIGNED) ASC, r.room_no ASC,
+                      CASE LEFT(bd.bed_no, 1) WHEN 'T' THEN 1 WHEN 'B' THEN 2 ELSE 3 END,
+                      CAST(SUBSTRING(bd.bed_no, 2) AS UNSIGNED) ASC"
+        );
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $rows = [];
+        while ($row = $result->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        return $rows;
     }
 }
 
