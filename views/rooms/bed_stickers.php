@@ -48,7 +48,7 @@ $back = APP_URL . '/rooms?hostel_id=' . urlencode((string) ($hostel_id ?? ''));
     <?php if ($beds): ?>
         <button type="button" class="btn btn-dark btn-sm" onclick="window.print()"><i class="fas fa-print me-1"></i>Print stickers</button>
         <a class="btn btn-outline-dark btn-sm" href="<?php echo $e(APP_URL . '/rooms/bed-stickers?hostel_id=' . urlencode((string) ($hostel_id ?? '')) . '&download=1'); ?>"><i class="fas fa-download me-1"></i>Download stickers</a>
-        <span class="text-muted small"><?php echo number_format(count($beds)); ?> stickers · 2 side by side · 4 in × 1 in · <?php echo $e($hostelName); ?></span>
+        <span class="text-muted small"><?php echo number_format(count($beds)); ?> stickers · T1 beside B1 · 4 in × 1 in · <?php echo $e($hostelName); ?></span>
     <?php endif; ?>
 </div>
 
@@ -59,19 +59,13 @@ $back = APP_URL . '/rooms?hostel_id=' . urlencode((string) ($hostel_id ?? ''));
 <?php else: ?>
     <div class="bed-sheet">
         <?php
-        $codes = [];
-        foreach ($beds as $bed) {
-            $code = trim((string) ($bed['barcode'] ?? ''));
-            if ($code !== '') {
-                $codes[] = $code;
-            }
-        }
-        for ($i = 0, $n = count($codes); $i < $n; $i += 2):
+        require_once BASE_PATH . '/helpers/BedStickerPdf.php';
+        foreach (BedStickerPdf::pairs($beds) as $pair):
         ?>
             <div class="bed-pair">
-                <div class="bed-sticker"><?php echo $e($codes[$i]); ?></div>
-                <div class="bed-sticker"><?php echo isset($codes[$i + 1]) ? $e($codes[$i + 1]) : ''; ?></div>
+                <div class="bed-sticker"><?php echo $e($pair[0]); ?></div>
+                <div class="bed-sticker"><?php echo $e($pair[1]); ?></div>
             </div>
-        <?php endfor; ?>
+        <?php endforeach; ?>
     </div>
 <?php endif; ?>

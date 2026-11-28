@@ -43,7 +43,7 @@ $where .= ' · Room ' . trim((string) ($room['room_no'] ?? ''));
     <?php if ($slots < 1): ?>
         <div class="alert alert-warning">This room already has 8 students.</div>
     <?php else: ?>
-        <p class="small text-muted">Level 04 and Level 05 stay in separate rooms. One room takes <?php echo (int) $slots; ?> students. Students who already have a room are not listed.</p>
+        <p class="small text-muted">Level 04 and Level 05 stay in separate rooms. One room takes <?php echo (int) $slots; ?> students. Students who already have a room are not listed. Northern Province students are not listed. Pick <?php echo (int) $slots; ?> at random chooses different departments.</p>
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
             <div class="btn-group" role="group">
                 <?php foreach (['4' => 'Level 04', '5' => 'Level 05'] as $code => $label):
@@ -76,7 +76,7 @@ $where .= ' · Room ' . trim((string) ($room['room_no'] ?? ''));
             <input type="hidden" name="academic_year" value="<?php echo $e($academicYear); ?>">
             <div class="assign-tools mb-2">
                 <input type="search" id="assignFind" class="form-control form-control-sm" style="max-width: 16rem;" placeholder="Search name or ID">
-                <button type="button" class="btn btn-outline-dark btn-sm" id="assignRandom">Pick <?php echo (int) $slots; ?> at random</button>
+                <button type="button" class="btn btn-outline-dark btn-sm" id="assignRandom">Pick <?php echo (int) $slots; ?> from different departments</button>
                 <span class="small text-muted" id="assignCount">0 selected</span>
             </div>
             <?php if (!$students): ?>
@@ -86,13 +86,18 @@ $where .= ' · Room ' . trim((string) ($room['room_no'] ?? ''));
                     <?php foreach ($students as $stu):
                         $sid = (string) ($stu['student_id'] ?? '');
                         $name = (string) ($stu['student_fullname'] ?? '');
-                        $hay = strtolower($sid . ' ' . $name);
+                        $dept = trim((string) ($stu['department_name'] ?? ''));
+                        $deptKey = trim((string) ($stu['department_id'] ?? ''));
+                        if ($deptKey === '') {
+                            $deptKey = $dept !== '' ? $dept : 'none';
+                        }
+                        $hay = strtolower($sid . ' ' . $name . ' ' . $dept);
                     ?>
-                        <label class="assign-row" data-hay="<?php echo $e($hay); ?>">
+                        <label class="assign-row" data-hay="<?php echo $e($hay); ?>" data-dept="<?php echo $e($deptKey); ?>">
                             <input class="form-check-input mt-1 assign-box" type="checkbox" name="student_ids[]" value="<?php echo $e($sid); ?>">
                             <span>
                                 <span class="name d-block"><?php echo $e($name !== '' ? $name : $sid); ?></span>
-                                <span class="small text-muted"><?php echo $e($sid); ?><?php if (!empty($stu['academic_year'])): ?> · <?php echo $e($stu['academic_year']); ?><?php endif; ?><?php if (!empty($stu['course_name'])): ?> · <?php echo $e($stu['course_name']); ?><?php endif; ?></span>
+                                <span class="small text-muted"><?php echo $e($sid); ?><?php if ($dept !== ''): ?> · <?php echo $e($dept); ?><?php endif; ?><?php if (!empty($stu['academic_year'])): ?> · <?php echo $e($stu['academic_year']); ?><?php endif; ?><?php if (!empty($stu['course_name'])): ?> · <?php echo $e($stu['course_name']); ?><?php endif; ?></span>
                             </span>
                         </label>
                     <?php endforeach; ?>
@@ -143,15 +148,43 @@ $where .= ' · Room ' . trim((string) ($room['room_no'] ?? ''));
     var randomBtn = document.getElementById('assignRandom');
     if (randomBtn) {
         randomBtn.addEventListener('click', function () {
-            var pool = visibleBoxes();
-            for (var i = pool.length - 1; i > 0; i--) {
-                var j = Math.floor(Math.random() * (i + 1));
-                var tmp = pool[i];
-                pool[i] = pool[j];
-                pool[j] = tmp;
+            var groups = {};
+            var keys = [];
+            visibleBoxes().forEach(function (box) {
+                var row = box.closest('.assign-row');
+                var key = (row && row.getAttribute('data-dept')) || 'none';
+                if (!groups[key]) {
+                    groups[key] = [];
+                    keys.push(key);
+                }
+                groups[key].push(box);
+            });
+            function shuffle(list) {
+                for (var i = list.length - 1; i > 0; i--) {
+                    var j = Math.floor(Math.random() * (i + 1));
+                    var tmp = list[i];
+                    list[i] = list[j];
+                    list[j] = tmp;
+                }
+            }
+            keys.forEach(function (key) { shuffle(groups[key]); });
+            shuffle(keys);
+            var chosen = [];
+            var guard = 0;
+            while (chosen.length < max && guard < 10000) {
+                var added = false;
+                keys.forEach(function (key) {
+                    if (chosen.length >= max) return;
+                    if (groups[key].length) {
+                        chosen.push(groups[key].shift());
+                        added = true;
+                    }
+                });
+                if (!added) break;
+                guard++;
             }
             boxes.forEach(function (box) { box.checked = false; });
-            pool.slice(0, max).forEach(function (box) { box.checked = true; });
+            chosen.forEach(function (box) { box.checked = true; });
             paint();
         });
     }

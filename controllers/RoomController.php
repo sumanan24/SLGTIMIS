@@ -47,6 +47,7 @@ class RoomController extends Controller {
 
         // Active students per room (for room-wise student info)
         $allocationModel = $this->model('RoomAllocationModel');
+        $studentModel = $this->model('StudentModel');
         $roomIds = array_column($rooms, 'id');
         $studentsByRoom = $allocationModel->getActiveStudentsByRoomIds($roomIds);
         $bedMap = $roomModel->getBedSummaries($roomIds);
@@ -54,7 +55,12 @@ class RoomController extends Controller {
         $hostelGroups = [];
         foreach ($rooms as $room) {
             $rid = (string) ($room['id'] ?? '');
-            $room['students'] = $studentsByRoom[$rid] ?? [];
+            $roomStudents = $studentsByRoom[$rid] ?? [];
+            foreach ($roomStudents as &$roomStudent) {
+                $roomStudent['photo_url'] = $studentModel->getProfileImagePath($roomStudent) ?: '';
+            }
+            unset($roomStudent);
+            $room['students'] = $roomStudents;
             $key = (string) ($room['hostel_id'] ?? 0);
             $flatName = trim((string) ($room['block_name'] ?? ''));
             if ($flatName === '') {
@@ -490,6 +496,63 @@ class RoomController extends Controller {
             'hostel_id' => $hostelId,
             'beds' => $beds,
         ]);
+    }
+
+    public function studentList() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        if (!$this->checkAdminOrADM()) {
+            return;
+        }
+        $hostelId = (int) $this->get('hostel_id', 0);
+        if ($hostelId < 1) {
+            $_SESSION['error'] = 'Select a hostel, then download the student list.';
+            $this->redirect('rooms');
+            return;
+        }
+        $hostelModel = $this->model('HostelModel');
+        $hostel = $hostelModel->getById($hostelId);
+        $name = trim((string) ($hostel['name'] ?? ''));
+        if ($name === '') {
+            $_SESSION['error'] = 'That hostel was not found.';
+            $this->redirect('rooms');
+            return;
+        }
+        $roomModel = $this->model('RoomModel');
+        $rooms = $roomModel->getRooms(1, 5000, ['hostel_id' => (string) $hostelId]);
+        $allocationModel = $this->model('RoomAllocationModel');
+        $studentModel = $this->model('StudentModel');
+        $byRoom = $allocationModel->getActiveStudentsByRoomIds(array_column($rooms, 'id'));
+        $includeFloor = count(array_unique(array_filter(array_map(static function ($room) {
+            return (string) ($room['block_name'] ?? '');
+        }, $rooms)))) > 1;
+        $sections = [];
+        foreach ($rooms as $room) {
+            $students = $byRoom[(string) ($room['id'] ?? '')] ?? [];
+            if (!$students) {
+                continue;
+            }
+            usort($students, static function ($a, $b) {
+                return strcasecmp((string) ($a['student_fullname'] ?? ''), (string) ($b['student_fullname'] ?? ''));
+            });
+            foreach ($students as &$stu) {
+                $stu['photo_file'] = $studentModel->getProfileImageAbsolutePath($stu);
+            }
+            unset($stu);
+            $sections[] = [
+                'code' => $roomModel->roomListCode(
+                    $name,
+                    (string) ($room['block_name'] ?? ''),
+                    (string) ($room['room_no'] ?? ''),
+                    $includeFloor
+                ),
+                'students' => $students,
+            ];
+        }
+        require_once BASE_PATH . '/helpers/RoomStudentListPdf.php';
+        RoomStudentListPdf::download($sections, $name);
     }
 
     public function assignStudents() {

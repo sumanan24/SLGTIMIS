@@ -377,10 +377,22 @@ class RoomModel extends Model {
         }
     }
 
-    /** Top bunks T1–T4 and bottom bunks B1–B4. */
-    public function bunkBedLabels(): array
+    /**
+     * Capacity 8 is T1–T4 and B1–B4. Half the beds are top, half are bottom.
+     *
+     * @return list<string>
+     */
+    public function bunkLabelsForCapacity(int $capacity): array
     {
-        return ['T1', 'T2', 'T3', 'T4', 'B1', 'B2', 'B3', 'B4'];
+        $half = intdiv(max(0, $capacity), 2);
+        $labels = [];
+        for ($i = 1; $i <= $half; $i++) {
+            $labels[] = 'T' . $i;
+        }
+        for ($i = 1; $i <= $half; $i++) {
+            $labels[] = 'B' . $i;
+        }
+        return $labels;
     }
 
     /**
@@ -393,7 +405,7 @@ class RoomModel extends Model {
         $this->ensureBedTable();
         $this->removeNonBunkBedsForHostel($hostelId);
         $stmt = $this->db->prepare(
-            "SELECT r.id, r.room_no, b.name AS block_name, h.name AS hostel_name
+            "SELECT r.id, r.room_no, r.capacity, b.name AS block_name, h.name AS hostel_name
              FROM `hostel_rooms` r
              JOIN `hostel_blocks` b ON b.id = r.block_id
              JOIN `hostels` h ON h.id = b.hostel_id
@@ -414,7 +426,8 @@ class RoomModel extends Model {
                 (string) $room['hostel_name'],
                 (string) $room['block_name'],
                 (string) $room['room_no'],
-                $includeFloor
+                $includeFloor,
+                (int) ($room['capacity'] ?? 0)
             );
         }
         $countStmt = $this->db->prepare(
@@ -436,18 +449,13 @@ class RoomModel extends Model {
             return 0;
         }
         $this->ensureBedTable();
-        $rid = (int) $room['id'];
-        $del = $this->db->prepare(
-            "DELETE FROM `hostel_beds` WHERE `room_id` = ? AND `bed_no` NOT IN ('T1','T2','T3','T4','B1','B2','B3','B4')"
-        );
-        $del->bind_param('i', $rid);
-        $del->execute();
         return $this->insertBunkBeds(
-            $rid,
+            (int) $room['id'],
             (string) ($room['hostel_name'] ?? ''),
             (string) ($room['block_name'] ?? ''),
             (string) ($room['room_no'] ?? ''),
-            $this->hostelUsesFloors((int) ($room['hostel_id'] ?? 0))
+            $this->hostelUsesFloors((int) ($room['hostel_id'] ?? 0)),
+            (int) ($room['capacity'] ?? 0)
         );
     }
 
@@ -475,14 +483,22 @@ class RoomModel extends Model {
         return (int) ($row['c'] ?? 0) > 1;
     }
 
-    private function insertBunkBeds(int $roomId, string $hostel, string $block, string $roomNo, bool $includeFloor): int
+    private function insertBunkBeds(int $roomId, string $hostel, string $block, string $roomNo, bool $includeFloor, int $capacity): int
     {
+        $labels = $this->bunkLabelsForCapacity($capacity);
+        if (!$labels) {
+            return 0;
+        }
+        $keep = "'" . implode("','", $labels) . "'";
+        $del = $this->db->prepare("DELETE FROM `hostel_beds` WHERE `room_id` = ? AND `bed_no` NOT IN ($keep)");
+        $del->bind_param('i', $roomId);
+        $del->execute();
         $stmt = $this->db->prepare(
             "INSERT INTO `hostel_beds` (`room_id`, `bed_no`, `barcode`) VALUES (?, ?, ?)
              ON DUPLICATE KEY UPDATE `barcode` = VALUES(`barcode`)"
         );
         $created = 0;
-        foreach ($this->bunkBedLabels() as $bedNo) {
+        foreach ($labels as $bedNo) {
             $code = $this->bedBarcode($hostel, $block, $roomNo, $bedNo, $includeFloor);
             $stmt->bind_param('iss', $roomId, $bedNo, $code);
             $stmt->execute();
@@ -491,6 +507,19 @@ class RoomModel extends Model {
             }
         }
         return $created;
+    }
+
+    public function roomListCode(string $hostel, string $block, string $roomNo, bool $includeFloor): string
+    {
+        $hostelPart = $this->barcodePart($hostel);
+        $roomPart = $this->numberedRoom($block, $roomNo, $includeFloor);
+        if ($hostelPart === '') {
+            return $roomPart;
+        }
+        if ($roomPart === '') {
+            return $hostelPart;
+        }
+        return $hostelPart . '/' . $roomPart;
     }
 
     private function bedBarcode(string $hostel, string $block, string $roomNo, string $bedNo, bool $includeFloor): string

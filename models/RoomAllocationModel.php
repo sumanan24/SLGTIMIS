@@ -406,6 +406,7 @@ class RoomAllocationModel extends Model {
         $placeholders = implode(',', array_fill(0, count($roomIds), '?'));
         $sql = "SELECT ha.room_id, ha.allocated_at, ha.status,
                 s.student_id, s.student_fullname, s.student_phone, s.student_nic, s.student_gender,
+                s.student_profile_img, s.student_provice, s.student_district,
                 d.department_name, c.course_name
                 FROM `{$this->table}` ha
                 LEFT JOIN `student` s ON ha.student_id COLLATE utf8mb4_unicode_ci = s.student_id"
@@ -558,12 +559,17 @@ class RoomAllocationModel extends Model {
         }
         $gender = ($hostelGender === 'male' || $hostelGender === 'female') ? $hostelGender : '';
         $academicYear = trim($academicYear);
-        $sql = "SELECT DISTINCT s.student_id, s.student_fullname, s.student_gender, c.course_name, se.academic_year
+        $province = "LOWER(TRIM(REPLACE(REPLACE(IFNULL(s.`student_provice`, ''), ' Province', ''), ' province', '')))";
+        $sql = "SELECT DISTINCT s.student_id, s.student_fullname, s.student_gender, c.course_name, se.academic_year,
+                       IFNULL(d.department_id, '') AS department_id, IFNULL(d.department_name, '') AS department_name
                 FROM `student` s
                 INNER JOIN `student_enroll` se ON se.student_id = s.student_id
                     AND se.student_enroll_status IN ('Following', 'Internship')
                 INNER JOIN `course` c ON c.course_id = se.course_id
+                LEFT JOIN `department` d ON d.department_id = c.department_id
                 WHERE TRIM(LEADING '0' FROM TRIM(CAST(c.course_nvq_level AS CHAR))) = ?
+                  AND {$province} <> 'northern'
+                  AND TRIM(IFNULL(s.student_provice, '')) <> ''
                   AND NOT EXISTS (
                       SELECT 1 FROM `hostel_allocations` a
                       WHERE a.student_id = s.student_id AND a.status = 'active'

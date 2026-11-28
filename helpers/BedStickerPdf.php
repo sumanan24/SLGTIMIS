@@ -23,19 +23,13 @@ class BedStickerPdf
         $pdf->SetMargins(0, 0, 0);
         $pdf->SetCompression(true);
 
-        $codes = [];
-        foreach ($beds as $bed) {
-            $code = trim((string) ($bed['barcode'] ?? ''));
-            if ($code !== '') {
-                $codes[] = self::latin($code);
-            }
-        }
-        $total = count($codes);
-        for ($i = 0; $i < $total; $i += 2) {
+        foreach (self::pairs($beds) as $pair) {
             $pdf->AddPage('L', [4.0, 1.0]);
-            self::drawNumber($pdf, 0.0, $codes[$i]);
-            if (isset($codes[$i + 1])) {
-                self::drawNumber($pdf, 2.0, $codes[$i + 1]);
+            if ($pair[0] !== '') {
+                self::drawNumber($pdf, 0.0, self::latin($pair[0]));
+            }
+            if ($pair[1] !== '') {
+                self::drawNumber($pdf, 2.0, self::latin($pair[1]));
             }
         }
 
@@ -46,6 +40,46 @@ class BedStickerPdf
         }
         $pdf->Output('D', $safe . '-bed-stickers.pdf');
         exit;
+    }
+
+    /**
+     * One strip is T1 beside B1, then T2 beside B2, for each room.
+     *
+     * @param list<array<string, mixed>> $beds
+     * @return list<array{0:string,1:string}>
+     */
+    public static function pairs(array $beds): array
+    {
+        $byRoom = [];
+        foreach ($beds as $bed) {
+            $roomId = (string) ($bed['room_id'] ?? '');
+            $code = trim((string) ($bed['barcode'] ?? ''));
+            $bedNo = strtoupper(trim((string) ($bed['bed_no'] ?? '')));
+            if ($roomId === '' || $code === '' || $bedNo === '') {
+                continue;
+            }
+            if (!isset($byRoom[$roomId])) {
+                $byRoom[$roomId] = ['T' => [], 'B' => []];
+            }
+            $side = $bedNo[0] === 'B' ? 'B' : 'T';
+            $index = (int) substr($bedNo, 1);
+            if ($index < 1) {
+                $index = count($byRoom[$roomId][$side]) + 1;
+            }
+            $byRoom[$roomId][$side][$index] = $code;
+        }
+        $pairs = [];
+        foreach ($byRoom as $room) {
+            ksort($room['T']);
+            ksort($room['B']);
+            $tops = array_values($room['T']);
+            $bottoms = array_values($room['B']);
+            $count = max(count($tops), count($bottoms));
+            for ($i = 0; $i < $count; $i++) {
+                $pairs[] = [$tops[$i] ?? '', $bottoms[$i] ?? ''];
+            }
+        }
+        return $pairs;
     }
 
     private static function drawNumber(FPDF $pdf, float $x, string $text): void

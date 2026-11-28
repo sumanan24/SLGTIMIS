@@ -266,6 +266,9 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                     <a href="<?php echo APP_URL; ?>/rooms/bed-stickers?hostel_id=<?php echo urlencode((string) $hostel_id); ?>&amp;download=1" class="btn btn-light btn-sm">
                         <i class="fas fa-download me-1"></i>Download stickers
                     </a>
+                    <a href="<?php echo APP_URL; ?>/rooms/student-list?hostel_id=<?php echo urlencode((string) $hostel_id); ?>" class="btn btn-light btn-sm">
+                        <i class="fas fa-file-alt me-1"></i>Download student list
+                    </a>
                 <?php endif; ?>
                 <?php if ($isAdminOrADM): ?>
                     <a href="<?php echo APP_URL; ?>/rooms/create" class="btn btn-light btn-sm">
@@ -362,6 +365,10 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                        href="<?php echo APP_URL; ?>/rooms/bed-stickers?hostel_id=<?php echo urlencode((string) $group['id']); ?>&amp;download=1">
                                         <i class="fas fa-download me-1"></i>Download stickers
                                     </a>
+                                    <a class="btn btn-sm btn-outline-dark"
+                                       href="<?php echo APP_URL; ?>/rooms/student-list?hostel_id=<?php echo urlencode((string) $group['id']); ?>">
+                                        <i class="fas fa-file-alt me-1"></i>Student list
+                                    </a>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -446,11 +453,13 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                                     <?php
                                                     $bedInfo = $bedMap[(string) ($room['id'] ?? '')] ?? null;
                                                     $bedCount = (int) ($bedInfo['count'] ?? 0);
-                                                    $bedBunks = (int) ($bedInfo['bunks'] ?? 0);
                                                     ?>
                                                     <span class="bed-line">
-                                                        <?php if ($bedBunks >= 8): ?>
-                                                            T1–T4 · B1–B4
+                                                        <?php
+                                                        $bedHalf = intdiv($bedCount, 2);
+                                                        if ($bedHalf >= 1 && $bedCount === $bedHalf * 2):
+                                                        ?>
+                                                            T1–T<?php echo $bedHalf; ?> · B1–B<?php echo $bedHalf; ?>
                                                         <?php elseif ($bedCount < 1): ?>
                                                             Beds not created
                                                         <?php else: ?>
@@ -514,22 +523,28 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                                                 <div class="table-wrap border rounded">
                                                                     <table class="table table-sm stu-table mb-0">
                                                                         <colgroup>
-                                                                            <col style="width:4%">
-                                                                            <col style="width:14%">
-                                                                            <col style="width:22%">
-                                                                            <col style="width:8%">
-                                                                            <col style="width:16%">
-                                                                            <col style="width:16%">
+                                                                            <col style="width:3%">
+                                                                            <col style="width:5%">
                                                                             <col style="width:12%">
-                                                                            <col style="width:8%">
+                                                                            <col style="width:15%">
+                                                                            <col style="width:7%">
+                                                                            <col style="width:12%">
+                                                                            <col style="width:12%">
+                                                                            <col style="width:12%">
+                                                                            <col style="width:10%">
+                                                                            <col style="width:10%">
+                                                                            <col style="width:6%">
                                                                         </colgroup>
                                                                         <thead>
                                                                             <tr>
                                                                                 <th>#</th>
+                                                                                <th>Photo</th>
                                                                                 <th>Student ID</th>
                                                                                 <th>Name</th>
                                                                                 <th>Gender</th>
                                                                                 <th>Department</th>
+                                                                                <th>Province</th>
+                                                                                <th>District</th>
                                                                                 <th>Course</th>
                                                                                 <th>Phone</th>
                                                                                 <th>Allocated</th>
@@ -539,10 +554,19 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                                                             <?php foreach ($students as $si => $st): ?>
                                                                                 <tr>
                                                                                     <td class="text-muted"><?php echo $si + 1; ?></td>
+                                                                                    <td>
+                                                                                        <?php if (!empty($st['photo_url'])): ?>
+                                                                                            <img src="<?php echo $e($st['photo_url']); ?>" alt="" width="32" height="40" style="width:32px;height:40px;object-fit:cover;border-radius:2px;display:block;">
+                                                                                        <?php else: ?>
+                                                                                            —
+                                                                                        <?php endif; ?>
+                                                                                    </td>
                                                                                     <td class="fw-semibold"><?php echo $e($st['student_id'] ?? ''); ?></td>
                                                                                     <td><?php echo $e($st['student_fullname'] ?? ''); ?></td>
                                                                                     <td><?php echo $e($st['student_gender'] ?? '—'); ?></td>
                                                                                     <td><?php echo $e($st['department_name'] ?? '—'); ?></td>
+                                                                                    <td><?php echo $e(trim((string) ($st['student_provice'] ?? '')) !== '' ? $st['student_provice'] : '—'); ?></td>
+                                                                                    <td><?php echo $e(trim((string) ($st['student_district'] ?? '')) !== '' ? $st['student_district'] : '—'); ?></td>
                                                                                     <td><?php echo $e($st['course_name'] ?? '—'); ?></td>
                                                                                     <td><?php echo $e($st['student_phone'] ?? '—'); ?></td>
                                                                                     <td class="text-muted">
