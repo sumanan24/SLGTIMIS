@@ -207,6 +207,7 @@ return [
     'rooms' => 'RoomController@index',
     'rooms/create-beds' => 'RoomController@createBeds',
     'rooms/bed-stickers' => 'RoomController@bedStickers',
+    'rooms/assign' => 'RoomController@assignStudents',
     'rooms/create' => 'RoomController@create',
     'rooms/edit' => 'RoomController@edit',
     'rooms/delete' => 'RoomController@delete',

@@ -495,23 +495,33 @@ class RoomModel extends Model {
 
     private function bedBarcode(string $hostel, string $block, string $roomNo, string $bedNo, bool $includeFloor): string
     {
-        $parts = [$this->barcodePart($hostel)];
-        if ($includeFloor) {
-            $floor = $this->barcodePart($block);
-            if ($floor !== '') {
-                $parts[] = $floor;
-            }
-        }
-        $parts[] = $this->barcodePart($roomNo);
-        $parts[] = $this->barcodePart($bedNo);
-        $parts = array_values(array_filter($parts, static function ($part) {
+        $hostelPart = $this->barcodePart($hostel);
+        $bedPart = $this->barcodePart($bedNo);
+        $roomPart = $this->numberedRoom($block, $roomNo, $includeFloor);
+        $parts = array_values(array_filter([$hostelPart, $roomPart, $bedPart], static function ($part) {
             return $part !== '';
         }));
         $code = implode('/', $parts);
         if ($code === '') {
-            $code = $this->barcodePart($bedNo);
+            $code = $bedPart;
         }
         return substr($code, 0, 40);
+    }
+
+    /**
+     * Floor 1 room 1 is 101. Floor 2 room 1 is 201.
+     */
+    private function numberedRoom(string $block, string $roomNo, bool $includeFloor): string
+    {
+        $roomDigits = preg_replace('/\D+/', '', $roomNo) ?? '';
+        $roomNum = (int) $roomDigits;
+        $floorDigits = preg_replace('/\D+/', '', $block) ?? '';
+        $floorNum = (int) $floorDigits;
+        if ($includeFloor && $floorNum > 0 && $roomNum > 0 && $roomNum < 100) {
+            return (string) (($floorNum * 100) + $roomNum);
+        }
+        $plain = $this->barcodePart($roomNo);
+        return $plain !== '' ? $plain : (string) $roomNum;
     }
 
     private function barcodePart(string $value): string

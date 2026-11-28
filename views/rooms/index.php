@@ -159,7 +159,7 @@ $totalAvail = max(0, $totalCap - $totalOcc);
 .rooms-page .col-stu { width: 10%; text-align: center; }
 .rooms-page .col-metric { width: 9%; text-align: center; }
 .rooms-page .col-occ { width: 16%; }
-.rooms-page .col-act { width: 96px; text-align: right; }
+.rooms-page .col-act { width: 132px; text-align: right; }
 .rooms-page .room-no { font-weight: 700; color: #0f172a; }
 .rooms-page .occ-wrap {
     display: flex;
@@ -482,6 +482,12 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                                 </td>
                                                 <?php if ($isAdminOrADM): ?>
                                                     <td class="col-act actions text-nowrap">
+                                                        <?php if ($available > 0): ?>
+                                                        <a href="<?php echo APP_URL; ?>/rooms/assign?room_id=<?php echo urlencode((string) ($room['id'] ?? '')); ?>&amp;nvq=4"
+                                                           class="btn btn-sm btn-outline-success" title="Assign students">
+                                                            <i class="fas fa-user-plus"></i>
+                                                        </a>
+                                                        <?php endif; ?>
                                                         <a href="<?php echo APP_URL; ?>/rooms/edit?id=<?php echo urlencode((string) ($room['id'] ?? '')); ?>"
                                                            class="btn btn-sm btn-outline-primary" title="Edit">
                                                             <i class="fas fa-edit"></i>

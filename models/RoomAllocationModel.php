@@ -515,5 +515,81 @@ class RoomAllocationModel extends Model {
     public function deleteAllocation($id) {
         return $this->delete($id);
     }
+
+    /**
+     * NVQ levels already living in a room: '4' and/or '5'.
+     *
+     * @return list<string>
+     */
+    public function roomAssignedNvq($roomId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT DISTINCT TRIM(LEADING '0' FROM TRIM(CAST(c.course_nvq_level AS CHAR))) AS nvq
+             FROM `hostel_allocations` a
+             INNER JOIN `student_enroll` se ON se.student_id = a.student_id
+                AND se.student_enroll_status IN ('Following', 'Internship')
+             INNER JOIN `course` c ON c.course_id = se.course_id
+             WHERE a.room_id = ? AND a.status = 'active'
+               AND TRIM(LEADING '0' FROM TRIM(CAST(c.course_nvq_level AS CHAR))) IN ('4', '5')"
+        );
+        $stmt->bind_param('s', $roomId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $levels = [];
+        while ($row = $result->fetch_assoc()) {
+            $nvq = (string) ((int) ($row['nvq'] ?? 0));
+            if ($nvq === '4' || $nvq === '5') {
+                $levels[$nvq] = $nvq;
+            }
+        }
+        return array_values($levels);
+    }
+
+    /**
+     * Following students of one NVQ level who have no active room.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listUnassignedStudents(string $nvq, string $hostelGender = '', string $academicYear = ''): array
+    {
+        $nvq = (string) ((int) $nvq);
+        if ($nvq !== '4' && $nvq !== '5') {
+            return [];
+        }
+        $gender = ($hostelGender === 'male' || $hostelGender === 'female') ? $hostelGender : '';
+        $academicYear = trim($academicYear);
+        $sql = "SELECT DISTINCT s.student_id, s.student_fullname, s.student_gender, c.course_name, se.academic_year
+                FROM `student` s
+                INNER JOIN `student_enroll` se ON se.student_id = s.student_id
+                    AND se.student_enroll_status IN ('Following', 'Internship')
+                INNER JOIN `course` c ON c.course_id = se.course_id
+                WHERE TRIM(LEADING '0' FROM TRIM(CAST(c.course_nvq_level AS CHAR))) = ?
+                  AND NOT EXISTS (
+                      SELECT 1 FROM `hostel_allocations` a
+                      WHERE a.student_id = s.student_id AND a.status = 'active'
+                  )";
+        $types = 's';
+        $params = [$nvq];
+        if ($academicYear !== '') {
+            $sql .= " AND se.academic_year = ?";
+            $types .= 's';
+            $params[] = $academicYear;
+        }
+        if ($gender !== '') {
+            $sql .= " AND LOWER(TRIM(s.student_gender)) = ?";
+            $types .= 's';
+            $params[] = $gender;
+        }
+        $sql .= " ORDER BY s.student_fullname ASC, s.student_id ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $rows = [];
+        while ($row = $result->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        return $rows;
+    }
 }
 

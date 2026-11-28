@@ -491,5 +491,153 @@ class RoomController extends Controller {
             'beds' => $beds,
         ]);
     }
+
+    public function assignStudents() {
+        if (!isset($_SESSION['user_id'])) {
+            $this->redirect('login');
+            return;
+        }
+        if (!$this->checkAdminOrADM()) {
+            return;
+        }
+        $roomModel = $this->model('RoomModel');
+        $roomId = trim((string) $this->get('room_id', $this->post('room_id', '')));
+        $room = $roomId !== '' ? $roomModel->getById($roomId) : null;
+        if (!$room) {
+            $_SESSION['error'] = 'That room was not found.';
+            $this->redirect('rooms');
+            return;
+        }
+        $hostelModel = $this->model('HostelModel');
+        $hostel = $hostelModel->getById($room['hostel_id'] ?? 0);
+        $gender = $this->hostelGenderKey($hostel['gender'] ?? '');
+        $allocationModel = $this->model('RoomAllocationModel');
+        $capacity = max(0, (int) ($room['capacity'] ?? 0));
+        $occupied = max(0, (int) ($room['occupied_beds'] ?? 0));
+        $free = max(0, $capacity - $occupied);
+        $slots = min(8, $free);
+        $locked = $allocationModel->roomAssignedNvq($roomId);
+        $studentModel = $this->model('StudentModel');
+        $academicYears = $studentModel->getAcademicYears();
+        $academicYear = trim((string) $this->get('academic_year', $this->post('academic_year', '')));
+        if (!in_array($academicYear, $academicYears, true)) {
+            $academicYear = '';
+        }
+        $nvq = (string) ((int) $this->get('nvq', $this->post('nvq', '4')));
+        if ($nvq !== '4' && $nvq !== '5') {
+            $nvq = '4';
+        }
+        if (count($locked) === 1) {
+            $nvq = $locked[0];
+        }
+        $back = 'rooms?hostel_id=' . (int) ($room['hostel_id'] ?? 0);
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if ($slots < 1) {
+                $_SESSION['error'] = 'This room is full.';
+                $this->redirect($back);
+                return;
+            }
+            $postedNvq = (string) ((int) $this->post('nvq', ''));
+            if (count($locked) === 1 && $postedNvq !== $locked[0]) {
+                $_SESSION['error'] = 'This room already has Level ' . str_pad($locked[0], 2, '0', STR_PAD_LEFT) . ' students. Keep the same level.';
+                $this->redirect('rooms/assign?room_id=' . urlencode($roomId) . '&nvq=' . urlencode($locked[0]) . $this->assignYearQuery($academicYear));
+                return;
+            }
+            if ($postedNvq === '4' || $postedNvq === '5') {
+                $nvq = $postedNvq;
+            }
+            $raw = $this->post('student_ids', []);
+            if (!is_array($raw)) {
+                $raw = [$raw];
+            }
+            $picked = [];
+            foreach ($raw as $id) {
+                $id = trim((string) $id);
+                if ($id !== '') {
+                    $picked[$id] = $id;
+                }
+            }
+            $picked = array_slice(array_values($picked), 0, $slots);
+            if (!$picked) {
+                $_SESSION['error'] = 'Select students for this room.';
+                $this->redirect('rooms/assign?room_id=' . urlencode($roomId) . '&nvq=' . urlencode($nvq) . $this->assignYearQuery($academicYear));
+                return;
+            }
+            $allowed = [];
+            foreach ($allocationModel->listUnassignedStudents($nvq, $gender, $academicYear) as $stu) {
+                $allowed[(string) $stu['student_id']] = true;
+            }
+            $assigned = 0;
+            foreach ($picked as $studentId) {
+                if (empty($allowed[$studentId])) {
+                    continue;
+                }
+                $newId = $allocationModel->createAllocation([
+                    'student_id' => $studentId,
+                    'room_id' => $roomId,
+                    'status' => 'active',
+                ]);
+                if ($newId) {
+                    $assigned++;
+                }
+            }
+            if ($assigned > 0) {
+                $levelLabel = 'Level ' . str_pad($nvq, 2, '0', STR_PAD_LEFT);
+                $_SESSION['message'] = 'Assigned ' . $assigned . ' ' . $levelLabel . ' student(s) to room ' . ($room['room_no'] ?? '') . '.';
+                $this->logActivity(
+                    'CREATE',
+                    'room_allocation',
+                    (string) $roomId,
+                    'Assigned ' . $assigned . ' ' . $levelLabel . ' students to room ' . ($room['room_no'] ?? $roomId),
+                    null,
+                    ['room_id' => $roomId, 'nvq' => $nvq, 'count' => $assigned]
+                );
+            } else {
+                $_SESSION['error'] = 'Those students were not assigned. They may already have a room, or this room is full.';
+            }
+            $this->redirect($back);
+            return;
+        }
+
+        $students = $slots > 0 ? $allocationModel->listUnassignedStudents($nvq, $gender, $academicYear) : [];
+        return $this->view('rooms/assign', [
+            'title' => 'Assign students',
+            'page' => 'rooms',
+            'room' => $room,
+            'hostel' => $hostel,
+            'nvq' => $nvq,
+            'locked' => $locked,
+            'slots' => $slots,
+            'free' => $free,
+            'students' => $students,
+            'gender' => $gender,
+            'academic_year' => $academicYear,
+            'academic_years' => $academicYears,
+        ]);
+    }
+
+    private function assignYearQuery(string $academicYear): string
+    {
+        return $academicYear !== '' ? '&academic_year=' . urlencode($academicYear) : '';
+    }
+
+    private function hostelGenderKey($gender): string
+    {
+        $raw = strtolower(trim((string) $gender));
+        if ($raw === 'male' || strpos($raw, 'boy') !== false) {
+            return 'male';
+        }
+        if ($raw === 'female' || strpos($raw, 'girl') !== false) {
+            return 'female';
+        }
+        if ($raw !== '' && $raw[0] === 'm') {
+            return 'male';
+        }
+        if ($raw !== '' && $raw[0] === 'f') {
+            return 'female';
+        }
+        return '';
+    }
 }
 
