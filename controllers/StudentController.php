@@ -936,6 +936,12 @@ class StudentController extends Controller {
         // Get all allocations (history) for this student
         $filters = ['student_id' => $id];
         $hostelHistory = $roomAllocationModel->getAllocations(1, 100, $filters);
+        $roomModel = $this->model('RoomModel');
+        foreach ($hostelHistory as &$historyRow) {
+            $historyBed = trim((string) ($historyRow['bed_no'] ?? ''));
+            $historyRow['bed_code'] = $historyBed === '' ? '' : $roomModel->studentBedCode($historyRow, $historyBed);
+        }
+        unset($historyRow);
         
         // Get payment information
         // Note: Payment information is visible to all authorized users including:

@@ -172,7 +172,7 @@ class RoomAllocationModel extends Model {
         $sql = "SELECT ha.*, 
                 s.student_id, s.student_fullname, s.student_email, s.student_nic, s.student_gender,
                 r.room_no, r.capacity,
-                b.name as block_name,
+                b.name as block_name, b.hostel_id,
                 h.name as hostel_name, h.gender as hostel_gender,
                 d.department_name
                 FROM `{$this->table}` ha
@@ -215,7 +215,7 @@ class RoomAllocationModel extends Model {
         $sql = "SELECT ha.*, 
                 s.student_id, s.student_fullname, s.student_email, s.student_nic, s.student_gender,
                 r.room_no, r.capacity,
-                b.name as block_name,
+                b.name as block_name, b.hostel_id,
                 h.name as hostel_name, h.gender as hostel_gender,
                 d.department_name
                 FROM `{$this->table}` ha
@@ -283,7 +283,7 @@ class RoomAllocationModel extends Model {
         $sql = "SELECT ha.*, 
                 s.student_id, s.student_fullname, s.student_email, s.student_nic, s.student_gender,
                 r.room_no, r.capacity, r.block_id,
-                b.name as block_name,
+                b.name as block_name, b.hostel_id,
                 h.name as hostel_name, h.gender as hostel_gender, h.id as hostel_id
                 FROM `{$this->table}` ha
                 LEFT JOIN `student` s ON ha.student_id COLLATE utf8mb4_unicode_ci = s.student_id
@@ -300,9 +300,11 @@ class RoomAllocationModel extends Model {
      * Get active allocation for a student
      */
     public function getActiveByStudentId($studentId) {
-        $sql = "SELECT ha.*, 
+        $this->ensureAllocationBedColumn();
+        $sql = "SELECT ha.*,
                 r.room_no,
                 b.name as block_name,
+                b.hostel_id,
                 h.name as hostel_name
                 FROM `{$this->table}` ha
                 LEFT JOIN `hostel_rooms` r ON ha.room_id = r.id
@@ -313,7 +315,29 @@ class RoomAllocationModel extends Model {
                 LIMIT 1";
 
         $result = $this->runFilteredQuery($sql, 's', [$studentId]);
-        return $result ? $result->fetch_assoc() : null;
+        $row = $result ? $result->fetch_assoc() : null;
+        if (!$row) {
+            return null;
+        }
+        $roomId = trim((string) ($row['room_id'] ?? ''));
+        if ($roomId !== '' && trim((string) ($row['bed_no'] ?? '')) === '') {
+            $this->fillMissingBeds([$roomId]);
+            $allocationId = (string) ($row['id'] ?? '');
+            if ($allocationId !== '') {
+                $fresh = $this->db->prepare("SELECT `bed_no` FROM `hostel_allocations` WHERE `id` = ?");
+                if ($fresh) {
+                    $fresh->bind_param('s', $allocationId);
+                    $fresh->execute();
+                    $bedRow = $fresh->get_result()->fetch_assoc();
+                    if ($bedRow) {
+                        $row['bed_no'] = $bedRow['bed_no'];
+                    }
+                }
+            }
+        }
+        $bedNo = trim((string) ($row['bed_no'] ?? ''));
+        $row['bed_code'] = $bedNo === '' ? '' : (new RoomModel())->studentBedCode($row, $bedNo);
+        return $row;
     }
     
     /**
