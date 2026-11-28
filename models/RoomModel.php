@@ -5,6 +5,9 @@
 
 class RoomModel extends Model {
     protected $table = 'hostel_rooms';
+
+    /** @var array<int,bool> */
+    private $floorHostelCache = [];
     
     protected function getPrimaryKey() {
         return 'id';
@@ -396,6 +399,52 @@ class RoomModel extends Model {
     }
 
     /**
+     * Bed order for a room: T1, B1, T2, B2, ...
+     *
+     * @return list<string>
+     */
+    public function bunkPairOrder(int $capacity): array
+    {
+        $half = intdiv(max(0, $capacity), 2);
+        $labels = [];
+        for ($i = 1; $i <= $half; $i++) {
+            $labels[] = 'T' . $i;
+            $labels[] = 'B' . $i;
+        }
+        return $labels;
+    }
+
+    public function bedPairRank(string $bedNo): int
+    {
+        if (!preg_match('/^([TB])(\d+)$/i', trim($bedNo), $m)) {
+            return 1000;
+        }
+        $n = (int) $m[2];
+        $side = strtoupper($m[1]) === 'T' ? 0 : 1;
+        return max(0, $n - 1) * 2 + $side;
+    }
+
+    /**
+     * Full bed label, for example B18/101/T1.
+     *
+     * @param array<string,mixed> $room
+     */
+    public function studentBedCode(array $room, string $bedNo): string
+    {
+        $code = $this->roomListCode(
+            (string) ($room['hostel_name'] ?? ''),
+            (string) ($room['block_name'] ?? ''),
+            (string) ($room['room_no'] ?? ''),
+            $this->hostelUsesFloors((int) ($room['hostel_id'] ?? 0))
+        );
+        $bedNo = strtoupper(trim($bedNo));
+        if ($bedNo === '') {
+            return $code;
+        }
+        return $code === '' ? $bedNo : $code . '/' . $bedNo;
+    }
+
+    /**
      * Give every room in a hostel beds T1–T4 and B1–B4.
      *
      * @return array{created:int,rooms:int,total:int}
@@ -476,11 +525,16 @@ class RoomModel extends Model {
         if ($hostelId < 1) {
             return false;
         }
+        if (isset($this->floorHostelCache[$hostelId])) {
+            return $this->floorHostelCache[$hostelId];
+        }
         $stmt = $this->db->prepare("SELECT COUNT(*) AS c FROM `hostel_blocks` WHERE `hostel_id` = ?");
         $stmt->bind_param('i', $hostelId);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
-        return (int) ($row['c'] ?? 0) > 1;
+        $uses = (int) ($row['c'] ?? 0) > 1;
+        $this->floorHostelCache[$hostelId] = $uses;
+        return $uses;
     }
 
     private function insertBunkBeds(int $roomId, string $hostel, string $block, string $roomNo, bool $includeFloor, int $capacity): int

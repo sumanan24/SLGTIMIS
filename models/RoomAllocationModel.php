@@ -404,7 +404,8 @@ class RoomAllocationModel extends Model {
         }
 
         $placeholders = implode(',', array_fill(0, count($roomIds), '?'));
-        $sql = "SELECT ha.room_id, ha.allocated_at, ha.status,
+        $this->fillMissingBeds($roomIds);
+        $sql = "SELECT ha.id AS allocation_id, ha.room_id, ha.bed_no, ha.allocated_at, ha.status,
                 s.student_id, s.student_fullname, s.student_phone, s.student_nic, s.student_gender,
                 s.student_profile_img, s.student_provice, s.student_district,
                 d.department_name, c.course_name
@@ -488,8 +489,132 @@ class RoomAllocationModel extends Model {
         if (empty($data['status'])) {
             $data['status'] = 'active';
         }
+
+        $this->fillMissingBeds([(string) $data['room_id']]);
+        $bed = $this->nextFreeBed((string) $data['room_id']);
+        if ($bed !== null && $bed !== '') {
+            $data['bed_no'] = $bed;
+        }
         
         return $this->create($data);
+    }
+
+    public function ensureAllocationBedColumn(): void
+    {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+        $done = true;
+        $result = $this->db->query("SHOW COLUMNS FROM `hostel_allocations` LIKE 'bed_no'");
+        if ($result && $result->num_rows > 0) {
+            return;
+        }
+        $this->db->query("ALTER TABLE `hostel_allocations` ADD COLUMN `bed_no` VARCHAR(10) NULL DEFAULT NULL AFTER `room_id`");
+    }
+
+    /**
+     * Give each active student without a bed the next free bunk: T1, B1, T2, B2.
+     *
+     * @param list<int|string> $roomIds
+     */
+    public function fillMissingBeds(array $roomIds): void
+    {
+        $this->ensureAllocationBedColumn();
+        $roomIds = array_values(array_unique(array_filter(array_map('strval', $roomIds), static function ($id) {
+            return $id !== '';
+        })));
+        if ($roomIds === []) {
+            return;
+        }
+        $placeholders = implode(',', array_fill(0, count($roomIds), '?'));
+        $types = str_repeat('s', count($roomIds));
+        $capStmt = $this->db->prepare("SELECT id, capacity FROM `hostel_rooms` WHERE id IN ($placeholders)");
+        $capStmt->bind_param($types, ...$roomIds);
+        $capStmt->execute();
+        $capResult = $capStmt->get_result();
+        $capacity = [];
+        while ($row = $capResult->fetch_assoc()) {
+            $capacity[(string) $row['id']] = (int) ($row['capacity'] ?? 0);
+        }
+        $stmt = $this->db->prepare(
+            "SELECT id, room_id, bed_no FROM `hostel_allocations`
+             WHERE status = 'active' AND room_id IN ($placeholders)
+             ORDER BY room_id ASC, allocated_at ASC, id ASC"
+        );
+        $stmt->bind_param($types, ...$roomIds);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $byRoom = [];
+        while ($row = $result->fetch_assoc()) {
+            $byRoom[(string) $row['room_id']][] = $row;
+        }
+        $roomModel = new RoomModel();
+        $update = $this->db->prepare("UPDATE `hostel_allocations` SET `bed_no` = ? WHERE `id` = ? AND (`bed_no` IS NULL OR `bed_no` = '')");
+        foreach ($byRoom as $roomId => $rows) {
+            $order = $roomModel->bunkPairOrder($capacity[$roomId] ?? 0);
+            if (!$order) {
+                continue;
+            }
+            $used = [];
+            $need = [];
+            foreach ($rows as $row) {
+                $bed = strtoupper(trim((string) ($row['bed_no'] ?? '')));
+                if ($bed !== '' && in_array($bed, $order, true) && empty($used[$bed])) {
+                    $used[$bed] = true;
+                    continue;
+                }
+                $need[] = (string) $row['id'];
+            }
+            foreach ($need as $id) {
+                $next = '';
+                foreach ($order as $label) {
+                    if (empty($used[$label])) {
+                        $next = $label;
+                        break;
+                    }
+                }
+                if ($next === '') {
+                    continue;
+                }
+                $used[$next] = true;
+                $update->bind_param('ss', $next, $id);
+                $update->execute();
+            }
+        }
+    }
+
+    public function nextFreeBed(string $roomId): ?string
+    {
+        $roomId = trim($roomId);
+        if ($roomId === '') {
+            return null;
+        }
+        $this->ensureAllocationBedColumn();
+        $capStmt = $this->db->prepare("SELECT capacity FROM `hostel_rooms` WHERE id = ? LIMIT 1");
+        $capStmt->bind_param('s', $roomId);
+        $capStmt->execute();
+        $cap = $capStmt->get_result()->fetch_assoc();
+        $order = (new RoomModel())->bunkPairOrder((int) ($cap['capacity'] ?? 0));
+        if (!$order) {
+            return null;
+        }
+        $stmt = $this->db->prepare(
+            "SELECT bed_no FROM `hostel_allocations` WHERE room_id = ? AND status = 'active' AND bed_no IS NOT NULL AND bed_no <> ''"
+        );
+        $stmt->bind_param('s', $roomId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $used = [];
+        while ($row = $result->fetch_assoc()) {
+            $used[strtoupper(trim((string) $row['bed_no']))] = true;
+        }
+        foreach ($order as $label) {
+            if (empty($used[$label])) {
+                return $label;
+            }
+        }
+        return null;
     }
     
     /**
@@ -573,6 +698,12 @@ class RoomAllocationModel extends Model {
                   AND NOT EXISTS (
                       SELECT 1 FROM `hostel_allocations` a
                       WHERE a.student_id = s.student_id AND a.status = 'active'
+                  )
+                  AND EXISTS (
+                      SELECT 1 FROM `pays` p
+                      WHERE p.student_id COLLATE utf8mb4_unicode_ci = s.student_id COLLATE utf8mb4_unicode_ci
+                        AND LOWER(TRIM(p.payment_reason)) = 'hostel charges'
+                        AND p.approved = 1
                   )";
         $types = 's';
         $params = [$nvq];

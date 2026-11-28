@@ -524,9 +524,10 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                                                     <table class="table table-sm stu-table mb-0">
                                                                         <colgroup>
                                                                             <col style="width:3%">
-                                                                            <col style="width:5%">
                                                                             <col style="width:12%">
-                                                                            <col style="width:15%">
+                                                                            <col style="width:5%">
+                                                                            <col style="width:11%">
+                                                                            <col style="width:13%">
                                                                             <col style="width:7%">
                                                                             <col style="width:12%">
                                                                             <col style="width:12%">
@@ -538,6 +539,7 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                                                         <thead>
                                                                             <tr>
                                                                                 <th>#</th>
+                                                                                <th>Bed</th>
                                                                                 <th>Photo</th>
                                                                                 <th>Student ID</th>
                                                                                 <th>Name</th>
@@ -554,6 +556,7 @@ $totalAvail = max(0, $totalCap - $totalOcc);
                                                                             <?php foreach ($students as $si => $st): ?>
                                                                                 <tr>
                                                                                     <td class="text-muted"><?php echo $si + 1; ?></td>
+                                                                                    <td class="fw-semibold"><?php echo $e($st['bed_code'] ?? '—'); ?></td>
                                                                                     <td>
                                                                                         <?php if (!empty($st['photo_url'])): ?>
                                                                                             <img src="<?php echo $e($st['photo_url']); ?>" alt="" width="32" height="40" style="width:32px;height:40px;object-fit:cover;border-radius:2px;display:block;">

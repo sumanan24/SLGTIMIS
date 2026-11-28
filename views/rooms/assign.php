@@ -23,19 +23,44 @@ if ($floor !== '') {
 $where .= ' · Room ' . trim((string) ($room['room_no'] ?? ''));
 ?>
 <style>
-.assign-page { max-width: 860px; }
-.assign-list { max-height: 28rem; overflow: auto; border: 1px solid #e2e8f0; border-radius: .5rem; background: #fff; }
-.assign-row { display: flex; gap: .75rem; align-items: flex-start; padding: .55rem .75rem; border-bottom: 1px solid #f1f5f9; }
+.assign-page { width: 100%; }
+.assign-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+.assign-meta { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .4rem; }
+.assign-meta span { display: inline-flex; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 999px; padding: .15rem .6rem; font-size: .78rem; color: #334155; line-height: 1.3; }
+.assign-note { margin: 0 0 1rem; max-width: 70rem; }
+.assign-filters { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1rem; margin-bottom: 1rem; }
+.assign-year { display: flex; align-items: center; gap: .5rem; margin: 0; }
+.assign-year .form-select { width: 9.5rem; }
+.assign-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .75rem; }
+.assign-tools .form-control { width: 16rem; max-width: 100%; }
+.assign-stats { margin-left: auto; display: flex; align-items: center; gap: .5rem; }
+.assign-list { max-height: 32rem; overflow: auto; border: 1px solid #e2e8f0; border-radius: .5rem; background: #fff; }
+.assign-cols { display: grid; grid-template-columns: minmax(10rem, 1.5fr) 9.5rem minmax(8rem, 1fr) 6.5rem minmax(8rem, 1.15fr); gap: .65rem; align-items: center; min-width: 0; }
+.assign-headrow, .assign-row { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr); gap: .5rem; align-items: center; padding: .5rem .75rem; }
+.assign-headrow { position: sticky; top: 0; z-index: 1; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: .75rem; font-weight: 650; color: #64748b; }
+.assign-row { margin: 0; border-bottom: 1px solid #f1f5f9; cursor: pointer; }
 .assign-row:last-child { border-bottom: 0; }
+.assign-row:hover { background: #f8fafc; }
 .assign-row.is-hide { display: none; }
+.assign-row .form-check-input { margin: 0; float: none; position: static; }
 .assign-row .name { font-weight: 650; }
-.assign-tools { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.assign-row .cell { color: #475569; font-size: .84rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 900px) {
+    .assign-stats { margin-left: 0; }
+    .assign-headrow { display: none; }
+    .assign-cols { grid-template-columns: 1fr; gap: .1rem; }
+    .assign-row .cell { white-space: normal; }
+}
 </style>
 <div class="assign-page">
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div class="assign-head">
         <div>
-            <h1 class="h5 mb-1">Assign students</h1>
-            <div class="text-muted small"><?php echo $e($where); ?> · <?php echo (int) $slots; ?> free <?php echo $slots === 1 ? 'bed' : 'beds'; ?></div>
+            <h1 class="h5 mb-0">Assign students</h1>
+            <div class="assign-meta">
+                <span><?php echo $e($where); ?></span>
+                <span><?php echo (int) $slots; ?> free <?php echo $slots === 1 ? 'bed' : 'beds'; ?></span>
+                <span><?php echo count($students); ?> active <?php echo count($students) === 1 ? 'student' : 'students'; ?> with hostel fee paid</span>
+            </div>
         </div>
         <a class="btn btn-outline-secondary btn-sm" href="<?php echo $e($back); ?>"><i class="fas fa-arrow-left me-1"></i>Rooms</a>
     </div>
@@ -43,8 +68,8 @@ $where .= ' · Room ' . trim((string) ($room['room_no'] ?? ''));
     <?php if ($slots < 1): ?>
         <div class="alert alert-warning">This room already has 8 students.</div>
     <?php else: ?>
-        <p class="small text-muted">Level 04 and Level 05 stay in separate rooms. One room takes <?php echo (int) $slots; ?> students. Students who already have a room are not listed. Northern Province students are not listed. Pick <?php echo (int) $slots; ?> at random chooses different departments.</p>
-        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <p class="assign-note small text-muted">Level 04 and Level 05 stay in separate rooms. One room takes <?php echo (int) $slots; ?> students. Only active students who have paid the hostel fee at least once are listed. Students who already have a room are not listed. Northern Province students are not listed. Pick <?php echo (int) $slots; ?> at random chooses different departments.</p>
+        <div class="assign-filters">
             <div class="btn-group" role="group">
                 <?php foreach (['4' => 'Level 04', '5' => 'Level 05'] as $code => $label):
                     $disabled = count($locked) === 1 && $locked[0] !== $code;
@@ -57,11 +82,11 @@ $where .= ' · Room ' . trim((string) ($room['room_no'] ?? ''));
                     <?php endif; ?>
                 <?php endforeach; ?>
             </div>
-            <form method="GET" action="<?php echo APP_URL; ?>/rooms/assign" class="d-flex align-items-center gap-2">
+            <form method="GET" action="<?php echo APP_URL; ?>/rooms/assign" class="assign-year">
                 <input type="hidden" name="room_id" value="<?php echo $e($roomId); ?>">
                 <input type="hidden" name="nvq" value="<?php echo $e($nvq); ?>">
                 <label class="small text-muted mb-0" for="academic_year">Academic year</label>
-                <select name="academic_year" id="academic_year" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                <select name="academic_year" id="academic_year" class="form-select form-select-sm" onchange="this.form.submit()">
                     <option value="">All years</option>
                     <?php foreach ($academicYears as $year): ?>
                         <option value="<?php echo $e($year); ?>" <?php echo $academicYear === (string) $year ? 'selected' : ''; ?>><?php echo $e($year); ?></option>
@@ -74,15 +99,28 @@ $where .= ' · Room ' . trim((string) ($room['room_no'] ?? ''));
             <input type="hidden" name="room_id" value="<?php echo $e($roomId); ?>">
             <input type="hidden" name="nvq" value="<?php echo $e($nvq); ?>">
             <input type="hidden" name="academic_year" value="<?php echo $e($academicYear); ?>">
-            <div class="assign-tools mb-2">
-                <input type="search" id="assignFind" class="form-control form-control-sm" style="max-width: 16rem;" placeholder="Search name or ID">
+            <div class="assign-tools">
+                <input type="search" id="assignFind" class="form-control form-control-sm" placeholder="Search name or ID">
                 <button type="button" class="btn btn-outline-dark btn-sm" id="assignRandom">Pick <?php echo (int) $slots; ?> from different departments</button>
-                <span class="small text-muted" id="assignCount">0 selected</span>
+                <span class="assign-stats">
+                    <span class="badge text-bg-light border"><?php echo count($students); ?> in this list</span>
+                    <span class="small text-muted" id="assignCount">0 selected</span>
+                </span>
             </div>
             <?php if (!$students): ?>
-                <div class="alert alert-info">No unassigned <?php echo $e($levelLabel); ?> students<?php echo $academicYear !== '' ? ' in ' . $e($academicYear) : ''; ?> for this hostel.</div>
+                <div class="alert alert-info">No active <?php echo $e($levelLabel); ?> students<?php echo $academicYear !== '' ? ' in ' . $e($academicYear) : ''; ?> who have paid the hostel fee are waiting for this hostel.</div>
             <?php else: ?>
                 <div class="assign-list mb-3">
+                    <div class="assign-headrow">
+                        <span></span>
+                        <span class="assign-cols">
+                            <span>Name</span>
+                            <span>Reg. number</span>
+                            <span>Department</span>
+                            <span>Year</span>
+                            <span>Course</span>
+                        </span>
+                    </div>
                     <?php foreach ($students as $stu):
                         $sid = (string) ($stu['student_id'] ?? '');
                         $name = (string) ($stu['student_fullname'] ?? '');
@@ -94,10 +132,13 @@ $where .= ' · Room ' . trim((string) ($room['room_no'] ?? ''));
                         $hay = strtolower($sid . ' ' . $name . ' ' . $dept);
                     ?>
                         <label class="assign-row" data-hay="<?php echo $e($hay); ?>" data-dept="<?php echo $e($deptKey); ?>">
-                            <input class="form-check-input mt-1 assign-box" type="checkbox" name="student_ids[]" value="<?php echo $e($sid); ?>">
-                            <span>
-                                <span class="name d-block"><?php echo $e($name !== '' ? $name : $sid); ?></span>
-                                <span class="small text-muted"><?php echo $e($sid); ?><?php if ($dept !== ''): ?> · <?php echo $e($dept); ?><?php endif; ?><?php if (!empty($stu['academic_year'])): ?> · <?php echo $e($stu['academic_year']); ?><?php endif; ?><?php if (!empty($stu['course_name'])): ?> · <?php echo $e($stu['course_name']); ?><?php endif; ?></span>
+                            <input class="form-check-input assign-box" type="checkbox" name="student_ids[]" value="<?php echo $e($sid); ?>">
+                            <span class="assign-cols">
+                                <span class="name"><?php echo $e($name !== '' ? $name : $sid); ?></span>
+                                <span class="cell"><?php echo $e($sid); ?></span>
+                                <span class="cell"><?php echo $e($dept !== '' ? $dept : '—'); ?></span>
+                                <span class="cell"><?php echo $e(!empty($stu['academic_year']) ? $stu['academic_year'] : '—'); ?></span>
+                                <span class="cell"><?php echo $e(!empty($stu['course_name']) ? $stu['course_name'] : '—'); ?></span>
                             </span>
                         </label>
                     <?php endforeach; ?>

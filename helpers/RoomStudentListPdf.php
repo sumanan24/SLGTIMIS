@@ -22,11 +22,12 @@ class RoomStudentListPdf
         $pdf->SetAutoPageBreak(false);
         $pdf->SetMargins(12, 12, 12);
 
-        $wNo = 10;
+        $wNo = 8;
+        $wBed = 32;
         $wPhoto = 16;
-        $wReg = 42;
-        $wNic = 36;
-        $wName = 82;
+        $wReg = 36;
+        $wNic = 34;
+        $wName = 60;
         $rowH = 16;
         $thumbs = [];
         $printed = 0;
@@ -39,25 +40,26 @@ class RoomStudentListPdf
             $printed++;
             $code = (string) ($room['code'] ?? '');
             $pdf->AddPage();
-            self::roomHead($pdf, $hostelName, $code, $wNo + $wPhoto + $wReg + $wNic + $wName);
-            self::tableHead($pdf, $wNo, $wPhoto, $wReg, $wNic, $wName);
+            self::roomHead($pdf, $hostelName, $code, $wNo + $wBed + $wPhoto + $wReg + $wNic + $wName);
+            self::tableHead($pdf, $wNo, $wBed, $wPhoto, $wReg, $wNic, $wName);
             $n = 0;
             foreach ($students as $stu) {
                 if ($pdf->GetY() > 268) {
                     $pdf->AddPage();
-                    self::roomHead($pdf, $hostelName, $code, $wNo + $wPhoto + $wReg + $wNic + $wName);
-                    self::tableHead($pdf, $wNo, $wPhoto, $wReg, $wNic, $wName);
+                    self::roomHead($pdf, $hostelName, $code, $wNo + $wBed + $wPhoto + $wReg + $wNic + $wName);
+                    self::tableHead($pdf, $wNo, $wBed, $wPhoto, $wReg, $wNic, $wName);
                 }
                 $n++;
                 $thumb = self::thumb((string) ($stu['photo_file'] ?? ''), $thumbs);
                 $x = $pdf->GetX();
                 $y = $pdf->GetY();
                 $pdf->Cell($wNo, $rowH, (string) $n, 1, 0, 'C');
+                $pdf->Cell($wBed, $rowH, self::fit($pdf, (string) ($stu['bed_code'] ?? ''), $wBed), 1, 0, 'L');
                 $pdf->Cell($wPhoto, $rowH, '', 1, 0);
                 if ($thumb !== null) {
                     $iw = 12;
                     $ih = 14;
-                    $pdf->Image($thumb, $x + $wNo + ($wPhoto - $iw) / 2, $y + ($rowH - $ih) / 2, $iw, $ih);
+                    $pdf->Image($thumb, $x + $wNo + $wBed + ($wPhoto - $iw) / 2, $y + ($rowH - $ih) / 2, $iw, $ih);
                 }
                 $pdf->Cell($wReg, $rowH, self::fit($pdf, (string) ($stu['student_id'] ?? ''), $wReg), 1, 0, 'L');
                 $pdf->Cell($wNic, $rowH, self::fit($pdf, (string) ($stu['student_nic'] ?? ''), $wNic), 1, 0, 'L');
@@ -94,12 +96,13 @@ class RoomStudentListPdf
         $pdf->Ln(2);
     }
 
-    private static function tableHead(FPDF $pdf, float $wNo, float $wPhoto, float $wReg, float $wNic, float $wName): void
+    private static function tableHead(FPDF $pdf, float $wNo, float $wBed, float $wPhoto, float $wReg, float $wNic, float $wName): void
     {
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFillColor(241, 245, 249);
         $pdf->SetFont('Helvetica', 'B', 9);
         $pdf->Cell($wNo, 7, '#', 1, 0, 'C', true);
+        $pdf->Cell($wBed, 7, 'Bed', 1, 0, 'L', true);
         $pdf->Cell($wPhoto, 7, 'Photo', 1, 0, 'C', true);
         $pdf->Cell($wReg, 7, 'Reg. number', 1, 0, 'L', true);
         $pdf->Cell($wNic, 7, 'NIC', 1, 0, 'L', true);

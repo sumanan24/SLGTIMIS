@@ -56,8 +56,16 @@ class RoomController extends Controller {
         foreach ($rooms as $room) {
             $rid = (string) ($room['id'] ?? '');
             $roomStudents = $studentsByRoom[$rid] ?? [];
+            usort($roomStudents, static function ($a, $b) use ($roomModel) {
+                $rank = $roomModel->bedPairRank((string) ($a['bed_no'] ?? '')) <=> $roomModel->bedPairRank((string) ($b['bed_no'] ?? ''));
+                if ($rank !== 0) {
+                    return $rank;
+                }
+                return strcasecmp((string) ($a['student_fullname'] ?? ''), (string) ($b['student_fullname'] ?? ''));
+            });
             foreach ($roomStudents as &$roomStudent) {
                 $roomStudent['photo_url'] = $studentModel->getProfileImagePath($roomStudent) ?: '';
+                $roomStudent['bed_code'] = $roomModel->studentBedCode($room, (string) ($roomStudent['bed_no'] ?? ''));
             }
             unset($roomStudent);
             $room['students'] = $roomStudents;
@@ -534,11 +542,16 @@ class RoomController extends Controller {
             if (!$students) {
                 continue;
             }
-            usort($students, static function ($a, $b) {
+            usort($students, static function ($a, $b) use ($roomModel) {
+                $rank = $roomModel->bedPairRank((string) ($a['bed_no'] ?? '')) <=> $roomModel->bedPairRank((string) ($b['bed_no'] ?? ''));
+                if ($rank !== 0) {
+                    return $rank;
+                }
                 return strcasecmp((string) ($a['student_fullname'] ?? ''), (string) ($b['student_fullname'] ?? ''));
             });
             foreach ($students as &$stu) {
                 $stu['photo_file'] = $studentModel->getProfileImageAbsolutePath($stu);
+                $stu['bed_code'] = $roomModel->studentBedCode($room, (string) ($stu['bed_no'] ?? ''));
             }
             unset($stu);
             $sections[] = [
@@ -663,7 +676,7 @@ class RoomController extends Controller {
             return;
         }
 
-        $students = $slots > 0 ? $allocationModel->listUnassignedStudents($nvq, $gender, $academicYear) : [];
+        $students = $allocationModel->listUnassignedStudents($nvq, $gender, $academicYear);
         return $this->view('rooms/assign', [
             'title' => 'Assign students',
             'page' => 'rooms',
