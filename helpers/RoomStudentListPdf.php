@@ -23,8 +23,7 @@ class RoomStudentListPdf
         $pdf->SetAutoPageBreak(false);
         $pdf->SetMargins(12, 12, 12);
 
-        $widths = [9, 18, 36, 40, 32, 51];
-        $rowH = 20;
+        $widths = [8, 15, 32, 38, 26, 67];
         $thumbs = [];
         $printed = 0;
 
@@ -43,7 +42,8 @@ class RoomStudentListPdf
             self::tableHead($pdf, $widths);
             $n = 0;
             foreach ($students as $stu) {
-                if ($pdf->GetY() + $rowH > 246) {
+                $rowH = self::rowHeight($pdf, (string) ($stu['student_fullname'] ?? ''), $widths[5]);
+                if ($pdf->GetY() + $rowH > 278) {
                     self::footer($pdf, $hostelName);
                     $pdf->AddPage();
                     self::roomHead($pdf, $hostelName, $code, count($students), true);
@@ -51,9 +51,6 @@ class RoomStudentListPdf
                 }
                 $n++;
                 self::studentRow($pdf, $stu, $n, $widths, $rowH, $thumbs);
-            }
-            if ($pdf->GetY() < 246) {
-                self::signatures($pdf);
             }
         }
 
@@ -109,10 +106,17 @@ class RoomStudentListPdf
         $labels = ['#', 'Photo', 'Bed', 'Reg. number', 'NIC', 'Name'];
         $align = ['C', 'C', 'L', 'L', 'L', 'L'];
         foreach ($widths as $i => $width) {
-            $pdf->Cell($width, 8, $labels[$i], 1, $i === count($widths) - 1 ? 1 : 0, $align[$i], true);
+            $pdf->Cell($width, 8, ($align[$i] === 'L' ? ' ' : '') . $labels[$i], 1, $i === count($widths) - 1 ? 1 : 0, $align[$i], true);
         }
         $pdf->SetTextColor(15, 23, 42);
         $pdf->SetFont('Helvetica', '', 9);
+    }
+
+    private static function rowHeight(FPDF $pdf, string $name, float $width): float
+    {
+        $pdf->SetFont('Helvetica', 'B', 10);
+        $lines = max(1, count(self::wrap($pdf, $name, $width - 3)));
+        return max(18, $lines * 5 + 6);
     }
 
     /**
@@ -131,31 +135,24 @@ class RoomStudentListPdf
         $pdf->Cell($widths[1], $rowH, '', 1, 0, 'C', $fill);
         $thumb = self::thumb((string) ($stu['photo_file'] ?? ''), $thumbs);
         if ($thumb !== null) {
-            $iw = 14;
-            $ih = 17;
+            $iw = 11;
+            $ih = 14;
             $pdf->Image($thumb, $x + $widths[0] + ($widths[1] - $iw) / 2, $y + ($rowH - $ih) / 2, $iw, $ih);
         }
+        $pdf->SetFont('Helvetica', '', 9);
         $pdf->Cell($widths[2], $rowH, self::fit($pdf, ' ' . (string) ($stu['bed_code'] ?? ''), $widths[2]), 1, 0, 'L', $fill);
         $pdf->Cell($widths[3], $rowH, self::fit($pdf, ' ' . (string) ($stu['student_id'] ?? ''), $widths[3]), 1, 0, 'L', $fill);
         $pdf->Cell($widths[4], $rowH, self::fit($pdf, ' ' . (string) ($stu['student_nic'] ?? ''), $widths[4]), 1, 0, 'L', $fill);
-        $pdf->Cell($widths[5], $rowH, self::fit($pdf, ' ' . (string) ($stu['student_fullname'] ?? ''), $widths[5]), 1, 1, 'L', $fill);
-    }
-
-    private static function signatures(FPDF $pdf): void
-    {
-        $pdf->SetY(250);
-        $pdf->SetTextColor(30, 41, 59);
-        $pdf->SetDrawColor(148, 163, 184);
-        $pdf->SetFont('Helvetica', '', 9);
-        $labels = ['Warden', 'SAO / Registrar', 'Date'];
-        foreach ($labels as $i => $label) {
-            $pdf->Cell(62, 6, $label, 0, $i === 2 ? 1 : 0, 'L');
+        $pdf->Cell($widths[5], $rowH, '', 1, 1, 'L', $fill);
+        $pdf->SetFont('Helvetica', 'B', 10);
+        $pdf->SetTextColor(15, 23, 42);
+        $nameLines = self::wrap($pdf, (string) ($stu['student_fullname'] ?? ''), $widths[5] - 3);
+        $blockH = count($nameLines) * 5;
+        $pdf->SetXY($x + $widths[0] + $widths[1] + $widths[2] + $widths[3] + $widths[4] + 1.5, $y + ($rowH - $blockH) / 2);
+        foreach ($nameLines as $line) {
+            $pdf->Cell($widths[5] - 3, 5, $line, 0, 2, 'L');
         }
-        $pdf->Ln(8);
-        foreach ($labels as $i => $label) {
-            $pdf->Cell(54, 6, '', 'B', 0);
-            $pdf->Cell(8, 6, '', 0, $i === 2 ? 1 : 0);
-        }
+        $pdf->SetXY($x, $y + $rowH);
     }
 
     private static function footer(FPDF $pdf, string $hostelName): void
@@ -235,6 +232,47 @@ class RoomStudentListPdf
                 @unlink($file);
             }
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function wrap(FPDF $pdf, string $text, float $width): array
+    {
+        $text = self::latin(trim($text));
+        if ($text === '' || $width < 4) {
+            return [''];
+        }
+        $words = preg_split('/\s+/', $text) ?: [];
+        $lines = [];
+        $current = '';
+        foreach ($words as $word) {
+            $try = $current === '' ? $word : $current . ' ' . $word;
+            if ($pdf->GetStringWidth($try) <= $width) {
+                $current = $try;
+                continue;
+            }
+            if ($current !== '') {
+                $lines[] = $current;
+                $current = '';
+            }
+            while ($word !== '' && $pdf->GetStringWidth($word) > $width) {
+                $cut = $word;
+                while ($cut !== '' && $pdf->GetStringWidth($cut) > $width) {
+                    $cut = substr($cut, 0, -1);
+                }
+                if ($cut === '') {
+                    break;
+                }
+                $lines[] = $cut;
+                $word = substr($word, strlen($cut));
+            }
+            $current = $word;
+        }
+        if ($current !== '') {
+            $lines[] = $current;
+        }
+        return $lines !== [] ? $lines : [''];
     }
 
     private static function fit(FPDF $pdf, string $text, float $width): string
