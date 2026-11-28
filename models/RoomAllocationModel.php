@@ -701,7 +701,7 @@ class RoomAllocationModel extends Model {
                   )
                   AND EXISTS (
                       SELECT 1 FROM `pays` p
-                      WHERE p.student_id COLLATE utf8mb4_unicode_ci = s.student_id COLLATE utf8mb4_unicode_ci
+                      WHERE BINARY p.student_id = BINARY s.student_id
                         AND LOWER(TRIM(p.payment_reason)) = 'hostel charges'
                         AND p.approved = 1
                   )";
@@ -719,6 +719,10 @@ class RoomAllocationModel extends Model {
         }
         $sql .= " ORDER BY s.student_fullname ASC, s.student_id ASC";
         $stmt = $this->db->prepare($sql);
+        if (!$stmt) {
+            error_log('listUnassignedStudents prepare: ' . ($this->db->getConnection()->error ?? 'prepare failed'));
+            return [];
+        }
         $stmt->bind_param($types, ...$params);
         $stmt->execute();
         $result = $stmt->get_result();
