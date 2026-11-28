@@ -336,8 +336,14 @@ class RoomAllocationModel extends Model {
             }
         }
         $bedNo = trim((string) ($row['bed_no'] ?? ''));
-        $row['bed_code'] = $bedNo === '' ? '' : (new RoomModel())->studentBedCode($row, $bedNo);
+        $row['bed_code'] = $bedNo === '' ? '' : $this->roomModel()->studentBedCode($row, $bedNo);
         return $row;
+    }
+
+    private function roomModel()
+    {
+        require_once BASE_PATH . '/models/RoomModel.php';
+        return new RoomModel();
     }
     
     /**
@@ -472,7 +478,7 @@ class RoomAllocationModel extends Model {
      * Check if room has available beds
      */
     public function hasAvailableBeds($roomId) {
-        $roomModel = new RoomModel();
+        $roomModel = $this->roomModel();
         $room = $roomModel->getById($roomId);
         
         if (!$room) {
@@ -573,7 +579,7 @@ class RoomAllocationModel extends Model {
         while ($row = $result->fetch_assoc()) {
             $byRoom[(string) $row['room_id']][] = $row;
         }
-        $roomModel = new RoomModel();
+        $roomModel = $this->roomModel();
         $update = $this->db->prepare("UPDATE `hostel_allocations` SET `bed_no` = ? WHERE `id` = ? AND (`bed_no` IS NULL OR `bed_no` = '')");
         foreach ($byRoom as $roomId => $rows) {
             $order = $roomModel->bunkPairOrder($capacity[$roomId] ?? 0);
@@ -619,7 +625,7 @@ class RoomAllocationModel extends Model {
         $capStmt->bind_param('s', $roomId);
         $capStmt->execute();
         $cap = $capStmt->get_result()->fetch_assoc();
-        $order = (new RoomModel())->bunkPairOrder((int) ($cap['capacity'] ?? 0));
+        $order = $this->roomModel()->bunkPairOrder((int) ($cap['capacity'] ?? 0));
         if (!$order) {
             return null;
         }
