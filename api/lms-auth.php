@@ -56,6 +56,7 @@ function slgti_lms_username(string $name, bool $extended): string
 
 $db = Database::getInstance();
 $sql = "SELECT u.`user_name`, u.`user_active`, u.`user_password_hash`,
+            s.`student_id`, s.`student_nic`, st.`staff_nic`,
             COALESCE(NULLIF(u.`user_email`, ''), NULLIF(s.`student_email`, ''), NULLIF(st.`staff_email`, '')) AS email
           FROM `user` u
           LEFT JOIN `student` s ON u.`user_table` = 'student'
@@ -103,21 +104,58 @@ if ($action === 'map') {
     exit;
 }
 
+function slgti_lms_keys(array $row, bool $extended): array
+{
+    $keys = [];
+    foreach (['user_name', 'student_id', 'student_nic', 'staff_nic'] as $field) {
+        $value = trim((string) ($row[$field] ?? ''));
+        if ($value === '') {
+            continue;
+        }
+        $key = slgti_lms_username($value, $extended);
+        if ($key !== '') {
+            $keys[$key] = true;
+        }
+    }
+    return array_keys($keys);
+}
+
 $wanted = slgti_lms_username((string) ($_POST['username'] ?? ''), $extended);
 $matches = [];
-foreach ($rows as $row) {
-    if (slgti_lms_username((string) $row['user_name'], $extended) === $wanted && $wanted !== '') {
-        $matches[] = $row;
+if ($wanted !== '') {
+    foreach ($rows as $row) {
+        if (in_array($wanted, slgti_lms_keys($row, $extended), true)) {
+            $matches[] = $row;
+        }
     }
 }
 if (count($matches) !== 1) {
-    echo '{"ok":true,"found":0}';
+    $withNic = 0;
+    foreach ($rows as $candidate) {
+        if (trim((string) ($candidate['student_nic'] ?? '')) !== '' || trim((string) ($candidate['staff_nic'] ?? '')) !== '') {
+            $withNic++;
+        }
+    }
+    echo json_encode([
+        'ok' => true,
+        'found' => 0,
+        'rev' => 2,
+        'matches' => count($matches),
+        'ulen' => strlen($wanted),
+        'rows' => count($rows),
+        'with_nic' => $withNic,
+    ]);
     exit;
 }
 $row = $matches[0];
-echo json_encode([
+$payload = [
     'ok' => true,
     'found' => 1,
+    'rev' => 2,
     'active' => (int) $row['user_active'] === 1 ? 1 : 0,
-    'hash' => (string) $row['user_password_hash'],
-]);
+    'username' => slgti_lms_username((string) $row['user_name'], $extended),
+];
+if ($action !== 'resolve') {
+    $payload['hash'] = (string) $row['user_password_hash'];
+}
+echo json_encode($payload);
